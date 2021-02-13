@@ -160,9 +160,9 @@ our coding conventions (below) and make sure all of your commits are atomic (one
 * The primary exceptions are
    * We (grudgingly) allow a maximum line length of 100 characters
    * All unqualified imports (``import foo``) are clustered alphabetically before qualified imports (``from foo import bar``).
-* We test code compliance with PEP8 with `flake8`
-  * Install flake8 with `pip install flake8`
-  * Run from project root with `flake8 [subdir path]`
+* We test code compliance with PEP8 with `pylint`
+  * Install pylint with `pip install pylint`
+  * Run from project root with `pylint [subdir path]`
   * Add pragma comments to disable warnings on a line-by-line basis, e.g.
   
       ```from foo import bar  # noqa: E401, F502```
