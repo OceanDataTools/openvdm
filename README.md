@@ -1,19 +1,19 @@
 # Open Vessel Data Management
 
-OpenVDMv2 is a ship-wide data management platform.  It is comprised of a suite of programs and an accompanying web-application that provides vessel operators with a unified at-sea solution for retrieving and organizing files from multiple data acquisition systems into a unified cruise data package.  Once the files are within the cruise data package they are immediately and safely accessible by crew and scientists.  In addition OpenVDM can perform regularly backups of the cruise data package to one or more backup storage location/devices such as NAS arrays, external hard drives and even to shore-based servers.
+OpenVDM is a ship-wide data management platform.  It is comprised of a suite of programs and an accompanying web-application that provides vessel operators with a unified at-sea solution for retrieving and organizing files from multiple data acquisition systems into a unified cruise data package.  Once the files are within the cruise data package they are immediately and safely accessible by crew and scientists.  In addition OpenVDM can perform regularly backups of the cruise data package to one or more backup storage location/devices such as NAS arrays, external hard drives and even to shore-based servers.
 
 ![Main Screen](/docs/OVDM_Config_Main.png)
 
-OpenVDMv2 includes a plugin architecture whereby vessel operators can develop and install their own data processing plugins used to web-based visualizations, perform data quality assurance (QA) tests and collecting data statistics at the file-level.  In practice the output data from plugins is ~5% the size of the raw data files, making the architecture ideal for projecting situatitional off-ship to institute or cloud-based servers over low-bandwidth connections.
+OpenVDM includes a plugin architecture whereby vessel operators can develop and install their own data processing plugins used to web-based visualizations, perform data quality assurance (QA) tests and collecting data statistics at the file-level.  In practice the output data from plugins is ~5% the size of the raw data files, making the architecture ideal for projecting situatitional off-ship to institute or cloud-based servers over low-bandwidth connections.
 
-OpenVDMv2 includes a hooks architure whereby vessel operators can link custom processes to run at key milestones during a cruise such as the start/end of a cruise, after a specific data transfer or after a data processing plugin completes.  The allow vessels operators to design and deploy potentially very sophisticated and asynchronous data processing workflows.
+OpenVDM includes a hooks architure whereby vessel operators can link custom processes to run at key milestones during a cruise such as the start/end of a cruise, after a specific data transfer or after a data processing plugin completes.  The allow vessels operators to design and deploy potentially very sophisticated and asynchronous data processing workflows.
 
-OpenVDMv2 includes full RESTful API, allowing vessel operators to build their own custom web-based and stand-alone applications that leverage information stored within OpenVDMv2 for their own, vessel-specific needs.
+OpenVDM includes full RESTful API, allowing vessel operators to build their own custom web-based and stand-alone applications that leverage information stored within OpenVDM for their own, vessel-specific needs.
 
 ![Data Dashboard](/docs/OVDM_DataDashboard_Main.png)
 
 #### Demo Site ####
-<http://openvdm.oceandatarat.org/OpenVDMv2/>
+<http://openvdm.oceandatarat.org>
 - Username: ***admin***
 - Password: ***demo***
 
@@ -40,7 +40,7 @@ For installation instruction please read the [INSTALL.md](INSTALL.md) file locat
 
 ## Supporting the development effort ##
 
-Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.com/messages/C3R1Z084Q) Slack channel!  You'll need an invite so please send a email request to oceandatarat at gmail dot com. Once in the channel please introduce yourself and let us know how you're using OpenVDM and how you'd like to contribute to the project.
+Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.com) Slack channel!  You'll need an invite so please send a email request to oceandatarat at gmail dot com. Once in the channel please introduce yourself and let us know how you're using OpenVDM and how you'd like to contribute to the project.
 
 ## Vessel's Currently using OpenVDMv2 ##
 - *[R/V Endeavor](https://techserv.gso.uri.edu/)* (URI Graduate School of Oceanography)
