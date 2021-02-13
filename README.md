@@ -42,7 +42,7 @@ For installation instruction please read the [INSTALL.md](INSTALL.md) file locat
 
 Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.com) Slack channel!  You'll need an invite so please send a email request to oceandatarat at gmail dot com. Once in the channel please introduce yourself and let us know how you're using OpenVDM and how you'd like to contribute to the project.
 
-## Vessel's Currently using OpenVDMv2 ##
+## Vessel's Currently using OpenVDM ##
 - *[R/V Endeavor](https://techserv.gso.uri.edu/)* (URI Graduate School of Oceanography)
 - *[R/V Falkor](https://schmidtocean.org/rv-falkor/)* (Schmidt Ocean Institute)
 - *[R/V Annie](http://engineeringfordiscovery.org/technology/rv-annie/)* (Global Foundation for Ocean Exploration)

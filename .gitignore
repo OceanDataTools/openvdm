@@ -127,3 +127,19 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# OpenVDM specific
+**/.DS_Store
+database/openvdm_db_custom.sql
+bin/*.py
+server/plugins/*.py
+server/plugins/parsers/*.py
+server/etc/openvdm.yaml
+www/app/Core/Config.php
+www/app/templates/default/js/dataDashboardMainCustom.js
+www/bower_components
+www/etc/datadashboard.yaml
+www/vendor
+www/.htaccess
+www/composer.lock
+
