@@ -535,33 +535,9 @@ function configure_apache {
     # after it has been globally disabled with "a2disconf".
     #Include conf-available/serve-cgi-bin.conf
 
-    # Alias /OpenVDMv2 /var/www/OpenVDMv2
-    # <Directory "/var/www/OpenVDMv2">
-    #   AllowOverride all
-    # </Directory>
-
-    <IfModule mod_rewrite.c>
-      # RewriteEngine on
-      # RewriteRule ^/$ /OpenVDMv2/ [R]
-
-      RewriteEngine On
-      # RewriteBase /OpenVDMv2/
-
-      # Force to exclude the trailing slash
-      RewriteCond %{REQUEST_FILENAME} !-d
-      RewriteCond %{REQUEST_URI} (.*)/$
-      RewriteRule ^(.+)/$ $1 [R=307,L]
-
-      # Restrict php files direct access
-      RewriteCond %{THE_REQUEST} ^.+?\ [^?]+\.php[?\ ]
-      RewriteRule \.php$ - [F]
-
-      # Allow any files or directories that exist to be displayed directly
-      RewriteCond %{REQUEST_FILENAME} !-f
-      RewriteCond %{REQUEST_FILENAME} !-d
-
-      RewriteRule ^(.*)$ index.php?$1 [QSA,L]
-    </IfModule>
+    <Directory "/var/www/openvdm">
+      AllowOverride all
+    </Directory>
 
     WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
 
@@ -907,19 +883,17 @@ EOF
     composer -q install
 
 
-    # if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
-    #     cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
-    # fi
+    if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
+        cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
+    fi
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml.dist ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml
     fi
 
-    if [ ! -e ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php ] ; then
-        sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
-        sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" \
-        > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
-    fi    
+    sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
+    sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" \
+    > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
         rm ${INSTALL_ROOT}/openvdm/www/errorlog.html
@@ -930,7 +904,10 @@ EOF
     chown -R root:root ${INSTALL_ROOT}/openvdm/www
 
     echo "Installing web-app"
-    ln -s ${INSTALL_ROOT}/openvdm/www /var/www/openvdm
+
+    if [ ! -e /var/www/openvdm ]; then
+        ln -s ${INSTALL_ROOT}/openvdm/www /var/www/openvdm
+    fi
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
