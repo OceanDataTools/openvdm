@@ -890,7 +890,7 @@ EOF
         sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/survey/${OPENVDM_USER}/" | \
         sed -e "s/127\.0\.0\.1/${HOSTNAME}/" \
-        > ${INSTALL_ROOT}/openvdm/database/OpenVDM_db_custom.sql
+        > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
 create database if not exists openvdm character set utf8;
