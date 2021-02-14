@@ -73,7 +73,7 @@ function set_default_variables {
     DEFAULT_DATA_ROOT=/vault
 
     DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
-    DEFAULT_OPENVDM_BRANCH=v2.x
+    DEFAULT_OPENVDM_BRANCH=master
 
     DEFAULT_OPENVDM_USER=survey
 
@@ -887,7 +887,7 @@ EOF
 
     else
         echo "Setup OpenVDM database"
-        sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/OpenVDM_db.sql | \
+        sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/survey/${OPENVDM_USER}/" | \
         sed -e "s/127\.0\.0\.1/${HOSTNAME}/" \
         > ${INSTALL_ROOT}/openvdm/database/OpenVDM_db_custom.sql
