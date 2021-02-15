@@ -15,7 +15,7 @@ OpenVDM includes full RESTful API, allowing vessel operators to build their own 
 ![Data Dashboard](/docs/OVDM_DataDashboard_Main.png)
 
 #### Demo Site ####
-<http://openvdm.oceandatatools.org>
+<http://openvdm.oceandatarat.org>
 - Username: ***admin***
 - Password: ***demo***
 
