@@ -360,7 +360,10 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
 
         except IOError:
-            logging.error("Error Reading Dashboard Manifest file %s", gearman_worker.data_dashboard_manifest_file_path)
+            logging.warning("Error Reading Dashboard Manifest file %s", gearman_worker.data_dashboard_manifest_file_path)
+            pass
+        except Exception as err:
+            logging.error(str(err))
             job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": "Error reading dashboard manifest file: " + gearman_worker.data_dashboard_manifest_file_path})
             return json.dumps(job_results)
 

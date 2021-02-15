@@ -38,10 +38,10 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.gga_parser   import GGAParser
+from server.plugins.parsers.met_parser   import MetParser
+from server.plugins.parsers.svp_parser   import SVPParser
 from server.plugins.parsers.tsg_parser   import TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
-from server.plugins.parsers.svp_parser   import SVPParser
-from server.plugins.parsers.met_parser   import MetParser
 
 # -------------------------------------------------------------------------------------
 # This array defines the various dataTypes collected by SCS and the cooresponding file
