@@ -92,9 +92,9 @@ class O2Parser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        abs_value = float(line['abs_value'])
-                        temp = float(line['temp'])
-                        airsat = float(line['airsat'])
+                        abs_value = float(line['abs_value']) if line['abs_value'] != '' else None
+                        temp = float(line['temp']) if line['temp'] != '' else None
+                        airsat = float(line['airsat']) if line['airsat'] != '' else None
 
                     except Exception as err:
                         errors.append(lineno)
@@ -123,6 +123,9 @@ class O2Parser(OpenVDMCSVParser):
         # Build DataFrame
         logging.debug("Building dataframe from parsed data...")
         df_proc = pd.DataFrame(raw_into_df)
+
+        # Remove row where data is completely missing
+        df_proc.dropna(inplace=True, thresh=3)
 
         # Convert Date/time column to datetime objects
         logging.debug("Converting data_time to datetime datatype...")

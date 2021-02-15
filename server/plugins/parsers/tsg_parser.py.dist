@@ -45,7 +45,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-RAW_COLS = ['date_time','data'] # OpenRVDAS style
+RAW_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity','water_temp_ext'] # OpenRVDAS style
 # RAW_COLS = ['date','time','water_temp_int','conductivity','salinity','sound_velocity','water_temp_ext'] # SCS style
 PROC_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity','water_temp_ext']
 
