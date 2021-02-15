@@ -3,8 +3,8 @@ Options -Indexes
 <IfModule mod_rewrite.c>
 
         RewriteEngine On
-        RewriteBase /OpenVDMv2/
-
+        RewriteBase /
+        
         # Force to exclude the trailing slash
         RewriteCond %{REQUEST_FILENAME} !-d
         RewriteCond %{REQUEST_URI} (.*)/$

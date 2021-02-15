@@ -2,9 +2,11 @@
 
 OpenVDM is a ship-wide data management platform.  It is comprised of a suite of programs and an accompanying web-application that provides vessel operators with a unified at-sea solution for retrieving and organizing files from multiple data acquisition systems into a unified cruise data package.  Once the files are within the cruise data package they are immediately and safely accessible by crew and scientists.  In addition OpenVDM can perform regularly backups of the cruise data package to one or more backup storage location/devices such as NAS arrays, external hard drives and even to shore-based servers.
 
-![Main Screen](/docs/OVDM_Config_Main.png)
+![Home](/docs/OVDM_Home.png)
 
 OpenVDM includes a plugin architecture whereby vessel operators can develop and install their own data processing plugins used to web-based visualizations, perform data quality assurance (QA) tests and collecting data statistics at the file-level.  In practice the output data from plugins is ~5% the size of the raw data files, making the architecture ideal for projecting situatitional off-ship to institute or cloud-based servers over low-bandwidth connections.
+
+![Configuration](/docs/OVDM_Config_Main.png)
 
 OpenVDM includes a hooks architure whereby vessel operators can link custom processes to run at key milestones during a cruise such as the start/end of a cruise, after a specific data transfer or after a data processing plugin completes.  The allow vessels operators to design and deploy potentially very sophisticated and asynchronous data processing workflows.
 
@@ -13,7 +15,7 @@ OpenVDM includes full RESTful API, allowing vessel operators to build their own 
 ![Data Dashboard](/docs/OVDM_DataDashboard_Main.png)
 
 #### Demo Site ####
-<http://openvdm.oceandatarat.org>
+<http://openvdm.oceandatatools.org>
 - Username: ***admin***
 - Password: ***demo***
 
@@ -50,10 +52,15 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 - *[R/V Helmer Hanssen](https://en.uit.no/om/enhet/artikkel?p_document_id=151541&p_dimension_id=88172&men=42374)* (UiT The Arctic University of Norway)
 - *[R/V OceanXplorer1](http://www.oceanx.org/oceanxplorer/)* (OceanX)
 
+## Vehicle's Currently using OpenVDM ##
+- *[ROV Subastian](https://schmidtocean.org/technology/robotic-platforms/4500-m-remotely-operated-vehicle-rov/)* (Schmidt Ocean Institute)
+- *[ROV Yogi](https://www.engineeringfordiscovery.org/technology/rov-yogi/)* (Global Foundation for Ocean Exploration)
+- *[ROV Chimaera, HOV Nadir, HOV Neptune](https://oceanx.org/oceanxplorer/deep-sea-vehicles)* (OceanX)
+
 ## Thanks and acknowledgments ##
 
-OpenVDM has been made possible largely by the generosity of the Schmidt Ocean Institute (SOI) who have continuously donated to the project since 2012.  OpenVDM currently is the primary data management solution for SOI's *R/V Falkor* and the ROV *Subastian*  In addition to financial support the marine technician aboard *R/V Falkor* continue to prove themselves invaluable to the development process by identifying on OpenVDM's deficiencies and providing ways to improve OpenVDM's functionality.
+OpenVDM is made possible largely by the generosity of the Schmidt Ocean Institute (SOI) who have continuously supported the project's development since 2012.
 
-Thanks also to the University of Rhode Island and OceanX for their financial contributions to the project as well as the technicians aboard the *R/V Falkor*, *R/V Endeavor*, *R/V Atlantic Explorer* and *R/V OceanXplorer1* for their patience during the early days of development and their continued support and enthusiasm for this project.
+Thanks also to the marine technicians from the *R/V Falkor*, *R/V Endeavor*, *R/V Atlantic Explorer* and *R/V OceanXplorer1* for their patience during the early days of development and their continued support and enthusiasm for this project.
 
-Lastly thanks the UNOLS community who have helped the project since the beginning by sharing their wealth of experience and technical ability.
+Lastly thanks the UNOLS community who have helped the project since the beginning by sharing their wealth of experience and technical ability in person and through the RVTEC listserv.
