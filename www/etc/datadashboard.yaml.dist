@@ -138,6 +138,12 @@
     dataArray:
     - dataType: rov-ctd
       visType: json
+  - plotType: chart
+    id: rov-o2
+    heading: ROV O2
+    dataArray:
+    - dataType: rov-o2
+      visType: json
 
 - title: Position
   page: position
@@ -158,29 +164,6 @@
       visType: geoJSON
     - dataType: geotiff
       visType: tms
-  - plotType: chart
-    id: vtg
-    heading: SOG/COG
-    dataArray:
-    - dataType: vtg
-      visType: json
-
-#- title: Interactive
-#  page: lowering
-#  view: lowering
-#  cssArray:
-#  - leaflet
-#  jsArray:
-#  - highcharts
-#  - leaflet
-#  - lowering
-#  placeholderArray:
-#  - plotType: map
-#    id: map
-#    heading: Position
-#    dataArray:
-#    - dataType: rov-pauv
-#      visType: geoJSON
 
 - title: Weather
   page: weather
@@ -203,8 +186,8 @@
     - dataType: twind
       visType: json
 
-- title: Sound Velocity
-  page: soundVelocity
+- title: Seawater
+  page: seawater
   view: default
   jsArray:
   - dataDashboardDefault
