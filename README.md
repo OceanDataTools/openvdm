@@ -44,7 +44,7 @@ For installation instruction please read the [INSTALL.md](INSTALL.md) file locat
 
 Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.com) Slack channel!  You'll need an invite so please send a email request to oceandatarat at gmail dot com. Once in the channel please introduce yourself and let us know how you're using OpenVDM and how you'd like to contribute to the project.
 
-## Vessel's Currently using OpenVDM ##
+## Vessels Currently using OpenVDM ##
 - *[R/V Endeavor](https://techserv.gso.uri.edu/)* (URI Graduate School of Oceanography)
 - *[R/V Falkor](https://schmidtocean.org/rv-falkor/)* (Schmidt Ocean Institute)
 - *[R/V Annie](http://engineeringfordiscovery.org/technology/rv-annie/)* (Global Foundation for Ocean Exploration)
@@ -52,7 +52,7 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 - *[R/V Helmer Hanssen](https://en.uit.no/om/enhet/artikkel?p_document_id=151541&p_dimension_id=88172&men=42374)* (UiT The Arctic University of Norway)
 - *[R/V OceanXplorer1](http://www.oceanx.org/oceanxplorer/)* (OceanX)
 
-## Vehicle's Currently using OpenVDM ##
+## Vehicles Currently using OpenVDM ##
 - *[ROV Subastian](https://schmidtocean.org/technology/robotic-platforms/4500-m-remotely-operated-vehicle-rov/)* (Schmidt Ocean Institute)
 - *[ROV Yogi](https://www.engineeringfordiscovery.org/technology/rov-yogi/)* (Global Foundation for Ocean Exploration)
 - *[ROV Chimaera, HOV Nadir, HOV Neptune](https://oceanx.org/oceanxplorer/deep-sea-vehicles)* (OceanX)
