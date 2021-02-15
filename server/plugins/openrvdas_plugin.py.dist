@@ -38,7 +38,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.gga_parser   import GGAParser
-from server.plugins.parsers.vtg_parser   import VTGParser
 from server.plugins.parsers.tsg_parser   import TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
 from server.plugins.parsers.svp_parser   import SVPParser
@@ -49,12 +48,11 @@ from server.plugins.parsers.met_parser   import MetParser
 # regex expression.
 # -------------------------------------------------------------------------------------
 fileTypeFilters = [
-    {"data_type":"gga",       "regex": "*/NAV/POSMV-GGA_*.Raw",                "parser": "GGA",    'parser_options':{}},
-    {"data_type":"vtg",       "regex": "*/NAV/POSMV-VTG_*.Raw",                "parser": "VTG",    'parser_options':{}},
-    {"data_type":"tsg",       "regex": "*/METOC/TSG-RAW_*.Raw",                "parser": "TSG",    'parser_options':{}},
-    {"data_type":"twind",     "regex": "*/METOC/TrueWind-RAW_*.Raw",           "parser": "TWind",  'parser_options':{}},
-    {"data_type":"svp",       "regex": "*/METOC/Sound-Velocity-Probe_*.Raw",   "parser": "SVP",    'parser_options':{}},
-    {"data_type":"met",       "regex": "*/METOC/MET-M01_*.Raw",                "parser": "Met",    'parser_options':{}},
+    {"data_type":"gga",   "regex": "*/raw/POSMV_GGA-*.txt",  "parser": "GGA",    'parser_options':{}},
+    {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
+    {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
+    {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{}},
+    {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}}
 ]
 
 # -------------------------------------------------------------------------------------
@@ -63,7 +61,7 @@ fileTypeFilters = [
 # -------------------------------------------------------------------------------------
 
 
-class SCSPlugin(OpenVDMPlugin):
+class OpeRVDASPlugin(OpenVDMPlugin):
     """
     OpenVDM plugin for the SCS Underway data acquisition system
     """
@@ -86,9 +84,6 @@ class SCSPlugin(OpenVDMPlugin):
 
         if file_type_filter['parser'] == "GGA":
             return GGAParser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "VTG":
-            return VTGParser(**file_type_filter['parser_options'])
 
         if file_type_filter['parser'] == "TSG":
             return TSGParser(**file_type_filter['parser_options'])
@@ -138,7 +133,7 @@ if __name__ == "__main__":
         logging.warning("File is empty")
         sys.exit(0)
 
-    plugin = SCSPlugin()
+    plugin = OpeRVDASPlugin()
 
     if parsed_args.dataType:
         dataType = plugin.get_data_type(parsed_args.dataFile)
