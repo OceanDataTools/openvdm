@@ -59,8 +59,6 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 
 ## Thanks and acknowledgments ##
 
-OpenVDM is made possible largely by the generosity of the Schmidt Ocean Institute (SOI) who have continuously supported the project's development since 2012.
+OpenVDM is possible thanks to the generosity of the Schmidt Ocean Institute (SOI) who have continuously supported the project's development since 2012.
 
 Thanks also to the marine technicians from the *R/V Falkor*, *R/V Endeavor*, *R/V Atlantic Explorer* and *R/V OceanXplorer1* for their patience during the early days of development and their continued support and enthusiasm for this project.
-
-Lastly thanks the UNOLS community who have helped the project since the beginning by sharing their wealth of experience and technical ability in person and through the RVTEC listserv.
