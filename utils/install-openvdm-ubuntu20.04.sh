@@ -166,8 +166,8 @@ function install_packages {
     apt-get update
 
     apt install -y openssh-server sshpass rsync curl git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev nodejs libnode-dev \
-        node-gyp npm python3 python3-dev python3-pip python3-venv libgdal-dev \
+        cifs-utils gearman-job-server libgearman-dev nodejs \
+        python3 python3-dev python3-pip python3-venv libgdal-dev \
         gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
         ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
         php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
