@@ -36,6 +36,9 @@ If the technician has setup backup locations for the data, OpenVDM use that info
 ### Want to get data to folks back on the beach??? (Read: TELEPRESENCE!!) ###
 OpenVDM includes provisions for sending user-defined subsets of the cruise data directory to a shore-based server.  These ship-to-shore transfers include a priority ranking that help ensure mission-critical data/information are pushed to shore in a timely manner and not "stuck" behind lower-priorty files.  Defining new dataset to send to shore is as simple as filling out a form within the OpenVDM web-interface and clicking the "On" button.
 
+### Video Tutorials
+A [7-part video series](https://www.youtube.com/playlist?list=PLZ52f9gdXYYuQ1RrSshutxcGWkoDTdwt9) explaining the operation of OpenVDM is availble on YouTube
+
 ## Installation ##
 
 For installation instruction please read the [INSTALL.md](INSTALL.md) file located in this repository.
