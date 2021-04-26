@@ -47,16 +47,16 @@ You will need to answer some questions about your configuration.
 ### All done... almost ###
 At this point the warehouse should have a working installation of OpenVDM however the vessel operator will still need to configure data dashboard collection system transfers, cruise data transfers and the shoreside data warehouse.
 
-To access the OpenVDM web-application goto: <http://<hostname>>
+To access the OpenVDM web-application goto: `<http://<hostname>>`
 The default username/passwd is admin/demo
 
 #### Reset the default password
- #Goto <http://<hostname>> and login (user icon, upper-right)
+ #Goto `<http://<hostname>>` and login (user icon, upper-right)
  #Click the user icon again and select "User Settings"
  #Set the desired password and optional change the admin username.
 
 ### An error has been reported ###
-If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: <http://<hostname>/errorlog.html>.  That should hopefully provide you with enough information as to what's gone wrong.  
+If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.  
 
 
 
