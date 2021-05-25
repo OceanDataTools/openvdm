@@ -11,7 +11,7 @@ DESCRIPTION:  Gearman worker that handles testing collection system transfer
    AUTHOR:  Webb Pinner
   VERSION:  2.6
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2021-05-25
 """
 
 import argparse

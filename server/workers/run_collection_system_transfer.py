@@ -12,7 +12,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
   COMPANY:  Capable Solutions
   VERSION:  2.6
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2021-05-25
 """
 
 import argparse
