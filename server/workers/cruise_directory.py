@@ -11,7 +11,7 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
    AUTHOR:  Webb Pinner
   VERSION:  2.6
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2021-05-25
 """
 
 import argparse
@@ -330,14 +330,14 @@ def task_set_cruise_data_directory_permissions(gearman_worker, gearman_job):
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
     if gearman_worker.ovdm.show_only_current_cruise_dir():
-        logging.info("Clear read permissions")
+        logging.info("Clear read permissions for all directories within CruiseData")
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 8, 10)
 
     if os.path.isdir(gearman_worker.cruise_dir):
-        logging.info("Clear read permissions")
+        logging.info("Set ownership and read/write permissions for current cruise directory within CruiseData")
         set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Set Directory Permissions for current cruise", "result": "Pass"})
 
