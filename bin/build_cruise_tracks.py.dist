@@ -31,8 +31,8 @@ DESCRIPTION:
             /<cruiseID>/OpenRVDAS/NAV/CNAV-GGA_*.Raw
             /<cruiseID>/OpenRVDAS/NAV/POSMV-GGA_*.Raw
         DataDashboard Files:
-            /<cruiseID>/OpenVDM/DashboardData/OpenRVDAS/NAV/CNAV-GGA_*.json
-            /<cruiseID>/OpenVDM/DashboardData/OpenRVDAS/NAV/POSMV-GGA_*.json
+            /<cruiseID>/OpenVDM/Dashboard_Data/OpenRVDAS/NAV/CNAV-GGA_*.json
+            /<cruiseID>/OpenVDM/Dashboard_Data/OpenRVDAS/NAV/POSMV-GGA_*.json
         Trackline Files:
             /<cruiseID>/OpenVDM/Tracklines/<cruiseID>_CNAV_Trackline.json
             /<cruiseID>/OpenVDM/Tracklines/<cruiseID>_CNAV_Trackline.kml
