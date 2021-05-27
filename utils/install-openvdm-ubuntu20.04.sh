@@ -777,7 +777,7 @@ function configure_directories {
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
-        "Creating logfile directory"
+        echo "Creating logfile directory"
         mkdir -p /var/log/openvdm
     fi
 
