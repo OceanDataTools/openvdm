@@ -116,7 +116,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
                 return_files['include'].append(filepath)
                 return_files['filesize'].append(os.stat(filepath).st_size)
 
-            elif not exclude:
+            elif not ignore and not exclude:
                 logging.debug("%s excluded because file does not match any of the filters", filepath)
                 return_files['exclude'].append(filepath)
 
@@ -145,13 +145,13 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
-    threshold_time = time.time() - staleness # 5 minutes
+    # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
+    # threshold_time = time.time() - staleness # 5 minutes
     epoch = datetime.datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M"))
 
-    logging.debug("Threshold: %s", threshold_time)
+    # logging.debug("Threshold: %s", threshold_time)
     logging.debug("    Start: %s", data_start_time)
     logging.debug("      End: %s", data_end_time)
 
@@ -220,17 +220,20 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
                     file_mod_time = datetime.datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
                     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
                     logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds > data_start_time and file_mod_time_seconds < threshold_time and file_mod_time_seconds < data_end_time:  # pylint: disable=chained-comparison
-                        logging.debug("%s is a valid file for transfer", filepath)
-                        include = True
-                    else:
+                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
                         logging.debug("%s ignored for time reasons", filepath)
+                        ignore = True
+                        break
+
+                    logging.debug("%s is a valid file for transfer", filepath)
+                    include = True
+                    break
 
             if include:
                 return_files['include'].append(filepath)
                 return_files['filesize'].append(size)
 
-            elif not exclude:
+            elif not ignore and not exclude:
                 logging.debug("%s excluded because file does not match any include or ignore filters", filepath)
                 return_files['exclude'].append(filepath)
 
@@ -274,13 +277,13 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
-    threshold_time = time.time() - staleness # 5 minutes
+    # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
+    # threshold_time = time.time() - staleness # 5 minutes
     epoch = datetime.datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M"))
 
-    logging.debug("Threshold: %s", threshold_time)
+    # logging.debug("Threshold: %s", threshold_time)
     logging.debug("    Start: %s", data_start_time)
     logging.debug("      End: %s", data_end_time)
 
@@ -329,17 +332,20 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
                     file_mod_time = datetime.datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
                     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
                     logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds > data_start_time and file_mod_time_seconds < threshold_time and file_mod_time_seconds < data_end_time: # pylint: disable=chained-comparison
-                        logging.debug("%s is a valid file for transfer", filepath)
-                        include = True
-                    else:
+                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
                         logging.debug("%s ignored for time reasons", filepath)
+                        ignore = True
+                        break
+
+                    logging.debug("%s is a valid file for transfer", filepath)
+                    include = True
+                    break
 
             if include:
                 return_files['include'].append(filepath)
                 return_files['filesize'].append(size)
 
-            elif not exclude:
+            elif not ignore and not exclude:
                 logging.debug("%s excluded because file does not match any include or ignore filters", filepath)
                 return_files['exclude'].append(filepath)
 
@@ -848,6 +854,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         logging.debug("current_job: %s", current_job)
 
         payload_obj = json.loads(current_job.data)
+        logging.debug("payload: %s" % current_job.data)
 
         try:
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransfer']['collectionSystemTransferID'])
@@ -891,12 +898,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         else:
             if self.collection_system_transfer['cruiseOrLowering'] == "0":
                 logging.debug("Using cruise Time bounds")
-                self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
-                self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
+                self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
+                self.data_end_date = self.ovdm.get_cruise_end_date() or "9999/12/31 23:59"
+                # self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
+                # self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
             else:
                 logging.debug("Using lowering Time bounds")
-                self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
-                self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
+                self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
+                self.data_end_date = self.ovdm.get_lowering_end_date() or "9999/12/31 23:59"
+                # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
+                # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
+
+            if self.collection_system_transfer['staleness'] == "1":
+                self.data_end_date = datetime.utcnow() - timedelta(minutes=5)
 
         logging.debug("Start date/time filter: %s", self.data_start_date)
         logging.debug("End date/time filter: %s", self.data_end_date)

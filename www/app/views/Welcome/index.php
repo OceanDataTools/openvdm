@@ -74,7 +74,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     if($data['shipboardTransfers']) {
         $itemNum = 0;
     
-        for($i = 0; $i < count($data['shipboardTransfers']); $i++ ) {
+	for($i = 0; $i < count($data['shipboardTransfers']); $i++ ) {
 ?>
                     <h5><?php echo $data['shipboardTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipboardTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
                     <ul>

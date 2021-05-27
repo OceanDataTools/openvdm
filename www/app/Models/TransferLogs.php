@@ -33,8 +33,9 @@ class TransferLogs extends Model {
         
         for($i = sizeof($files)-1; $i >= 0; $i--) {
             if (file_exists($files[$i]) && is_readable($files[$i])) {
-                $transferLogSummary = json_decode(file_get_contents($files[$i]));
-                $filename = explode(".", basename($files[$i]))[0];
+		$transferLogSummary = json_decode(file_get_contents($files[$i]));
+		$filename = basename($files[$i],'.log');
+                //$filename = explode(".", basename($files[$i]))[0];
                 $filenameArray = explode("_", $filename);
 		$date = array_pop($filenameArray);
 		$collectionSystem = join("_", $filenameArray);
@@ -98,7 +99,7 @@ class TransferLogs extends Model {
         array_multisort(array_map('filemtime', $files = $fileList), SORT_ASC, $files);
         if (is_array($files) && sizeof($files) > $count) {
             array_splice($files, 0, sizeof($files)-$count);
-        }
+	}
         return $this->outputLogFileSummary($files);
     }
     
