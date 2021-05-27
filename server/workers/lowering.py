@@ -90,7 +90,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = self.ovdm.get_lowering_id()
         self.lowering_start_date = self.ovdm.get_lowering_start_date()
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
+        self.lowering_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
