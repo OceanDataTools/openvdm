@@ -21,6 +21,10 @@ Download the install script
 cd ~
 curl https://raw.githubusercontent.com/oceandatatools/openvdm/master/utils/install-openvdm-ubuntu20.04.sh > ~/install-openvdm-ubuntu20.04.sh
 ```
+If you see an error it could be because curl is not yet installed. Run the following command and try to download the install script again.
+```
+apt install -y curl
+```
 
 Run the install script
 ```
