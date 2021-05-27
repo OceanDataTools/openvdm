@@ -169,7 +169,7 @@ function install_packages {
         cifs-utils gearman-job-server libgearman-dev nodejs \
         python3 python3-dev python3-pip python3-venv libgdal-dev \
         gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
-        ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
+        npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
         php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
         php7.3-yaml proj-bin python3-pyproj
 
