@@ -156,7 +156,7 @@ def build_exclude_filterlist(gearman_worker):
         if excluded_extra_directory_id == '0':
             continue
 
-        extra_directory = gearman_worker.ovdm.getExtraDirectory(excluded_extra_directory_id)
+        extra_directory = gearman_worker.ovdm.get_extra_directory(excluded_extra_directory_id)
         exclude_filterlist.append("*{}*".format(extra_directory['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)))
 
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
