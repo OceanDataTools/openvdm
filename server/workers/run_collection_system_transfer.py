@@ -17,7 +17,6 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
 
 import argparse
 import calendar
-import datetime
 import fnmatch
 import json
 import logging
@@ -28,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime, timedelta
 from os.path import dirname, realpath
 from random import randint
 import python3_gearman
@@ -147,7 +147,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
 
     # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
     # threshold_time = time.time() - staleness # 5 minutes
-    epoch = datetime.datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
+    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M"))
 
@@ -217,7 +217,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
                     if exclude:
                         break
 
-                    file_mod_time = datetime.datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
                     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
                     logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
                     if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
@@ -279,7 +279,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
     # threshold_time = time.time() - staleness # 5 minutes
-    epoch = datetime.datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
+    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M"))
 
@@ -329,7 +329,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
                     if exclude:
                         break
 
-                    file_mod_time = datetime.datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
                     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
                     logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
                     if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
@@ -854,7 +854,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         logging.debug("current_job: %s", current_job)
 
         payload_obj = json.loads(current_job.data)
-        logging.debug("payload: %s" % current_job.data)
+        logging.debug("payload: %s", current_job.data)
 
         try:
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransfer']['collectionSystemTransferID'])
