@@ -766,9 +766,18 @@ function configure_directories {
     fi
 
     if [ ! -d $DATA_ROOT/FTPROOT ]; then
-        echo "Creating data directory structure starting at: $DATA_ROOT"
+        echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering
+        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData
+        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/TransferLogs
+
+        echo "[]" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/ovdmConfig.json
+        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
+        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.md5
+        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.txt
+
         mkdir -p ${DATA_ROOT}/FTPRoot/PublicData
         mkdir -p ${DATA_ROOT}/FTPRoot/VisitorInformation
 
