@@ -60,6 +60,9 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 - *[ROV Yogi](https://www.engineeringfordiscovery.org/technology/rov-yogi/)* (Global Foundation for Ocean Exploration)
 - *[ROV Chimaera, HOV Nadir, HOV Neptune](https://oceanx.org/oceanxplorer/deep-sea-vehicles)* (OceanX)
 
+## Autonomous Vessels Currently using OpenVDM ##
+- *[S/V Surveyor](https://www.saildrone.com/news/saildrone-launches-72-foot-surveyor-ocean-mapping)* (SailDrone)
+
 ## Thanks and acknowledgments ##
 
 OpenVDM is possible thanks to the generosity of the Schmidt Ocean Institute (SOI) who have continuously supported the project's development since 2012.
