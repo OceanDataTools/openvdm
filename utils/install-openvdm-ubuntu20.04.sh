@@ -74,6 +74,7 @@ function set_default_variables {
 
     DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
     DEFAULT_OPENVDM_BRANCH=master
+    DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
 
@@ -104,6 +105,7 @@ DEFAULT_DATA_ROOT=$DATA_ROOT
 
 DEFAULT_OPENVDM_REPO=$OPENVDM_REPO
 DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
+DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
 
@@ -873,7 +875,7 @@ EOF
         echo "Setup OpenVDM database"
         sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/survey/${OPENVDM_USER}/" | \
-        sed -e "s/127\.0\.0\.1/${HOSTNAME}/" \
+        sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
@@ -965,9 +967,13 @@ OPENVDM_REPO=${OPENVDM_REPO:-$DEFAULT_OPENVDM_REPO}
 read -p "Repository branch to install? ($DEFAULT_OPENVDM_BRANCH) " OPENVDM_BRANCH
 OPENVDM_BRANCH=${OPENVDM_BRANCH:-$DEFAULT_OPENVDM_BRANCH}
 
+read -p "IP Address or URL users will access OpenVDM from? ($DEFAULT_OPENVDM_SITEROOT) " OPENVDM_SITEROOT
+OPENVDM_SITEROOT=${OPENVDM_SITEROOT:-$DEFAULT_OPENVDM_SITEROOT}
+
 echo "Will install from github.com"
 echo "Repository: '$OPENVDM_REPO'"
 echo "Branch: '$OPENVDM_BRANCH'"
+echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
 # Create user if they don't exist yet
