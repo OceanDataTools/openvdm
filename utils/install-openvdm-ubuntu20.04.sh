@@ -861,8 +861,7 @@ function install_openvdm {
 
     cd ${INSTALL_ROOT}/openvdm
 
-    DB_EXISTS=`mysqlshow --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} openvdm| grep -v Wildcard`
-    if [ $? == 0 ]; then
+    if mysql --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} -e 'use openvdm'; then
         echo "openvdm database found, skipping database setup"
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
 GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
@@ -1035,7 +1034,7 @@ save_default_variables
 
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
-install_packages
+#install_packages
 
 echo "#####################################################################"
 echo "Setting system timezone to UTC"

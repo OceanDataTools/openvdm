@@ -45,22 +45,24 @@ class DashboardData extends Model {
                         $ovdmConfigContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . self::CONFIG_FN);
                         $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                         //Get the the directory that holds the DashboardData
-                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
-                            if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
-                                $dataDashboardList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
-                                foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
-                                    //If a manifest file is found, add CruiseID to output
-                                    if (in_array($dataDashboardValue,array(self::MANIFEST_FN))){
-                                        $manifestContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir'] . DIRECTORY_SEPARATOR . self::MANIFEST_FN);
-					$this->_manifestObj = json_decode($manifestContents,true);
-                                        break;
+                        if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){	    
+                           for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+                                if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
+                                    $dataDashboardList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
+                                    foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
+                                        //If a manifest file is found, add CruiseID to output
+                                        if (in_array($dataDashboardValue,array(self::MANIFEST_FN))){
+                                            $manifestContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir'] . DIRECTORY_SEPARATOR . self::MANIFEST_FN);
+					    $this->_manifestObj = json_decode($manifestContents,true);
+                                            break;
+                                        }
                                     }
+                                    break;
                                 }
-                                break;
                             }
+                            break;
                         }
-                        break;
-                    }
+		    }
                 }
             }
         }
