@@ -1034,7 +1034,7 @@ save_default_variables
 
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
-#install_packages
+install_packages
 
 echo "#####################################################################"
 echo "Setting system timezone to UTC"
