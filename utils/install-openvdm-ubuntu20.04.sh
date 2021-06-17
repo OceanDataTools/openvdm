@@ -74,6 +74,7 @@ function set_default_variables {
 
     DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
     DEFAULT_OPENVDM_BRANCH=master
+    DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
 
@@ -104,6 +105,7 @@ DEFAULT_DATA_ROOT=$DATA_ROOT
 
 DEFAULT_OPENVDM_REPO=$OPENVDM_REPO
 DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
+DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
 
@@ -703,7 +705,7 @@ function configure_mysql {
         # a special case if the password is empty.
         PASS=TRUE
         [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root  < /dev/null) || PASS=FALSE
-        [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD < /dev/null) || PASS=FALSE
+        [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /dev/null) || PASS=FALSE
         case $PASS in
             TRUE ) break;;
             * ) echo "Database root password failed";read -p "Current database password for root? (if one exists - hit return if not) " CURRENT_ROOT_DATABASE_PASSWORD;;
@@ -717,7 +719,7 @@ FLUSH PRIVILEGES;
 EOF
 
     # If there's a current root password
-    [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD < /tmp/set_pwd
+    [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /tmp/set_pwd
 
     # If there's no current root password
     [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
@@ -735,7 +737,7 @@ EOF
     update-rc.d mysql defaults
 
     echo "Setting up OpenVDM database user"
-    mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
+    mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 drop user if exists '$OPENVDM_USER'@'localhost';
 create user '$OPENVDM_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$OPENVDM_DATABASE_PASSWORD';
 flush privileges;
@@ -861,10 +863,9 @@ function install_openvdm {
 
     cd ${INSTALL_ROOT}/openvdm
 
-    DB_EXISTS=`mysqlshow --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} openvdm| grep -v Wildcard`
-    if [ $? == 0 ]; then
+    if mysql --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} -e 'use openvdm' 2> /dev/null; then
         echo "openvdm database found, skipping database setup"
-        mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
+        mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
 flush privileges;
 \q
@@ -874,10 +875,10 @@ EOF
         echo "Setup OpenVDM database"
         sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/survey/${OPENVDM_USER}/" | \
-        sed -e "s/127\.0\.0\.1/${HOSTNAME}/" \
+        sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
-        mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
+        mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 create database if not exists openvdm character set utf8;
 GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
 USE openvdm;
@@ -966,9 +967,13 @@ OPENVDM_REPO=${OPENVDM_REPO:-$DEFAULT_OPENVDM_REPO}
 read -p "Repository branch to install? ($DEFAULT_OPENVDM_BRANCH) " OPENVDM_BRANCH
 OPENVDM_BRANCH=${OPENVDM_BRANCH:-$DEFAULT_OPENVDM_BRANCH}
 
+read -p "IP Address or URL users will access OpenVDM from? ($DEFAULT_OPENVDM_SITEROOT) " OPENVDM_SITEROOT
+OPENVDM_SITEROOT=${OPENVDM_SITEROOT:-$DEFAULT_OPENVDM_SITEROOT}
+
 echo "Will install from github.com"
 echo "Repository: '$OPENVDM_REPO'"
 echo "Branch: '$OPENVDM_BRANCH'"
+echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
 # Create user if they don't exist yet

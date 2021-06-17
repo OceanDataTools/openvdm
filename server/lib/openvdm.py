@@ -453,7 +453,6 @@ class OpenVDM():
             logging.error("Unable to retrieve shipboard data warehouse configuration from OpenVDM API")
             raise err
 
-
     def get_ship_to_shore_bw_limit_status(self):
         """
         Return the ship-to-shore transfer bandwidth limit
