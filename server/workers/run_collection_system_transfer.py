@@ -864,7 +864,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             if self.collection_system_transfer['status'] == "1": #not running
                 logging.info("Transfer job for %s skipped because a transfer for that collection system is already in-progress", self.collection_system_transfer['name'])
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Fail", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
         except Exception as err:
             logging.debug(str(err))
