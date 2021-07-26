@@ -25,7 +25,7 @@ transferInterval: 5
 gearmanServer: "localhost:4730"
 
 # Whether or not to hide all directories in the CruiseData directory other than the
-# current cruise. (Yes|No))
+# current cruise. (True|False))
 showOnlyCurrentCruiseDir: False
 
 # The plugins section defines where the plugins processing scripts reside

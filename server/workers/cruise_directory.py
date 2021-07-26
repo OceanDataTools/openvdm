@@ -296,7 +296,7 @@ def task_create_cruise_directory(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 7, 10)
 
-    if gearman_worker.ovdm.show_only_current_cruise_dir():
+    if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear read permissions for all cruise directories")
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
 
@@ -329,7 +329,7 @@ def task_set_cruise_data_directory_permissions(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
-    if gearman_worker.ovdm.show_only_current_cruise_dir():
+    if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear read permissions for all directories within CruiseData")
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
@@ -359,7 +359,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    if gearman_worker.ovdm.show_only_current_cruise_dir():
+    if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear read permissions")
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})

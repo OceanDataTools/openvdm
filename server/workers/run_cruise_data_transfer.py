@@ -621,12 +621,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         try:
             self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(payload_obj['cruiseDataTransfer']['cruiseDataTransferID'])
 
-            if not self.cruise_data_transfer:
+            if not self.cruise_data_transfer: # doesn't exist
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Cruise Data Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for cruise data transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
-            if self.cruise_data_transfer['status'] == "1": #not running
+            if self.cruise_data_transfer['status'] == "1": # running
                 logging.info("Transfer job for %s skipped because a transfer for that cruise data destination is already in-progress", self.cruise_data_transfer['name'])
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Fail", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
         except Exception as err:
             logging.debug(str(err))
