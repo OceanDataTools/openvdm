@@ -169,6 +169,7 @@ Router::any('api/dashboardData/getDashboardObjectVisualizerDataByJsonName/(:any)
 Router::any('api/dashboardData/getDashboardObjectVisualizerDataByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectVisualizerDataByRawName');
 Router::any('api/dashboardData/getDashboardObjectStatsByJsonName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByJsonName');
 Router::any('api/dashboardData/getDashboardObjectStatsByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByRawName');
+Router::any('api/dashboardData/getDashboardObjectStatsByDataType/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByDataType');
 Router::any('api/dashboardData/getDashboardObjectQualityTestsByJsonName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByJsonName');
 Router::any('api/dashboardData/getDashboardObjectQualityTestsByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByRawName');
 

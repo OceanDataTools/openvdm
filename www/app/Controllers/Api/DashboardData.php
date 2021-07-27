@@ -34,7 +34,7 @@ class DashboardData extends Controller {
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
-            echo json_encode(array($dataObjectList));
+            echo json_encode($dataObjectList);
         } else {
             echo json_encode(array());
         }
@@ -68,7 +68,7 @@ class DashboardData extends Controller {
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
             $lastDataObject = $dataObjectList[sizeof($dataObjectList)-1];
             //echo $lastDataObject['dd_json'];
-            echo json_encode($this->_model->getDashboardObjectStatsByName($lastDataObject['dd_json']));
+            echo json_encode($this->_model->getDashboardObjectStatsByJsonName($lastDataObject['dd_json']));
         } else {
             echo json_encode(array());
         }
@@ -80,7 +80,7 @@ class DashboardData extends Controller {
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
             $lastDataObject = $dataObjectList[sizeof($dataObjectList)-1];
             //echo $lastDataObject['dd_json'];
-            echo json_encode($this->_model->getDashboardObjectQualityTestsByName($lastDataObject['dd_json']));
+            echo json_encode($this->_model->getDashboardObjectQualityTestsByJsonName($lastDataObject['dd_json']));
         } else {
             echo json_encode(array());
         }
@@ -126,6 +126,16 @@ class DashboardData extends Controller {
         }
     }
     
+    public function getDashboardObjectStatsByDataType($cruiseID, $data_type){
+        $this->_model->setCruiseID($cruiseID);
+        $dataObjectStats = $this->_model->getDataTypeStats($data_type);
+        if(is_array($dataObjectStats) && sizeof($dataObjectStats) > 0) {
+            echo json_encode($dataObjectStats);
+        } else {
+            echo json_encode(array());
+        }
+    }
+
     public function getDashboardObjectQualityTestsByJsonName($cruiseID, $dd_json){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByJsonName($dd_json);
