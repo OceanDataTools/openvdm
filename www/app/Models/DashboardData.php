@@ -333,6 +333,7 @@ class DashboardData extends Model {
         $fileCountStat = new \stdClass();
         $fileCountStat->statType = "totalValue";
         $fileCountStat->statName = "File Count";
+        $fileCountStat->statUnit = "Files";
         $fileCountStat->statValue = array();
         $fileCountStat->statValue[0] = sizeof($dataObjects);
         
