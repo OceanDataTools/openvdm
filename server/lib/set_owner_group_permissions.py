@@ -32,7 +32,7 @@ def set_owner_group_permissions(user, path):
             chown(path, uid, gid)
             chmod(path, 0o644)
         except OSError:
-            logging.error("Unable to set ownership/permissions for /%s", path)
+            logging.debug("Unable to set ownership/permissions for /%s", path)
             reasons.append("Unable to set ownership/permissions for /{}".format(path))
 
     else: #directory
@@ -40,7 +40,7 @@ def set_owner_group_permissions(user, path):
             chown(path, uid, gid)
             chmod(path, 0o755)
         except OSError:
-            logging.error("Unable to set ownership/permissions for /%s", path)
+            logging.debug("Unable to set ownership/permissions for /%s", path)
             reasons.append("Unable to set ownership/permissions for /{}".format(path))
 
         for root, dirs, files in walk(path):
@@ -51,7 +51,7 @@ def set_owner_group_permissions(user, path):
                     chown(fname, uid, gid)
                     chmod(fname, 0o644)
                 except OSError:
-                    logging.error("Unable to set ownership/permissions for %s", fname)
+                    logging.debug("Unable to set ownership/permissions for %s", fname)
                     reasons.append("Unable to set ownership/permissions for {}".format(fname))
 
             for directory in dirs:
@@ -61,10 +61,11 @@ def set_owner_group_permissions(user, path):
                     chown(dname, uid, gid)
                     chmod(dname, 0o755)
                 except OSError:
-                    logging.error("Unable to set ownership/permissions for %s", dname)
+                    logging.debug("Unable to set ownership/permissions for %s", dname)
                     reasons.append("Unable to set ownership/permissions for {}".format(dname))
 
     if len(reasons) > 0:
-        return {'verdict': False, 'reason': '\n'.join(reasons)}
+        logging.error("Unable to set ownership/permissions for %s file", len(reasons))
+        return {'verdict': False, 'reason': "Unable to set ownership/permissions for %s file" % len(reasons)}
 
     return {'verdict': True}

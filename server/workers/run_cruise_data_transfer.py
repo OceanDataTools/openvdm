@@ -621,6 +621,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         try:
             self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(payload_obj['cruiseDataTransfer']['cruiseDataTransferID'])
 
+            logging.info("cruiseDataTransfer configuration: \n%s", json.dumps(self.cruise_data_transfer, indent=2))
+
             if not self.cruise_data_transfer: # doesn't exist
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Cruise Data Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for cruise data transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
