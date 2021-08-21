@@ -859,10 +859,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         try:
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransfer']['collectionSystemTransferID'])
 
-            if not self.collection_system_transfer:
+            if not self.collection_system_transfer: # doesn't exists
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
-            if self.collection_system_transfer['status'] == "1": #not running
+            if self.collection_system_transfer['status'] == "1": #running
                 logging.info("Transfer job for %s skipped because a transfer for that collection system is already in-progress", self.collection_system_transfer['name'])
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
@@ -912,6 +912,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.collection_system_transfer['staleness'] == "1":
                 self.data_end_date = datetime.utcnow() - timedelta(minutes=5)
 
+        # Todo - there's a change the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
         logging.debug("End date/time filter: %s", self.data_end_date)
 
