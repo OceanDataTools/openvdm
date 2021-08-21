@@ -160,7 +160,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
     total_files = len(files['include'])
 
     # Transfer files
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
     while True:
 
         line = proc.stdout.readline().rstrip('\n')
