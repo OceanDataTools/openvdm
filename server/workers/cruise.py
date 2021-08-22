@@ -153,7 +153,8 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
         return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file", 'files': files }
 
     # Build transfer command
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])]
+    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
     logging.debug("Command: %s", ' '.join(command))
 
     file_index = 0
@@ -194,7 +195,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
     # Cleanup
     shutil.rmtree(tmpdir)
 
-    logging.info("files:\n%s", json.dumps(files, indent-2))
+    logging.info("files:\n%s", json.dumps(files, indent=2))
     
     return {'verdict': True, 'files':files }
 
