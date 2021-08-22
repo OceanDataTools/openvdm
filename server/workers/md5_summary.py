@@ -93,22 +93,19 @@ def build_md5_hashes(gearman_worker, gearman_job, filelist):
 
         filepath = os.path.join(gearman_worker.cruise_dir, filename)
 
-        if filesize_limit_status == 'On' and filesize_limit != '0':
-            if os.stat(filepath).st_size < int(filesize_limit) * 1000000:
-                try:
+        try:
+            if filesize_limit_status == 'On' and filesize_limit != '0':
+                if os.stat(filepath).st_size < int(filesize_limit) * 1000000:
                     hashes.append({'hash': hash_file(filepath), 'filename': filename})
-                except Exception as err:
-                    logging.error("Could not generate md5 hash for file: %s", filename)
-                    logging.debug(str(err))
+                else:
+                    hashes.append({'hash': '********************************', 'filename': filename})
 
             else:
-                hashes.append({'hash': '********************************', 'filename': filename})
-        else:
-            try:
                 hashes.append({'hash': hash_file(filepath), 'filename': filename})
-            except Exception as err:
-                logging.error("Could not generate md5 hash for file: %s", filename)
-                logging.error(str(err))
+
+        except Exception as err:
+            logging.error("Could not generate md5 hash for file: %s", filename)
+            logging.debug(str(err))
 
         gearman_worker.send_job_status(gearman_job, int(20 + 60*float(idx)/float(len(filelist))), 100)
 
