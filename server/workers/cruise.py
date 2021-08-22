@@ -189,10 +189,10 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
             popen.terminate()
             break
 
-    logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
-    logging.info('dest_dir: %s', dest_dir)
-    # files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
-    # files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
+    # logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
+    # logging.info('dest_dir: %s', dest_dir)
+    files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
+    files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -561,8 +561,8 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         'files': files
     }
 
-    gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
-    gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
+    # gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
+    # gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
     gm_data['files']['updated'].append(DEFAULT_CRUISE_CONFIG_FN)
 
     gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
