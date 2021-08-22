@@ -186,7 +186,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
 
         if gearman_worker.stop:
             logging.error("Stopping rsync transfer")
-            popen.terminate()
+            proc.terminate()
             break
 
     # logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
@@ -198,7 +198,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
     shutil.rmtree(tmpdir)
 
     logging.info("files:\n%s", json.dumps(files, indent=2))
-    
+
     return {'verdict': True, 'files':files }
 
 
