@@ -189,8 +189,8 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
             popen.terminate()
             break
 
-    files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
+    files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
+    files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
 
     # Cleanup
     shutil.rmtree(tmpdir)
