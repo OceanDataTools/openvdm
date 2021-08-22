@@ -20,8 +20,6 @@ def set_owner_group_permissions(user, path):
     """
     reasons = []
 
-    basename_path = basename(path)
-    root_dirname = dirname(path)
     uid = getpwnam(user).pw_uid
     gid = getgrnam(user).gr_gid
     # Set the file permission and ownership for the current directory

@@ -153,36 +153,52 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
         return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file", 'files': files }
 
     # Build transfer command
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])]
+    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
     logging.debug("Command: %s", ' '.join(command))
 
-    file_count = 1
-    total_files = len(files['include'])
+    file_index = 0
+    file_count = len(files['include'])
 
     # Transfer files
-    popen = subprocess.Popen(command, stdout=subprocess.PIPE)
-    lines_iterator = iter(popen.stdout.readline, b"")
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    while True:
 
-    for line in lines_iterator:
+        line = proc.stdout.readline().rstrip('\n')
+
+        if proc.poll() is not None:
+            break
+
+        if not line:
+            continue
+
         logging.debug("Line: %s", line) # yield line
         if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1].rstrip('\n')
+            filename = line.split(' ',1)[1]
             files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(round(20 + (70*file_count/total_files),0)), 100)
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_count += 1
         elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1].rstrip('\n')
+            filename = line.split(' ',1)[1]
             files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(round(20 + (70*file_count/total_files),0)), 100)
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_count += 1
 
         if gearman_worker.stop:
             logging.error("Stopping rsync transfer")
-            popen.terminate()
+            proc.terminate()
             break
+
+    # logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
+    # logging.info('dest_dir: %s', dest_dir)
+    files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
+    files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
 
     # Cleanup
     shutil.rmtree(tmpdir)
+
+    logging.info("files:\n%s", json.dumps(files, indent=2))
+
     return {'verdict': True, 'files':files }
 
 
@@ -545,8 +561,8 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         'files': files
     }
 
-    gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
-    gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
+    # gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
+    # gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
     gm_data['files']['updated'].append(DEFAULT_CRUISE_CONFIG_FN)
 
     gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))

@@ -954,7 +954,6 @@ class OpenVDM():
         """
 
         cruise_data_transfer_name = self.get_cruise_data_transfer(cruise_data_transfer_id)['name']
-
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setRunningCruiseDataTransfer/' + cruise_data_transfer_id
         payload = {'jobPid': job_pid}
 
@@ -965,7 +964,8 @@ class OpenVDM():
             self.track_gearman_job('Transfer for ' + cruise_data_transfer_name, job_pid, job_handle)
 
             logging.info(req.text)
-            #return req.text
+            # return req.text
+
         except Exception as err:
             logging.error("Unable to set cruise data transfer: %s to running with OpenVDM API", cruise_data_transfer_name)
             raise err
