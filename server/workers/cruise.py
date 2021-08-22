@@ -189,6 +189,8 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
             popen.terminate()
             break
 
+    logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
+    logging.info('dest_dir: %s', dest_dir)
     files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
 
