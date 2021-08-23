@@ -557,7 +557,7 @@ class Main extends Controller {
                 $data['tasks'] = $this->_tasksModel->getActiveTasks();
                 $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
                 
-                $data['jobName'] = 'Setup New ' LOWERING_NAME;
+                $data['jobName'] = 'Setup New ' . LOWERING_NAME;
 
                 View::rendertemplate('header',$data);
                 View::render('Config/main',$data);
