@@ -38,9 +38,9 @@ class Warehouse extends Controller {
             $cruiseDates = $this->_warehouseModel->getCruiseDates();
 
             if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
-                $response['warning'] = "Cruise has not started";
+                $response['warning'] = CRUISE_NAME . " has not started";
             } elseif ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
-                $response['warning'] = "Cruise has Ended";
+                $response['warning'] = CRUISE_NAME . " has Ended";
             }
 
         } else {

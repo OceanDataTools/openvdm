@@ -21,7 +21,7 @@ $_warehouseModel = new \Models\Warehouse();
                     <li class=""><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
                     <li class="active"><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
-                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers">Cruise Data Transfers</a></li>
+                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
                     <li class=""><a id="system" href="<?php echo DIR; ?>config/system">System</a></li>
                 </ul>
@@ -49,7 +49,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
   if ( $data['showLoweringComponents']) {
 ?>
-                                <div class="form-group"><label>Cruise or <?php echo LOWERING_NAME;?>?</label><?php echo FormCustom::radioInline($data['cruiseOrLoweringOptions'], $_POST['cruiseOrLowering']); ?></div>
+                                <div class="form-group"><label><?php echo CRUISE_NAME; ?> or <?php echo LOWERING_NAME;?>?</label><?php echo FormCustom::radioInline($data['cruiseOrLoweringOptions'], $_POST['cruiseOrLowering']); ?></div>
 <?php
   }
 ?>
@@ -93,11 +93,11 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
   if ( $data['showLoweringComponents']) {
 ?>
-            <p>The <strong>Cruise or <?php echo LOWERING_NAME;?>?</strong> option instructs OpenVDM on whether the transfer is a Cruise-wide (normal) transfer or specific to lowerings.</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> or <?php echo LOWERING_NAME;?>?</strong> option instructs OpenVDM on whether the transfer is a cruise-wide (normal) transfer or specific to lowerings.</p>
 <?php
   }
 ?>
-            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the Cruise Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).</p>
+            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).</p>
             <p>The <strong>Source Directory</strong> is the location of the data files on the collection system.</p>
             <p class="localDir">The <strong>Source Directory is mountpoint</strong> specifies whether OpenVDM should confirm a device (external HDD) is connected at that location.</p>
             <p class="rsyncServer">The <strong>Rsync Server</strong> is the IP address of the Collection System (i.e. "192.168.4.151").</p>

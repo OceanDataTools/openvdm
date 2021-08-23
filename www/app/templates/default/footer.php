@@ -15,9 +15,10 @@ $hooks = Hooks::get();
 
 <!-- JS -->    
 <script type="text/javascript">
-    var siteRoot = "<?php echo DIR . '";'; ?>
+    var siteRoot = "<?php echo DIR; ?>";
     
-    var lowering_name = "<?php echo LOWERING_NAME . '";'; ?>
+    var lowering_name = "<?php echo LOWERING_NAME; ?>";
+    var cruise_name = "<?php echo CRUISE_NAME; ?>";
     
     <?php echo (isset($data['cruiseID']) ? 'var cruiseID = "' . $data['cruiseID'] . '";' : ''); ?>
     

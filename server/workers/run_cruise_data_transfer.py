@@ -31,7 +31,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii
+from server.lib.check_filenames import is_ascii, is_rsync_patial_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM, DEFAULT_CRUISE_CONFIG_FN, DEFAULT_MD5_SUMMARY_FN, DEFAULT_MD5_SUMMARY_MD5_FN
 
@@ -47,6 +47,10 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
 
     for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
         for filename in filenames:
+
+            # do not include rsync partial files.
+            if is_rsync_patial_file(filename)
+                continue
 
             filepath = os.path.join(root, filename)
 

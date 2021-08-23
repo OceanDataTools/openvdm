@@ -370,7 +370,7 @@ use Helpers\Hooks;
                 <div id="cruiseIDPanel" class="panel panel-primary">
                     <div class="panel-heading">
                         <div id="cruiseID" class="huge"><?php echo $data['cruiseID']; ?></div>
-                        <div class="text-right">Cruise ID</div>
+                        <div class="text-right"><?php echo CRUISE_NAME; ?> ID</div>
                     </div> <!-- .panel-heading -->
                 </div> <!-- .panel .panel-primary -->
             </div> <!-- .col-lg-3 .col-md-6 -->
@@ -378,7 +378,7 @@ use Helpers\Hooks;
                 <div id="cruiseSizePanel" class="panel panel-primary">
                     <div class="panel-heading">
                         <div id="cruiseSize" class="huge"><?php echo $data['cruiseSize']; ?></div>
-                        <div class="text-right">Cruise Size</div>
+                        <div class="text-right"><?php echo CRUISE_NAME; ?> Size</div>
                     </div> <!-- .panel-heading -->
                 </div> <!-- .panel .panel-primary -->
             </div> <!-- .col-lg-3 .col-md-6 -->

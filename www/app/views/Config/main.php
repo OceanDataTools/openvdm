@@ -20,7 +20,7 @@ $_warehouseModel = new \Models\Warehouse();
                     <li class="active"><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
                     <li class=""><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
-                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers">Cruise Data Transfers</a></li>
+                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
                     <li class=""><a id="system" href="<?php echo DIR; ?>config/system">System</a></li>
                 </ul>
@@ -31,11 +31,11 @@ $_warehouseModel = new \Models\Warehouse();
     <div class="row">
         <div class="col-lg-6 col-md-6">
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Control</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Control</div>
                 <div class="panel-body">
-                    <a href="<?php echo DIR ?>config/setupNewCruise" class="btn-lg btn btn-primary btn-block">Setup New Cruise</a>
-                    <a id="finalizeCurrentCruise" href="<?php echo DIR ?>config/finalizeCurrentCruise" class="btn-lg btn btn-primary btn-block"><?php echo ($data['cruiseFinalizedOn'] === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-Cruise Tasks</a>
-                    <a href="<?php echo DIR ?>config/editCruise" class="btn-lg btn btn-primary btn-block">Edit Current Cruise</a>
+                    <a href="<?php echo DIR ?>config/setupNewCruise" class="btn-lg btn btn-primary btn-block">Setup New <?php echo CRUISE_NAME; ?></a>
+                    <a id="finalizeCurrentCruise" href="<?php echo DIR ?>config/finalizeCurrentCruise" class="btn-lg btn btn-primary btn-block"><?php echo ($data['cruiseFinalizedOn'] === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-<?php echo CRUISE_NAME; ?> Tasks</a>
+                    <a href="<?php echo DIR ?>config/editCruise" class="btn-lg btn btn-primary btn-block">Edit Current <?php echo CRUISE_NAME; ?></a>
                 </div>
             </div>
 <?php
@@ -131,7 +131,7 @@ $_warehouseModel = new \Models\Warehouse();
                 </div>
             </div>
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Data Transfer Status</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Data Transfer Status</div>
                 <div class="panel-body">
                     <div class="list-group" id="requiredCruiseDataTransfers">
 <?php

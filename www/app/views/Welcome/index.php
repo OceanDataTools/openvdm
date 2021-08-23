@@ -204,7 +204,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                 </div>
             </div>
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Data Transfer Status</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Data Transfer Status</div>
                 <div class="panel-body">
                     <div class="list-group" id="requiredCruiseDataTransfers">
 <?php

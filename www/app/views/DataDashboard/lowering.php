@@ -9,7 +9,7 @@ rsort($data['loweringIDs']);
                 <div class="pull-right">
                     <form  class="form-inline">                            
                         <div class="form-group">
-                            <label for="lowering_sel">Lowering:</label>
+                            <label for="lowering_sel"><?php echo LOWERING_NAME; ?>:</label>
                             <select class="form-control inline" id="lowering_sel" onchange="window.location.href = window.location.href.split('?')[0] + '?loweringID=' + this[selectedIndex].value">
 <?php
     for($i = 0; $i < sizeof($data['loweringIDs']); $i++){

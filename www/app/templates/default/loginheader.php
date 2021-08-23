@@ -61,7 +61,7 @@
                             <li><a href="<?php echo DIR; ?>config">Main</a></li>
                             <li><a href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
                             <li><a href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
-                            <li><a href="<?php echo DIR; ?>config/cruiseDataTransfers">Cruise Data Transfers</a></li>
+                            <li><a href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                             <li><a href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
                             <li><a href="<?php echo DIR; ?>config/users">Users</a></li>
                         </ul> <!-- /.nav-second-level -->
