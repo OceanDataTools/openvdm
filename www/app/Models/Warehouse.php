@@ -320,8 +320,8 @@ class Warehouse extends Model {
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                                     #var_dump($ovdmConfigJSON['extraDirectoriesConfig']);
                                     //Get the the directory that holds the DashboardData
-				    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
-				        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+				                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
+				                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
                                             if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                                 $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
                                                 foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
@@ -334,7 +334,7 @@ class Warehouse extends Model {
                                                 break;
                                             }
                                         }
-				    }
+				                    }
                                     break;
                                 }
                             }

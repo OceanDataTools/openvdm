@@ -1,14 +1,11 @@
 <?php
+
 namespace Controllers\DataDashboard;
 use Core\Controller;
 use Core\Router;
 use Core\View;
 use Helpers\Session;
 use Helpers\Url;
-#use Helpers\Hooks;
-
-//$hooks = Hooks::get();
-//Hooks::addHook('routes', 'Controllers\DataDashboard\DataDashboard@routes');
 
 class DataDashboard extends Controller {
     
@@ -54,7 +51,6 @@ class DataDashboard extends Controller {
     public function customTab($tabName) {
         
         $tab = $this->_dataDashboardModel->getDataDashboardTab($tabName);
-        //var_dump($tab['title']);
         $data['title'] = $tab['title'];
         $data['page'] = $tabName;
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();

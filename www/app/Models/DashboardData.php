@@ -280,7 +280,7 @@ class DashboardData extends Model {
 
                                 #South
                                 if($dataFileStatsObj[$j]->statValue[2] < $dataTypeStatsObj[$j]->statValue[2]){
-                                    $dataTypeStatsObj[$j]->staValue[2] = $dataFileStatsObj[$j]->statValue[2];
+                                    $dataTypeStatsObj[$j]->statValue[2] = $dataFileStatsObj[$j]->statValue[2];
                                 }
 
                                 #West

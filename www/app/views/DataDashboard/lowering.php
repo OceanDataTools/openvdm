@@ -87,7 +87,7 @@ rsort($data['loweringIDs']);
 <?php
                     }
                 } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'tms')===0) {
-                    for($k = sizeof($datafiles)-1; $k >= 0; $k--){
+                    for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
 ?>                              
                                                     <div class='col-lg-4 col-sm-6'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
