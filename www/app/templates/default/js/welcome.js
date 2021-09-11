@@ -249,9 +249,9 @@ $(function () {
                             }
                             shipToShoreTransfersOutput += '                       <li><small>' + data[i].newFiles[j] + '</small></li>';
                         }
-                        if(data[i].newFiles.length > 40){
-                            shipToShoreTransfersOutput += '                       <li><small>... and <strong>' + data[i].newFiles.length-40 + '</strong> other files</small></li>';
-                        }
+                        // if(data[i].newFiles.length > 40){
+                        //     shipToShoreTransfersOutput += '                       <li><small>... and <strong>' + data[i].newFiles.length-40 + '</strong> other files</small></li>';
+                        // }
                         if (data[i].updatedFiles.length > 0) {
                             shipToShoreTransfersOutput += '                       <li><small>' + data[i].updatedFiles.length + ' File(s) Updated</small></li>';
                         }
