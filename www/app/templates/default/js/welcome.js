@@ -143,6 +143,9 @@ $(function () {
                             errorFilesOutput += '                   <ul>';
                             var j = 0;
                             for (j = 0; j < 20; j++) {
+                                if(data[i].errorFiles[j] === undefined) {
+                                    break
+                                }
                                 errorFilesOutput += '                       <li><small>' + data[i].errorFiles[j] + '</small></li>';
                             }
                             if(data[i].errorFiles.length > 20){
