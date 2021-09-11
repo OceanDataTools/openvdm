@@ -9,7 +9,7 @@ rsort($data['loweringIDs']);
                 <div class="pull-right">
                     <form  class="form-inline">                            
                         <div class="form-group">
-                            <label for="lowering_sel">Lowering:</label>
+                            <label for="lowering_sel"><?php echo LOWERING_NAME; ?>:</label>
                             <select class="form-control inline" id="lowering_sel" onchange="window.location.href = window.location.href.split('?')[0] + '?loweringID=' + this[selectedIndex].value">
 <?php
     for($i = 0; $i < sizeof($data['loweringIDs']); $i++){
@@ -87,7 +87,7 @@ rsort($data['loweringIDs']);
 <?php
                     }
                 } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'tms')===0) {
-                    for($k = sizeof($datafiles)-1; $k >= 0; $k--){
+                    for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
 ?>                              
                                                     <div class='col-lg-4 col-sm-6'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>

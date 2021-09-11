@@ -72,7 +72,7 @@ class CruiseDataTransfers extends Controller {
     }
 
     public function add(){
-        $data['title'] = 'Add Cruise Data Transfer';
+        $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
@@ -265,7 +265,7 @@ class CruiseDataTransfers extends Controller {
                 );
 
                 $this->_cruiseDataTransfersModel->insertCruiseDataTransfer($postdata);
-                Session::set('message','Cruise Data Transfer Added');
+                Session::set('message',CRUISE_NAME . ' Data Transfer Added');
                 Url::redirect('config/cruiseDataTransfers');
             }
         } elseif(isset($_POST['inlineTest'])){
@@ -469,7 +469,7 @@ class CruiseDataTransfers extends Controller {
     }
         
     public function edit($id){
-        $data['title'] = 'Edit Cruise Data Transfer';
+        $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
@@ -659,7 +659,7 @@ class CruiseDataTransfers extends Controller {
                 $where = array('cruiseDataTransferID' => $id);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
                 
-                Session::set('message','Cruise Data Transfers Updated');
+                Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
                 Url::redirect('config/cruiseDataTransfers');
             } else {
                 

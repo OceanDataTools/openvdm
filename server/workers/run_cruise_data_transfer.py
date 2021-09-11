@@ -31,7 +31,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii
+from server.lib.check_filenames import is_ascii, is_rsync_patial_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM, DEFAULT_CRUISE_CONFIG_FN, DEFAULT_MD5_SUMMARY_FN, DEFAULT_MD5_SUMMARY_MD5_FN
 
@@ -47,6 +47,10 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
 
     for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
         for filename in filenames:
+
+            # do not include rsync partial files.
+            if is_rsync_patial_file(filename):
+                continue
 
             filepath = os.path.join(root, filename)
 
@@ -191,6 +195,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         logging.error("Error Saving temporary rsync filelist file")
 
         # Cleanup
+        logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
         return False
 
@@ -252,6 +257,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(dest_dir, gearman_worker.cruise_id))
 
     # Cleanup
+    logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
     if not output_results['verdict']:
@@ -312,6 +318,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         logging.error("Error Saving temporary rsync filelist file")
 
         # Cleanup
+        logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
         return False
 
@@ -372,6 +379,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     logging.debug("Unmount SMB Share")
     subprocess.call(['umount', mntpoint])
+    logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
     return { 'verdict': True, 'files': files }
@@ -407,6 +415,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         rsync_password_file.close()
 
         # Cleanup
+        logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync password file: ' + rsync_password_filepath}
@@ -425,6 +434,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         logging.error("Error Saving temporary rsync filelist file")
 
         # Cleanup
+        logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
         return False
 
@@ -490,6 +500,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
 
     # Cleanup
+    logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
     return {'verdict': True, 'files': files}
@@ -522,6 +533,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         logging.debug("Error Saving temporary ssh exclude filelist file")
 
         # Cleanup
+        logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
 
         return {'verdict': False, 'reason': 'Error Saving temporary ssh exclude filelist file: ' + ssh_excludelist_filepath, 'files':[]}
@@ -588,6 +600,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
 
     # Cleanup
+    logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
     return {'verdict': True, 'files': files}

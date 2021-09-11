@@ -64,8 +64,6 @@ $(function () {
         mapObject['map'] = L.map(mapObject['placeholderID'], {
             //maxZoom: 13,
             fullscreenControl: true,
-            //timeDimension: true,
-//            timeDimensionControl: true,
         }).setView(L.latLng(0, 0), 2);
 
         //Add basemap layer, use ESRI Oceans Base Layer
@@ -125,34 +123,7 @@ $(function () {
             filename: 'openvdm_map_export'
             // sizeModes: ['A4Portrait', 'A4Landscape']
         }).addTo(mapObject['map']);
-
-	// start of TimeDimension manual instantiation
-	//var timeDimension = new L.TimeDimension({
-	//        period: "PT1M",
-	//    });
-	// helper to share the timeDimension object between all layers
-	//mapObject['map'].timeDimension = timeDimension;
-
-	// otherwise you have to set the 'timeDimension' option on all layers.
-        //var timeDimensionControlOptions = {
-            //player:        player,
-            //timeDimension: timeDimension,
-            //position:      'bottomleft',
-            //autoPlay:      true,
-            //minSpeed:      1,
-            //speedStep:     0.5,
-            //maxSpeed:      15,
-            //timeSliderDragUpdate: true
-            //'backwardButton': false,
-            //'playButton': false,
-            //'forwardButton': false,
-            //'speedSlider': false
-        //};
-
-        //var timeDimensionControl = new L.Control.TimeDimension(timeDimensionControlOptions);
-        //mapObject['map'].addControl(timeDimensionControl);
-        
-        
+    
         return mapObject;
     }
     
@@ -233,7 +204,7 @@ $(function () {
         $.getJSON(getDashboardDataFilesURL, function (data, status) {
             if (status === 'success' && data !== null) {
                
-               var files = data[0].filter(function(object) {
+               var files = data.filter(function(object) {
                    return object['raw_data'].includes(loweringID)
                })
                
@@ -480,25 +451,9 @@ $(function () {
                                 dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
                                },
                         yAxis: yAxes,
-                        series: seriesData,
-                        //exporting: {
-                        //    buttons: {
-                        //            customButton: {
-                        //            text: 'Test',
-                        //            symbol: 'text:\uf065',
-                        //            symbolFill: '666',
-                        //            symbolStroke: 'none',
-                        //            symbolX: '14',
-                        //            symbolY: '9',
-                        //            onclick: function () {
-                        //                alert('You pressed the button!');
-                        //            }
-                        //        }
-                        //    }
-                        //}
+                        series: seriesData
                     };
 
-//                    console.log('chartOptions:', chartOptions)
                     $(placeholder).highcharts(chartOptions);
                 }
             }

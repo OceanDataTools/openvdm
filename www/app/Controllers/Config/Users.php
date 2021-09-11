@@ -9,26 +9,25 @@ use Helpers\Url;
 
 class Users extends Controller {
 
-    private $_model;
+    private $_usersModel;
 
     public function __construct(){
         if(!Session::get('loggedin')){
             Url::redirect('config/login');
         }
 
-        $this->_model = new \Models\Config\Users();
+        $this->_usersModel = new \Models\Config\Users();
     }
         
     public function index(){
         $data['title'] = 'Configuration';
-        $data['users'] = $this->_model->getUsers();
-        //$data['javascript'] = array('');
+        $data['users'] = $this->_usersModel->getUsers();
         View::rendertemplate('header',$data);
         View::render('Config/users',$data);
         View::rendertemplate('footer',$data);
     }
 
-    public function add(){
+    public function addUser(){
         $data['title'] = 'Add User';
 
         if(isset($_POST['submit'])){
@@ -53,7 +52,7 @@ class Users extends Controller {
                     'password' => Password::make($password)//,
                 );
 
-                $this->_model->insertUser($postdata);
+                $this->_usersModel->insertUser($postdata);
                 Session::set('message','User Added');
                 Url::redirect('config/users');
             }
@@ -64,9 +63,9 @@ class Users extends Controller {
         View::rendertemplate('footer',$data);
     }
         
-    public function edit($id){
+    public function editUser($id){
         $data['title'] = 'Edit User';
-        $data['row'] = $this->_model->getUser($id);
+        $data['row'] = $this->_usersModel->getUser($id);
 
         if(isset($_POST['submit'])){
             $username = $_POST['username'];
@@ -93,7 +92,7 @@ class Users extends Controller {
                 );
             
                 $where = array('userID' => $id);
-                $this->_model->updateUser($postdata,$where);
+                $this->_usersModel->updateUser($postdata,$where);
                 Session::set('message','User Updated');
                 Url::redirect('config');
             }
@@ -104,9 +103,9 @@ class Users extends Controller {
         View::rendertemplate('footer',$data);
     }
     
-    public function delete($id){
+    public function deleteUser($id){
         $where = array('userID' => $id);
-        $this->_model->deleteUser($where);
+        $this->_usersModel->deleteUser($where);
         Session::set('message','User Deleted');
         Url::redirect('config/users');
     }

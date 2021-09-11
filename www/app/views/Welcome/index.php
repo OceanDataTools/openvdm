@@ -123,7 +123,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
         
         for($i = 0; $i < count($data['shipToShoreTransfers']); $i++ ) {
 ?>
-                    <h5><?php echo $data['shipToShoreTransfers'][$i]->shipToShoreTransferName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipToShoreTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
+                    <h5><?php echo $data['shipToShoreTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipToShoreTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
                     <ul>
 <?php
 	    if( is_array($data['shipToShoreTransfers'][$i]->newFiles) && sizeof($data['shipToShoreTransfers'][$i]->newFiles) <= 20) {
@@ -204,7 +204,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                 </div>
             </div>
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Data Transfer Status</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Data Transfer Status</div>
                 <div class="panel-body">
                     <div class="list-group" id="requiredCruiseDataTransfers">
 <?php

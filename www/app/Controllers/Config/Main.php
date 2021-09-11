@@ -76,16 +76,16 @@ class Main extends Controller {
             }
 
             if($cruiseID == ''){
-                $error[] = 'Cruise ID is required';
+                $error[] = CRUISE_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseStartDate)){
-                $error[] = 'Valid Cruise Start Date is required';              
+                $error[] = 'Valid ' . CRUISE_NAME . ' Start Date is required';              
             } elseif(strcmp($cruiseEndDate,'') != 0 && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
-                $error[] = 'Improperly formatted Cruise End Date';
+                $error[] = 'Improperly formatted ' . CRUISE_NAME . ' End Date';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();
                 
                 if (!is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
-                    $error[] = 'A Cruise Data Directory for that Cruise ID does not exist';
+                    $error[] = 'A ' . CRUISE_NAME . ' Data Directory for that ' . CRUISE_NAME . ' ID does not exist';
                 }
             }
             
@@ -128,7 +128,7 @@ class Main extends Controller {
                 //var_dump($this->_warehouseModel->getLatestLowering());
         
                 sleep(1);
-                Session::set('message','Cruise ID Updated');
+                Session::set('message',CRUISE_NAME . ' ID Updated');
                 Url::redirect('config');
             } else {
                 $data['cruiseID'] = $cruiseID;
@@ -199,16 +199,16 @@ class Main extends Controller {
             }
 
             if($loweringID == ''){
-                $error[] = 'Lowering ID is required';
+                $error[] = LOWERING_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringStartDate)){
-                $error[] = 'Valid Lowering Start Date is required';              
+                $error[] = 'Valid ' . LOWERING_NAME . ' Start Date is required';              
             } elseif(strcmp($loweringEndDate,'') != 0 && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringEndDate)){
-                $error[] = 'Improperly formatted Lowering End Date';
+                $error[] = 'Improperly formatted ' . LOWERING_NAME . ' End Date';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();
                 
                 if (!is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $this->_warehouseModel->getCruiseID() .'/' . $this->_warehouseModel->getLoweringDataBaseDir() . '/' . '/' . $loweringID)) {
-                    $error[] = 'A Lowering Data Directory for that Lowering ID does not exist';
+                    $error[] = 'A ' . LOWERING_NAME . ' Data Directory for that ' . LOWERING_NAME . ' ID does not exist';
                 }
             }
             
@@ -236,7 +236,7 @@ class Main extends Controller {
                 //var_dump($this->_warehouseModel->getLatestLowering());
         
                 sleep(1);
-                Session::set('message','Lowering ID Updated');
+                Session::set('message', LOWERING_NAME . ' ID Updated');
                 Url::redirect('config');
             } else {
                 $data['loweringID'] = $loweringID;
@@ -287,7 +287,7 @@ class Main extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
 
-        $data['jobName'] = 'Rebuild Cruise Directory';
+        $data['jobName'] = 'Rebuild ' . CRUISE_NAME . ' Directory';
 
         View::rendertemplate('header',$data);
         View::render('Config/main',$data);
@@ -320,7 +320,7 @@ class Main extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
 
-        $data['jobName'] = 'Rebuild Lowering Directory';
+        $data['jobName'] = 'Rebuild ' . LOWERING_NAME . ' Directory';
 
         View::rendertemplate('header',$data);
         View::render('Config/main',$data);
@@ -396,15 +396,15 @@ class Main extends Controller {
             $cruiseEndDate = $_POST['cruiseEndDate'];
 
             if($cruiseID == ''){
-                $error[] = 'Cruise ID is required';
+                $error[] = CRUISE_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseStartDate)){
-                $error[] = 'Valid Cruise Start Date is required';
+                $error[] = 'Valid ' . CRUISE_NAME . ' Start Date is required';
             } elseif($cruiseEndDate != '' && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
-                $error[] = 'Improperly formatted Cruise End Date';
+                $error[] = 'Improperly formatted ' . CRUISE_NAME . ' End Date';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();  
                 if (is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
-                    $error[] = 'A Cruise Data Directory for that Cruise ID already exists';
+                    $error[] = 'A ' . CRUISE_NAME . ' Data Directory for that ' . CRUISE_NAME . ' ID already exists';
                 }
             }
                 
@@ -441,7 +441,7 @@ class Main extends Controller {
                 $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
                 $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
                 
-                $data['jobName'] = 'Setup New Cruise';
+                $data['jobName'] = 'Setup New ' . CRUISE_NAME;
 
                 View::rendertemplate('header',$data);
                 View::render('Config/main',$data);
@@ -521,15 +521,15 @@ class Main extends Controller {
             $loweringEndDate = $_POST['loweringEndDate'];
 
             if($loweringID == ''){
-                $error[] = 'Lowering ID is required';
+                $error[] = LOWERING_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringStartDate)){
-                $error[] = 'Valid Lowering Start Date is required';
+                $error[] = 'Valid ' . LOWERING_NAME . ' Start Date is required';
             } elseif($loweringEndDate != '' && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringEndDate)){
-                $error[] = 'Improperly formatted Lowering End Date';
+                $error[] = 'Improperly formatted ' . LOWERING_NAME . ' End Date';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();  
                 if (is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID . '/' . $loweringDataBaseDir . '/' . $loweringID)) {
-                    $error[] = 'A Loweing Data Directory for that Lowering ID already exists';
+                    $error[] = 'A ' . LOWERING_NAME . ' Data Directory for that ' . LOWERING_NAME . ' ID already exists';
                 }
             }
                 
@@ -557,7 +557,7 @@ class Main extends Controller {
                 $data['tasks'] = $this->_tasksModel->getActiveTasks();
                 $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
                 
-                $data['jobName'] = 'Setup New Lowering';
+                $data['jobName'] = 'Setup New ' . LOWERING_NAME;
 
                 View::rendertemplate('header',$data);
                 View::render('Config/main',$data);
@@ -693,7 +693,7 @@ class Main extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
         
-        $data['jobName'] = 'Export Lowering Configuration';
+        $data['jobName'] = 'Export ' . LOWERING_NAME . ' Configuration';
 
         View::rendertemplate('header',$data);
         View::render('Config/main',$data);

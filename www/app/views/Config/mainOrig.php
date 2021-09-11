@@ -27,7 +27,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                     <li class="active"><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
                     <li class=""><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
-                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers">Cruise Data Transfers</a></li>
+                    <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
                     <li class=""><a id="system" href="<?php echo DIR; ?>config/system">System</a></li>
                 </ul>
@@ -38,11 +38,11 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     <div class="row">
         <div class="col-lg-6 col-md-6">
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Status</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Status</div>
                 <div class="panel-body">
                     <div class="list-group">
                         <div class="list-group-item">
-                            Cruise: <strong><?php echo $data['cruiseID']; ?></strong>, Start Date: <strong><?php echo $data['cruiseStartDate']; ?></strong><a href="<?php echo DIR ?>config/editCruiseID" class="pull-right btn btn-default btn-xs">Edit</a>
+                            <?php echo CRUISE_NAME; ?>: <strong><?php echo $data['cruiseID']; ?></strong>, Start Date: <strong><?php echo $data['cruiseStartDate']; ?></strong><a href="<?php echo DIR ?>config/editCruiseID" class="pull-right btn btn-default btn-xs">Edit</a>
                         </div>
                         <div class="list-group-item">
 <?php
@@ -143,7 +143,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                 </div>
             </div>
             <div class="panel panel-default">
-                <div class="panel-heading">Cruise Data Transfer Status</div>
+                <div class="panel-heading"><?php echo CRUISE_NAME; ?> Data Transfer Status</div>
                 <div class="panel-body">
                     <div class="list-group" id="requiredCruiseDataTransfers">
 <?php

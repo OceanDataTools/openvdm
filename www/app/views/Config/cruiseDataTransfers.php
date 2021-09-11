@@ -18,7 +18,7 @@ use Helpers\Session;
                     <li class=""><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
                     <li class=""><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
-                    <li class="active"><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers">Cruise Data Transfers</a></li>
+                    <li class="active"><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
                     <li class=""><a id="system" href="<?php echo DIR; ?>config/system">System</a></li>
                 </ul>
@@ -43,7 +43,7 @@ use Helpers\Session;
                     <td><?php echo $row->longName; ?></td>
                     <td>
                         <a href='<?php echo DIR; ?>config/cruiseDataTransfers/edit/<?php echo $row->cruiseDataTransferID; ?>'>Edit</a> / 
-                        <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Cruise Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> / 
+                        <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> / 
                         <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> / 
 <?php
             if($row->status === "1") {
@@ -92,18 +92,18 @@ use Helpers\Session;
     }
 ?>
             </table>
-            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/cruiseDataTransfers/add">Add New Cruise Data Transfer</a>
+            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/cruiseDataTransfers/add">Add New <?php echo CRUISE_NAME; ?> Data Transfer</a>
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
-            <p>This page is for managing Cruise Data Transfers.  A Cruise Data Transfer is an OpenVDM-managed copy of all collected data from the current cruise data directory on the Shipboard Data Warehouse to a remote server, NAS box or external HDD connected to the Shipboard Data Warehouse.</p>
-            <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit Cruise Data Transfer Form" where you can modify the Cruise Data Transfer settings.</p>
+            <p>This page is for managing <?php echo CRUISE_NAME; ?> Data Transfers.  A <?php echo CRUISE_NAME; ?> Data Transfer is an OpenVDM-managed copy of all collected data from the current cruise data directory on the Shipboard Data Warehouse to a remote server, NAS box or external HDD connected to the Shipboard Data Warehouse.</p>
+            <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit <?php echo CRUISE_NAME; ?> Data Transfer Form" where you can modify the <?php echo CRUISE_NAME; ?> Data Transfer settings.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Collection System Transfer. There is a confirmation window so don't worry about accidental clicks.</p>
-            <p>Clicking a <strong class="text-primary">Test</strong> link will verify the corresponding Cruise Data Transfer configuration is valid. A window will appear displaying the test results.  If there is a <i class="fa fa-warning text-danger"></i> in a row, the corresponding Cruise Data Transfer has encountered and error.  Click <strong class="text-primary">Test</strong> to diagnose the problem.</p>
-            <p>Clicking a <strong class="text-primary">Run</strong> link will manually trigger the corresponding Cruise Data Transfer to start.  If the Cruise Data Transfer is currently running, this link is not present</p>
-            <p>Clicking a <strong class="text-primary">Stop</strong> link will manually trigger the corresponding Cruise Data Transfer to stop immediately.  If the Cruise Data Transfer is not currently running, this link is not present</p>
-            <p>The button in the <strong>Enabled</strong> Column shows whether the transfer is enabled.  Click the button in the enable column to toggle the enable status of the cooresponding Cruise Data Transfer.</p>
-            <p>Click the <strong>Add New Cruise Data Transfer</strong> button to add a new Cruise Data Transfer.</p>
+            <p>Clicking a <strong class="text-primary">Test</strong> link will verify the corresponding <?php echo CRUISE_NAME; ?> Data Transfer configuration is valid. A window will appear displaying the test results.  If there is a <i class="fa fa-warning text-danger"></i> in a row, the corresponding <?php echo CRUISE_NAME; ?> Data Transfer has encountered and error.  Click <strong class="text-primary">Test</strong> to diagnose the problem.</p>
+            <p>Clicking a <strong class="text-primary">Run</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to start.  If the <?php echo CRUISE_NAME; ?> Data Transfer is currently running, this link is not present</p>
+            <p>Clicking a <strong class="text-primary">Stop</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to stop immediately.  If the <?php echo CRUISE_NAME; ?> Data Transfer is not currently running, this link is not present</p>
+            <p>The button in the <strong>Enabled</strong> Column shows whether the transfer is enabled.  Click the button in the enable column to toggle the enable status of the cooresponding <?php echo CRUISE_NAME; ?> Data Transfer.</p>
+            <p>Click the <strong>Add New <?php echo CRUISE_NAME; ?> Data Transfer</strong> button to add a new <?php echo CRUISE_NAME; ?> Data Transfer.</p>
         </div>
     </div>
 

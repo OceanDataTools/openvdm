@@ -40,20 +40,6 @@ class Warehouse extends Model {
         if ($data['cruiseSize'] === 0) {
             $data['error'] = '(getCruiseSize) Unable to get size of cruise directory';
         }
-
-        // $baseDir = $this->getShipboardDataWarehouseBaseDir();
-        // $cruiseID = $this->getCruiseID();
-        // if (is_dir($baseDir . DIRECTORY_SEPARATOR . $cruiseID)){
-        //     try {
-        //         $output = exec('du -sk ' . $baseDir . DIRECTORY_SEPARATOR . $cruiseID);
-        //         $data['cruiseSize'] = trim(str_replace($file_directory, '', $output)) * 1024;
-        //     } catch (Exception $e) {
-        //         $data['error'] = '(getCruiseSize) Unable to get size of cruise directory';                            
-        //     }
-
-        // } else {
-        //     $data['error'] = '(getCruiseSize) Cruise Directory: ' . $baseDir . DIRECTORY_SEPARATOR . $cruiseID . ' is not a directory';            
-        // }
         
         return $data;
     }
@@ -66,22 +52,6 @@ class Warehouse extends Model {
             if ($data['loweringSize'] === 0) {
                 $data['error'] = '(getLoweringSize) Unable to get size of lowering directory';
             }
-
-        // $baseDir = $this->getShipboardDataWarehouseBaseDir();
-        // $cruiseID = $this->getCruiseID();
-        // $loweringDataBaseDir = $this->getLoweringDataBaseDir();
-        // $loweringID = $this->getLoweringID();
-        // if (is_dir($baseDir . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $loweringDataBaseDir . DIRECTORY_SEPARATOR . $loweringID)){
-        //     try {
-        //         $output = exec('du -sk ' . $baseDir . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $loweringDataBaseDir . DIRECTORY_SEPARATOR . $loweringID);
-        //         $data['loweringSize'] = trim(str_replace($file_directory, '', $output)) * 1024;
-        //     } catch (Exception $e) {
-        //         $data['error'] = '(getLoweringSize) Unable to get size of lowering directory';                            
-        //     }
-
-        // } else {
-        //     $data['error'] = '(getLoweringSize) Lowering Directory: ' . $baseDir . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $loweringDataBaseDir . DIRECTORY_SEPARATOR . $loweringID . ' is not a directory';            
-        // }
         
         return $data;
     }
@@ -350,8 +320,8 @@ class Warehouse extends Model {
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                                     #var_dump($ovdmConfigJSON['extraDirectoriesConfig']);
                                     //Get the the directory that holds the DashboardData
-				    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
-				        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+				                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
+				                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
                                             if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                                 $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
                                                 foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
@@ -364,7 +334,7 @@ class Warehouse extends Model {
                                                 break;
                                             }
                                         }
-				    }
+				                    }
                                     break;
                                 }
                             }

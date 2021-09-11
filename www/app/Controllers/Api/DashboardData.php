@@ -39,7 +39,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getLatestDataObjectByType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
