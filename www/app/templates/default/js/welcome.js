@@ -146,7 +146,7 @@ $(function () {
                                 errorFilesOutput += '                       <li><small>' + data[i].errorFiles[j] + '</small></li>';
                             }
                             if(data[i].errorFiles.length > 20){
-                                errorFilesOutput += '                       <li><small>... and <strong>' + data[i].errorFiles.length-20 '</strong> other files</small></li>';
+                                errorFilesOutput += '                       <li><small>... and <strong>' + data[i].errorFiles.length-20 + '</strong> other files</small></li>';
                             }
                             errorFilesOutput += '                   </ul>';
                         }
