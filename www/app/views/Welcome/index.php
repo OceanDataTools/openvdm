@@ -126,7 +126,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                     <h5><?php echo $data['shipToShoreTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipToShoreTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
                     <ul>
 <?php
-	    if( is_array($data['shipToShoreTransfers'][$i]->newFiles) && sizeof($data['shipToShoreTransfers'][$i]->newFiles) <= 20) {
+	    if( is_array($data['shipToShoreTransfers'][$i]->newFiles) && sizeof($data['shipToShoreTransfers'][$i]->newFiles) <= 40) {
                 foreach($data['shipToShoreTransfers'][$i]->newFiles as $file) {
 ?>
                         <li><small><?php echo $file; ?></small></li>
@@ -139,7 +139,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
                 }
 ?>
-                        <li><small>...and <strong><?php echo sizeof($data['shipToShoreTransfers'][$i]->newFiles)-20; ?></strong> other files</small></li>
+                        <li><small>...and <strong><?php echo sizeof($data['shipToShoreTransfers'][$i]->newFiles)-40; ?></strong> other files</small></li>
 <?php
             }	
 		
