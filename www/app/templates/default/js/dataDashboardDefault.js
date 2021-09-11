@@ -204,7 +204,7 @@ $(function () {
         $.getJSON(getDashboardDataFilesURL, function (data, status) {
             if (status === 'success' && data !== null) {
                
-               var files = data[0].filter(function(object) {
+               var files = data.filter(function(object) {
                    return object['raw_data'].includes(loweringID)
                })
                
