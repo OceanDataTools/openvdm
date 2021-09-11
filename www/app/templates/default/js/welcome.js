@@ -243,8 +243,14 @@ $(function () {
                         shipToShoreTransfersOutput += '                   <h5>SSDW - ' + formatTime(data[i].date) + '</h5>';
                         shipToShoreTransfersOutput += '                   <ul>';
                         var j = 0;
-                        for (j = 0; j < data[i].newFiles.length; j++) {
+                        for (j = 0; j < 40; j++) {
+                            if(data[i].newFiles[j] === undefined) {
+                                break
+                            }
                             shipToShoreTransfersOutput += '                       <li><small>' + data[i].newFiles[j] + '</small></li>';
+                        }
+                        if(data[i].newFiles.length > 20){
+                            shipToShoreTransfersOutput += '                       <li><small>... and <strong>' + data[i].newFiles.length-40 + '</strong> other files</small></li>';
                         }
                         if (data[i].updatedFiles.length > 0) {
                             shipToShoreTransfersOutput += '                       <li><small>' + data[i].updatedFiles.length + ' File(s) Updated</small></li>';
