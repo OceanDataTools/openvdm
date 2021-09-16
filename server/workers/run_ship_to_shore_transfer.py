@@ -270,7 +270,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if len(results_obj['parts']) > 0:
             if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
                 self.ovdm.set_error_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'], results_obj['parts'][-1]['reason'])
-            else:
+            elif results_obj['parts'][-1]['result'] == "Pass":
                 self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
         else:
             self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])

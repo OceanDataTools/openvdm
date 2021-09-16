@@ -963,7 +963,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if len(results_obj['parts']) > 0:
             if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
                 self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
-            else:
+            elif results_obj['parts'][-1]['result'] == "Pass":
                 self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
         else:
             self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])

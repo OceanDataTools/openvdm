@@ -774,6 +774,7 @@ class OpenVDM():
             # Clear Error for current tranfer in DB via API
             url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
 
+            logging.info("clear error")
             try:
                 requests.get(url)
             except Exception as err:
@@ -850,6 +851,7 @@ class OpenVDM():
         # Set Error for current tranfer test in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
 
+        logging.info("Set Error")
         try:
             requests.get(url)
             cruise_data_transfer_name = self.get_cruise_data_transfer(cruise_data_transfer_id)['name']
@@ -898,6 +900,7 @@ class OpenVDM():
         # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
 
+        logging.info("Set Idle")
         try:
             requests.get(url)
         except Exception as err:
@@ -957,6 +960,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setRunningCruiseDataTransfer/' + cruise_data_transfer_id
         payload = {'jobPid': job_pid}
 
+        logging.info("Set Running")
         try:
             req = requests.post(url, data=payload)
 

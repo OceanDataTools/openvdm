@@ -207,9 +207,12 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout:
+    for line in proc.stdout.splitlines():
+        logging.debug("%s", line)
         if line.startswith('Number of regular files transferred:'):
-            file_count = int(line.split(':')[1])
+            file_count = int(line.split(':')[1].replace(',',''))
+            logging.info("File Count: %d", file_count)
+            break
 
     bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
 
@@ -330,9 +333,10 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout:
+    for line in proc.stdout.splitlines():
         if line.startswith('Number of regular files transferred:'):
-            file_count = int(line.split(':')[1])
+            file_count = int(line.split(':')[1].replace(',',''))
+            logging.info("File Count: %d", file_count)
             break
 
     bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
@@ -446,9 +450,10 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout:
+    for line in proc.stdout.splitlines():
         if line.startswith('Number of regular files transferred:'):
-            file_count = int(line.split(':')[1])
+            file_count = int(line.split(':')[1].replace(',',''))
+            logging.info("File Count: %d", file_count)
             break
 
     bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
@@ -546,9 +551,11 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout:
+    for line in proc.stdout.splitlines():
+        logging.debug("%s", line)
         if line.startswith('Number of regular files transferred:'):
-            file_count = int(line.split(':')[1])
+            file_count = int(line.split(':')[1].replace(',',''))
+            logging.info("File Count: %d", file_count)
             break
 
     bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
@@ -689,7 +696,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if len(results_obj['parts']) > 0:
             if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
                 self.ovdm.set_error_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'], results_obj['parts'][-1]['reason'])
-            else:
+            elif results_obj['parts'][-1]['result'] == "Pass":
                 self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
         else:
             self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
