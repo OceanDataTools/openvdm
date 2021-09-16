@@ -159,12 +159,12 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
         logging.debug("%s", line)
 
-        if line.startswith( '>f+++++++++' ):
+        if line.startswith( '<f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-        elif line.startswith( '>f.' ):
+        elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
