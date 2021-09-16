@@ -244,8 +244,6 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
-        
-
     # files['new'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['new']]
     # files['updated'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['updated']]
 
@@ -339,7 +337,14 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     logging.debug('Transfer Command: %s', ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is not None:
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
 
         line = proc.stdout.readline().rstrip('\n')
         logging.debug("%s", line)
@@ -354,11 +359,6 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
 
     # Cleanup
     time.sleep(2)
@@ -450,7 +450,14 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug('Transfer Command: %s', ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is not None:
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
 
         line = proc.stdout.readline().rstrip('\n')
         logging.debug("%s", line)
@@ -465,14 +472,6 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-    # files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)
@@ -540,7 +539,14 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is not None:
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
 
         line = proc.stdout.readline().rstrip('\n')
         logging.debug("%s", line)
@@ -555,14 +561,6 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-    # files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)
