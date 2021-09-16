@@ -240,11 +240,13 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         if line.startswith( '<f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
@@ -360,11 +362,13 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         if line.startswith( '<f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
@@ -477,13 +481,13 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         if line.startswith( '<f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
-            logging.info("Progress Update: %d/%d", int(20 + 70*float(file_index)/float(file_count)), 100)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
-            logging.info("Progress Update: %d/%d", int(20 + 70*float(file_index)/float(file_count)), 100)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
@@ -572,11 +576,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         if line.startswith( '<f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
+            logging.info("Progress Update: %d/%d", file_index, file_count)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
