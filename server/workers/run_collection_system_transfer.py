@@ -481,18 +481,19 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-        line = proc.stdout.readline().rstrip('\n')
+        proc.poll()
 
-        if proc.poll() is not None:
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
             break
 
-        if not line:
-            continue
+        line = proc.stdout.readline().rstrip('\n')
+        logging.debug("%s", line)
 
-        logging.debug("Line: %s", line)
         if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
@@ -503,11 +504,6 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
 
     files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
@@ -596,34 +592,29 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-    while True:
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if proc.poll() is not None:
-            break
-
-        if not line:
-            continue
-
-        logging.debug('line %s', line)
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1].rstrip('\n')
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1].rstrip('\n')
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+        proc.poll()
 
         if gearman_worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
+
+        line = proc.stdout.readline().rstrip('\n')
+        logging.debug("%s", line)
+
+        if line.startswith( '>f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            files['new'].append(filename)
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '>f.' ):
+            filename = line.split(' ',1)[1]
+            files['updated'].append(filename)
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
 
     files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
@@ -703,19 +694,19 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-    while True:
+        proc.poll()
 
-        line = proc.stdout.readline().rstrip('\n')
-
-        if proc.poll() is not None:
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
             break
 
-        if not line:
-            continue
+        line = proc.stdout.readline().rstrip('\n')
+        logging.debug("%s", line)
 
-        logging.debug('Line: %s', line)
         if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
@@ -726,11 +717,6 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
 
     files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
@@ -790,19 +776,19 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-    while True:
+        proc.poll()
 
-        line = proc.stdout.readline().rstrip('\n')
-
-        if proc.poll() is not None:
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
             break
 
-        if not line:
-            continue
+        line = proc.stdout.readline().rstrip('\n')
+        logging.debug("%s", line)
 
-        logging.debug("Line: %s", line)
         if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
@@ -813,11 +799,6 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
 
     files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
