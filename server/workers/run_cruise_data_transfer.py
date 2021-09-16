@@ -221,7 +221,14 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug('Transfer Command: %s', ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is not None:
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
 
         line = proc.stdout.readline().rstrip('\n')
         logging.debug("%s", line)
@@ -237,10 +244,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
 
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
+        
 
     # files['new'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['new']]
     # files['updated'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['updated']]
