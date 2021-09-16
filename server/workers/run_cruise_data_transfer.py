@@ -220,38 +220,35 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-        line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+        proc.poll()
 
         if gearman_worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
+
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '>f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            files['new'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '>f.' ):
+            filename = line.split(' ',1)[1]
+            files['updated'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
 
     # files['new'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['new']]
     # files['updated'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['updated']]
@@ -345,38 +342,35 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-        line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+        proc.poll()
 
         if gearman_worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
+
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '>f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            files['new'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '>f.' ):
+            filename = line.split(' ',1)[1]
+            files['updated'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
 
     # Cleanup
     time.sleep(2)
@@ -467,42 +461,35 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-    while True:
-
-        line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
-
-        if line.startswith( '<f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '<f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+        proc.poll()
 
         if gearman_worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
 
-    # files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '<f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            files['new'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '<f.' ):
+            filename = line.split(' ',1)[1]
+            files['updated'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)
@@ -545,7 +532,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 1 # avoids divide by 0 error
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':', dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -569,42 +556,35 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
 
-    while True:
-
-        line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #    continue
-
-        if line.startswith( '<f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '<f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+        proc.poll()
 
         if gearman_worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
 
-    # files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    # files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '<f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            files['new'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '<f.' ):
+            filename = line.split(' ',1)[1]
+            files['updated'].append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)
