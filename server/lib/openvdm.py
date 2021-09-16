@@ -774,7 +774,7 @@ class OpenVDM():
             # Clear Error for current tranfer in DB via API
             url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
 
-            logging.info("clear error")
+            logging.info("Clear Error")
             try:
                 requests.get(url)
             except Exception as err:
@@ -962,14 +962,10 @@ class OpenVDM():
 
         logging.info("Set Running")
         try:
-            req = requests.post(url, data=payload)
+            requests.post(url, data=payload)
 
             # Add to gearman job tracker
             self.track_gearman_job('Transfer for ' + cruise_data_transfer_name, job_pid, job_handle)
-
-            logging.info(req.text)
-            # return req.text
-
         except Exception as err:
             logging.error("Unable to set cruise data transfer: %s to running with OpenVDM API", cruise_data_transfer_name)
             raise err

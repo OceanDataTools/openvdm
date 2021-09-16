@@ -220,22 +220,11 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is not None:
 
         line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
+        logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
@@ -345,22 +334,11 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is not None:
 
         line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
-
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
+        logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
@@ -467,30 +445,18 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is not None:
 
         line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
+        logging.debug("%s", line)
 
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #     continue
-
-        if line.startswith( '<f+++++++++' ):
+        if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-        elif line.startswith( '<f.' ):
+        elif line.startswith( '>f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
@@ -569,30 +535,18 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    while True:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is not None:
 
         line = proc.stdout.readline().rstrip('\n')
-        err_line = proc.stderr.readline().rstrip('\n')
+        logging.debug("%s", line)
 
-        if err_line:
-            logging.warning("Err Line: %s", err_line)
-        if line:
-            logging.debug("Line: %s", line)
-
-        if proc.poll() is not None:
-            break
-
-        # if not line:
-        #    continue
-
-        if line.startswith( '<f+++++++++' ):
+        if line.startswith( '>f+++++++++' ):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
             file_index += 1
-        elif line.startswith( '<f.' ):
+        elif line.startswith( '>f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
             gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
