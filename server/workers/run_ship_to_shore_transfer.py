@@ -153,6 +153,10 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
             break
 
         line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
         logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):

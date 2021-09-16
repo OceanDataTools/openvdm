@@ -231,6 +231,10 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             break
 
         line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
         logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
@@ -347,6 +351,10 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
             break
 
         line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
         logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
@@ -460,6 +468,10 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             break
 
         line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
         logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
@@ -549,6 +561,10 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
             break
 
         line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
         logging.debug("%s", line)
 
         if line.startswith( '>f+++++++++' ):
