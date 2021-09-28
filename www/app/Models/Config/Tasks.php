@@ -7,6 +7,8 @@ class Tasks extends Model {
 
     private function buildTaskName($task) {
         $task->longName = str_replace('{lowering_name}', LOWERING_NAME, $task->longName);
+        $task->longName = str_replace('{cruise_name}', CRUISE_NAME, $task->longName);
+
         return $task;
     }
 
