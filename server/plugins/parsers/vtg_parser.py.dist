@@ -163,7 +163,7 @@ class VTGParser(OpenVDMCSVParser):
         self.add_bounds_stat([round(df_proc['cog_t'].min(),3), round(df_proc['cog_t'].max(),3)], "COG True Bounds", "deg")
         self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG True Validity")
         self.add_bounds_stat([round(df_proc['cog_m'].min(),3), round(df_proc['cog_m'].max(),3)], "COG Magnetic Bounds", "deg")
-        self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG Magnetic Validity")
+        self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
         self.add_bounds_stat([round(df_proc['sog_kts'].min(),3), round(df_proc['sog_kts'].max(),3)], 'SOG Knots Bounds', 'deg')
         self.add_value_validity_stat([len(df_proc[(df_proc['sog_kts'] <= MAX_SOG_KTS)]),len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)])], "SOG Knots Validity")
         self.add_bounds_stat([round(df_proc['sog_kph'].min(),3), round(df_proc['sog_kph'].max(),3)], 'SOG KPH Bounds', 'deg')

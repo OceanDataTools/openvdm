@@ -78,8 +78,10 @@ def build_directorylist(gearman_worker):
 
     required_extra_directories = gearman_worker.ovdm.get_required_extra_directories()
     for required_extra_directory in required_extra_directories:
-        dest_dir = build_dest_dir(gearman_worker, required_extra_directory['destDir'])
-        return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+
+        if required_extra_directories['enable'] == "1":
+            dest_dir = build_dest_dir(gearman_worker, required_extra_directory['destDir'])
+            return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
 
     extra_directories = gearman_worker.ovdm.get_extra_directories()
     if extra_directories:

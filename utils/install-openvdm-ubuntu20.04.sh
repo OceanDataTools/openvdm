@@ -159,6 +159,8 @@ function install_packages {
 
     apt-get update
 
+    apt-get install -y software-properties-common
+
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
