@@ -59,7 +59,7 @@ Router::any('config/system/privateLink/(:num)', '\Controllers\Config\System@priv
 Router::any('config/system/publicLink/(:num)', '\Controllers\Config\System@publicLink');
 //Router::any('config/system/delete/(:num)', '\Controllers\Config\System@delete');
 
-Router::any('config/users/edit/(:num)', '\Controllers\Config\Users@edit');
+Router::any('config/users/edit/(:num)', '\Controllers\Config\Users@editUser');
 
 Router::any('config/collectionSystemTransfers', '\Controllers\Config\CollectionSystemTransfers@index');
 Router::any('config/collectionSystemTransfers/add', '\Controllers\Config\CollectionSystemTransfers@add');
