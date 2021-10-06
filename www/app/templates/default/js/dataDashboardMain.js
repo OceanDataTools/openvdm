@@ -27,7 +27,7 @@ $(function () {
                     
                     for (i = 0; i < data.length; i++) {
                         yAxes[i] = {
-                            reversed = (reversedY || data[i].label == "Depth")
+                            reversed: reversedY || data[i].label == "Depth"
                             labels: {
                                 enabled: false
                             },
