@@ -562,7 +562,7 @@ $(function () {
             } else if ($(this).hasClass( "json-inverted-radio" )) {
                 updateChart(chartObjects[i], $(this).val(), false, true);
             } else {
-                updateChart(chartObjects[i], $(this).val());
+                updateChart(chartObjects[i], $(this).val(), false, true);
             }
         });
         
