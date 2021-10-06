@@ -444,7 +444,7 @@ $(function () {
                             crosshairs: true,
                             xDateFormat: '%Y-%m-%d',
                             formatter: function() {
-                                var toolTipStr = '<span style="font-size: 10px">Time: ' + Highcharts.dateFormat('%b %e %Y - %H:%M:%S', this.x) + '</span>';
+                                var toolTipStr = inverted ? 'X: ' + this.x : '<span style="font-size: 10px">Time: ' + Highcharts.dateFormat('%b %e %Y - %H:%M:%S', this.x) + '</span>';
                                 $.each(this.points, function (i) {
                                     toolTipStr += '<br/>' + '<span style="font-size: 10px; color:' + this.series.color + '">\u25CF</span><span style="font-size: 10px"> ' + this.series.name + ': ' + this.y +  ' </span>';
                                 });
