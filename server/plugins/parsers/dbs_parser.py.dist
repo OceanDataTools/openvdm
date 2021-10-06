@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-FILE:  dpt_parser.py
+FILE:  dbs_parser.py
 
-USAGE:  dpt_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  dbs_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA DPT file and return the json-formatted string
+DESCRIPTION:  Parse the supplied NMEA DBS file and return the json-formatted string
     used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
@@ -45,12 +45,12 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
 
-RAW_COLS = ['date_time','hdr','depth','surface_offset','max-depth_checksum'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','depth','surface_offset','max-depth_checksum'] # SCS style
-PROC_COLS = ['date_time','depth']
+RAW_COLS = ['date_time','hdr','depth_f','f','depth_m','m','depth_F','F_checksum'] # OpenRVDAS style
+# RAW_COLS = ['date','time','hdr','depth_f','f','depth_m','m','depth_F','F_checksum'] # SCS style
+PROC_COLS = ['date_time','depth_m']
 
 ROUNDING = {
-    'depth': 3
+    'depth_m': 3
 }
 
 MIN_DEPTH = 0
@@ -62,7 +62,7 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
-class DPTParser(OpenVDMCSVParser):
+class DBSParser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
@@ -94,7 +94,7 @@ class DPTParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        depth = float(line['depth'])
+                        depth = float(line['depth_m'])
 
                     except Exception as err:
                         errors.append(lineno)
@@ -104,7 +104,7 @@ class DPTParser(OpenVDMCSVParser):
 
                     else:
                         raw_into_df['date_time'].append(date_time)
-                        raw_into_df['depth'].append(depth)
+                        raw_into_df['depth_m'].append(depth)
 
         except Exception as err:
             logging.error("Problem accessing input file: %s", filepath)
@@ -147,8 +147,8 @@ class DPTParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['depth'].min(),3), round(df_proc['depth'].max(),3)], 'Depth Bounds', 'm')
-        self.add_value_validity_stat([len(df_proc[(df_proc['depth'] >= MIN_DEPTH)]),len(df_proc[(df_proc['depth'] < MIN_DEPTH)])], 'Depth Validity')
+        self.add_bounds_stat([round(df_proc['depth_m'].min(),3), round(df_proc['depth_m'].max(),3)], 'Depth Bounds', 'm')
+        self.add_value_validity_stat([len(df_proc[(df_proc['depth_m'] >= MIN_DEPTH)]),len(df_proc[(df_proc['depth_m'] < MIN_DEPTH)])], 'Depth Validity')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -169,7 +169,7 @@ class DPTParser(OpenVDMCSVParser):
         else:
             self.add_quality_test_passed("DeltaT")
 
-        error_rate = len(df_proc[(df_proc['depth'] < MIN_DEPTH)]) / len(df_proc)
+        error_rate = len(df_proc[(df_proc['depth_m'] < MIN_DEPTH)]) / len(df_proc)
         if error_rate > .25:
             self.add_quality_test_failed("Depth")
         elif error_rate > .10:
@@ -193,7 +193,7 @@ class DPTParser(OpenVDMCSVParser):
         logging.debug("Building visualization data...")
 
         visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','depth']].to_json(orient='values'))
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','depth_m']].to_json(orient='values'))
         visualizer_data_obj['unit'] = 'm'
         visualizer_data_obj['label'] = 'Depth'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
@@ -209,7 +209,7 @@ class DPTParser(OpenVDMCSVParser):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Parse NMEA DPT data')
+    parser = argparse.ArgumentParser(description='Parse NMEA DBS data')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = DPTParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
+    ovdm_parser = DBSParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)
