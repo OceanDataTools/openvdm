@@ -78,7 +78,7 @@ $(function () {
                             enabled: true
                         },
                         xAxis: {
-                            type: 'datetime',
+                            type: inverted ? 'linear' : 'datetime',
                             title: {text: ''},
                             dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
                         },
