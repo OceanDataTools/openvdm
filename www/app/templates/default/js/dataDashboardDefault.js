@@ -434,7 +434,10 @@ $(function () {
                     }
 
                     var chartOptions = {
-                        chart: {type: 'line' },
+                        chart: {
+                            type: 'line',
+                            inverted: inverted,
+                        },
                         title: {text: ''},
                         tooltip: {
                             shared: true,
@@ -449,7 +452,6 @@ $(function () {
                             }
                         },
                         legend: {enabled: true},
-                        inverted: inverted,
                         xAxis: {
                             type: inverted ? 'linear' : 'datetime',
                             title: {text: ''},
@@ -562,7 +564,7 @@ $(function () {
             } else if ($(this).hasClass( "json-inverted-radio" )) {
                 updateChart(chartObjects[i], $(this).val(), false, true);
             } else {
-                updateChart(chartObjects[i], $(this).val(), false, true);
+                updateChart(chartObjects[i], $(this).val());
             }
         });
         
