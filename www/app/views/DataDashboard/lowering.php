@@ -110,7 +110,37 @@ rsort($data['loweringIDs']);
 ?>
                                                     </div>
 <?php
-                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-reversed-y')===0) {
+                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-reversedY')===0) {
+?>
+                                                    <div class="form-group">
+<?php
+                    for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
+?>                              
+                                                        <div class='col-lg-4 col-sm-6'>
+                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
+                                                            <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
+                                                        </div>
+<?php
+                    }
+?>
+                                                    </div>
+<?php
+                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-reversedY-inverted')===0) {
+?>
+                                                    <div class="form-group">
+<?php
+                    for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
+?>                              
+                                                        <div class='col-lg-4 col-sm-6'>
+                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
+                                                            <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
+                                                        </div>
+<?php
+                    }
+?>
+                                                    </div>
+<?php
+                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-inverted')===0) {
 ?>
                                                     <div class="form-group">
 <?php
