@@ -7,7 +7,7 @@ class CollectionSystemTransfers extends Model {
 
     public function getCollectionSystemTransfers($sort = 'name'){
 
-        if (!in_array($sort, array("name", "longName")) {
+        if (!in_array($sort, array("name", "longName"))) {
             $sort = 'name';
         }
 
