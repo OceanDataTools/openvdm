@@ -5,8 +5,13 @@ use Core\Model;
 
 class CollectionSystemTransfers extends Model {
 
-    public function getCollectionSystemTransfers(){
-        return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers ORDER BY name");
+    public function getCollectionSystemTransfers($sort = 'name'){
+
+        if (!in_array($sort, array("name", "longName")) {
+            $sort = 'name';
+        }
+
+        return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers ORDER BY ".$sort );
     }
 
     public function getActiveCollectionSystemTransfers(){

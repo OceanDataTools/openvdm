@@ -96,7 +96,7 @@ class CollectionSystemTransfers extends Controller {
         
     public function index(){
         $data['title'] = 'Configuration';
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
+        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
         $data['javascript'] = array('collectionSystemTransfers');
 
         $warehouseModel = new \Models\Warehouse();
