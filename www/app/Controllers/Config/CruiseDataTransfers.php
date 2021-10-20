@@ -64,7 +64,7 @@ class CruiseDataTransfers extends Controller {
 
     public function index(){
         $data['title'] = 'Configuration';
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers("longName");
         $data['javascript'] = array('cruiseDataTransfers');
         View::rendertemplate('header',$data);
         View::render('Config/cruiseDataTransfers',$data);

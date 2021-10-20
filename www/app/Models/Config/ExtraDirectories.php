@@ -5,12 +5,22 @@ use Core\Model;
 
 class ExtraDirectories extends Model {
 
-    public function getExtraDirectories(){
-        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY name", array(':required' => '0'));
+    public function getExtraDirectories($sort = "name"){
+
+        if (!in_array($sort, array("name", "longName"))) {
+            $sort = 'name';
+        }
+
+        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '0'));
     }
 
-    public function getRequiredExtraDirectories(){
-        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY name", array(':required' => '1'));
+    public function getRequiredExtraDirectories($sort = "name"){
+
+        if (!in_array($sort, array("name", "longName"))) {
+            $sort = 'name';
+        }
+
+        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '1'));
     }
 
     public function getExtraDirectory($id){
