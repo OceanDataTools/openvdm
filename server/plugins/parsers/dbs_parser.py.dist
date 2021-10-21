@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FILE:  vtg_parser.py
+FILE:  dbs_parser.py
 
-USAGE:  vtg_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  dbs_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted VTG file and return the json-
-    formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied NMEA DBS file and return the json-formatted string
+    used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -44,30 +44,25 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-RAW_COLS = ['date_time','hdr','cog_t','T','cog_m','M','sog_kts','N','sog_kph','K','checksum'] # OpenRVDAS style
-# RAW_COLS = ['date', 'time','hdr','cog_t','T','cog_m','M','sog_kts','N','sog_kph','K','checksum'] # SCS style
-PROC_COLS = ['date_time','cog_t','cog_m','sog_kts','sog_kph']
+
+RAW_COLS = ['date_time','hdr','depth_f','f','depth_m','m','depth_F','F_checksum'] # OpenRVDAS style
+# RAW_COLS = ['date','time','hdr','depth_f','f','depth_m','m','depth_F','F_checksum'] # SCS style
+PROC_COLS = ['date_time','depth_m']
 
 ROUNDING = {
-    'cog_t': 3,
-    'cog_m': 3,
-    'sog_kts': 3,
-    'sog_kph': 3
+    'depth_m': 3
 }
 
-MIN_COG = 0
-MAX_COG = 360
-
-MAX_SOG_KTS = 25
-MAX_SOG_KPH = MAX_SOG_KTS * 1.852
+MIN_DEPTH = 0
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
+
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
-class VTGParser(OpenVDMCSVParser):
+class DBSParser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
@@ -99,10 +94,7 @@ class VTGParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        cog_t = float(line['cog_t']) if line['cog_t'] != '' else None
-                        cog_m = float(line['cog_m']) if line['cog_m'] != '' else None
-                        sog_kts = float(line['sog_kts']) if line['sog_kts'] != '' else None
-                        sog_kph = float(line['sog_kph']) if line['sog_kph'] != '' else None
+                        depth = float(line['depth_m'])
 
                     except Exception as err:
                         errors.append(lineno)
@@ -112,10 +104,7 @@ class VTGParser(OpenVDMCSVParser):
 
                     else:
                         raw_into_df['date_time'].append(date_time)
-                        raw_into_df['cog_t'].append(cog_t)
-                        raw_into_df['cog_m'].append(cog_m)
-                        raw_into_df['sog_kts'].append(sog_kts)
-                        raw_into_df['sog_kph'].append(sog_kph)
+                        raw_into_df['depth_m'].append(depth)
 
         except Exception as err:
             logging.error("Problem accessing input file: %s", filepath)
@@ -133,11 +122,9 @@ class VTGParser(OpenVDMCSVParser):
         logging.debug("Building dataframe from parsed data...")
         df_proc = pd.DataFrame(raw_into_df)
 
-        # Remove row where data is completely missing
-        df_proc.dropna(inplace=True, thresh=4)
-
         # Convert Date/time column to datetime objects
         logging.debug("Converting data_time to datetime datatype...")
+
         df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
 
         # Optionally crop data by start/stop times
@@ -160,15 +147,8 @@ class VTGParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['cog_t'].min(),3), round(df_proc['cog_t'].max(),3)], "COG True Bounds", "deg")
-        self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG True Validity")
-        self.add_bounds_stat([round(df_proc['cog_m'].min(),3), round(df_proc['cog_m'].max(),3)], "COG Magnetic Bounds", "deg")
-        self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
-        self.add_bounds_stat([round(df_proc['sog_kts'].min(),3), round(df_proc['sog_kts'].max(),3)], 'SOG Knots Bounds', 'deg')
-        self.add_value_validity_stat([len(df_proc[(df_proc['sog_kts'] <= MAX_SOG_KTS)]),len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)])], "SOG Knots Validity")
-        self.add_bounds_stat([round(df_proc['sog_kph'].min(),3), round(df_proc['sog_kph'].max(),3)], 'SOG KPH Bounds', 'deg')
-        self.add_value_validity_stat([len(df_proc[(df_proc['sog_kph'] <= MAX_SOG_KPH)]),len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)])], "SOG KPH Validity")
-
+        self.add_bounds_stat([round(df_proc['depth_m'].min(),3), round(df_proc['depth_m'].max(),3)], 'Depth Bounds', 'm')
+        self.add_value_validity_stat([len(df_proc[(df_proc['depth_m'] >= MIN_DEPTH)]),len(df_proc[(df_proc['depth_m'] < MIN_DEPTH)])], 'Depth Validity')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -189,37 +169,13 @@ class VTGParser(OpenVDMCSVParser):
         else:
             self.add_quality_test_passed("DeltaT")
 
-        error_rate = len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)]) / len(df_proc)
+        error_rate = len(df_proc[(df_proc['depth_m'] < MIN_DEPTH)]) / len(df_proc)
         if error_rate > .25:
-            self.add_quality_test_failed("SOG KTS")
+            self.add_quality_test_failed("Depth")
         elif error_rate > .10:
-            self.add_quality_test_warning("SOG KTS")
+            self.add_quality_test_warning("Depth")
         else:
-            self.add_quality_test_passed("SOG KTS")
-
-        error_rate = len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("SOG KPH")
-        elif error_rate > .10:
-            self.add_quality_test_warning("SOG KPH")
-        else:
-            self.add_quality_test_passed("SOG KPH")
-
-        error_rate = len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("COG True")
-        elif error_rate > .10:
-            self.add_quality_test_warning("COG True")
-        else:
-            self.add_quality_test_passed("COG True")
-
-        error_rate = len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("COG Magnetic")
-        elif error_rate > .10:
-            self.add_quality_test_warning("COG Magnetic")
-        else:
-            self.add_quality_test_passed("COG Magnetic")
+            self.add_quality_test_passed("Depth")
 
         # set index
         logging.debug('Setting index...')
@@ -237,24 +193,9 @@ class VTGParser(OpenVDMCSVParser):
         logging.debug("Building visualization data...")
 
         visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_t']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'deg'
-        visualizer_data_obj['label'] = 'COG, True'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_m']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'deg'
-        visualizer_data_obj['label'] = 'COG, Magnetic'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sog_kts']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'kts'
-        visualizer_data_obj['label'] = 'SOG, kts'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sog_kph']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'kph'
-        visualizer_data_obj['label'] = 'SOG, kph'
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','depth_m']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'm'
+        visualizer_data_obj['label'] = 'Depth'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
         # send message about errors encountered to OpenVDM
@@ -268,7 +209,7 @@ class VTGParser(OpenVDMCSVParser):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Parse NMEA VTG data')
+    parser = argparse.ArgumentParser(description='Parse NMEA DBS data')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
@@ -296,7 +237,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = VTGParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
+    ovdm_parser = DBSParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

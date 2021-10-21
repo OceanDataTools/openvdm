@@ -311,7 +311,7 @@ def test_ssh_dest_dir(gearman_worker):
 
     dest_dir = gearman_worker.cruise_data_transfer['destDir']
 
-    dest_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'ls', dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls', dest_dir]
+    dest_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'ls', "\"" + dest_dir + "\""] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls', "\"" + dest_dir + "\""]
 
     logging.debug("Destination test command: %s", dest_test_command)
 

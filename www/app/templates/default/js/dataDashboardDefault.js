@@ -159,8 +159,13 @@ $(function () {
     
     function chartChecked(chartObject) {
         $( '#' + chartObject['objectListID']).find(':radio:checked').each(function() {
-            if ($(this).hasClass( "json-reversed-y-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true);
+            
+            if ($(this).hasClass( "json-reversedY-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, false);
+            } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, true);
+            } else if ($(this).hasClass( "json-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), false, true);
             } else {
                 updateChart(chartObjects[i], $(this).val());
             }
@@ -384,8 +389,9 @@ $(function () {
         updateBounds(mapObject);
     }
     
-    function updateChart(chartObject, dataObjectJsonName, reversedY) {
+    function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
         var reversedY = reversedY || false;
+        var inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -401,6 +407,7 @@ $(function () {
                     var i = 0;
                     for (i = 0; i < data.length; i++) {
                         yAxes[i] = {
+                            reversed: reversedY || data[i].label == "Depth",
                             labels: {
                                 format: '{value}',
                                 style: {
@@ -418,10 +425,6 @@ $(function () {
                             yAxes[i].opposite = true;
                         }
 
-                        if (reversedY || data[i].label == "Depth") {
-                            yAxes[i].reversed = true;
-                        }
-
                         seriesData[i] = {
                             name: data[i].label +  ' (' + data[i].unit + ')',
                             yAxis: i,
@@ -431,14 +434,17 @@ $(function () {
                     }
 
                     var chartOptions = {
-                        chart: {type: 'line' },
+                        chart: {
+                            type: 'line',
+                            inverted: inverted,
+                        },
                         title: {text: ''},
                         tooltip: {
                             shared: true,
                             crosshairs: true,
                             xDateFormat: '%Y-%m-%d',
                             formatter: function() {
-                                var toolTipStr = '<span style="font-size: 10px">Time: ' + Highcharts.dateFormat('%b %e %Y - %H:%M:%S', this.x) + '</span>';
+                                var toolTipStr = inverted ? 'X: ' + this.x : '<span style="font-size: 10px">Time: ' + Highcharts.dateFormat('%b %e %Y - %H:%M:%S', this.x) + '</span>';
                                 $.each(this.points, function (i) {
                                     toolTipStr += '<br/>' + '<span style="font-size: 10px; color:' + this.series.color + '">\u25CF</span><span style="font-size: 10px"> ' + this.series.name + ': ' + this.y +  ' </span>';
                                 });
@@ -446,10 +452,11 @@ $(function () {
                             }
                         },
                         legend: {enabled: true},
-                        xAxis: {type: 'datetime',
-                                title: {text: ''},
-                                dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
-                               },
+                        xAxis: {
+                            type: inverted ? 'linear' : 'datetime',
+                            title: {text: ''},
+                            dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
+                        },
                         yAxis: yAxes,
                         series: seriesData
                     };
@@ -550,8 +557,12 @@ $(function () {
     //Check for updates
     $.each(chartObjects, function(i) {
         $( '#' + chartObjects[i]['objectListID']).find(':radio').change(function() {
-	    if ($(this).hasClass( "json-reversed-y-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true);
+    	    if ($(this).hasClass( "json-reversedY-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, false);
+            } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, true);
+            } else if ($(this).hasClass( "json-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), false, true);
             } else {
                 updateChart(chartObjects[i], $(this).val());
             }

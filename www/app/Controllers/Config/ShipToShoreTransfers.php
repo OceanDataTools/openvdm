@@ -99,7 +99,7 @@ class shipToShoreTransfers extends Controller {
     public function index(){
         $data['title'] = 'Configuration';
         $data['javascript'] = array('shipToShoreTransfers');
-        $data['shipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfers();
+        $data['shipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfers("longName");
         $data['ssdwID'] = $this->_ssdwConfig->cruiseDataTransferID;
         $data['ssdwEnable'] = $this->_ssdwConfig->enable;
         $data['ssdwStatus'] = $this->_ssdwConfig->status;

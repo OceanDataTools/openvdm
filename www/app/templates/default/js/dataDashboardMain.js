@@ -9,8 +9,9 @@ $(function () {
         colors: ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
     });
     
-    function displayLatestJSON(dataType, reversedY) {
+    function displayLatestJSON(dataType, reversedY, inverted) {
         var reversedY = reversedY || false;
+        var inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -26,6 +27,7 @@ $(function () {
                     
                     for (i = 0; i < data.length; i++) {
                         yAxes[i] = {
+                            reversed: reversedY || data[i].label == "Depth",
                             labels: {
                                 enabled: false
                             },
@@ -34,9 +36,9 @@ $(function () {
                             }
                         };
 
-                        if (reversedY || data[i].label == "Depth") {
-                            yAxes[i].reversed = true;
-                        }
+                        // if (reversedY || data[i].label == "Depth") {
+                        //     yAxes[i].reversed = true;
+                        // }
 
                         seriesData[i] = {
                             name: data[i].label,
@@ -48,6 +50,7 @@ $(function () {
                 
                     var chartOptions = {
                         chart: {
+                            inverted: inverted,
                             type: 'line',
                             events: {
                                 click: function (e) {
@@ -75,7 +78,7 @@ $(function () {
                             enabled: true
                         },
                         xAxis: {
-                            type: 'datetime',
+                            type: inverted ? 'linear' : 'datetime',
                             title: {text: ''},
                             dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
                         },
@@ -89,85 +92,85 @@ $(function () {
     }
 
 
-    function displayLatestInvertedJSON(dataType) {
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
-        $.getJSON(getVisualizerDataURL, function (data, status) {
-            if (status === 'success' && data !== null) {
+    // function displayLatestInvertedJSON(dataType) {
+    //     var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
+    //     $.getJSON(getVisualizerDataURL, function (data, status) {
+    //         if (status === 'success' && data !== null) {
                 
-                var placeholder = '#' + dataType + '-placeholder';
-                if (data.indexOf('error') > 0) {
-                    $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
-                } else {
-                    var seriesData = [],
-                        yAxes = [],
-                        xAxes = [],
-                        i = 0;
+    //             var placeholder = '#' + dataType + '-placeholder';
+    //             if (data.indexOf('error') > 0) {
+    //                 $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
+    //             } else {
+    //                 var seriesData = [],
+    //                     yAxes = [],
+    //                     xAxes = [],
+    //                     i = 0;
                     
-                    for (i = 0; i < data.length; i++) {
-                        yAxes[i] = {
-                            reversed: true,
-                            labels: {
-                                enabled: false
-                            },
-                            title: {
-                                enabled: false
-                            }
-                        };
+    //                 for (i = 0; i < data.length; i++) {
+    //                     yAxes[i] = {
+    //                         reversed: true,
+    //                         labels: {
+    //                             enabled: false
+    //                         },
+    //                         title: {
+    //                             enabled: false
+    //                         }
+    //                     };
                     
-                        //if (data[i].label === "Humidity (%)") {
-                        //    yAxes[i].min = 0;
-                        //    yAxes[i].max = 100;
-                        //}
+    //                     //if (data[i].label === "Humidity (%)") {
+    //                     //    yAxes[i].min = 0;
+    //                     //    yAxes[i].max = 100;
+    //                     //}
                     
-                        seriesData[i] = {
-                            name: data[i].label,
-                            yAxis: i,
-                            data: data[i].data,
-                            animation: false
-                        };
-                    }
+    //                     seriesData[i] = {
+    //                         name: data[i].label,
+    //                         yAxis: i,
+    //                         data: data[i].data,
+    //                         animation: false
+    //                     };
+    //                 }
                 
-                    var chartOptions = {
-                        chart: {
-                            type: 'line',
-                            events: {
-                                click: function (e) {
-                                    window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
-                                }
-                            }
-                        },
-                        plotOptions: {
-                            series: {
-                                events: {
-                                    legendItemClick: function () {
-                                        return false;
-                                    }
-                                },
-                                states: {
-                                    hover: {
-                                        enabled: false
-                                    }
-                                }
-                            }
-                        },
-                        title: {text: ''},
-                        tooltip: false,
-                        legend: {
-                            enabled: true
-                        },
-                        xAxis: {
-                            type: 'datetime',
-                            title: {text: ''},
-                            dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
-                        },
-                        yAxis: yAxes,
-                        series: seriesData
-                    };
-                    $(placeholder).highcharts(chartOptions);
-                }
-            }
-        });
-    }
+    //                 var chartOptions = {
+    //                     chart: {
+    //                         type: 'line',
+    //                         events: {
+    //                             click: function (e) {
+    //                                 window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
+    //                             }
+    //                         }
+    //                     },
+    //                     plotOptions: {
+    //                         series: {
+    //                             events: {
+    //                                 legendItemClick: function () {
+    //                                     return false;
+    //                                 }
+    //                             },
+    //                             states: {
+    //                                 hover: {
+    //                                     enabled: false
+    //                                 }
+    //                             }
+    //                         }
+    //                     },
+    //                     title: {text: ''},
+    //                     tooltip: false,
+    //                     legend: {
+    //                         enabled: true
+    //                     },
+    //                     xAxis: {
+    //                         type: 'datetime',
+    //                         title: {text: ''},
+    //                         dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
+    //                     },
+    //                     yAxis: yAxes,
+    //                     series: seriesData
+    //                 };
+    //                 $(placeholder).highcharts(chartOptions);
+    //             }
+    //         }
+    //     });
+    // }
     
         
     function displayLatestGeoJSON(dataType) {
@@ -318,10 +321,19 @@ $(function () {
         }
         for (i = 0; i < jsonReversedYTypes.length; i++) {
             if ($('#' + jsonReversedYTypes[i] + '-placeholder').length) {
-                displayLatestJSON(jsonReversedYTypes[i], true);
+                displayLatestJSON(jsonReversedYTypes[i], true, false);
             }
         }
-
+        for (i = 0; i < jsonReversedYInvertedTypes.length; i++) {
+            if ($('#' + jsonReversedYInvertedTypes[i] + '-placeholder').length) {
+                displayLatestJSON(jsonReversedYInvertedTypes[i], true, true);
+            }
+        }
+        for (i = 0; i < jsonInvertedTypes.length; i++) {
+            if ($('#' + jsonInvertedTypes[i] + '-placeholder').length) {
+                displayLatestJSON(jsonInvertedTypes[i], false, true);
+            }
+        }
     }
     
     displayLatestData();

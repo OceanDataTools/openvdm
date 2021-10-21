@@ -289,7 +289,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     filters = build_filters(gearman_worker)
 
-    command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
+    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -790,7 +790,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     bandwidth_limit = '--bwlimit=' + gearman_worker.collection_system_transfer['bandwidthLimit'] if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
 
-    command = ['rsync', '-tri', bandwidth_limit, '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-tri', bandwidth_limit, '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
+    command = ['rsync', '-tri', bandwidth_limit, '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-tri', '--protect-args', bandwidth_limit, '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 

@@ -157,8 +157,12 @@ $(function () {
         //alert($( '#' + chartObject['objectListID']).length);
         //alert($( '#' + chartObject['objectListID']).find(':radio:checked').length);
         $( '#' + chartObject['objectListID']).find(':radio:checked').each(function() {
-            if ($(this).hasClass( "json-reversed-y-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true);
+            if ($(this).hasClass( "json-reversedY-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, false);
+            } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), true, true);
+            } else if ($(this).hasClass( "json-inverted-radio" )) {
+                updateChart(chartObjects[i], $(this).val(), false, true);
             } else {
                 updateChart(chartObjects[i], $(this).val());
             }

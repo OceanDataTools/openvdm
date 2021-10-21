@@ -5,12 +5,22 @@ use Core\Model;
 
 class ShipToShoreTransfers extends Model {
 
-    public function getShipToShoreTransfers(){
-        return $this->db->select("SELECT * FROM ".PREFIX."ShipToShoreTransfers WHERE required = :requried ORDER BY name", array(':requried' => '0'));
+    public function getShipToShoreTransfers($sort = "name"){
+
+        if (!in_array($sort, array("name", "longName"))) {
+            $sort = 'name';
+        }
+
+        return $this->db->select("SELECT * FROM ".PREFIX."ShipToShoreTransfers WHERE required = :requried ORDER BY ".$sort, array(':requried' => '0'));
     }
 
-    public function getRequiredShipToShoreTransfers(){
-        return $this->db->select("SELECT * FROM ".PREFIX."ShipToShoreTransfers WHERE required = :requried ORDER BY name", array(':requried' => '1'));
+    public function getRequiredShipToShoreTransfers($sort = "name"){
+
+        if (!in_array($sort, array("name", "longName"))) {
+            $sort = 'name';
+        }
+
+        return $this->db->select("SELECT * FROM ".PREFIX."ShipToShoreTransfers WHERE required = :requried ORDER BY ".$sort, array(':requried' => '1'));
     }
 
     public function getShipToShoreTransfer($id){

@@ -64,7 +64,7 @@ class CruiseDataTransfers extends Controller {
 
     public function index(){
         $data['title'] = 'Configuration';
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers("longName");
         $data['javascript'] = array('cruiseDataTransfers');
         View::rendertemplate('header',$data);
         View::render('Config/cruiseDataTransfers',$data);
@@ -942,7 +942,7 @@ class CruiseDataTransfers extends Controller {
         $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
 
         $data['title'] = 'Configuration';
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers("longName");
         $data['javascript'] = array('cruiseDataTransfers');
 
         #additional data needed for view

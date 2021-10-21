@@ -313,13 +313,13 @@ LOCK TABLES `OVDM_Tasks` WRITE;
 
 INSERT INTO `OVDM_Tasks` (`taskID`, `name`, `longName`, `cruiseOrLowering`, `status`, `enable`, `pid`)
 VALUES
-	(1,'setupNewCruise','Setup New Cruise',0,2,1,0),
-	(2,'finalizeCurrentCruise','Finalize Current Cruise',0,2,1,0),
+	(1,'setupNewCruise','Setup New {cruise_name}',0,2,1,0),
+	(2,'finalizeCurrentCruise','Finalize Current {cruise_name}',0,2,1,0),
 	(3,'rebuildMD5Summary','Rebuild MD5 Summary',0,2,1,0),
 	(4,'rebuildDataDashboard','Rebuild Data Dashboard',0,2,1,0),
-	(5,'rebuildCruiseDirectory','Rebuild Cruise Directory',0,2,1,0),
+	(5,'rebuildCruiseDirectory','Rebuild {cruise_name} Directory',0,2,1,0),
 	(6,'exportOVDMConfig','Re-export the OpenVDM Configuration',0,2,1,0),
-	(7,'rsyncPublicDataToCruiseData','Sync PublicData within Cruise Directory',0,2,1,0),
+	(7,'rsyncPublicDataToCruiseData','Sync PublicData within {cruise_name} Directory',0,2,1,0),
 	(8,'setupNewLowering','Setup New {lowering_name}',1,2,1,0),
 	(9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
 	(10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),

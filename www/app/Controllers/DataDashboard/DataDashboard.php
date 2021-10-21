@@ -35,6 +35,8 @@ class DataDashboard extends Controller {
         $data['tmsTypes'] = $this->_dataDashboardModel->getTMSTypes();
         $data['jsonTypes'] = $this->_dataDashboardModel->getJSONTypes();
         $data['jsonReversedYTypes'] = $this->_dataDashboardModel->getJSONReversedYTypes();
+        $data['jsonReversedYInvertedTypes'] = $this->_dataDashboardModel->getJSONReversedYInvertedTypes();
+        $data['jsonInvertedTypes'] = $this->_dataDashboardModel->getJSONInvertedTypes();
         
         $data['subPages'] = $this->_dataDashboardModel->getSubPages();
 
