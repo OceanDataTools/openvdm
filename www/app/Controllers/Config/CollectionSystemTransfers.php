@@ -1071,7 +1071,7 @@ class CollectionSystemTransfers extends Controller {
         $data['testResults'] = json_decode($gmc->doNormal("testCollectionSystemTransfer", json_encode($gmData)), true);
 
         $data['title'] = 'Configuration';
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
+        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
         $data['javascript'] = array('collectionSystemTransfers');
 
         #additional data needed for view
