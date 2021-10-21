@@ -289,7 +289,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     filters = build_filters(gearman_worker)
 
-    command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
+    command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':"' + source_dir + '/"'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':"' + source_dir + '/"']
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
