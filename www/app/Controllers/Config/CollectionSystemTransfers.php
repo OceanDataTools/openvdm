@@ -27,7 +27,7 @@ class CollectionSystemTransfers extends Controller {
     
     private function _buildStalenessOptions($staleness="5") {
 
-        $staleness = ($staleness != "0")? $staleness : "5"
+        $staleness = ($staleness != "0")? $staleness : "5";
         
         $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>$staleness, 'label'=>'Yes'));
         return $trueFalse;
