@@ -25,9 +25,9 @@ class CollectionSystemTransfers extends Controller {
         return $output;
     }
     
-    private function _buildStalenessOptions() {
+    private function _buildStalenessOptions($staleness="5") {
         
-        $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>'5', 'label'=>'Yes'));
+        $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>$staleness, 'label'=>'Yes'));
         return $trueFalse;
     }
     
@@ -546,7 +546,6 @@ class CollectionSystemTransfers extends Controller {
         $data['title'] = 'Collection System Transfers';
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
-        $data['stalenessOptions'] = $this->_buildStalenessOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
@@ -554,6 +553,8 @@ class CollectionSystemTransfers extends Controller {
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);        
+
+        $data['stalenessOptions'] = $this->_buildStalenessOptions(data['row']['staleness']);
         
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
