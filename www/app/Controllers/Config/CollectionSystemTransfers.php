@@ -555,7 +555,7 @@ class CollectionSystemTransfers extends Controller {
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);        
 
         var_dump($data['row'][0]->staleness);
-        $data['stalenessOptions'] = $this->_buildStalenessOptions($data['row'][0]]->staleness);
+        $data['stalenessOptions'] = $this->_buildStalenessOptions($data['row'][0]->staleness);
         
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
