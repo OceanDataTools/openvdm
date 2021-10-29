@@ -47,7 +47,7 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group">
                                     <label>Skip files being actively written to?</label><?php echo FormCustom::radioInline($data['stalenessOptions'], $_POST['staleness']); ?>
                                     <span class="pull-right staleness">
-                                        <label>Time to wait when checking for active writes (seconds)?</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'customStaleness', 'value'=> ($_POST['staleness'] != "0")? $_POST['staleness'] : "5", 'size'=>'7', 'length'=>'8')); ?>
+                                        <label>Time to wait when checking for active writes (seconds)?</label><?php echo Form::input( array('name'=>'customStaleness', 'value'=> ($_POST['staleness'] != "0")? $_POST['staleness'] : "5", 'size'=>'7', 'length'=>'8')); ?>
                                     </span>
                                 </div>
                                 <div class="form-group"><label>Skip files create/modified outside of cruise start/stop times?</label><?php echo FormCustom::radioInline($data['useStartDateOptions'], $_POST['useStartDate']); ?></div>
