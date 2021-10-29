@@ -26,6 +26,8 @@ class CollectionSystemTransfers extends Controller {
     }
     
     private function _buildStalenessOptions($staleness="5") {
+
+        $staleness = ($staleness != "0")? $staleness : "5"
         
         $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>$staleness, 'label'=>'Yes'));
         return $trueFalse;
@@ -554,7 +556,6 @@ class CollectionSystemTransfers extends Controller {
 
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);        
 
-        var_dump($data['row'][0]->staleness);
         $data['stalenessOptions'] = $this->_buildStalenessOptions($data['row'][0]->staleness);
         
         if(isset($_POST['submit'])){
