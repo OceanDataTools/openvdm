@@ -126,7 +126,7 @@ class CollectionSystemTransfers extends Controller {
             $transferType = $_POST['transferType'];
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = $_POST['staleness'];
+            $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
             $useStartDate = $_POST['useStartDate'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
