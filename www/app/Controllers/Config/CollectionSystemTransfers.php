@@ -185,6 +185,12 @@ class CollectionSystemTransfers extends Controller {
                 $ignoreFilter = preg_replace("/\s*,\s*/", ",",$ignoreFilter);
             }
 
+            if ($staleness === '') {
+                $staleness = '0';
+            } elseif(!((string)(int)$staleness == $staleness)){
+                $error[] = 'Transfer limit must be an integer';
+            }
+
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
@@ -619,6 +625,12 @@ class CollectionSystemTransfers extends Controller {
                 $ignoreFilter = preg_replace("/\s*,\s*/", ",",$ignoreFilter);
             }
             
+            if ($staleness === '') {
+                $staleness = '0';
+            } elseif(!((string)(int)$staleness == $staleness)){
+                $error[] = 'Transfer limit must be an integer';
+            }
+
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
