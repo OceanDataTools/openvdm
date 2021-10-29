@@ -66,9 +66,9 @@ $(function () {
     function setCustomStalenessField(staleness) {
         console.log("staleness:", staleness);    
         if(staleness == "0"){
-            $('.staleness]').hide();
+            $(".staleness").hide();
         } else {
-            $('.staleness]').show();
+            $(".staleness").show();
         }
     }
 
