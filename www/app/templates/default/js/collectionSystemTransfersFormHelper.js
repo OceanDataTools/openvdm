@@ -64,11 +64,11 @@ $(function () {
     }
 
     function setCustomStalenessField(staleness) {
-        console.log("staleness:", staleness, typeof(staleness));    
-        if(staleness == 0){
+        console.log("staleness:", staleness);    
+        if(staleness == "0"){
             $('input[name=customStaleness]').prop('disabled', true);
         } else {
-            $('input[name=sshPass]').prop('disabled', false);
+            $('input[name=customStaleness]').prop('disabled', false);
         }
     }
 
