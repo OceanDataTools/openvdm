@@ -47,7 +47,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60 #5 Mintues
+    staleness = int(gearman_worker.collection_system_transfer['staleness'])# * 60 #5 Mintues
     logging.debug("Staleness: %s", staleness)
 
     threshold_time = time.time() - staleness
@@ -122,7 +122,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
 
     if not gearman_worker.collection_system_transfer['staleness'] == '0':
         logging.debug("Checking for changing filesizes")
-        time.sleep(5)
+        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
         for idx, filepath in enumerate(return_files['include']):
             if not os.stat(filepath).st_size == return_files['filesize'][idx]:
                 logging.debug("file %s has changed size, removing from include list", filepath)
@@ -239,7 +239,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
 
     if not gearman_worker.collection_system_transfer['staleness'] == '0':
         logging.debug("Checking for changing filesizes")
-        time.sleep(5)
+        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
         proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
         for line in proc.stdout.splitlines():
@@ -351,7 +351,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     if not gearman_worker.collection_system_transfer['staleness'] == '0':
         logging.debug("Checking for changing filesizes")
-        time.sleep(5)
+        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
         proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
         for line in proc.stdout.splitlines():
@@ -914,8 +914,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
-            if self.collection_system_transfer['staleness'] == "1":
-                self.data_end_date = datetime.utcnow() - timedelta(minutes=5)
+            if self.collection_system_transfer['staleness'] != "0":
+                self.data_end_date = datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))
 
         # Todo - there's a change the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
