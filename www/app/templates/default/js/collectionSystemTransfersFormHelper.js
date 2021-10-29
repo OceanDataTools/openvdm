@@ -64,7 +64,7 @@ $(function () {
     }
 
     function setCustomStalenessField(staleness) {
-        console.log("staleness:" staleness);
+        console.log("staleness:", staleness);    
         if(staleness == "0"){
             $('input[name=customStaleness]').prop('disabled', true);
         } else {
