@@ -62,9 +62,19 @@ $(function () {
         default:
         }
     }
+
+    function setCustomStalenessField(staleness) {
+        if(staleness == "0"){
+            $('input[name=customStaleness]').prop('disabled', true);
+        } else {
+            $('input[name=sshPass]').prop('disabled', false);
+        }
+    }
+
     
     setTransferTypeFields($('input[name=transferType]:checked').val());
     setSSHUseKeyField($('input[name=sshUseKey]:checked').val())
+    setCustomStalenessField($('input[name=staleness]:checked').val())
     
     $('input[name=transferType]').change(function () {
         setTransferTypeFields($(this).val());
@@ -74,4 +84,7 @@ $(function () {
         setSSHUseKeyField($(this).val());
     });
     
+    $('input[name=staleness]').change(function () {
+        setCustomStalenessField($(this).val());
+    });
 });
