@@ -44,7 +44,7 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group"><label>Exclude Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'excludeFilter', 'value'=> $data['row'][0]->excludeFilter)); ?></div>
                                 <div class="form-group"><label>Ignore Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'ignoreFilter', 'value'=> $data['row'][0]->ignoreFilter)); ?></div>
                                 <div class="form-group"><label>Skip files being actively written to?</label><?php echo FormCustom::radioInline($data['stalenessOptions'], $data['row'][0]->staleness); ?></div>
-                                <div class="form-group staleness"><label>Time to wait when checking for active writes?</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'customStaleness', 'value'=> $data['row'][0]->staleness)); ?></div>
+                                <div class="form-group staleness"><label>Time to wait when checking for active writes?</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'customStaleness', 'value'=>($data['row'][0]->staleness != "0")? $data['row'][0]->staleness): "5"); ?></div>
                                 <div class="form-group"><label>Skip files create/modified outside of cruise start/stop times?</label><?php echo FormCustom::radioInline($data['useStartDateOptions'], $data['row'][0]->useStartDate); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $data['row'][0]->bandwidthLimit, 'size'=>'7', 'length'=>'8')); ?></label></div>
 <?php
