@@ -25,9 +25,9 @@ class CollectionSystemTransfers extends Controller {
         return $output;
     }
     
-    private function _buildStalenessOptions() {
+    private function _buildStalenessOptions($staleness="5") {
         
-        $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>'5', 'label'=>'Yes'));
+        $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>$staleness, 'label'=>'Yes'));
         return $trueFalse;
     }
     
@@ -126,7 +126,7 @@ class CollectionSystemTransfers extends Controller {
             $transferType = $_POST['transferType'];
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = $_POST['staleness'];
+            $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
             $useStartDate = $_POST['useStartDate'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
@@ -183,6 +183,12 @@ class CollectionSystemTransfers extends Controller {
 
             if($ignoreFilter != ''){
                 $ignoreFilter = preg_replace("/\s*,\s*/", ",",$ignoreFilter);
+            }
+
+            if ($staleness === '') {
+                $staleness = '0';
+            } elseif(!((string)(int)$staleness == $staleness)){
+                $error[] = 'Transfer limit must be an integer';
             }
 
             if ($bandwidthLimit === '') {
@@ -546,7 +552,6 @@ class CollectionSystemTransfers extends Controller {
         $data['title'] = 'Collection System Transfers';
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
-        $data['stalenessOptions'] = $this->_buildStalenessOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
@@ -554,6 +559,8 @@ class CollectionSystemTransfers extends Controller {
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);        
+
+        $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
         
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -561,7 +568,7 @@ class CollectionSystemTransfers extends Controller {
             $transferType = $_POST['transferType'];
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = $_POST['staleness'];
+            $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
             $useStartDate = $_POST['useStartDate'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
@@ -618,6 +625,12 @@ class CollectionSystemTransfers extends Controller {
                 $ignoreFilter = preg_replace("/\s*,\s*/", ",",$ignoreFilter);
             }
             
+            if ($staleness === '') {
+                $staleness = '0';
+            } elseif(!((string)(int)$staleness == $staleness)){
+                $error[] = 'Transfer limit must be an integer';
+            }
+
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){

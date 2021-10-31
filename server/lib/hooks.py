@@ -31,8 +31,8 @@ def build_commands(gearman_worker, command_list):
         command['command'] = [arg.replace('{loweringID}', gearman_worker.lowering_id) for arg in command['command']] if gearman_worker.lowering_id else command['command']
         command['command'] = [arg.replace('{collectionSystemTransferID}', gearman_worker.collection_system_transfer['collectionSystemTransferID']) for arg in command['command']] if gearman_worker.collection_system_transfer and 'collectionSystemTransferID' in gearman_worker.collection_system_transfer else command['command']
         command['command'] = [arg.replace('{collectionSystemTransferName}', gearman_worker.collection_system_transfer['name']) for arg in command['command']] if gearman_worker.collection_system_transfer and 'name' in gearman_worker.collection_system_transfer else command['command']
-        command['command'] = [arg.replace('{newFiles}', json.dumps(gearman_worker.files['new'])) for arg in command['command']] if gearman_worker.files and 'new' in gearman_worker.files else command['command']
-        command['command'] = [arg.replace('{updatedFiles}', json.dumps(gearman_worker.files['updated']) ) for arg in command['command']] if gearman_worker.files and 'updated' in gearman_worker.files else command['command']
+        command['command'] = [arg.replace('{newFiles}', ' '.join(gearman_worker.files['new'])) for arg in command['command']] if gearman_worker.files and 'new' in gearman_worker.files else command['command']
+        command['command'] = [arg.replace('{updatedFiles}', ' '.join(gearman_worker.files['updated'])) for arg in command['command']] if gearman_worker.files and 'updated' in gearman_worker.files else command['command']
 
     logging.debug("Processed Command: %s", json.dumps(command_list))
 
