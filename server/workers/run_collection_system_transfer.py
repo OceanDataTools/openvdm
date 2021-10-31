@@ -151,7 +151,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
     # threshold_time = time.time() - staleness # 5 minutes
     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M%S"))
+    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
     # logging.debug("Threshold: %s", threshold_time)
     logging.debug("    Start: %s", data_start_time)
