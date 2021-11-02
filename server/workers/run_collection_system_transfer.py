@@ -899,7 +899,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # if temporal bands are not used then set to absolute min/max
         if self.collection_system_transfer['useStartDate'] == '0':
             self.data_start_date = "1970/01/01 00:00"
-            self.data_end_date = "9999/12/31 23:59"
+            self.data_end_date = "9999/12/31 23:59:59"
 
         # if temporal bands are used then set to specified bounds for the corresponding cruise/lowering
         else:
