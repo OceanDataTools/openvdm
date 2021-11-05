@@ -261,25 +261,34 @@ function install_python_packages {
 # Install and configure database
 function configure_supervisor {
 
-    cp /etc/supervisord.conf /etc/supervisord.conf.orig
+    mv /etc/supervisord.conf /etc/supervisord.conf.orig
 
-    # sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
-    # sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
+    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisord.conf.orig |
+    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisord.conf
 
     if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
-        sed 's/;[inet_http_server]/[inet_http_server]/' /etc/supervisord.conf |
-        sed 's/;port=/port=/'
+        cat >> /etc/supervisord.conf <<EOF
 
+### Added by OpenVDM install script ###
+[inet_http_server]
+port=9001
+EOF
         if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
             SUPERVISORD_WEBINTERFACE_HASH=`echo -n ${SUPERVISORD_WEBINTERFACE_PASS} | sha1sum | awk '{printf("{SHA}%s",$1)}'`
-            sed 's/;username=user/username=${SUPERVISORD_WEBINTERFACE_USER}/' /etc/supervisord.conf |
-            sed 's/;password=123/password=${SUPERVISORD_WEBINTERFACE_HASH}/'
+            cat >> /etc/supervisord.conf <<EOF
+username=${SUPERVISORD_WEBINTERFACE_USER}
+password=${SUPERVISORD_WEBINTERFACE_HASH} ; echo -n "<password>" | sha1sum | awk '{printf("{SHA}%s",\$1)}'
+EOF
         fi
+
+      cat >> /etc/supervisord.conf <<EOF
+### Added by OpenVDM install script ###
+EOF
     fi
 
 VENV_BIN=${INSTALL_ROOT}/openvdm/venv/bin
 
-    cat > /etc/supervisor.d/openvdm.ini << EOF
+    cat > /etc/supervisord.d/openvdm.ini << EOF
 [program:cruise]
 command=${VENV_BIN}/python server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
