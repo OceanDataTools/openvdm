@@ -261,7 +261,7 @@ function install_python_packages {
 # Install and configure database
 function configure_supervisor {
 
-    mv /etc/supervisord.conf /etc/supervisord.conf.orig
+    cp /etc/supervisord.conf /etc/supervisord.conf.orig
 
     # sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
     # sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
