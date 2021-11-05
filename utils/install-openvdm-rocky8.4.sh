@@ -192,25 +192,25 @@ function install_packages {
     # Not available:
     # ntp --> has chrony instead
 
-    apt-get install -y software-properties-common
+    # apt-get install -y software-properties-common
 
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
 
-    # add-apt-repository -y ppa:ubuntugis/ppa
+    # # add-apt-repository -y ppa:ubuntugis/ppa
 
-    apt-get update
+    # apt-get update
 
-    apt install -y openssh-server sshpass rsync curl git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev nodejs \
-        python3 python3-dev python3-pip python3-venv libgdal-dev \
-        gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
-        npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-        php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-        php7.3-yaml proj-bin python3-pyproj
+    # apt install -y openssh-server sshpass rsync curl git samba smbclient \
+    #     cifs-utils gearman-job-server libgearman-dev nodejs \
+    #     python3 python3-dev python3-pip python3-venv libgdal-dev \
+    #     gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
+    #     npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
+    #     php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
+    #     php7.3-yaml proj-bin python3-pyproj
 
-    pip3 install MapProxy
+    # pip3 install MapProxy
     
     # TODO Install these via virtualenv
     #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests
@@ -252,7 +252,7 @@ function install_python_packages {
 
     pip install -r $INSTALL_ROOT/openvdm/requirements.txt
 
-    pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
+    # pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
 }
 
 
@@ -261,34 +261,25 @@ function install_python_packages {
 # Install and configure database
 function configure_supervisor {
 
-    mv /etc/supervisor/supervisord.conf /etc/supervisor/supervisord.conf.orig
+    mv /etc/supervisord.conf /etc/supervisord.conf.orig
 
-    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
-    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
+    # sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
+    # sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
 
     if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
-        cat >> /etc/supervisor/supervisord.conf <<EOF
+        sed 's/;[inet_http_server]/[inet_http_server]/' /etc/supervisord.conf |
+        sed 's/;port=/port=/'
 
-### Added by OpenVDM install script ###
-[inet_http_server]
-port=9001
-EOF
         if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
             SUPERVISORD_WEBINTERFACE_HASH=`echo -n ${SUPERVISORD_WEBINTERFACE_PASS} | sha1sum | awk '{printf("{SHA}%s",$1)}'`
-            cat >> /etc/supervisor/supervisord.conf <<EOF
-username=${SUPERVISORD_WEBINTERFACE_USER}
-password=${SUPERVISORD_WEBINTERFACE_HASH} ; echo -n "<password>" | sha1sum | awk '{printf("{SHA}%s",\$1)}'
-EOF
+            sed 's/;username=user/username=${SUPERVISORD_WEBINTERFACE_USER}/' /etc/supervisord.conf |
+            sed 's/;password=123/password=${SUPERVISORD_WEBINTERFACE_HASH}/'
         fi
-
-      cat >> /etc/supervisor/supervisord.conf <<EOF
-### Added by OpenVDM install script ###
-EOF
     fi
 
 VENV_BIN=${INSTALL_ROOT}/openvdm/venv/bin
 
-    cat > /etc/supervisor/conf.d/openvdm.conf << EOF
+    cat > /etc/supervisor.d/openvdm.ini << EOF
 [program:cruise]
 command=${VENV_BIN}/python server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
@@ -461,8 +452,11 @@ programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_
 EOF
 
     echo "Starting new supervisor processes"
+    systemctl start supervisord
+    systemctl enable supervisord
+
     supervisorctl reread
-    systemctl restart supervisor.service
+    supervisorctl update
     
 }
 
@@ -544,7 +538,7 @@ EOF
 EOF
 
     echo "Updating firewall rules for samba"
-    
+
     # TODO Check if firewall installed
     sudo firewall-cmd --add-service=samba --zone=public --parmanent
     sudo firewall-cmd --reload
