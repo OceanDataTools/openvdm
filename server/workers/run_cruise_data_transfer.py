@@ -93,7 +93,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
             #     return_files['exclude'].append(os.path.join(root, filename))
 
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
+    return_files['exclude'] = ['"' + filename.split(source_dir + '/',1).pop() + '"' for filename in return_files['exclude']]
 
     logging.debug("file list: %s", json.dumps(return_files, indent=2))
 
