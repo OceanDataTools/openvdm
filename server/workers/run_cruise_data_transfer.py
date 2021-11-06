@@ -145,7 +145,7 @@ def build_exclude_filterlist(gearman_worker):
 
         try:
             if collection_system_transfer['cruiseOrLowering'] == '0':
-                exclude_filterlist.append("*{}*".format(collection_system_transfer['destDir']))
+                exclude_filterlist.append("*{}*".format(collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)))
             else:
                 lowerings = gearman_worker.ovdm.get_lowerings()
                 for lowering in lowerings:
