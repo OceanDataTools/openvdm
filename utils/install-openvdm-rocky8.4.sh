@@ -162,17 +162,21 @@ function install_packages {
     yum install -y epel-release
     yum -y update
 
-    yum -y install openssh-server sshpass rsync curl git samba samba-common samba-client \
-    cifs-utils gearmand libgearman-devel nodejs python3 \
-    python3-devel supervisor mysql-server npm httpd python3-mod_wsgi \
-
-    # Instructions at:
+    # Install php7.3, Instructions at:
     # https://wiki.crowncloud.net/?How_to_Install_PHP_7_3_in_Rocky_Linux_8
     # https://techviewleo.com/install-lamp-stack-on-rocky-almalinux-8/
     yum install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
     yum module reset php -y
     yum module enable php:remi-7.3 -y
     yum install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
+
+    # Install Python3.8 and set to default
+    yum install -y python38
+    alternatives --set python /usr/bin/python3.8
+    yum install -y python38-devel # python3-mod_wsgi
+
+    yum -y install openssh-server sshpass rsync curl git samba samba-common samba-client \
+    cifs-utils gearmand libgearman-devel nodejs supervisor mysql-server npm httpd
 
     # Doesn't work
     # gdal.x86_64 gdal-devel.x86_64 \
@@ -242,7 +246,7 @@ function install_python_packages {
 
     # Set up virtual environment
     VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python3 -m venv $VENV_PATH
+    python -m venv $VENV_PATH
     source $VENV_PATH/bin/activate  # activate virtual environment
 
     pip install \
@@ -461,7 +465,7 @@ programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_
 EOF
 
     echo "Starting new supervisor processes"
-    systemctl start supervisord
+    systemctl restart supervisord
     systemctl enable supervisord
 
     supervisorctl reread
@@ -644,6 +648,7 @@ EOF
 
     echo "Restarting Apache Web Server"
     sudo systemctl enable --now httpd
+    sudo systemctl restart httpd
 
 }
 
