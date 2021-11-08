@@ -236,7 +236,7 @@ VALUES
 	(1,'Supervisord','http://{hostIP}:9001',1,1),
 	(2,'Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
 	(3,'Public Data','http://{hostIP}/PublicData/',1,0),
-	(4,'Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
+	(4,'Visitor Information','http://{hostIP}/VisitorInformation/',1,0);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
