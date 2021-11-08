@@ -178,53 +178,6 @@ function install_packages {
     yum -y install openssh-server sshpass rsync curl git samba samba-common samba-client \
     cifs-utils gearmand libgearman-devel nodejs supervisor mysql-server npm httpd
 
-    # Doesn't work
-    # gdal.x86_64 gdal-devel.x86_64 \
-    #     Error: 
-    #  Problem 1: conflicting requests
-    #   - nothing provides libdap.so.25()(64bit) needed by gdal-3.0.4-10.el8.x86_64
-    #   - nothing provides libdapclient.so.6()(64bit) needed by gdal-3.0.4-10.el8.x86_64
-    #   - nothing provides libdapserver.so.7()(64bit) needed by gdal-3.0.4-10.el8.x86_64
-    #  Problem 2: package gdal-devel-3.0.4-10.el8.x86_64 requires libgdal.so.26()(64bit), but none of the providers can be installed
-    #   - package gdal-devel-3.0.4-10.el8.x86_64 requires gdal-libs(x86-64) = 3.0.4-10.el8, but none of the providers can be installed
-    #   - conflicting requests
-    #   - nothing provides libdap.so.25()(64bit) needed by gdal-libs-3.0.4-10.el8.x86_64
-    #   - nothing provides libdapclient.so.6()(64bit) needed by gdal-libs-3.0.4-10.el8.x86_64
-    #   - nothing provides libdapserver.so.7()(64bit) needed by gdal-libs-3.0.4-10.el8.x86_64
-    # (try to add '--skip-broken' to skip uninstallable packages or '--nobest' to use not only best candidate packages)
-    
-    # Not available:
-    # ntp --> has chrony instead
-
-    # apt-get install -y software-properties-common
-
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
-
-    # # add-apt-repository -y ppa:ubuntugis/ppa
-
-    # apt-get update
-
-    # apt install -y openssh-server sshpass rsync curl git samba smbclient \
-    #     cifs-utils gearman-job-server libgearman-dev nodejs \
-    #     python3 python3-dev python3-pip python3-venv libgdal-dev \
-    #     gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
-    #     npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-    #     php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-    #     php7.3-yaml proj-bin python3-pyproj
-
-    # pip3 install MapProxy
-    
-    # TODO Install these via virtualenv
-    #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests
-
-    # pip install python3_gearman pandas geopy gdal pyyaml requests
-
-    # change from cgi import escape to from html import escape in 
-    # /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py 
-    # (line 16)
-
     npm install -g bower
 
     startingDir=${PWD}
@@ -255,16 +208,15 @@ function install_python_packages {
     pip install wheel  # To help with the rest of the installations
 
 
-    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resoures/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resources/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
     pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
 
-    # pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
 }
 
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure supervisor
 function configure_supervisor {
 
     mv /etc/supervisord.conf /etc/supervisord.conf.orig
@@ -483,7 +435,7 @@ EOF
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure gearman
 function configure_gearman {
     echo "Starting Gearman Job Server"
     systemctl start gearmand
@@ -493,7 +445,7 @@ function configure_gearman {
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure samba
 function configure_samba {
 
     echo "Set smbpasswd for ${OPENVDM_USER}, recommended to use same password as system user"
@@ -571,7 +523,9 @@ EOF
 
 }
 
-
+###########################################################################
+###########################################################################
+# Setup Apache
 function configure_apache {
 
     echo "Building new vhost file"
@@ -602,13 +556,6 @@ function configure_apache {
       AllowOverride all
     </Directory>
 
-    # WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
-
-    # <Directory /var/www/mapproxy/>
-    #  Order deny,allow
-    #  Allow from all
-    # </Directory>
-
     Alias /CruiseData/ $DATA_ROOT/FTPRoot/CruiseData/
     <Directory "$DATA_ROOT/FTPRoot/CruiseData">
       AllowOverride None
@@ -638,15 +585,6 @@ function configure_apache {
 
 </VirtualHost>
 EOF
-    
-    # echo "Enabling ReWrite Module"
-    # a2enmod rewrite
-
-    # echo "Disabling default vhost"
-    # a2dissite 000-default
-
-    # echo "Enabling new vhost"
-    # a2ensite openvdm
 
     echo "Updating Firewall rules for Apache Web Server"
     # TODO Check for firewall
@@ -661,96 +599,6 @@ EOF
     echo "Restarting Apache Web Server"
     sudo systemctl enable --now httpd
     sudo systemctl restart httpd
-
-}
-
-
-###########################################################################
-###########################################################################
-# Install and configure database
-function configure_mapproxy {
-	
-    startingDir=${PWD}
-
-    cd ~
-    mapproxy-util create -t base-config --force mapproxy
-
-    cat > ~/mapproxy/mapproxy.yaml <<EOF
-# -------------------------------
-# MapProxy configuration.
-# -------------------------------
-
-# Start the following services:
-services:
-  demo:
-  tms:
-    use_grid_names: false
-    # origin for /tiles service
-    origin: 'nw'
-  kml:
-    #use_grid_names: true
-  wmts:
-  wms:
-    srs: ['EPSG:900913']
-    image_formats: ['image/png']
-    md:
-      title: MapProxy WMS Proxy
-      abstract: This is a minimal MapProxy installation.
-
-#Make the following layers available
-layers:
-  - name: WorldOceanBase
-    title: ESRI World Ocean Base
-    sources: [esri_worldOceanBase_cache]
-
-  - name: WorldOceanReference
-    title: ESRI World Ocean Reference
-    sources: [esri_worldOceanReference_cache]
-
-caches:
-  esri_worldOceanBase_cache:
-    grids: [esri_online]
-    sources: [esri_worldOceanBase]
-
-  esri_worldOceanReference_cache:
-    grids: [esri_online]
-    sources: [esri_worldOceanReference]
-
-sources:
-  esri_worldOceanBase:
-    type: tile
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/%(z)s/%(y)s/%(x)s.png
-    grid: esri_online
-
-  esri_worldOceanReference:
-    type: tile
-    transparent: true
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/%(z)s/%(y)s/%(x)s.png
-    grid: esri_online
-
-grids:
-  webmercator:
-    base: GLOBAL_WEBMERCATOR
-
-  esri_online:
-     tile_size: [256, 256]
-     srs: EPSG:900913
-     origin: 'nw'
-     num_levels: 11
-
-globals:
-EOF
-
-    cp -r ~/mapproxy /var/www/
-    mkdir -p /var/www/mapproxy/cache_data
-    chmod 777 /var/www/mapproxy/cache_data
-    chown -R root:root /var/www/mapproxy
-
-    cd /var/www/mapproxy
-    mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
-
-    # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
-    cd ${startingDir}
 
 }
 
@@ -797,17 +645,6 @@ EOF
     [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
     rm -f /tmp/set_pwd
 
-    # Now do the rest of the 'mysql_safe_installation' stuff
-#     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
-# DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-# DELETE FROM mysql.user WHERE User='';
-# DELETE FROM mysql.db WHERE Db='test' OR Db='test_%';
-# FLUSH PRIVILEGES;
-# EOF
-
-    # Start mysql to start up as a service
-    # update-rc.d mysql defaults
-
     echo "Setting up OpenVDM database user"
     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 drop user if exists '$OPENVDM_USER'@'localhost';
@@ -818,7 +655,9 @@ EOF
     echo "Done setting up MySQL"
 }
 
-
+###########################################################################
+###########################################################################
+# Create the various directories needed for the install
 function configure_directories {
 
     if [ ! -d $DATA_ROOT ]; then
@@ -1001,10 +840,7 @@ EOF
 
 ###########################################################################
 ###########################################################################
-###########################################################################
-###########################################################################
 # Start of actual script
-###########################################################################
 ###########################################################################
 
 # Read from the preferences file in $PREFERENCES_FILE, if it exists
@@ -1102,13 +938,11 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 fi
 
 #########################################################################
-#########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
 
 #########################################################################
-#########################################################################
-
+# The rest of the installtion
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
 install_packages
@@ -1144,10 +978,6 @@ install_openvdm
 echo "#####################################################################"
 echo "Installing additional python libraries"
 install_python_packages
-
-# echo "#####################################################################"
-# echo "Installing/Configuring MapProxy"
-# configure_mapproxy
 
 echo "#####################################################################"
 echo "Configuring Apache2"
