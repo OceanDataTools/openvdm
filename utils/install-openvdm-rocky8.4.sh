@@ -254,7 +254,9 @@ function install_python_packages {
       --upgrade pip
     pip install wheel  # To help with the rest of the installations
 
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt
+
+    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resoures/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
 
     # pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
 }
@@ -464,6 +466,11 @@ programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_
 
 EOF
 
+    echo "Updating Firewall rules for Supervisor Web Server"
+    # TODO Check for firewall
+    firewall-cmd --zone=public --add-port=9001/tcp --permanent
+    firewall-cmd --reload
+
     echo "Starting new supervisor processes"
     systemctl restart supervisord
     systemctl enable supervisord
@@ -645,6 +652,11 @@ EOF
     # TODO Check for firewall
     firewall-cmd --permanent --add-service={http,https}
     firewall-cmd --reload
+
+    echo "Setting SELinux exception rules"
+    chcon -R -t httpd_sys_content_t ${DATA_ROOT}/FTPRoot
+    chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
+    setsebool -P httpd_can_network_connect=1
 
     echo "Restarting Apache Web Server"
     sudo systemctl enable --now httpd
