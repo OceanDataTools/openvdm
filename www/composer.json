@@ -20,10 +20,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "bower --allow-root install"
+            "/usr/local/bin/bower --allow-root install"
         ],
         "post-update-cmd": [
-            "bower --allow-root install"
+            "/usr/local/bin/bower --allow-root install"
         ]
     },
     "minimum-stability": "dev"

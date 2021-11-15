@@ -160,7 +160,7 @@ function create_user {
 function install_packages {
 
     yum install -y epel-release
-    yum -y update
+    yum -y update --nobest flag
 
     # Install php7.3, Instructions at:
     # https://wiki.crowncloud.net/?How_to_Install_PHP_7_3_in_Rocky_Linux_8
