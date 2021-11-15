@@ -814,7 +814,7 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s/define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');/define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');');/" \
+    sed -e "s/define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');/define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
