@@ -175,8 +175,9 @@ function install_packages {
     alternatives --set python /usr/bin/python3.8
     yum install -y python38-devel # python3-mod_wsgi
 
-    yum -y install openssh-server sshpass rsync curl git samba samba-common samba-client \
-    cifs-utils gearmand libgearman-devel nodejs supervisor mysql-server npm httpd
+    yum -y install openssh-server sshpass rsync curl git samba samba-common \
+    samba-client cifs-utils gearmand libgearman-devel nodejs supervisor \
+    mysql-server npm httpd setroubleshoot policycoreutils-python-utils
 
     npm install -g bower
 
@@ -512,7 +513,7 @@ EOF
     echo "Updating firewall rules for samba"
 
     # TODO Check if firewall installed
-    sudo firewall-cmd --add-service=samba --zone=public --parmanent
+    sudo firewall-cmd --add-service=samba --zone=public --permanent
     sudo firewall-cmd --reload
 
     echo "Restarting Samba Service"
@@ -800,7 +801,7 @@ EOF
 
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    composer -q install
+    /usr/local/bin/composer -q install
 
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
@@ -812,7 +813,8 @@ EOF
     fi
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
-    sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" \
+    sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
+    sed -e "s/define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');/define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');');/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
