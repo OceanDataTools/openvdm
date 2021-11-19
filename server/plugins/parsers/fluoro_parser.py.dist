@@ -146,8 +146,8 @@ class FluoroParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['chlorophyll_signal'].min(),3), round(df_proc['chlorophyll_signal'].max(),3)], 'Chlorophyll Bounds', 'counts')
-        self.add_value_validity_stat([len(df_proc[(df_proc['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS, df_proc['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]),len(df_proc[(df_proc['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS, df_proc['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)])], 'Chlorophyll Validity')
+        self.add_bounds_stat([int(df_proc['chlorophyll_signal'].min()), int(df_proc['chlorophyll_signal'].max())], 'Chlorophyll Bounds', 'counts')
+        self.add_value_validity_stat([len(df_proc[(df_proc['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) | (df_proc['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]),len(df_proc[(df_proc['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS) & (df_proc['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)])], 'Chlorophyll Validity')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -168,7 +168,7 @@ class FluoroParser(OpenVDMCSVParser):
         else:
             self.add_quality_test_passed("DeltaT")
 
-        error_rate = len(df_proc[(df_proc['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS, df_proc['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]) / len(df_proc)
+        error_rate = len(df_proc[(df_proc['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) | (df_proc['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]) / len(df_proc)
         if error_rate > .25:
             self.add_quality_test_failed("Chlorophyll Signal")
         elif error_rate > .10:
