@@ -74,12 +74,16 @@ if __name__ == "__main__":
                 logging.info("Cruise Size: %s", cruise_size_proc.stdout.split()[0])
                 ovdm.set_cruise_size(cruise_size_proc.stdout.split()[0])
 
-        if lowering_dir and isdir(lowering_dir):
-            logging.debug("Calculating Lowering Size...")
-            loweringSizeProc = subprocess.run(['du','-sb', lowering_dir], capture_output=True, text=True, check=False)
-            if loweringSizeProc.returncode == 0:
-                logging.info("Lowering Size: %s", loweringSizeProc.stdout.split()[0])
-                ovdm.set_lowering_size(loweringSizeProc.stdout.split()[0])
+            if lowering_dir and isdir(lowering_dir):
+                logging.debug("Calculating Lowering Size...")
+                loweringSizeProc = subprocess.run(['du','-sb', lowering_dir], capture_output=True, text=True, check=False)
+                if loweringSizeProc.returncode == 0:
+                    logging.info("Lowering Size: %s", loweringSizeProc.stdout.split()[0])
+                    ovdm.set_lowering_size(loweringSizeProc.stdout.split()[0])
+
+        else:
+            ovdm.set_cruise_size()
+            ovdm.set_lowering_size()
 
         end_t = datetime.datetime.utcnow()
 

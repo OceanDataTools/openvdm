@@ -1025,7 +1025,7 @@ class OpenVDM():
             raise err
 
 
-    def set_cruise_size(self, size_in_bytes):
+    def set_cruise_size(self, size_in_bytes=None):
         """
         Set the filesize for the current cruise
         """
@@ -1040,7 +1040,7 @@ class OpenVDM():
             logging.error("Unable to set cruise size with OpenVDM API")
             raise err
 
-    def set_lowering_size(self, size_in_bytes):
+    def set_lowering_size(self, size_in_bytes=None):
         """
         Set the filesize for the current lowering
         """
