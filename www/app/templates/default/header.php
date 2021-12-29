@@ -375,7 +375,7 @@ use Helpers\Hooks;
                 </div> <!-- .panel .panel-primary -->
             </div> <!-- .col-lg-3 .col-md-6 -->
     <?php echo $_warehouseModel->getShowLoweringComponents() ? "        <div class=\"col-lg-2 col-md-4 col-sm-6 col-xs-12\">" : "       <div class=\"col-lg-3 col-md-6 col-sm-6 col-xs-12\">"; ?>
-                <div id="cruiseSizePanel" class="panel panel-primary">
+                <div id="cruiseSizePanel" class="panel <?php echo $data['cruiseSize'] === 'Error' ? "panel-red" : "panel-primary" ?>">
                     <div class="panel-heading">
                         <div id="cruiseSize" class="huge"><?php echo $data['cruiseSize']; ?></div>
                         <div class="text-right"><?php echo CRUISE_NAME; ?> Size</div>
