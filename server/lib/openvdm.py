@@ -1025,7 +1025,7 @@ class OpenVDM():
             raise err
 
 
-    def set_cruise_size(self, size_in_bytes):
+    def set_cruise_size(self, size_in_bytes=Noneß):
         """
         Set the filesize for the current cruise
         """
