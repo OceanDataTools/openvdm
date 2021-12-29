@@ -84,6 +84,11 @@ $(function () {
                     $(cruiseSize).html('Error');
                     $(cruiseSizePanel).removeClass('panel-primary');
                     $(cruiseSizePanel).addClass('panel-red');
+                } else if (data.cruiseSize === 'Undefined') {
+                    $(cruiseSize).html(data.cruiseSize);
+                    $(cruiseSizePanel).removeClass('panel-red');
+                    $(cruiseSizePanel).removeClass('panel-primary');
+                    $(cruiseSizePanel).addClass('panel-yellow');
                 } else {
                     $(cruiseSize).html(formatFilesize(data.cruiseSize));
                     $(cruiseSizePanel).removeClass('panel-red');
@@ -95,7 +100,6 @@ $(function () {
             }, 5000);
         });
     }
-
 
     function updateLoweringIDPanel(loweringIDPanel, loweringID) {
         var transferStatusURL = siteRoot + 'api/warehouse/getLoweringID';
@@ -151,7 +155,6 @@ $(function () {
         });
     }
 
-    
     function updateFreeSpacePanel(freeSpacePanel, freeSpace) {
         var transferStatusURL = siteRoot + 'api/warehouse/getFreeSpace';
         $.getJSON(transferStatusURL, function (data, status) {
@@ -161,19 +164,21 @@ $(function () {
                     $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).removeClass('panel-yellow');
                     $(freeSpacePanel).addClass('panel-red');
-
                 } else if (data.freeSpace/data.totalSpace <= .1) {
                     $(freeSpace).html(formatFilesize(data.freeSpace));
                     $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).removeClass('panel-yellow');
                     $(freeSpacePanel).addClass('panel-red');
-
                 } else if (data.freeSpace/data.totalSpace <= .25) {
                     $(freeSpace).html(formatFilesize(data.freeSpace));
                     $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).removeClass('panel-red');
                     $(freeSpacePanel).addClass('panel-yellow');
-
+                } else if (data.freeSpace === '') {
+                    $(freeSpace).html('Undefined');
+                    $(freeSpacePanel).removeClass('panel-red');
+                    $(freeSpacePanel).removeClass('panel-primary');
+                    $(freeSpacePanel).addClass('panel-yellow');
                 } else {
                     $(freeSpace).html(formatFilesize(data.freeSpace));
                     $(freeSpacePanel).removeClass('panel-red');
