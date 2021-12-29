@@ -1,6 +1,6 @@
 {
   "name": "openvdm",
-  "version": "2.6.8",
+  "version": "2.6.9",
   "homepage": "https://github.com/oceandatatools/openvdm",
   "authors": [
     {
@@ -40,13 +40,12 @@
     "esri-leaflet": "~1.0.3",
     "leaflet-fullscreen-bower": "~1.0.1",
     "leaflet.awesome-markers": "~2.0.2",
-    "leaflet-easyprint": "~2.1.8",
     "ionicons": "~2.0.1",
     "js-cookie": "~2.1.0",
     "eonasdan-bootstrap-datetimepicker": "~4.17.37",
     "leaflet-timedimension": "~1.0.6",
     "moment": "~2.17.1",
-    "leaflet-easyprint": "git://github.com/rowanwins/leaflet-easyPrint.git#gh-pages",
-    "leaflet-color-markers": "git://github.com/pointhi/leaflet-color-markers"
+    "leaflet-easyprint": "https://github.com/rowanwins/leaflet-easyPrint.git#gh-pages",
+    "leaflet-color-markers": "https://github.com/pointhi/leaflet-color-markers"
   }
 }

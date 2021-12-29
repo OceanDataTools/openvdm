@@ -3,9 +3,9 @@
 # OpenVDM is available as open source under the MIT License at
 #   https:/github.com/oceandatatools/openvdm
 #
-# This script installs and configures OpenVDM to run on Ubuntu 20.04.  It
+# This script installs and configures OpenVDM to run on Rocky 8.4.  It
 # is designed to be run as root. It should take a (relatively) clean
-# Ubuntu 20.04 installation and install and configure all the components
+# Rocky 8.4 installation and install and configure all the components
 # to run the full OpenVDM system.
 #
 # It should be re-run whenever the code has been refresh. Preferably
@@ -124,9 +124,9 @@ function set_hostname {
     HOSTNAME=$1
 
     hostnamectl set-hostname $HOSTNAME
-    echo $HOSTNAME > /etc/hostname
+    # echo "HOSTNAME=$HOSTNAME" > /etc/sysconfig/network # not sure if needed
 
-    ETC_HOSTS_LINE="127.0.1.1 $HOSTNAME"
+    ETC_HOSTS_LINE="127.0.1.1 $HOSTNAME $HOSTNAME"
     if grep -q "$ETC_HOSTS_LINE" /etc/hosts ; then
         echo Hostname already in /etc/hosts
     else
@@ -148,8 +148,10 @@ function create_user {
     fi
 
     echo "Creating $OPENVDM_USER"
-    adduser --gecos "" $OPENVDM_USER
-    usermod -a -G sudo $OPENVDM_USER
+    adduser $OPENVDM_USER
+    passwd $OPENVDM_USER
+    usermod -a -G tty $OPENVDM_USER
+    usermod -a -G wheel $OPENVDM_USER
 }
 
 ###########################################################################
@@ -157,36 +159,25 @@ function create_user {
 # Install and configure required packages
 function install_packages {
 
-    apt-get update
+    yum install -y epel-release
+    yum -y update --nobest flag
 
-    apt-get install -y software-properties-common
+    # Install php7.3, Instructions at:
+    # https://wiki.crowncloud.net/?How_to_Install_PHP_7_3_in_Rocky_Linux_8
+    # https://techviewleo.com/install-lamp-stack-on-rocky-almalinux-8/
+    yum install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    yum module reset php -y
+    yum module enable php:remi-7.3 -y
+    yum install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
 
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
+    # Install Python3.8 and set to default
+    yum install -y python38
+    alternatives --set python /usr/bin/python3.8
+    yum install -y python38-devel # python3-mod_wsgi
 
-    # add-apt-repository -y ppa:ubuntugis/ppa
-
-    apt-get update
-
-    apt install -y openssh-server sshpass rsync curl git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev nodejs \
-        python3 python3-dev python3-pip python3-venv libgdal-dev \
-        gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
-        npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-        php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-        php7.3-yaml proj-bin python3-pyproj
-
-    pip3 install MapProxy
-    
-    # TODO Install these via virtualenv
-    #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests
-
-    # pip install python3_gearman pandas geopy gdal pyyaml requests
-
-    # change from cgi import escape to from html import escape in 
-    # /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py 
-    # (line 16)
+    yum -y install openssh-server sshpass rsync curl git samba samba-common \
+    samba-client cifs-utils gearmand libgearman-devel nodejs supervisor \
+    mysql-server npm httpd setroubleshoot policycoreutils-python-utils
 
     npm install -g bower
 
@@ -209,7 +200,7 @@ function install_python_packages {
 
     # Set up virtual environment
     VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python3 -m venv $VENV_PATH
+    python -m venv $VENV_PATH
     source $VENV_PATH/bin/activate  # activate virtual environment
 
     pip install \
@@ -217,24 +208,25 @@ function install_python_packages {
       --upgrade pip
     pip install wheel  # To help with the rest of the installations
 
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt
 
-    pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
+    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resources/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+
 }
 
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure supervisor
 function configure_supervisor {
 
-    mv /etc/supervisor/supervisord.conf /etc/supervisor/supervisord.conf.orig
+    mv /etc/supervisord.conf /etc/supervisord.conf.orig
 
-    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
-    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
+    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisord.conf.orig |
+    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisord.conf
 
     if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
-        cat >> /etc/supervisor/supervisord.conf <<EOF
+        cat >> /etc/supervisord.conf <<EOF
 
 ### Added by OpenVDM install script ###
 [inet_http_server]
@@ -242,20 +234,20 @@ port=9001
 EOF
         if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
             SUPERVISORD_WEBINTERFACE_HASH=`echo -n ${SUPERVISORD_WEBINTERFACE_PASS} | sha1sum | awk '{printf("{SHA}%s",$1)}'`
-            cat >> /etc/supervisor/supervisord.conf <<EOF
+            cat >> /etc/supervisord.conf <<EOF
 username=${SUPERVISORD_WEBINTERFACE_USER}
 password=${SUPERVISORD_WEBINTERFACE_HASH} ; echo -n "<password>" | sha1sum | awk '{printf("{SHA}%s",\$1)}'
 EOF
         fi
 
-      cat >> /etc/supervisor/supervisord.conf <<EOF
+      cat >> /etc/supervisord.conf <<EOF
 ### Added by OpenVDM install script ###
 EOF
     fi
 
 VENV_BIN=${INSTALL_ROOT}/openvdm/venv/bin
 
-    cat > /etc/supervisor/conf.d/openvdm.conf << EOF
+    cat > /etc/supervisord.d/openvdm.ini << EOF
 [program:cruise]
 command=${VENV_BIN}/python server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
@@ -426,25 +418,35 @@ stopsignal=INT
 programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_summary,post_hooks,reboot_reset,run_collection_system_transfer,run_cruise_data_transfer,run_ship_to_shore_transfer,scheduler,size_cacher,stop_job,test_collection_system_transfer,test_cruise_data_transfer
 
 EOF
+
+    echo "Updating Firewall rules for Supervisor Web Server"
+    # TODO Check for firewall
+    firewall-cmd --zone=public --add-port=9001/tcp --permanent
+    firewall-cmd --reload
+
     echo "Starting new supervisor processes"
+    systemctl restart supervisord
+    systemctl enable supervisord
+
     supervisorctl reread
-    systemctl restart supervisor.service
+    supervisorctl update
     
 }
 
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure gearman
 function configure_gearman {
-    echo "Restarting Gearman Job Server"
-    service gearman-job-server restart
+    echo "Starting Gearman Job Server"
+    systemctl start gearmand
+    systemctl enable gearmand
 }
 
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure samba
 function configure_samba {
 
     echo "Set smbpasswd for ${OPENVDM_USER}, recommended to use same password as system user"
@@ -508,15 +510,27 @@ EOF
   force directory mode = 777
 EOF
 
+    echo "Updating firewall rules for samba"
+
+    # TODO Check if firewall installed
+    sudo firewall-cmd --add-service=samba --zone=public --permanent
+    sudo firewall-cmd --reload
+
     echo "Restarting Samba Service"
-    systemctl restart smbd.service
+    systemctl start smb
+    systemctl enable smb
+    systemctl start nmb
+    systemctl enable nmb
+
 }
 
-
+###########################################################################
+###########################################################################
+# Setup Apache
 function configure_apache {
 
     echo "Building new vhost file"
-    cat > /etc/apache2/sites-available/openvdm.conf <<EOF
+    cat > /etc/httpd/conf.d/openvdm.conf <<EOF
 <VirtualHost *:80>
     ServerName $HOSTNAME
 
@@ -529,8 +543,8 @@ function configure_apache {
     # modules, e.g.
     #LogLevel info ssl:warn
 
-    ErrorLog \${APACHE_LOG_DIR}/error.log
-    CustomLog \${APACHE_LOG_DIR}/access.log combined
+    ErrorLog /var/log/httpd/openvdm_error.log
+    CustomLog /var/log/httpd/openvdm_requests.log combined
 
     # For most configuration files from conf-available/, which are
     # enabled or disabled at a global level, it is possible to
@@ -541,13 +555,6 @@ function configure_apache {
 
     <Directory "/var/www/openvdm">
       AllowOverride all
-    </Directory>
-
-    WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
-
-    <Directory /var/www/mapproxy/>
-      Order deny,allow
-      Allow from all
     </Directory>
 
     Alias /CruiseData/ $DATA_ROOT/FTPRoot/CruiseData/
@@ -580,107 +587,19 @@ function configure_apache {
 </VirtualHost>
 EOF
 
-    echo "Enabling ReWrite Module"
-    a2enmod rewrite
+    echo "Updating Firewall rules for Apache Web Server"
+    # TODO Check for firewall
+    firewall-cmd --permanent --add-service={http,https}
+    firewall-cmd --reload
 
-    echo "Disabling default vhost"
-    a2dissite 000-default
-
-    echo "Enabling new vhost"
-    a2ensite openvdm
+    echo "Setting SELinux exception rules"
+    chcon -R -t httpd_sys_content_t ${DATA_ROOT}/FTPRoot
+    chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
+    setsebool -P httpd_can_network_connect=1
 
     echo "Restarting Apache Web Server"
-    systemctl restart apache2.service
-
-}
-
-
-###########################################################################
-###########################################################################
-# Install and configure database
-function configure_mapproxy {
-	
-    startingDir=${PWD}
-
-    cd ~
-    mapproxy-util create -t base-config --force mapproxy
-
-    cat > ~/mapproxy/mapproxy.yaml <<EOF
-# -------------------------------
-# MapProxy configuration.
-# -------------------------------
-
-# Start the following services:
-services:
-  demo:
-  tms:
-    use_grid_names: false
-    # origin for /tiles service
-    origin: 'nw'
-  kml:
-    #use_grid_names: true
-  wmts:
-  wms:
-    srs: ['EPSG:900913']
-    image_formats: ['image/png']
-    md:
-      title: MapProxy WMS Proxy
-      abstract: This is a minimal MapProxy installation.
-
-#Make the following layers available
-layers:
-  - name: WorldOceanBase
-    title: ESRI World Ocean Base
-    sources: [esri_worldOceanBase_cache]
-
-  - name: WorldOceanReference
-    title: ESRI World Ocean Reference
-    sources: [esri_worldOceanReference_cache]
-
-caches:
-  esri_worldOceanBase_cache:
-    grids: [esri_online]
-    sources: [esri_worldOceanBase]
-
-  esri_worldOceanReference_cache:
-    grids: [esri_online]
-    sources: [esri_worldOceanReference]
-
-sources:
-  esri_worldOceanBase:
-    type: tile
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/%(z)s/%(y)s/%(x)s.png
-    grid: esri_online
-
-  esri_worldOceanReference:
-    type: tile
-    transparent: true
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/%(z)s/%(y)s/%(x)s.png
-    grid: esri_online
-
-grids:
-  webmercator:
-    base: GLOBAL_WEBMERCATOR
-
-  esri_online:
-     tile_size: [256, 256]
-     srs: EPSG:900913
-     origin: 'nw'
-     num_levels: 11
-
-globals:
-EOF
-
-    cp -r ~/mapproxy /var/www/
-    mkdir -p /var/www/mapproxy/cache_data
-    chmod 777 /var/www/mapproxy/cache_data
-    chown -R root:root /var/www/mapproxy
-
-    cd /var/www/mapproxy
-    mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
-
-    # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
-    cd ${startingDir}
+    sudo systemctl enable --now httpd
+    sudo systemctl restart httpd
 
 }
 
@@ -697,8 +616,8 @@ function configure_mysql {
 
     echo "Enabling MySQL Database Server"
 
-    systemctl restart mysql    # to manually start db server
-    systemctl enable mysql     # to make it start on boot
+    systemctl enable mysqld    # to make it start on boot
+    systemctl start mysqld     # to manually start db server
 
     echo "Setting up database root user and permissions"
     # Verify current root password for mysql
@@ -727,17 +646,6 @@ EOF
     [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
     rm -f /tmp/set_pwd
 
-    # Now do the rest of the 'mysql_safe_installation' stuff
-#     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
-# DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-# DELETE FROM mysql.user WHERE User='';
-# DELETE FROM mysql.db WHERE Db='test' OR Db='test_%';
-# FLUSH PRIVILEGES;
-# EOF
-
-    # Start mysql to start up as a service
-    update-rc.d mysql defaults
-
     echo "Setting up OpenVDM database user"
     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 drop user if exists '$OPENVDM_USER'@'localhost';
@@ -748,7 +656,9 @@ EOF
     echo "Done setting up MySQL"
 }
 
-
+###########################################################################
+###########################################################################
+# Create the various directories needed for the install
 function configure_directories {
 
     if [ ! -d $DATA_ROOT ]; then
@@ -801,8 +711,7 @@ function configure_directories {
 ###########################################################################
 # Set system timezone
 function setup_timezone {
-    echo "Etc/UTC" | tee /etc/timezone
-    dpkg-reconfigure --frontend noninteractive tzdata
+    sudo timedatectl set-timezone UTC
 }
 
 
@@ -892,7 +801,7 @@ EOF
 
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    composer -q install
+    /usr/local/bin/composer -q install
 
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
@@ -905,7 +814,7 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');|"\
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');|" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
@@ -933,10 +842,7 @@ EOF
 
 ###########################################################################
 ###########################################################################
-###########################################################################
-###########################################################################
 # Start of actual script
-###########################################################################
 ###########################################################################
 
 # Read from the preferences file in $PREFERENCES_FILE, if it exists
@@ -1034,13 +940,11 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 fi
 
 #########################################################################
-#########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
 
 #########################################################################
-#########################################################################
-
+# The rest of the installtion
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
 install_packages
@@ -1076,10 +980,6 @@ install_openvdm
 echo "#####################################################################"
 echo "Installing additional python libraries"
 install_python_packages
-
-echo "#####################################################################"
-echo "Installing/Configuring MapProxy"
-configure_mapproxy
 
 echo "#####################################################################"
 echo "Configuring Apache2"

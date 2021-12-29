@@ -482,45 +482,47 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
-    logging.info("Transferring files from PublicData to the cruise data directory")
+    if gearman_worker.ovdm.get_transfer_public_data():
 
-    logging.debug("Verify From_PublicData directory exists within the cruise data directory")
-    if not os.path.exists(from_publicdata_dir):
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + from_publicdata_dir + " could not be found"})
-        return json.dumps(job_results)
+        logging.info("Transferring files from PublicData to the cruise data directory")
 
-    job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
+        logging.debug("Verify From_PublicData directory exists within the cruise data directory")
+        if not os.path.exists(from_publicdata_dir):
+            job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + from_publicdata_dir + " could not be found"})
+            return json.dumps(job_results)
 
-    logging.debug("Verify PublicData Directory exists")
-    if not os.path.exists(publicdata_dir):
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + publicdata_dir+ " could not be found"})
-        return json.dumps(job_results)
+        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
 
-    job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
+        logging.debug("Verify PublicData Directory exists")
+        if not os.path.exists(publicdata_dir):
+            job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + publicdata_dir + " could not be found"})
+            return json.dumps(job_results)
 
-    logging.debug("Transferring files")
-    output_results = transfer_publicdata_dir(gearman_worker, gearman_job)
-    logging.debug("Transfer Complete")
+        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
+        logging.debug("Transferring files")
+        output_results = transfer_publicdata_dir(gearman_worker, gearman_job)
+        logging.debug("Transfer Complete")
 
-    job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
+        if not output_results['verdict']:
+            job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Fail", "reason": output_results['reason']})
+            return json.dumps(job_results)
 
-    files = output_results['files']
+        job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
 
-    logging.debug("PublicData Files Transferred: %s", json.dumps(files, indent=2))
+        files = output_results['files']
 
-    logging.info("Clearing files from PublicData")
-    output_results = clear_directory(publicdata_dir)
-    logging.debug("Clearing Complete")
+        logging.debug("PublicData Files Transferred: %s", json.dumps(files, indent=2))
 
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
+        logging.info("Clearing files from PublicData")
+        output_results = clear_directory(publicdata_dir)
+        logging.debug("Clearing Complete")
 
-    job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
+        if not output_results['verdict']:
+            job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
+            return json.dumps(job_results)
+
+        job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 9, 10)
 

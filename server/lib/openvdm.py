@@ -151,6 +151,14 @@ class OpenVDM():
 
         return self.config['siteRoot']
 
+    def get_transfer_public_data(self):
+        """
+        Return whether to transfer the contents of PublicData to the cruise
+        data directory
+        """
+
+        return self.config['transferPubicData']
+
     def get_md5_filesize_limit(self):
         """
         Return the MD5 filesize limit

@@ -28,6 +28,10 @@ gearmanServer: "localhost:4730"
 # current cruise. (True|False))
 showOnlyCurrentCruiseDir: False
 
+# Whether or not to move the contents of the PublicData share to the cruise data
+# directory. (True|False))
+transferPubicData: True
+
 # The plugins section defines where the plugins processing scripts reside
 # and the expected suffix for each processing file.  It should include 2 directives:
 # processingScriptDir --> the full path containing the plugins processing scripts
