@@ -159,7 +159,7 @@ $(function () {
         var transferStatusURL = siteRoot + 'api/warehouse/getFreeSpace';
         $.getJSON(transferStatusURL, function (data, status) {
             if (status === 'success' && data !== null) {
-                if (data.error) {
+                if (data.error || data.freeSpace === null) {
                     $(freeSpace).html('Error');
                     $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).removeClass('panel-yellow');
@@ -173,11 +173,6 @@ $(function () {
                     $(freeSpace).html(formatFilesize(data.freeSpace));
                     $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).removeClass('panel-red');
-                    $(freeSpacePanel).addClass('panel-yellow');
-                } else if (data.freeSpace === '') {
-                    $(freeSpace).html('Undefined');
-                    $(freeSpacePanel).removeClass('panel-red');
-                    $(freeSpacePanel).removeClass('panel-primary');
                     $(freeSpacePanel).addClass('panel-yellow');
                 } else {
                     $(freeSpace).html(formatFilesize(data.freeSpace));
