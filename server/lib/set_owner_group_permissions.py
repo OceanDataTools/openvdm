@@ -2,7 +2,6 @@
 """Utilities for setting file permissions/ownership.
 """
 import logging
-from grp import getgrnam
 from os import chown, chmod, walk
 from os.path import isfile, join, basename, dirname
 from pwd import getpwnam
@@ -21,7 +20,7 @@ def set_owner_group_permissions(user, path):
     reasons = []
 
     uid = getpwnam(user).pw_uid
-    gid = getgrnam(user).gr_gid
+    gid = getpwnam(user).pw_gid
     # Set the file permission and ownership for the current directory
 
     logging.debug("Setting ownership/permissions for %s", path)

@@ -143,7 +143,7 @@ if __name__ == "__main__":
         logging.error("Cruise data directory: %s not found!", cruiseDir)
         sys.exit(1)
 
-    tracklineDirectory = parsed_args.outputDir or os.path.join(cruiseDir, openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)['destDir'])
+    tracklineDir = parsed_args.outputDir or os.path.join(cruiseDir, openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)['destDir'])
     # if not tracklineDirectory:
     #     logging.error("Extra Directory: %s not found in OpenVDM configuration", TRACKLINE_EXTRA_DIR_NAME)
     #     sys.exit(1)
