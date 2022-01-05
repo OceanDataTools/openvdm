@@ -84,7 +84,7 @@ $(function () {
         
         var baseLayers = {
             "World Ocean Base" : worldOceanBase,
-            "GMRT Base" : gmrtBase
+            // "GMRT Base" : gmrtBase
         };
 
         var overlays = {
@@ -151,8 +151,8 @@ $(function () {
         }); 
     }
 
-    function addLatestPositionLabelToMap(mapObject) {
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + 'gga-cnav';
+    function addLatestPositionLabelToMap(mapObject, dataType) {
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -461,7 +461,7 @@ $(function () {
     for(var i = 0; i < mapObjects.length; i++) {
         mapChecked(mapObjects[i]);
         setTimeout(updateBounds(mapObjects[i]), 5000);
-        addLatestPositionLabelToMap(mapObjects[i]);
+        addLatestPositionLabelToMap(mapObjects[i], 'gga-cnav');
     }
     
     //build the charts
