@@ -237,6 +237,8 @@ if __name__ == "__main__":
                             with open(file,'r') as f:
                                 geojson_obj = json.load(f)
 
+                            geojson_obj = geojson_obj['visualizerData'][0]
+
                         # If the file cannot be processed return false.
                         except:
                             errPrint("ERROR: Could not proccess file: ", file)
