@@ -535,6 +535,8 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
                 return json.dumps(job_results)
 
             job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
+    else:
+        files = { 'include':[], 'exclude':[], 'new':[], 'updated':[] }
 
     gearman_worker.send_job_status(gearman_job, 95, 100)
 
