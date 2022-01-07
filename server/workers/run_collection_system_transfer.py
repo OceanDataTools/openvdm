@@ -74,8 +74,16 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = os.stat(filepath).st_mtime
+            logging.debug("file_mod_time: %s", file_mod_time)
+
+            if file_mod_time < data_start_time or file_mod_time > data_end_time:
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
-                #logging.debug(ignore_filter)
                 if fnmatch.fnmatch(filepath, ignore_filter):
                     logging.debug("%s ignored by ignore filter", filepath)
                     ignore = True
@@ -100,14 +108,6 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = os.stat(filepath).st_mtime
-                    logging.debug("file_mod_time: %s", file_mod_time)
-
-                    if file_mod_time < data_start_time or file_mod_time > data_end_time:
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
@@ -191,8 +191,16 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+            file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+            logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
+            if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
-                #logging.debug("ignore_filter")
                 if fnmatch.fnmatch(filepath, ignore_filter):
                     logging.debug("%s ignored because file matched ignore filter", filepath)
                     ignore = True
@@ -217,14 +225,6 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-                    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-                    logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
@@ -303,6 +303,15 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+            file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+            logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
+            if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
                 #logging.debug("filt")
                 if fnmatch.fnmatch(filepath, ignore_filter):
@@ -329,14 +338,6 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-                    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-                    logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
