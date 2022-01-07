@@ -44,7 +44,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-$PSXN,23,r.rr,p.pp,hhh.hh,e.ee*cc
+# $PSXN,23,r.rr,p.pp,hhh.hh,e.ee*cc
 RAW_COLS = ['date_time','hdr','23','roll','pitch','heading','heave_checksum'] # OpenRVDAS style
 # RAW_COLS = ['date','time','hdr','23','roll','pitch','heading','heave_checksum'] # SCS style
 PROC_COLS = ['date_time','roll','pitch','heading','heave']
