@@ -50,10 +50,10 @@ RAW_COLS = ['date_time','hdr','23','roll','pitch','heading','heave_checksum'] # 
 PROC_COLS = ['date_time','roll','pitch','heading','heave']
 
 ROUNDING = {
-    'roll': 3
+    'roll': 3,
     'pitch': 3,
     'heading': 3,
-    'heave': 3,
+    'heave': 3
 }
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
