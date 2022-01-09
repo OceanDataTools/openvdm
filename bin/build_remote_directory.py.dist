@@ -122,6 +122,10 @@ def main(argv):
             logging.error("Collection System: %s is not a Local Directory or Samba Server Transfer!", parsed_args.collection_system)
             sys.exit(1)
 
+        if not os.path.is_dir(os.path.join(template_directory, collection_system['name']))
+            logging.info("Template Directory not found: %s", os.path.join(template_directory, collection_system['name']))
+            continue
+
         source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID)
 
         if parsed_args.create_source:
