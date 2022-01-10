@@ -15,12 +15,37 @@ OPTIONAL ARGUMENTS:
                              server
 
 DESCRIPTION:
-    This script utilizes OpenVDM's hook architecture to create a directory
-    structure on a remote workstations based on a directory structure template.
-    The directory structure is created automatically at the when a new cruise
-    is created within OpenVDM.
+    This script is designed to be called from the postSetupNewCruise hook to
+    create directories and files on remote workstations when a new cruise is
+    setup.
 
-    This script is designed to be called from the postSetupNewCruise hook.
+    This script will only create directories on remote machines if the
+    corresponding collection system transfer is active when the cruise is
+    created.
+
+    The template directory structure must include top-level subdirectories
+    whose names match the short-names for the collection system transfers.
+
+    Any files or directories below the top-level subdirectory will be copied
+    to the remote workstation using the connection details provided in the
+    corresponding collection system transfer.  The current cruiseID can be
+    used in a remote directory or file name by adding "{cruiseID}" to the
+    directory/file in the template directory.
+
+    i.e.
+    /template_directory
+        /XBT
+            /{cruiseID}
+                /raw_data
+                /{cruiseID}_XBT_log.csv
+
+    For the example template directory struction and a current cruiseID of
+    RV1001, this script will create the following directory structure within
+    the source directory defined for the XBT workstation.
+
+    <source dir>/RV1001
+    <source dir>/RV1001/raw_data
+    <source dir>/RV1001/RV1001_XBT_log.csv
 
     BUGS:
    NOTES:
@@ -35,6 +60,7 @@ import sys
 import json
 import shutil
 import logging
+import argparse
 import subprocess
 
 from os.path import dirname, realpath
@@ -46,25 +72,26 @@ from server.lib.openvdm import OpenVDM
 TEMPLATE_DIRECTORY = '/home/sealog/template_directory'
 
 def make_system_call(command):
+    """
+    function to make any system calls
+    """
 
     logging.debug("Command: %s", ' '.join(command))
     proc = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = proc.communicate()            
+    out, err = proc.communicate()
 
     if len(out) > 0:
         logging.debug("stdout:\n%s",out)
-        
+
     if len(err) > 0:
         logging.error("stderr:\n%s",err)
 
 
-# -------------------------------------------------------------------------------------
-# The main function of the script
-# -------------------------------------------------------------------------------------
 def main(argv):
+    """
+    The main function of the script
+    """
 
-    import argparse
-       
     # Define the command-line structure
     parser = argparse.ArgumentParser(description='build remote directory structure based on template')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
@@ -138,7 +165,7 @@ def main(argv):
 
         if parsed_args.create_source:
             source_dir_parts = os.path.split(source_dir)
-            for idx, subDir in enumerate(source_dir_parts, start=1):
+            for idx, _ in enumerate(source_dir_parts, start=1):
                 logging.debug("Create directory: %s", os.path.join(*source_dir_parts[:idx]))
                 if collection_system['transferType'] == 1:
                     os.mkdir(os.path.join(*source_dir_parts[:idx]), 0o755)
@@ -162,12 +189,11 @@ def main(argv):
                 new_name = name.replace("{cruiseID}", cruiseID)
                 logging.debug("Create file:      %s", os.path.join(source_dir, root, new_name))
                 if collection_system['transferType'] == 1:
-                    shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(sourceDir, root, new_name))
-                    set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(sourceDir, root, new_name))
+                    shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(source_dir, root, new_name))
+                    set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir, root, new_name))
 
                 if collection_system['transferType'] == 3:
-                    make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(sourceDir, root, new_name) + "\"'"])
+                    make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
