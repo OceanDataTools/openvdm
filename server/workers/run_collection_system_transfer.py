@@ -907,13 +907,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.collection_system_transfer['cruiseOrLowering'] == "0":
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_cruise_end_date() + ":59" or "9999/12/31 23:59:59"
+                self.data_end_date = self.ovdm.get_cruise_end_date() + ":59" if self.ovdm.get_cruise_end_date() else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
             else:
                 logging.debug("Using lowering Time bounds")
                 self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_lowering_end_date() + ":59" or "9999/12/31 23:59:59"
+                self.data_end_date = self.ovdm.get_lowering_end_date() + ":59" if self.ovdm.get_lowering_end_date() else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
