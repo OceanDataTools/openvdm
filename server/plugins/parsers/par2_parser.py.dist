@@ -185,12 +185,12 @@ class PARParser(OpenVDMCSVParser):
 
         visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
         visualizer_data_obj['data'] = json.loads(df_proc[['date_time','lw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = ''
+        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
         visualizer_data_obj['label'] = 'LW Irradiance'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
         visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = ''
+        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
         visualizer_data_obj['label'] = 'SW Irradiance'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
