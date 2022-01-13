@@ -90,13 +90,16 @@ postHookCommands:
         #- name: "Setup Remote Cruise Directories"
         #  command:
         #  - /opt/openvdm/venv/bin/python
-        #  - /opt/openvdm/bin/build_remote_directory.py -s
+        #  - /opt/openvdm/bin/build_remote_directory.py
+        #  - "-s"
     postSetupNewLowering:
         #commandList:
         #- name: "Setup Remote Lowering Directories"
         #  command:
         #  - /opt/openvdm/venv/bin/python
-        #  - /opt/openvdm/bin/build_remote_directory.py -s -l
+        #  - /opt/openvdm/bin/build_remote_directory.py
+        #  - "-s"
+        #  - "-l"
     postFinalizeCurrentCruise:
         #commandList:
         #- name: "Export Sealog Vessel Data"

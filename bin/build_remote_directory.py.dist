@@ -144,6 +144,10 @@ def main(argv):
     # Retrieve the current loweringID
     loweringID = openVDM.get_lowering_id()
 
+    if parsed_args.lowering is True and loweringID is None:
+        logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
+        sys.exit(1)
+
     collection_systems = []
 
     # Retrieve the information for the collection system defined in the command-line argument
