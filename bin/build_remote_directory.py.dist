@@ -162,6 +162,10 @@ def main(argv):
             logging.info("Collection System: %s is not a Local Directory or Samba Server Transfer!", parsed_args.collection_system)
             sys.exit(1)
 
+        if collection_system['cruiseOrLowering'] == "1" and loweringID is None:
+            logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
+            sys.exit(1)
+
         collection_systems.append(collection_system)
     else:
         collection_systems = openVDM.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openVDM.get_active_collection_system_transfers(cruise=False)
