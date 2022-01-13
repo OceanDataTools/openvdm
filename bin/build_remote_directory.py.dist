@@ -101,12 +101,14 @@ def main(argv):
 
     # Define the command-line structure
     parser = argparse.ArgumentParser(description='build remote directory structure based on template')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
+    parser.add_argument('-v', '--verbosity', dest='verbosity', action='count', default=0,
                         help='Increase output verbosity')
-    parser.add_argument('-s', '--create_source',  action='store_true', help=' create the source directory')
+    parser.add_argument('-s', '--create_source',  action='store_true',
+                        help='Create the source directory')
     parser.add_argument('-t', '--template', dest='template_directory', metavar='template_directory',
-                        help='the directory structure to create on the remote server')
+                        help='The directory containing the directories/files to create on the remote system')
+    parser.add_argument('-l', '--lowering',  action='store_true'
+                        help='Create the remote directories/files for the lowering collection system transfers.')
     parser.add_argument('-c', '--collection_system', dest='collection_system', metavar='collection_system',
                         help='create the remote directory/file just for the specified collection system')
 
@@ -139,6 +141,9 @@ def main(argv):
     # Retrieve the current cruiseID
     cruiseID = openVDM.get_cruise_id()
 
+    # Retrieve the current loweringID
+    loweringID = openVDM.get_lowering_id()
+
     collection_systems = []
 
     # Retrieve the information for the collection system defined in the command-line argument
@@ -155,7 +160,7 @@ def main(argv):
 
         collection_systems.append(collection_system)
     else:
-        collection_systems = openVDM.get_active_collection_system_transfers(lowering=False)
+        collection_systems = openVDM.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openVDM.get_active_collection_system_transfers(cruise=False)
 
     for collection_system in collection_systems:
 
@@ -169,7 +174,7 @@ def main(argv):
             continue
 
         logging.info("Collection System: %s", collection_system['name'])
-        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID)
+        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
 
         if parsed_args.create_source is True:
             logging.info("  - Creating source directory: %s", source_dir)
@@ -183,7 +188,7 @@ def main(argv):
         for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
             root = root.replace(template_directory, '').lstrip('/')
             for name in dirs:
-                name = name.replace("{cruiseID}", cruiseID)
+                name = name.replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
                 logging.info("  - Creating directory: %s", os.path.join(source_dir, root, name))
                 if collection_system['transferType'] == "1":
                     logging.info("make_local_dir")
@@ -193,7 +198,7 @@ def main(argv):
                     make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
 
             for name in files:
-                new_name = name.replace("{cruiseID}", cruiseID)
+                new_name = name.replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
                 logging.info("  - Creating file:      %s", os.path.join(source_dir, root, new_name))
                 if collection_system['transferType'] == "1":
                     shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(source_dir, root, new_name))
