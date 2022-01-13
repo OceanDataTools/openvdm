@@ -107,7 +107,7 @@ def main(argv):
                         help='Create the source directory')
     parser.add_argument('-t', '--template', dest='template_directory', metavar='template_directory',
                         help='The directory containing the directories/files to create on the remote system')
-    parser.add_argument('-l', '--lowering',  action='store_true'
+    parser.add_argument('-l', '--lowering',  action='store_true',
                         help='Create the remote directories/files for the lowering collection system transfers.')
     parser.add_argument('-c', '--collection_system', dest='collection_system', metavar='collection_system',
                         help='create the remote directory/file just for the specified collection system')
