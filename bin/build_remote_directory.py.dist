@@ -105,10 +105,10 @@ def main(argv):
                         help='Increase output verbosity')
     parser.add_argument('-s', '--create_source',  action='store_true',
                         help='Create the source directory')
-    parser.add_argument('-t', '--template', dest='template_directory', metavar='template_directory',
-                        help='The directory containing the directories/files to create on the remote system')
     parser.add_argument('-l', '--lowering',  action='store_true',
                         help='Create the remote directories/files for the lowering collection system transfers.')
+    parser.add_argument('-t', '--template', dest='template_directory', metavar='template_directory',
+                        help='The directory containing the directories/files to create on the remote system')
     parser.add_argument('-c', '--collection_system', dest='collection_system', metavar='collection_system',
                         help='create the remote directory/file just for the specified collection system')
 
@@ -143,6 +143,7 @@ def main(argv):
 
     # Retrieve the current loweringID
     loweringID = openVDM.get_lowering_id()
+    logging.info("LoweringID: \"%s\"", loweringID)
 
     if parsed_args.lowering is True and loweringID is None:
         logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
