@@ -16,7 +16,7 @@ import datetime
 import json
 import logging
 import sys
-from os.path import dirname, realpath
+from os.path import dirname, realpath, join
 import requests
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -24,7 +24,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import read_config
 
 
-DEFAULT_CONFIG_FILE = './server/etc/openvdm.yaml'
+DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
 DEFAULT_CRUISE_CONFIG_FN = 'ovdmConfig.json'
 
