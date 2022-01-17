@@ -143,7 +143,6 @@ def main(argv):
 
     # Retrieve the current loweringID
     loweringID = openVDM.get_lowering_id()
-    logging.info("LoweringID: \"%s\"", loweringID)
 
     if parsed_args.lowering is True and loweringID is None:
         logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
@@ -183,7 +182,9 @@ def main(argv):
             continue
 
         logging.info("Collection System: %s", collection_system['name'])
-        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
+        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID)
+        if loweringID is not None:
+            source_dir = source_dir.replace("{loweringID}", loweringID)
 
         if parsed_args.create_source is True:
             logging.info("  - Creating source directory: %s", source_dir)
@@ -192,29 +193,35 @@ def main(argv):
                 set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir))
 
             if collection_system['transferType'] == "3":
-                make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
+                make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + "%" + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
 
         for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
             root = root.replace(template_directory, '').lstrip('/')
             for name in dirs:
-                name = name.replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
+                name = name.replace("{cruiseID}", cruiseID)
+                if loweringID is not None:
+                    name = name.replace("{loweringID}", loweringID)
+
                 logging.info("  - Creating directory: %s", os.path.join(source_dir, root, name))
                 if collection_system['transferType'] == "1":
                     logging.info("make_local_dir")
                     make_local_directory(os.path.join(source_dir, root, name), parsed_args.create_source)
 
                 if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
+                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
 
             for name in files:
-                new_name = name.replace("{cruiseID}", cruiseID).replace("{loweringID}", loweringID)
+                new_name = name.replace("{cruiseID}", cruiseID)
+                if loweringID is not None:
+                    new_name = new_name.replace("{loweringID}", loweringID)
+                    
                 logging.info("  - Creating file:      %s", os.path.join(source_dir, root, new_name))
                 if collection_system['transferType'] == "1":
                     shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(source_dir, root, new_name))
                     set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir, root, new_name))
 
                 if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], collection_system['smbPass'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
+                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
 
 if __name__ == "__main__":
     main(sys.argv[1:])

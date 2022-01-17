@@ -58,7 +58,7 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
-class ParParser(OpenVDMCSVParser):
+class PARParser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = ParParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
+    ovdm_parser = PARParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)
