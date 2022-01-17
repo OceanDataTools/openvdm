@@ -44,8 +44,8 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-RAW_COLS = ['date','time','hdr','irradiance','voltage'] # OpenRVDAS style
-# RAW_COLS = ['date_time','hdr','irradiance','voltage'] # SCS style
+RAW_COLS = ['date_time','hdr','irradiance','voltage'] # OpenRVDAS style
+# RAW_COLS = ['date','time','hdr','irradiance','voltage'] # SCS style
 PROC_COLS = ['date_time','irradiance']
 
 ROUNDING = {

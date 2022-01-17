@@ -305,7 +305,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
             vers="1.0"
             break
 
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw' + ',guest' + ',domain=' + gearman_worker.cruise_data_transfer['smbDomain'] + ',vers=' + vers] if gearman_worker.cruise_data_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw' + ',username=' + gearman_worker.cruise_data_transfer['smbUser'] + ',password=' + gearman_worker.cruise_data_transfer['smbPass'] + ',domain=' + gearman_worker.cruise_data_transfer['smbDomain'] + ',vers=' + vers]
+    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw' + ',guest' + ',domain=' + gearman_worker.cruise_data_transfer['smbDomain'] + ',vers=' + vers] if gearman_worker.cruise_data_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw' + ',username=' + gearman_worker.cruise_data_transfer['smbUser'] + ',password="' + gearman_worker.cruise_data_transfer['smbPass'] + '",domain=' + gearman_worker.cruise_data_transfer['smbDomain'] + ',vers=' + vers]
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
     subprocess.run(mount_command, capture_output=True, text=True, check=False)

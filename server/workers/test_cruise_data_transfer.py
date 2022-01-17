@@ -134,7 +134,7 @@ def test_smb_dest_dir(gearman_worker):
     os.mkdir(mntpoint, 0o755)
 
     # Mount SMB Share
-    mount_command = ['mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw'+',guest'+',domain='+gearman_worker.cruise_data_transfer['smbDomain']+',vers='+vers] if gearman_worker.cruise_data_transfer['smbUser'] == 'guest' else ['mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw'+',username='+gearman_worker.cruise_data_transfer['smbUser']+',password='+gearman_worker.cruise_data_transfer['smbPass']+',domain='+gearman_worker.cruise_data_transfer['smbDomain']+',vers='+vers]
+    mount_command = ['mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw'+',guest'+',domain='+gearman_worker.cruise_data_transfer['smbDomain']+',vers='+vers] if gearman_worker.cruise_data_transfer['smbUser'] == 'guest' else ['mount', '-t', 'cifs', gearman_worker.cruise_data_transfer['smbServer'], mntpoint, '-o', 'rw'+',username='+gearman_worker.cruise_data_transfer['smbUser']+',password="'+gearman_worker.cruise_data_transfer['smbPass']+'",domain='+gearman_worker.cruise_data_transfer['smbDomain']+',vers='+vers]
 
     logging.debug("Mount command: %s", ' '.join(mount_command))
 

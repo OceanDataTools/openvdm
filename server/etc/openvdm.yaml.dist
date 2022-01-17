@@ -85,6 +85,7 @@ postHookCommands:
         #    command:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/build_cruise_tracks.py
+        #    - OpenRVDAS
     postSetupNewCruise:
         #commandList:
         #- name: "Setup Remote Cruise Directories"
