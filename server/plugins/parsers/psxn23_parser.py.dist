@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FILE:  par2_parser.py
+FILE:  psxn23_parser.py
 
-USAGE:  par2_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  psxn23_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied PAR sensor data and return the json-formatted string
-    used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied NMEA PSXN (23) data and return the json-formatted
+    string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -44,13 +44,16 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-RAW_COLS = ['date_time','hdr','interna_date','internal_time','samples_used','avg_voltage_from_thermopile','lw_irradiance','pir_case_temp','pir_dome_temp','sw_irradiance','circuit_board_temp','voltage_after_diode_drop'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','interna_date','internal_time','samples_used','avg_voltage_from_thermopile','lw_irradiance','pir_case_temp','pir_dome_temp','sw_irradiance','circuit_board_temp','voltage_after_diode_drop'] # SCS style
-PROC_COLS = ['date_time','lw_irradiance','sw_irradiance']
+# $PSXN,23,r.rr,p.pp,hhh.hh,e.ee*cc
+RAW_COLS = ['date_time','hdr','23','roll','pitch','heading','heave_checksum'] # OpenRVDAS style
+# RAW_COLS = ['date','time','hdr','23','roll','pitch','heading','heave_checksum'] # SCS style
+PROC_COLS = ['date_time','roll','pitch','heading','heave']
 
 ROUNDING = {
-    'lw_irradiance': 3,
-    'sw_irradiance': 3
+    'roll': 3,
+    'pitch': 3,
+    'heading': 3,
+    'heave': 3
 }
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
@@ -59,7 +62,7 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
-class PARParser(OpenVDMCSVParser):
+class PSXN23Parser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
@@ -91,8 +94,10 @@ class PARParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        lw_irradiance = float(line['lw_irradiance'])
-                        sw_irradiance = float(line['sw_irradiance'])
+                        roll = float(line['roll'])
+                        pitch = float(line['pitch'])
+                        heading = float(line['heading'])
+                        heave = float(line['heave_checksum'].split('*')[0])
 
                     except Exception as err:
                         errors.append(lineno)
@@ -102,8 +107,10 @@ class PARParser(OpenVDMCSVParser):
 
                     else:
                         raw_into_df['date_time'].append(date_time)
-                        raw_into_df['lw_irradiance'].append(lw_irradiance)
-                        raw_into_df['sw_irradiance'].append(sw_irradiance)
+                        raw_into_df['roll'].append(roll)
+                        raw_into_df['pitch'].append(pitch)
+                        raw_into_df['heading'].append(heading)
+                        raw_into_df['heave'].append(heave)
 
         except Exception as err:
             logging.error("Problem accessing input file: %s", filepath)
@@ -146,8 +153,9 @@ class PARParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['lw_irradiance'].min(),3), round(df_proc['lw_irradiance'].max(),3)], 'LW Irradiance', '')
-        self.add_bounds_stat([round(df_proc['sw_irradiance'].min(),3), round(df_proc['lw_irradiance'].max(),3)], 'SW Irradiance', '')
+        self.add_bounds_stat([round(df_proc['pitch'].min(),3), round(df_proc['pitch'].max(),3)], 'Pitch Bounds', 'deg')
+        self.add_bounds_stat([round(df_proc['roll'].min(),3), round(df_proc['roll'].max(),3)], 'Roll Bounds', 'deg')
+        self.add_bounds_stat([round(df_proc['heave'].min(),3), round(df_proc['heave'].max(),3)], 'Heave Bounds', 'm')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -184,14 +192,24 @@ class PARParser(OpenVDMCSVParser):
         logging.debug("Building visualization data...")
 
         visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','lw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
-        visualizer_data_obj['label'] = 'LW Irradiance'
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','heading']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'deg'
+        visualizer_data_obj['label'] = 'Heading'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
-        visualizer_data_obj['label'] = 'SW Irradiance'
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','pitch']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'deg'
+        visualizer_data_obj['label'] = 'Pitch'
+        self.add_visualization_data(deepcopy(visualizer_data_obj))
+
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','roll']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'deg'
+        visualizer_data_obj['label'] = 'Roll'
+        self.add_visualization_data(deepcopy(visualizer_data_obj))
+
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','heave']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'm'
+        visualizer_data_obj['label'] = 'Heave'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
         # send message about errors encountered to OpenVDM
@@ -205,7 +223,7 @@ class PARParser(OpenVDMCSVParser):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Parse PAR sensor data')
+    parser = argparse.ArgumentParser(description='Parse NEMA PSXN23 data')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
@@ -233,7 +251,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = PARParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
+    ovdm_parser = PSXN23Parser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

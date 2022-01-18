@@ -74,8 +74,16 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = os.stat(filepath).st_mtime
+            logging.debug("file_mod_time: %s", file_mod_time)
+
+            if file_mod_time < data_start_time or file_mod_time > data_end_time:
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
-                #logging.debug(ignore_filter)
                 if fnmatch.fnmatch(filepath, ignore_filter):
                     logging.debug("%s ignored by ignore filter", filepath)
                     ignore = True
@@ -100,14 +108,6 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = os.stat(filepath).st_mtime
-                    logging.debug("file_mod_time: %s", file_mod_time)
-
-                    if file_mod_time < data_start_time or file_mod_time > data_end_time:
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
@@ -191,8 +191,16 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+            file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+            logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
+            if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
-                #logging.debug("ignore_filter")
                 if fnmatch.fnmatch(filepath, ignore_filter):
                     logging.debug("%s ignored because file matched ignore filter", filepath)
                     ignore = True
@@ -217,14 +225,6 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-                    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-                    logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
@@ -303,6 +303,15 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
             exclude = False
             ignore = False
             include = False
+
+            file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+            file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+            logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
+            if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
+                logging.debug("%s ignored for time reasons", filepath)
+                ignore = True
+                continue
+
             for ignore_filter in filters['ignoreFilter'].split(','):
                 #logging.debug("filt")
                 if fnmatch.fnmatch(filepath, ignore_filter):
@@ -329,14 +338,6 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
                             break
 
                     if exclude:
-                        break
-
-                    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-                    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-                    logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-                    if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
-                        logging.debug("%s ignored for time reasons", filepath)
-                        ignore = True
                         break
 
                     logging.debug("%s is a valid file for transfer", filepath)
@@ -906,13 +907,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.collection_system_transfer['cruiseOrLowering'] == "0":
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_cruise_end_date() + ":59" or "9999/12/31 23:59:59"
+                self.data_end_date = self.ovdm.get_cruise_end_date() + ":59" if self.ovdm.get_cruise_end_date() else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
             else:
                 logging.debug("Using lowering Time bounds")
                 self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_lowering_end_date() + ":59" or "9999/12/31 23:59:59"
+                self.data_end_date = self.ovdm.get_lowering_end_date() + ":59" if self.ovdm.get_lowering_end_date() else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 

@@ -524,17 +524,19 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
         job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
 
-    gearman_worker.send_job_status(gearman_job, 9, 10)
+        gearman_worker.send_job_status(gearman_job, 9, 10)
 
-    if len(files['new']) > 0 or len(files['updated']) > 0:
+        if len(files['new']) > 0 or len(files['updated']) > 0:
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], from_publicdata_dir)
+            output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], from_publicdata_dir)
 
-        if not output_results['verdict']:
-            job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-            return json.dumps(job_results)
+            if not output_results['verdict']:
+                job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+                return json.dumps(job_results)
 
-        job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
+            job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
+    else:
+        files = { 'include':[], 'exclude':[], 'new':[], 'updated':[] }
 
     gearman_worker.send_job_status(gearman_job, 95, 100)
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FILE:  par2_parser.py
+FILE:  sbe38_parser.py
 
-USAGE:  par2_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  sbe38_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied PAR sensor data and return the json-formatted string
-    used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied SBE38 temp data and return the json-formatted
+    string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -27,7 +27,7 @@ REQUIREMENTS:  Python3.8
    AUTHOR:  Webb Pinner
   VERSION:  2.6
   CREATED:  2016-08-29
- REVISION:  2021-02-13
+ REVISION:  2021-01-13
 """
 
 import csv
@@ -44,14 +44,15 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.openvdm import OpenVDM
 
-RAW_COLS = ['date_time','hdr','interna_date','internal_time','samples_used','avg_voltage_from_thermopile','lw_irradiance','pir_case_temp','pir_dome_temp','sw_irradiance','circuit_board_temp','voltage_after_diode_drop'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','interna_date','internal_time','samples_used','avg_voltage_from_thermopile','lw_irradiance','pir_case_temp','pir_dome_temp','sw_irradiance','circuit_board_temp','voltage_after_diode_drop'] # SCS style
-PROC_COLS = ['date_time','lw_irradiance','sw_irradiance']
+RAW_COLS = ['date_time','water_temp'] # OpenRVDAS style
+# RAW_COLS = ['date','time','water_temp'] # SCS style
+PROC_COLS = ['date_time','water_temp']
 
 ROUNDING = {
-    'lw_irradiance': 3,
-    'sw_irradiance': 3
+    'water_temp': 4,
 }
+
+MIN_DEPTH = 0
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
@@ -59,7 +60,7 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
-class PARParser(OpenVDMCSVParser):
+class SBE38Parser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
@@ -89,10 +90,9 @@ class PARParser(OpenVDMCSVParser):
 
                     try:
                         date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                        #date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        lw_irradiance = float(line['lw_irradiance'])
-                        sw_irradiance = float(line['sw_irradiance'])
+                        water_temp = float(line['water_temp'])
 
                     except Exception as err:
                         errors.append(lineno)
@@ -102,8 +102,7 @@ class PARParser(OpenVDMCSVParser):
 
                     else:
                         raw_into_df['date_time'].append(date_time)
-                        raw_into_df['lw_irradiance'].append(lw_irradiance)
-                        raw_into_df['sw_irradiance'].append(sw_irradiance)
+                        raw_into_df['water_temp'].append(water_temp)
 
         except Exception as err:
             logging.error("Problem accessing input file: %s", filepath)
@@ -146,8 +145,7 @@ class PARParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['lw_irradiance'].min(),3), round(df_proc['lw_irradiance'].max(),3)], 'LW Irradiance', '')
-        self.add_bounds_stat([round(df_proc['sw_irradiance'].min(),3), round(df_proc['lw_irradiance'].max(),3)], 'SW Irradiance', '')
+        self.add_bounds_stat([round(df_proc['water_temp'].min(),4), round(df_proc['water_temp'].max(),4)], 'Water Temp 1', 'C')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -184,14 +182,9 @@ class PARParser(OpenVDMCSVParser):
         logging.debug("Building visualization data...")
 
         visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','lw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
-        visualizer_data_obj['label'] = 'LW Irradiance'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sw_irradiance']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = '\u03BCE/cm2sec'
-        visualizer_data_obj['label'] = 'SW Irradiance'
+        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','water_temp']].to_json(orient='values'))
+        visualizer_data_obj['unit'] = 'C'
+        visualizer_data_obj['label'] = 'Water Temp'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
         # send message about errors encountered to OpenVDM
@@ -205,7 +198,7 @@ class PARParser(OpenVDMCSVParser):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Parse PAR sensor data')
+    parser = argparse.ArgumentParser(description='Parse SBE38 Temp sensor data')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
@@ -233,7 +226,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = PARParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
+    ovdm_parser = SBE38Parser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)
