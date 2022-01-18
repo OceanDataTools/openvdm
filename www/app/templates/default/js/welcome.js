@@ -158,7 +158,7 @@ $(function () {
                 }
                 
                 if (errorFilesOutput == '') {
-                    errorFilesOutput = '                   <h5>No Filename Errors Found</h5>';
+                    errorFilesOutput = '                   <h5>No Filename Errors Detected</h5>';
                 }
 
                 $(errorFilesPanel).html(errorFilesOutput);
@@ -195,8 +195,14 @@ $(function () {
                         shipboardTransfersOutput += '                   <h5>' + data[i].collectionSystemName + ' - ' + formatTime(data[i].date) + '</h5>';
                         shipboardTransfersOutput += '                   <ul>';
                         var j = 0;
-                        for (j = 0; j < data[i].newFiles.length; j++) {
+                        for (j = 0; j < 20; j++) {
+                            if(data[i].newFiles[j] === undefined) {
+                                break
+                            }
                             shipboardTransfersOutput += '                       <li><small>' + data[i].newFiles[j] + '</small></li>';
+                        }
+                        if(data[i].newFiles.length > 20){
+                            shipboardTransfersOutput += '                       <li><small>...and <strong>' + (data[i].newFiles.length-20).toString() + '</strong> other files</small></li>';
                         }
                         if (data[i].updatedFiles.length > 0) {
                             shipboardTransfersOutput += '                       <li><small>' + data[i].updatedFiles.length + ' File(s) Updated</small></li>';
