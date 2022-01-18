@@ -121,7 +121,7 @@ def test_smb_source_dir(gearman_worker):
 
 
     # Mount SMB Share
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',username='+gearman_worker.collection_system_transfer['smbUser']+',password="'+gearman_worker.collection_system_transfer['smbPass']+'",domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]
+    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',username='+gearman_worker.collection_system_transfer['smbUser']+',password='+gearman_worker.collection_system_transfer['smbPass']+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]
 
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
