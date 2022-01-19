@@ -918,7 +918,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
             if self.collection_system_transfer['staleness'] != "0":
-                self.data_end_date = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).strftime("%Y/%m/%d %H:%M:%S")
+                staleness_dt = datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))
+                data_end_dt = datetime.strptime(gearman_worker.data_end_date + "+0000", "%Y/%m/%d %H:%M:%S" + '%z')
+                if staleness_dt < data_end_dt:
+                    self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
 
         # Todo - there's a change the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
