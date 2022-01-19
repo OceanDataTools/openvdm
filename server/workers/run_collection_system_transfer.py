@@ -919,7 +919,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             if self.collection_system_transfer['staleness'] != "0":
                 staleness_dt = datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))
-                data_end_dt = datetime.strptime(gearman_worker.data_end_date + "+0000", "%Y/%m/%d %H:%M:%S" + '%z')
+                data_end_dt = datetime.strptime(self.data_end_date + "+0000", "%Y/%m/%d %H:%M:%S" + '%z')
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
 
