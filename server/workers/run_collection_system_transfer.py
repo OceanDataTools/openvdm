@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import pytz
 from datetime import datetime, timedelta
 from os.path import dirname, realpath
 from random import randint
@@ -918,7 +919,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
             if self.collection_system_transfer['staleness'] != "0":
-                staleness_dt = datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))
+                staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
                 data_end_dt = datetime.strptime(self.data_end_date + "+0000", "%Y/%m/%d %H:%M:%S" + '%z')
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
