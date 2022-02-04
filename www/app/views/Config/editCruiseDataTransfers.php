@@ -58,19 +58,19 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 <?php
     if ($data['collectionSystemTransfers']) {
 ?>
-                                <!-- <div class="form-group"> -->
+                                <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
                                     <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
                                         <input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'checked': '' ?>>
-                                        <label><?php echo $value->longName;?></label>
+                                        <label><?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
                                     </div>
-                                <!-- </div> -->
+                                </div>
 <?php
     } else {
 ?>
