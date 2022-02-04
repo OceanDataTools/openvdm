@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.6
+  VERSION:  2.7
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-02-04
 """
 
 import argparse
@@ -119,10 +119,10 @@ def build_exclude_filterlist(gearman_worker):
     exclude_filterlist = []
 
     if gearman_worker.cruise_data_transfer['includeOVDMFiles'] == '0':
-        # dashboard_data_dir = gearman_worker.ovdm.get_extra_directory_by_name("Dashboard_Data")
+        # dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
         # exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
 
-        # transfer_logs = gearman_worker.ovdm.get_extra_directory_by_name("Transfer_Logs")
+        # transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
         # exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
 
         exclude_filterlist.append("*{}".format(DEFAULT_CRUISE_CONFIG_FN))
@@ -132,7 +132,7 @@ def build_exclude_filterlist(gearman_worker):
         # TODO - exclude the lowering.json files for each of the lowerings
 
     # if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
-    #     from_publicdata_dir = gearman_worker.ovdm.get_extra_directory_by_name("From_PublicData")
+    #     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
     #     exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
 
     excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',')

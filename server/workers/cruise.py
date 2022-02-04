@@ -9,7 +9,7 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.6
+  VERSION:  2.7
   CREATED:  2015-01-01
  REVISION:  2021-02-13
 """
@@ -153,7 +153,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
         return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file", 'files': files }
 
     # Build transfer command
-    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_extra_directory_by_name('From_PublicData')['destDir'])
+    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
     command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
     logging.debug("Command: %s", ' '.join(command))
 
@@ -435,7 +435,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_extra_directory_by_name('From_PublicData')['destDir'])
+    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
     ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, DEFAULT_CRUISE_CONFIG_FN)
 
@@ -585,7 +585,7 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
     job_results = {'parts':[]}
 
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_extra_directory_by_name('From_PublicData')['destDir'])
+    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
