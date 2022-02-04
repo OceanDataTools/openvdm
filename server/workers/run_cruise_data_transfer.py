@@ -268,7 +268,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("output_results: %s", output_results)
 
-    if output_results is not None and 'verdict' in output_results:
+    if output_results is not None and not output_results['verdict']:
         logging.error("Error setting ownership/permissions for cruise data at destination: %s", os.path.join(dest_dir, gearman_worker.cruise_id))
         return output_results
 
