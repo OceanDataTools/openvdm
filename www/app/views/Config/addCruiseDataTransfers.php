@@ -92,7 +92,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
 ?>
-                                        <label><input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $_POST['excludedCollectionSystems']))? 'checked': '' ?>>
+                                        <label><input type="checkbox" name="excludedExtraDirectories[]" value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $_POST['excludedExtraDirectories']))? 'checked': '' ?>>
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
