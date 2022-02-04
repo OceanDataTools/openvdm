@@ -60,14 +60,16 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 ?>
                                 <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
+                                    <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
-                                        <label class="checkbox"><input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'checked': '' ?>>
+                                        <label><input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'checked': '' ?>>
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
+                                    </div>
                                 </div>
 <?php
     } else {
@@ -82,14 +84,16 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 ?>
                                 <div class="form-group">
                                     <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label><br>
+                                    <div class="checkbox">
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
 ?>
-                                        <label class="checkbox"><input type="checkbox" name="excludedExtraDirectories[]" value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $data['row'][0]->excludedExtraDirectories))? 'checked': '' ?>>
+                                        <label><input type="checkbox" name="excludedExtraDirectories[]" value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $data['row'][0]->excludedExtraDirectories))? 'checked': '' ?>>
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
+                                    </div>
                                 </div>
 <?php
     } else {
