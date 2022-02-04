@@ -70,7 +70,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
         }
 ?>  
                                     </div>
-                                <!-- </div> -->
+                                </div>
 <?php
     } else {
 ?>
