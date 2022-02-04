@@ -20,10 +20,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "/usr/local/bin/bower --allow-root install"
+            "bash ./post_composer.sh"
         ],
         "post-update-cmd": [
-            "/usr/local/bin/bower --allow-root install"
+            "bash ./post_composer.sh"
         ]
     },
     "minimum-stability": "dev"

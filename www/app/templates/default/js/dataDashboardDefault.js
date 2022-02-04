@@ -3,9 +3,7 @@ $(function () {
     
     var MAPPROXY_DIR = '/mapproxy';
     
-    Highcharts.setOptions({
-        colors: ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
-    });
+    const colors = ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
 
     var greenIcon = null;
     var redIcon = null;    
@@ -33,7 +31,6 @@ $(function () {
         
         var mapObject = [];
         
-
         greenIcon = new L.Icon({
             iconUrl: '/bower_components/leaflet-color-markers/img/marker-icon-green.png',
             shadowUrl: '/bower_components/leaflet/dist/images/marker-shadow.png',
@@ -79,25 +76,25 @@ $(function () {
         //    });
         
         var worldOceanBase = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/WorldOceanBase/EPSG900913/{z}/{x}/{y}.png', {
-                tms:true,
-                zoomOffset:-1,
-                minZoom:1,
-                maxNativeZoom:9,
-                attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
-            }),
-            worldOceanReference = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/WorldOceanReference/EPSG900913/{z}/{x}/{y}.png', {
-                tms:true,
-                zoomOffset:-1,
-                minZoom:1,
-                maxNativeZoom:9,
-                attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
-            }),
-	        gmrtBase = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/GMRTBase/EPSG900913/{z}/{x}/{y}.png', {
-                tms:true,
-                zoomOffset:-1,
-                minZoom:1,
-                attribution: '<a href="http://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
-            });
+            tms:true,
+            zoomOffset:-1,
+            minZoom:1,
+            maxNativeZoom:9,
+            attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
+        }),
+        worldOceanReference = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/WorldOceanReference/EPSG900913/{z}/{x}/{y}.png', {
+            tms:true,
+            zoomOffset:-1,
+            minZoom:1,
+            maxNativeZoom:9,
+            attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
+        }),
+        gmrtBase = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/GMRTBase/EPSG900913/{z}/{x}/{y}.png', {
+            tms:true,
+            zoomOffset:-1,
+            minZoom:1,
+            attribution: '<a href="http://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
+        });
         
         worldOceanBase.addTo(mapObject['map']);
         worldOceanBase.bringToBack();
@@ -134,10 +131,14 @@ $(function () {
         //Build chartObject object
         chartObject['placeholderID'] = placeholderID;
         chartObject['objectListID'] = objectListID;
+
         var tempArray = chartObject['placeholderID'].split("_");
         tempArray.pop();
+
         chartObject['dataType'] = tempArray.join('_');
         chartObject['expanded'] = false; //chartHeight;
+        chartObject['chart'] = null;
+
         return chartObject;
     }
 
@@ -148,10 +149,8 @@ $(function () {
             } else if ($(this).hasClass("se-checkbox")) {
                 addStartEndPositionsToMap(mapObject, $(this).val());
             } else if ($(this).hasClass("geoJSON-checkbox")) {
-                //alert($(this).val());
                 addGeoJSONToMap(mapObject, $(this).val());
             } else if ($(this).hasClass("tms-checkbox")) {
-                //alert($(this).val());
                 addTMSToMap(mapObject, $(this).val());
             }
         });        
@@ -257,7 +256,6 @@ $(function () {
             }
         });
     }
-
 
     function removeStartEndPositionsFromMap(mapObject, dataType) {
         mapObject['map'].removeLayer(mapObject['markers']['StartPosition-' + dataType]);
@@ -379,6 +377,7 @@ $(function () {
     }
     
     function removeTMSFromMap(mapObject, tmsObjectJsonName) {
+
         //remove the layer
         mapObject['map'].removeLayer(mapObject['tmsLayers'][tmsObjectJsonName]);
         delete mapObject['tmsLayers'][tmsObjectJsonName];
@@ -395,73 +394,82 @@ $(function () {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
-
+ 
                 var placeholder = '#' + chartObject['placeholderID'];
                 if ('error' in data){
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    var seriesData = [];
-                    var yAxes = [];
-                    var xAxes = [];
+
+                    var scales = { x: (inverted === true) ? { type: null } : {
+                        type: 'time',
+                        adapters: { date: { zone: 0 } },
+                        time: {
+                            displayFormats: {
+                                millisecond: 'HH:MM:ss.SSS',
+                                second: 'HH:mm:ss',
+                                minute: 'HH:mm',
+                                hour: 'HH:mm',
+                                day: 'LL/dd ',
+                                month: 'LL/yyyy',
+                                year: 'yyyy'
+                            }
+                        }
+                    }}
+
+                    var seriesData = { datasets: []}
 
                     var i = 0;
                     for (i = 0; i < data.length; i++) {
-                        yAxes[i] = {
-                            reversed: reversedY || data[i].label == "Depth",
-                            labels: {
-                                format: '{value}',
-                                style: {
-                                    color: Highcharts.getOptions().colors[i]
-                                }
-                            },
-                            title: {
-                                text: '',
-                                style: {
-                                    color: Highcharts.getOptions().colors[i]
-                                }
+
+                        seriesData['datasets'].push({
+                            data: data[i].data.map(elem => {
+                                return { x:luxon.DateTime.fromMillis(elem[0], { zone: 'UTC'}).toISO(), y:elem[1] }
+                            }),
+                            label: data[i].label + ' (' + data[i].unit + ')',
+                            yAxisID: data[i].label,
+                            borderColor: colors[i%colors.length],
+                            backgroundColor: colors[i%colors.length],
+                        });
+                                
+                        scales[data[i].label] = {
+                            type: 'linear',
+                            display: true,
+                            reverse: (reversedY || data[i].label == "Depth") ? true : false,
+                                        position: (i%2) ? 'left' : 'right',
+                            grid: {
+                                drawOnChartArea: (i==0) ? true : false
                             }
-                        };
-                        if (i >= data.length / 2) {
-                            yAxes[i].opposite = true;
                         }
-
-                        seriesData[i] = {
-                            name: data[i].label +  ' (' + data[i].unit + ')',
-                            yAxis: i,
-                            data: data[i].data,
-                            animation: false
-                        };
                     }
-
+                            
                     var chartOptions = {
-                        chart: {
-                            type: 'line',
-                            inverted: inverted,
-                        },
-                        title: {text: ''},
-                        tooltip: {
-                            shared: true,
-                            crosshairs: true,
-                            xDateFormat: '%Y-%m-%d',
-                            formatter: function() {
-                                var toolTipStr = inverted ? 'X: ' + this.x : '<span style="font-size: 10px">Time: ' + Highcharts.dateFormat('%b %e %Y - %H:%M:%S', this.x) + '</span>';
-                                $.each(this.points, function (i) {
-                                    toolTipStr += '<br/>' + '<span style="font-size: 10px; color:' + this.series.color + '">\u25CF</span><span style="font-size: 10px"> ' + this.series.name + ': ' + this.y +  ' </span>';
-                                });
-                                return toolTipStr;
+                        type: 'line',
+                        options: {
+                            animation: false,
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: scales,
+                            radius: 0,
+                            interaction: {
+                                mode: 'index'
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
                             }
                         },
-                        legend: {enabled: true},
-                        xAxis: {
-                            type: inverted ? 'linear' : 'datetime',
-                            title: {text: ''},
-                            dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
-                        },
-                        yAxis: yAxes,
-                        series: seriesData
+                        data: seriesData
                     };
 
-                    $(placeholder).highcharts(chartOptions);
+                    const ctx = document.getElementById(chartObject['placeholderID']).getContext('2d');
+                            
+                    if (chartObject['chart'] !== null) {
+                        chartObject['chart'].destroy();
+                    }
+
+                    chartObject['chart'] = new Chart(ctx, chartOptions);
+                    $('#' + chartObject['placeholderID']).css({height: chartObject['expanded'] ? 500 : 200});
                 }
             }
         });
@@ -473,7 +481,6 @@ $(function () {
         var tempArray = mapPlaceholderID.split("_");
         tempArray.pop();
         var objectListPlaceholderID =  tempArray.join('_') + '_objectList-placeholder';
-        //alert(objectListPlaceholderID);
         mapObjects.push(initMapObject(mapPlaceholderID, objectListPlaceholderID));
     });
     
@@ -483,7 +490,6 @@ $(function () {
         var tempArray = chartPlaceholderID.split("_");
         tempArray.pop();
         var objectListPlaceholderID =  tempArray.join('_') + '_objectList-placeholder';
-        //alert(objectListPlaceholderID);
         chartObjects.push(initChartObject(chartPlaceholderID, objectListPlaceholderID));
     });
     
@@ -503,30 +509,22 @@ $(function () {
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
             if ($(this).is(":checked")) {
                 if ($(this).hasClass("se-checkbox")) {
-                    //alert($(this).val());
                     addStartEndPositionsToMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("lp-checkbox")) {
-                    //alert($(this).val());
                     addLatestPositionToMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("geoJSON-checkbox")) {
-                    //alert($(this).val());
                     addGeoJSONToMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("tms-checkbox")) {
-                    //alert($(this).val());
                     addTMSToMap(mapObjects[i], $(this).val());
                 }
             } else {
                 if ($(this).hasClass("se-checkbox")) {
-                    //alert($(this).val());
                     removeStartEndPositionsFromMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("lp-checkbox")) {
-                    //alert($(this).val());
                     removeLatestPositionFromMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("geoJSON-checkbox")) {
-                    //alert($(this).val());
                     removeGeoJSONFromMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("tms-checkbox")) {
-                    //alert($(this).val());
                     removeTMSFromMap(mapObjects[i], $(this).val());
                 }
             }
@@ -557,7 +555,7 @@ $(function () {
     //Check for updates
     $.each(chartObjects, function(i) {
         $( '#' + chartObjects[i]['objectListID']).find(':radio').change(function() {
-    	    if ($(this).hasClass( "json-reversedY-radio" )) {
+            if ($(this).hasClass( "json-reversedY-radio" )) {
                 updateChart(chartObjects[i], $(this).val(), true, false);
             } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
                 updateChart(chartObjects[i], $(this).val(), true, true);
@@ -569,16 +567,10 @@ $(function () {
         });
         
         $( '#' + chartObjects[i]['dataType'] + '_expand-btn').click(function() {
-            var chart = $('#' + chartObjects[i]['placeholderID']).highcharts();
-            
-            $('#' + chartObjects[i]['placeholderID']).height(chartObjects[i]['expanded'] ? 200 : 500);
-            $('#' + chartObjects[i]['placeholderID']).highcharts().reflow();
-            $(this).removeClass(chartObjects[i]['expanded'] ? 'fa-compress' : 'fa-expand');
-            $(this).addClass(chartObjects[i]['expanded'] ? 'fa-expand' : 'fa-compress');
             chartObjects[i]['expanded'] = !chartObjects[i]['expanded'];
+            $('#' + chartObjects[i]['placeholderID']).css({height: chartObjects[i]['expanded'] ? 500 : 200});
+            $(this).removeClass(chartObjects[i]['expanded'] ? 'fa-expand' : 'fa-compress');
+            $(this).addClass(chartObjects[i]['expanded'] ? 'fa-compress' : 'fa-expand');
         });
     });
-    
-    
-
 });
