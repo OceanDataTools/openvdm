@@ -71,7 +71,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_id = self.ovdm.get_cruise_id()
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
+        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_extra_directory_by_name('Dashboard_Data')['destDir'])
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
 
         self.collection_system_transfer = {}
@@ -111,7 +111,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
         self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransferID']) if 'collectionSystemTransferID' in payload_obj else { 'name': "Unknown" }
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
+        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_extra_directory_by_name('Dashboard_Data')['destDir'])
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
 
         return super().on_job_execute(current_job)
@@ -407,7 +407,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
-        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], DEFAULT_DATA_DASHBOARD_MANIFEST_FN))
+        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_extra_directory_by_name('Dashboard_Data')['destDir'], DEFAULT_DATA_DASHBOARD_MANIFEST_FN))
 
         gearman_worker.send_job_status(gearman_job, 9, 10)
 
@@ -619,7 +619,7 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
 
     gearman_worker.send_job_status(gearman_job, 99, 100)
 
-    data_dashboard_dest_dir = gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir']
+    data_dashboard_dest_dir = gearman_worker.ovdm.get_extra_directory_by_name('Dashboard_Data')['destDir']
     job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(gearman_worker.data_dashboard_dir)]# might need to remove cruise_dir from begining of filepaths
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
