@@ -71,7 +71,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_id = self.ovdm.get_cruise_id()
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_extra_directory_by_name('Dashboard_Data')['destDir'])
+        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
 
         self.collection_system_transfer = {}
