@@ -391,7 +391,7 @@ class OpenVDM():
         extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_extra_directories()))
         return extra_directory[0] if len(extra_directory) > 0 else None
 
-    def get_extra_directories(self):
+    def get_extra_directories(self, required=False):
         """
         Return all extra directory configurations
 
@@ -402,34 +402,34 @@ class OpenVDM():
         try:
             req = requests.get(url)
             return_obj = json.loads(req.text)
-            return return_obj
+            return return_obj if required else list(filter(lambda directory: directory['required'] == '0', return_obj))
         except Exception as err:
             logging.error("Unable to retrieve extra directories from OpenVDM API")
             raise err
 
-    def get_required_extra_directory(self, extra_directory_id):
-        """
-        Return the required extra directory configuration based on the extra_directory_id
+    # def get_required_extra_directory(self, extra_directory_id):
+    #     """
+    #     Return the required extra directory configuration based on the extra_directory_id
 
-        """
+    #     """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
+    #     url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
 
-        try:
-            req = requests.get(url)
-            return_obj = json.loads(req.text)
-            return return_obj[0]
-        except Exception as err:
-            logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
-            raise err
+    #     try:
+    #         req = requests.get(url)
+    #         return_obj = json.loads(req.text)
+    #         return return_obj[0]
+    #     except Exception as err:
+    #         logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
+    #         raise err
 
-    def get_required_extra_directory_by_name(self, extra_directory_name):
-        """
-        Return the required extra directory configuration based on the extra_directory_name
-        """
+    # def get_required_extra_directory_by_name(self, extra_directory_name):
+    #     """
+    #     Return the required extra directory configuration based on the extra_directory_name
+    #     """
 
-        extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_required_extra_directories()))
-        return extra_directory[0] if len(extra_directory) > 0 else None
+    #     extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_required_extra_directories()))
+    #     return extra_directory[0] if len(extra_directory) > 0 else None
 
     def get_required_extra_directories(self):
         """
