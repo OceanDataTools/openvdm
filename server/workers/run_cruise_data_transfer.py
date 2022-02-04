@@ -215,6 +215,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             logging.info("File Count: %d", file_count)
             break
 
+    output_results = None
     if file_count == 0:
         logging.debug("Nothing to tranfser")
 
