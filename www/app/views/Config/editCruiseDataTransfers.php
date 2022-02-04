@@ -59,7 +59,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
     if ($data['collectionSystemTransfers']) {
 ?>
                                 <div class="form-group">
-                                    <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
+                                    <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label>
                                     <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
@@ -83,7 +83,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
     if ($data['extraDirectories']) {
 ?>
                                 <div class="form-group">
-                                    <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label><br>
+                                    <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label>
                                     <div class="checkbox">
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
