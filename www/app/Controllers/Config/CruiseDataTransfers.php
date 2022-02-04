@@ -39,6 +39,12 @@ class CruiseDataTransfers extends Controller {
         return $trueFalse;
     }
     
+    private function _buildIncludeOVDMFilesOptions() {
+        
+        $trueFalse = array(array('id'=>'includeOVDMFilesOptions0', 'name'=>'includeOVDMFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'includeOVDMFilesOptions1', 'name'=>'includeOVDMFiles', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
     public function __construct(){
         if(!Session::get('loggedin')){
             Url::redirect('config/login');
@@ -65,12 +71,14 @@ class CruiseDataTransfers extends Controller {
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
+        $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -224,6 +232,7 @@ class CruiseDataTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -253,6 +262,7 @@ class CruiseDataTransfers extends Controller {
         } elseif(isset($_POST['inlineTest'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -407,6 +417,7 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer'] = (object)array(
                     'name' => $name,
                     'longName' => $longName,
+                    'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -452,6 +463,7 @@ class CruiseDataTransfers extends Controller {
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
+        $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
@@ -460,6 +472,7 @@ class CruiseDataTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -609,6 +622,7 @@ class CruiseDataTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -637,6 +651,7 @@ class CruiseDataTransfers extends Controller {
                 
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
                 $data['row'][0]->bandwidthLimit = $bandwidthLimit;
                 $data['row'][0]->transferType = $transferType;
                 $data['row'][0]->destDir = $destDir;
@@ -659,6 +674,7 @@ class CruiseDataTransfers extends Controller {
 
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -810,6 +826,7 @@ class CruiseDataTransfers extends Controller {
                 
                 $gmData['cruiseDataTransfer']->name = $name;
                 $gmData['cruiseDataTransfer']->longName = $longName;
+                $gmData['cruiseDataTransfer']->includeOVDMFiles = $includeOVDMFiles;
                 $gmData['cruiseDataTransfer']->bandwidthLimit = $bandwidthLimit;
                 $gmData['cruiseDataTransfer']->transferType = $transferType;
                 $gmData['cruiseDataTransfer']->destDir = $destDir;
@@ -842,6 +859,7 @@ class CruiseDataTransfers extends Controller {
             #additional data needed for view
             $data['row'][0]->name = $name;
             $data['row'][0]->longName = $longName;
+            $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
             $data['row'][0]->bandwidthLimit = $bandwidthLimit;
             $data['row'][0]->transferType = $transferType;
             $data['row'][0]->destDir = $destDir;

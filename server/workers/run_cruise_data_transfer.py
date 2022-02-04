@@ -119,11 +119,11 @@ def build_exclude_filterlist(gearman_worker):
     exclude_filterlist = []
 
     if gearman_worker.cruise_data_transfer['includeOVDMFiles'] == '0':
-        dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
-        exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
+        # dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
+        # exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
 
-        transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
-        exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
+        # transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
+        # exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
 
         exclude_filterlist.append("*{}".format(DEFAULT_CRUISE_CONFIG_FN))
         exclude_filterlist.append("*{}".format(DEFAULT_MD5_SUMMARY_FN))
@@ -131,9 +131,9 @@ def build_exclude_filterlist(gearman_worker):
 
         # TODO - exclude the lowering.json files for each of the lowerings
 
-    if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
-        from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
-        exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
+    # if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
+    #     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
+    #     exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
 
     excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',')
     for collection_system_id in excluded_collection_system_ids:
