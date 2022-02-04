@@ -65,16 +65,16 @@ if(!isset($_POST['excludedExtraDirectories'])) {
 ?>
                                 <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
-                                    <select multiple="multiple" name="excludedCollectionSystems[]">
-                                        <option value="0" <?php echo (in_array("0", $_POST['excludedCollectionSystems']))? 'selected="selected"': '' ?>></option>
+                                    <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
-                                        <option value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $_POST['excludedCollectionSystems']))? 'selected="selected"': '' ?>><?php echo $value->longName;?></option>
+                                        <label><input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $_POST['excludedCollectionSystems']))? 'checked': '' ?>>
+                                        <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
-                                    </select>
+                                    </div>
                                 </div>
 <?php
     } else {
