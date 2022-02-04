@@ -266,7 +266,9 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
-    if not output_results['verdict']:
+    logging.debug("output_results: %s", output_results)
+
+    if 'verdict' not in output_results:
         logging.error("Error setting ownership/permissions for cruise data at destination: %s", os.path.join(dest_dir, gearman_worker.cruise_id))
         return output_results
 
