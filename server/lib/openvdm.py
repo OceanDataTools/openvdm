@@ -391,7 +391,7 @@ class OpenVDM():
         extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_extra_directories()))
         return extra_directory[0] if len(extra_directory) > 0 else None
 
-    def get_extra_directories(self, required=False):
+    def get_extra_directories(self, required=True):
         """
         Return all extra directory configurations
 
