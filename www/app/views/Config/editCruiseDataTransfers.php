@@ -60,7 +60,6 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 ?>
                                 <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
-                                    <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
@@ -69,12 +68,12 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 <?php
         }
 ?>  
-                                    </div>
                                 </div>
 <?php
     } else {
 ?>
-                                <input type="hidden" name="excludedCollectionSystems[]" value="0"><?php
+                                <input type="hidden" name="excludedCollectionSystems[]" value="0">
+<?php
     }
 ?>
 
@@ -83,16 +82,14 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
 ?>
                                 <div class="form-group">
                                     <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label><br>
-                                    <select multiple="multiple" name="excludedExtraDirectories[]">
-                                    <option value="0" <?php echo (in_array("0", $data['row'][0]->excludedExtraDirectories))? 'selected="selected"': '' ?>></option>
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
 ?>
-                                        <option value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $data['row'][0]->excludedExtraDirectories))? 'selected="selected"': '' ?>><?php echo $value->longName;?></option>
+                                        <label><input type="checkbox" name="excludedExtraDirectories[]" value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $data['row'][0]->excludedExtraDirectories))? 'checked': '' ?>>
+                                        <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
-                                    </select>
                                 </div>
 <?php
     } else {
