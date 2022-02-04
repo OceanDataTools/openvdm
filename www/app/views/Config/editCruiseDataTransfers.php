@@ -61,20 +61,15 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
                                 <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
                                     <div class="checkbox">
-                                    <!-- <select multiple="multiple" name="excludedCollectionSystems[]">
-                                        <option value="0" <?php echo (in_array("0", $data['row'][0]->excludedCollectionSystems))? 'selected="selected"': '' ?>></option>
-                                    -->
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
-                                        <label><input type="checkbox" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'checked': '' ?>><?php echo $value->longName;?>
-                                        </label>
-                                        <!-- <option value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'selected="selected"': '' ?>><?php echo $value->longName;?></option> -->
+                                        <input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $data['row'][0]->excludedCollectionSystems))? 'checked': '' ?>>
+                                        <label><?php echo $value->longName;?></label>
 <?php
         }
 ?>  
                                     </div>
-                                    <!-- </select> -->
                                 </div>
 <?php
     } else {
