@@ -77,16 +77,12 @@ class CruiseDataTransfers extends Controller {
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
-        $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
-        $data['includePublicDataFilesOptions'] = $this->_buildIncludePublicDataFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
-        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories();
+        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -240,8 +236,6 @@ class CruiseDataTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
-                    'includeOVDMFiles' => $includeOVDMFiles,
-                    'includePublicDataFiles' => $includePublicDataFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -271,8 +265,6 @@ class CruiseDataTransfers extends Controller {
         } elseif(isset($_POST['inlineTest'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -427,8 +419,6 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer'] = (object)array(
                     'name' => $name,
                     'longName' => $longName,
-                    'includeOVDMFiles' => $includeOVDMFiles,
-                    'includePublicDataFiles' => $includePublicDataFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,

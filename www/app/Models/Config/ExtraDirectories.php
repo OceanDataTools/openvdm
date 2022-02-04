@@ -5,23 +5,28 @@ use Core\Model;
 
 class ExtraDirectories extends Model {
 
-    public function getExtraDirectories($sort = "name"){
+    public function getExtraDirectories($required = false, $only_required = false, $sort = "name"){
 
         if (!in_array($sort, array("name", "longName"))) {
             $sort = 'name';
         }
 
-        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '0'));
-    }
-
-    public function getRequiredExtraDirectories($sort = "name"){
-
-        if (!in_array($sort, array("name", "longName"))) {
-            $sort = 'name';
+        if ( $required && ! $only_required ) {
+            return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories ORDER BY ".$sort);
         }
-
-        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '1'));
+        elseif ( $required && $only_required ) {
+            return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '1'));
+        }
+        elseif ( ! $required ) {
+            return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE required = :required ORDER BY ".$sort, array(':required' => '0'));
+        }
     }
+
+    // public function getRequiredExtraDirectories($sort = "name"){
+
+    //     return $this->getExtraDirectories(true, true, $sort);
+
+    // }
 
     public function getExtraDirectory($id){
         return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE extraDirectoryID = :id",array(':id' => $id));

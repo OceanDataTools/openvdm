@@ -31,7 +31,7 @@ class ExtraDirectories extends Controller {
 
     public function getRequiredExtraDirectories(){
 
-        echo json_encode($this->_model->getRequiredExtraDirectories());
+        echo json_encode($this->_model->getExtraDirectories(true, true));
     }
 
 }
