@@ -153,7 +153,7 @@ if __name__ == "__main__":
         logging.error("Trackline Directory: %s not found", tracklineDir)
         sys.exit(1)
 
-    dashboardDataDirectory = openVDM.get_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
+    dashboardDataDirectory = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
     dashboardDataDir = os.path.join(cruiseDir, dashboardDataDirectory)
 
     # Verify the data dashboard directory exists

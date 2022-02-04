@@ -84,7 +84,7 @@ def build_logfile_dirpath(gearman_worker):
     """
     cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
 
-    return os.path.join(cruise_dir, gearman_worker.ovdm.get_extra_directory_by_name('Transfer_Logs')['destDir'])
+    return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
 def build_filters(gearman_worker, raw_filters):
