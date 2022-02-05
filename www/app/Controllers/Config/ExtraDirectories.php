@@ -42,7 +42,7 @@ class ExtraDirectories extends Controller {
     public function index(){
         $data['title'] = 'Configuration';
         $data['javascript'] = array();
-        $data['extraDirectories'] = $this->_model->getExtraDirectories("longName");
+        $data['extraDirectories'] = $this->_model->getExtraDirectories(false, false, "longName");
         View::rendertemplate('header',$data);
         View::render('Config/extraDirectories',$data);
         View::rendertemplate('footer',$data);
