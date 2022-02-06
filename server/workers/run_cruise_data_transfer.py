@@ -135,7 +135,7 @@ def build_exclude_filterlist(gearman_worker):
     #     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
     #     exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
 
-    excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',')
+    excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',') if gearman_worker.cruise_data_transfer['excludedCollectionSystems'] != '' else []
     for collection_system_id in excluded_collection_system_ids:
 
         if collection_system_id == '0':
@@ -155,7 +155,7 @@ def build_exclude_filterlist(gearman_worker):
             logging.warning("Could not retrieve collection system transfer %s", collection_system_id)
             logging.warning(str(err))
 
-    excluded_extra_directory_ids = gearman_worker.cruise_data_transfer['excludedExtraDirectories'].split(',')
+    excluded_extra_directory_ids = gearman_worker.cruise_data_transfer['excludedExtraDirectories'].split(',') if gearman_worker.cruise_data_transfer['excludedExtraDirectories'] != '' else []
     for excluded_extra_directory_id in excluded_extra_directory_ids:
 
         if excluded_extra_directory_id == '0':
