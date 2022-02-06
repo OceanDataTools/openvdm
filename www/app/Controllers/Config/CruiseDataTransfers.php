@@ -96,8 +96,8 @@ class CruiseDataTransfers extends Controller {
             $sshPass = $_POST['sshPass'];
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "";
-            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "";
+            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "");
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "");
 
             if($name == ''){
                 $error[] = 'Name is required';
