@@ -281,7 +281,7 @@ class CruiseDataTransfers extends Controller {
             $status = 3;
             $enable = 0;
             $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "");
-            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "";
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "");
 
             if($name == ''){
                 $error[] = 'Name is required';
