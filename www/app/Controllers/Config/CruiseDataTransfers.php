@@ -96,8 +96,8 @@ class CruiseDataTransfers extends Controller {
             $sshPass = $_POST['sshPass'];
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "";
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -280,8 +280,8 @@ class CruiseDataTransfers extends Controller {
             $sshPass = $_POST['sshPass'];
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "");
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -488,8 +488,8 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'];
             $sshUseKey = $_POST['sshUseKey'];
             $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "");
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "");
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -690,8 +690,8 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'];
             $sshUseKey = $_POST['sshUseKey'];
             $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = (join(",", $_POST['excludedCollectionSystems']) || "");
+            $excludedExtraDirectories = (join(",", $_POST['excludedExtraDirectories']) || "");
 
             if($name == ''){
                 $error[] = 'Name is required';
