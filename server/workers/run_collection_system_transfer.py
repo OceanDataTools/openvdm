@@ -123,14 +123,14 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
                 logging.debug("%s excluded because file does not match any of the filters", filepath)
                 return_files['exclude'].append(filepath)
 
-    # if not gearman_worker.collection_system_transfer['staleness'] == '0':
-    #     logging.debug("Checking for changing filesizes")
-    #     time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-    #     for idx, filepath in enumerate(return_files['include']):
-    #         if not os.stat(filepath).st_size == return_files['filesize'][idx]:
-    #             logging.debug("file %s has changed size, removing from include list", filepath)
-    #             del return_files['include'][idx]
-    #             del return_files['filesize'][idx]
+    if not gearman_worker.collection_system_transfer['staleness'] == '0':
+        logging.debug("Checking for changing filesizes")
+        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
+        for idx, filepath in enumerate(return_files['include']):
+            if not os.stat(filepath).st_size == return_files['filesize'][idx]:
+                logging.debug("file %s has changed size, removing from include list", filepath)
+                del return_files['include'][idx]
+                del return_files['filesize'][idx]
 
     del return_files['filesize']
 
@@ -924,7 +924,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
 
-        # Todo - there's a change the dates are not set and stay set to None... which errors here.
+        # Todo - there's a chance the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
         logging.debug("End date/time filter: %s", self.data_end_date)
 
