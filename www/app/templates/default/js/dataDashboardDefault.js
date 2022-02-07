@@ -470,8 +470,8 @@ $(function () {
                                         console.log(chartObject['chart'].options.scales);
                                         // console.log(chartObject['chart'].options.scales.yAxes);
                                         // console.log(chartObject['chart'].options.scales.yAxes[index]);
-                                        chartObject['chart'].options.scales = { y: { display: false } };                
-                                            !chartObject['chart'].options.scales.yAxes[index].display;
+                                        chartObject['chart'].options.scales.y.display =                 
+                                            !chartObject['chart'].options.scales.y.display
                                         // chartObject['chart'].options.scales.yAxes[index].display =                 
                                         //     !chartObject['chart'].options.scales.yAxes[index].display;
                                         chartObject['chart'].update();
