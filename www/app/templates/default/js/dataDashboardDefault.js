@@ -466,13 +466,13 @@ $(function () {
                                         chartObject['chart'].data.datasets[index].hidden = 
                                             !chartObject['chart'].data.datasets[index].hidden;
                                         //toggle the related labels' visibility
-                                        console.log(chartObject['chart'].data.datasets[index]);
+                                        console.log(chartObject['chart'].data.datasets[index].yAxisID);
                                         console.log(chartObject['chart'].options.scales);
-                                        console.log(chartObject['chart'].options.scales.Hummidity);
+                                        console.log(chartObject['chart'].options.scales[chartObject['chart'].data.datasets[index].yAxisID]);
                                         // console.log(chartObject['chart'].options.scales.yAxes);
                                         // console.log(chartObject['chart'].options.scales.yAxes[index]);
-                                        chartObject['chart'].options.scales.y.display =                 
-                                            !chartObject['chart'].options.scales.y.display
+                                        chartObject['chart'].options.scales[chartObject['chart'].data.datasets[index].yAxisID].display =                 
+                                            !chartObject['chart'].options.scales[chartObject['chart'].data.datasets[index].yAxisID].display
                                         // chartObject['chart'].options.scales.yAxes[index].display =                 
                                         //     !chartObject['chart'].options.scales.yAxes[index].display;
                                         chartObject['chart'].update();
