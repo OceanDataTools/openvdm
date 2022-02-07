@@ -466,7 +466,8 @@ $(function () {
                                         chartObject['chart'].data.datasets[index].hidden = 
                                             !chartObject['chart'].data.datasets[index].hidden;
                                         //toggle the related labels' visibility
-                                        console.log(chartObject['chart'].options);
+                                        console.log(chartObject['chart'].data.datasets[index]);
+                                        console.log(chartObject['chart'].options.scales);
                                         console.log(chartObject['chart'].options.scales.Hummidity);
                                         // console.log(chartObject['chart'].options.scales.yAxes);
                                         // console.log(chartObject['chart'].options.scales.yAxes[index]);
