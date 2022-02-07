@@ -461,6 +461,8 @@ $(function () {
                             },
                             legend: {
                                 onClick: function(event, legendItem) {
+                                    console.log("hide/show");
+                                    console.log(legendItem);
                                     //get the index of the clicked legend
                                     var index = legendItem.datasetIndex;
                                     //toggle chosen dataset's visibility
