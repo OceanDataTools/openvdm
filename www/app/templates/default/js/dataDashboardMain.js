@@ -47,6 +47,7 @@ $(function () {
                             label: data[i].label + ' (' + data[i].unit + ')',
                             yAxisID: data[i].label,
                             borderColor: colors[i%colors.length],
+                            borderWidth: 1,
                             backgroundColor: colors[i%colors.length],
                         });
                                 
