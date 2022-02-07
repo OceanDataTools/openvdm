@@ -456,24 +456,22 @@ $(function () {
                             },
                             plugins: {
                                 legend: {
-                                    position: 'bottom'
+                                    position: 'bottom',
+                                    onClick: function(event, legendItem) {
+                                        console.log("hide/show");
+                                        console.log(legendItem);
+                                        //get the index of the clicked legend
+                                        var index = legendItem.datasetIndex;
+                                        //toggle chosen dataset's visibility
+                                        chartObject['chart'].data.datasets[index].hidden = 
+                                            !chartObject['chart'].data.datasets[index].hidden;
+                                        //toggle the related labels' visibility
+                                        chartObject['chart'].options.scales.yAxes[index].display =                 
+                                            !chartObject['chart'].options.scales.yAxes[index].display;
+                                        chartObject['chart'].update();
+                                    }
                                 }
                             },
-                            legend: {
-                                onClick: function(event, legendItem) {
-                                    console.log("hide/show");
-                                    console.log(legendItem);
-                                    //get the index of the clicked legend
-                                    var index = legendItem.datasetIndex;
-                                    //toggle chosen dataset's visibility
-                                    chartObject['chart'].data.datasets[index].hidden = 
-                                        !chartObject['chart'].data.datasets[index].hidden;
-                                    //toggle the related labels' visibility
-                                    chartObject['chart'].options.scales.yAxes[index].display =                 
-                                        !chartObject['chart'].options.scales.yAxes[index].display;
-                                    chartObject['chart'].update();
-                                }
-                            }
                         },
                         data: seriesData
                     };
