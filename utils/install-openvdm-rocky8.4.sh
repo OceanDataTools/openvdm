@@ -177,7 +177,10 @@ function install_packages {
 
     yum -y install openssh-server sshpass rsync curl git samba samba-common \
     samba-client cifs-utils gearmand libgearman-devel nodejs supervisor \
-    mysql-server npm httpd setroubleshoot policycoreutils-python-utils
+    mysql-server npm httpd setroubleshoot policycoreutils-python-utils gcc \
+    zlib-devel libjpeg-devel make python3-devel proj python3-pyproj python3-mod_wsgi
+
+    pip3 install Pillow MapProxy
 
     npm install -g bower
 
@@ -557,6 +560,13 @@ function configure_apache {
       AllowOverride all
     </Directory>
 
+    WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
+
+    <Directory /var/www/mapproxy/>
+      Allow from all
+      Require all granted
+    </Directory>
+
     Alias /CruiseData/ $DATA_ROOT/FTPRoot/CruiseData/
     <Directory "$DATA_ROOT/FTPRoot/CruiseData">
       AllowOverride None
@@ -595,6 +605,11 @@ EOF
     echo "Setting SELinux exception rules"
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}/FTPRoot
     chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
+
+    chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
+    chcon -R -t httpd_sys_rw_content_t /var/www/mapproxy/cache_data
+
+    setsebool httpd_tmp_exec on
     setsebool -P httpd_can_network_connect=1
 
     echo "Restarting Apache Web Server"
@@ -706,6 +721,94 @@ function configure_directories {
 
 }
 
+
+###########################################################################
+###########################################################################
+# Install and configure database
+function configure_mapproxy {
+    
+    startingDir=${PWD}
+
+    cd ~
+    mapproxy-util create -t base-config --force mapproxy
+
+    cat > ~/mapproxy/mapproxy.yaml <<EOF
+# -------------------------------
+# MapProxy configuration.
+# -------------------------------
+
+# Start the following services:
+services:
+  demo:
+  tms:
+    use_grid_names: false
+    # origin for /tiles service
+    origin: 'nw'
+  kml:
+    #use_grid_names: true
+  wmts:
+  wms:
+    srs: ['EPSG:900913']
+    image_formats: ['image/png']
+    md:
+      title: MapProxy WMS Proxy
+      abstract: This is a minimal MapProxy installation.
+
+#Make the following layers available
+layers:
+  - name: WorldOceanBase
+    title: ESRI World Ocean Base
+    sources: [esri_worldOceanBase_cache]
+
+  - name: WorldOceanReference
+    title: ESRI World Ocean Reference
+    sources: [esri_worldOceanReference_cache]
+
+caches:
+  esri_worldOceanBase_cache:
+    grids: [esri_online]
+    sources: [esri_worldOceanBase]
+
+  esri_worldOceanReference_cache:
+    grids: [esri_online]
+    sources: [esri_worldOceanReference]
+
+sources:
+  esri_worldOceanBase:
+    type: tile
+    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/%(z)s/%(y)s/%(x)s.png
+    grid: esri_online
+
+  esri_worldOceanReference:
+    type: tile
+    transparent: true
+    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/%(z)s/%(y)s/%(x)s.png
+    grid: esri_online
+
+grids:
+  webmercator:
+    base: GLOBAL_WEBMERCATOR
+
+  esri_online:
+     tile_size: [256, 256]
+     srs: EPSG:900913
+     origin: 'nw'
+     num_levels: 11
+
+globals:
+EOF
+
+    cp -r ~/mapproxy /var/www/mapproxy
+    mkdir /var/www/mapproxy/cache_data
+    chmod 777 /var/www/mapproxy/cache_data
+
+    cd /var/www/mapproxy
+    mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
+
+    # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
+    cd ${startingDir}
+
+}
 
 ###########################################################################
 ###########################################################################
@@ -980,6 +1083,10 @@ install_openvdm
 echo "#####################################################################"
 echo "Installing additional python libraries"
 install_python_packages
+
+echo "#####################################################################"
+echo "Installing/Configuring MapProxy"
+configure_mapproxy
 
 echo "#####################################################################"
 echo "Configuring Apache2"
