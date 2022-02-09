@@ -485,10 +485,12 @@ $(function () {
                                             enabled: true,
                                         },
                                         mode: 'x',
+                                        onZoomComplete: function() { showZoomResetBtn({chart}, chartObject['placeholderID']) }
                                     },
                                     pan: {
                                         enabled: true,
                                         mode: 'x',
+                                        onPanComplete: function() { showZoomResetBtn({chart}, chartObject['placeholderID']) }
                                     },
                                 }
                             },
@@ -507,6 +509,15 @@ $(function () {
                 }
             }
         });
+    }
+
+    function showZoomResetBtn(chart, placeholderID) {
+        if( chart.isZoomedOrPanned ) {
+            $( "#" + placeholderID + '_zoom-reset-btn').removeClass('hidden');
+        }
+        else {
+            $( "#" + placeholderID + '_zoom-reset-btn').addClass('hidden');   
+        }
     }
     
     //Initialize the mapObjects
