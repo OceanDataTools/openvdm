@@ -485,12 +485,12 @@ $(function () {
                                             enabled: true,
                                         },
                                         mode: 'x',
-                                        onZoomComplete: function(chart) { showZoomResetBtn(chart, chartObject['placeholderID']) }
+                                        onZoomComplete({chart}) { showZoomResetBtn(chart, chartObject['placeholderID']) }
                                     },
                                     pan: {
                                         enabled: true,
                                         mode: 'x',
-                                        onPanComplete: function(chart) { showZoomResetBtn(chart, chartObject['placeholderID']) }
+                                        onPanComplete({chart}) { showZoomResetBtn(chart, chartObject['placeholderID']) }
                                     },
                                 }
                             },
@@ -514,6 +514,7 @@ $(function () {
     function showZoomResetBtn(chart, placeholderID) {
 
         console.debug('#' + placeholderID + '_zoom-reset-btn');
+        console.debug(chart);
         console.debug(chart.isZoomedOrPanned);
         if( chart.isZoomedOrPanned ) {
             $( '#' + placeholderID + '_zoom-reset-btn').removeClass('hidden');
