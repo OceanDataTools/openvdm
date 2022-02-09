@@ -474,13 +474,13 @@ $(function () {
                                 },
                                 zoom: {
                                     zoom: {
-                                        limits: {
-                                            x: {
-                                                min: 'original',
-                                                max: 'original',
+                                        // limits: {
+                                        //     x: {
+                                        //         min: 'original',
+                                        //         max: 'original',
 
-                                            }
-                                        },
+                                        //     }
+                                        // },
                                         wheel: {
                                             enabled: true,
                                         },
@@ -494,7 +494,7 @@ $(function () {
                                     },
                                     pan: {
                                         enabled: true,
-                                        modifierKey: 'ctrl',
+                                        modifierKey: 'shift',
                                         mode: 'x',
                                     },
                                 }
