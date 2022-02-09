@@ -515,8 +515,8 @@ $(function () {
 
         console.debug('#' + placeholderID + '_zoom-reset-btn');
         console.debug(chart);
-        console.debug(chart.isZoomedOrPanned);
-        if( chart.isZoomedOrPanned ) {
+        console.debug(chart.isZoomedOrPanned());
+        if( chart.isZoomedOrPanned() ) {
             $( '#' + placeholderID + '_zoom-reset-btn').removeClass('hidden');
         }
         else {
