@@ -485,12 +485,12 @@ $(function () {
                                             enabled: true,
                                         },
                                         mode: 'x',
-                                        onZoomComplete: function() { showZoomResetBtn({chart}, chartObject['placeholderID']) }
+                                        onZoomComplete: function(chart) { showZoomResetBtn(chart, chartObject['placeholderID']) }
                                     },
                                     pan: {
                                         enabled: true,
                                         mode: 'x',
-                                        onPanComplete: function() { showZoomResetBtn({chart}, chartObject['placeholderID']) }
+                                        onPanComplete: function(chart) { showZoomResetBtn(chart, chartObject['placeholderID']) }
                                     },
                                 }
                             },
