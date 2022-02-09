@@ -474,6 +474,11 @@ $(function () {
                                 },
                                 zoom: {
                                     zoom: {
+                                        limits: {
+                                            x: {
+                                                max: 'original'
+                                            }
+                                        },
                                         wheel: {
                                             enabled: true,
                                         },
@@ -481,6 +486,9 @@ $(function () {
                                             enabled: true
                                         },
                                         mode: 'x',
+                                    },
+                                    drag: {
+                                        enabled: true,
                                     },
                                     pan: {
                                         enabled: true,
