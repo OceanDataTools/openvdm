@@ -505,6 +505,7 @@ $(function () {
                     }
 
                     chartObject['chart'] = new Chart(ctx, chartOptions);
+                    showZoomResetBtn(chartObject['chart'], placeholder);
                     $('#' + chartObject['placeholderID']).css({height: chartObject['expanded'] ? 500 : 200});
                 }
             }
