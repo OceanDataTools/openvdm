@@ -480,11 +480,11 @@ $(function () {
                                         pinch: {
                                             enabled: true
                                         },
-                                        mode: 'xy',
+                                        mode: 'x',
                                     },
                                     pan: {
                                         enabled: true,
-                                        mode: 'xy',
+                                        mode: 'x',
                                     },
                                 }
                             },
