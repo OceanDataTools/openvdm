@@ -485,12 +485,12 @@ $(function () {
                                             enabled: true,
                                         },
                                         mode: 'x',
-                                        onZoomComplete({chart}) { showZoomResetBtn(chart, chartObject['placeholderID']) }
+                                        onZoomComplete({chart}) { showZoomResetBtn(chart, placeholder) }
                                     },
                                     pan: {
                                         enabled: true,
                                         mode: 'x',
-                                        onPanComplete({chart}) { showZoomResetBtn(chart, chartObject['placeholderID']) }
+                                        onPanComplete({chart}) { showZoomResetBtn(chart, placeholder) }
                                     },
                                 }
                             },
@@ -517,10 +517,10 @@ $(function () {
         console.debug(chart);
         console.debug(chart.isZoomedOrPanned());
         if( chart.isZoomedOrPanned() ) {
-            $( '#' + placeholderID + '_zoom-reset-btn').removeClass('hidden');
+            $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').removeClass('hidden');
         }
         else {
-            $( '#' + placeholderID + '_zoom-reset-btn').addClass('hidden');   
+            $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');   
         }
     }
     
