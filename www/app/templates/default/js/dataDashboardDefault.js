@@ -502,10 +502,10 @@ $(function () {
                             
                     if (chartObject['chart'] !== null) {
                         chartObject['chart'].destroy();
+                        $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
                     }
 
                     chartObject['chart'] = new Chart(ctx, chartOptions);
-                    showZoomResetBtn(chartObject['chart'], placeholder);
                     $('#' + chartObject['placeholderID']).css({height: chartObject['expanded'] ? 500 : 200});
                 }
             }
