@@ -481,7 +481,11 @@ $(function () {
                                             enabled: true
                                         },
                                         mode: 'xy',
-                                    }
+                                    },
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'xy',
+                                    },
                                 }
                             },
                         },
