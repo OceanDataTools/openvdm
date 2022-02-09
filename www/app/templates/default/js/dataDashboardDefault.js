@@ -511,7 +511,7 @@ $(function () {
         });
     }
 
-    function showZoomResetBtn(chart, placeholderID) {
+    function showZoomResetBtn(chart, placeholder) {
 
         console.debug('#' + placeholderID + '_zoom-reset-btn');
         console.debug(chart);
