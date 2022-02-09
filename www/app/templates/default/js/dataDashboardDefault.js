@@ -474,13 +474,14 @@ $(function () {
                                 },
                                 zoom: {
                                     zoom: {
-                                        // limits: {
-                                        //     x: {
-                                        //         min: 'original',
-                                        //         max: 'original',
+                                        limits: {
+                                            x: {
+                                                min: 1335657660000,
+                                                max: 1335711780000,
+                                                minRange: 60000
 
-                                        //     }
-                                        // },
+                                            }
+                                        },
                                         wheel: {
                                             enabled: true,
                                         },
