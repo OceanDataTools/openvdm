@@ -477,10 +477,14 @@ $(function () {
                                         limits: {
                                             x: {
                                                 min: 'original',
-                                                max: 'original'
+                                                max: 'original',
+
                                             }
                                         },
                                         wheel: {
+                                            enabled: true,
+                                        },
+                                        drag: {
                                             enabled: true,
                                         },
                                         pinch: {
@@ -488,13 +492,11 @@ $(function () {
                                         },
                                         mode: 'x',
                                     },
-                                    drag: {
+                                    pan: {
                                         enabled: true,
+                                        modifierKey: 'ctrl',
+                                        mode: 'x',
                                     },
-                                    // pan: {
-                                    //     enabled: true,
-                                    //     mode: 'x',
-                                    // },
                                 }
                             },
                         },
