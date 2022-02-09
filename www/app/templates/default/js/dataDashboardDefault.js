@@ -513,9 +513,6 @@ $(function () {
 
     function showZoomResetBtn(chart, placeholder) {
 
-        console.debug(placeholder.replace('_placeholder', '') + '_zoom-reset-btn');
-        console.debug(chart);
-        console.debug(chart.isZoomedOrPanned());
         if( chart.isZoomedOrPanned() ) {
             $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').removeClass('hidden');
         }
@@ -624,6 +621,7 @@ $(function () {
 
         $( '#' + chartObjects[i]['dataType'] + '_zoom-reset-btn').click(function() {
             chartObjects[i]['chart'].resetZoom();
+            $(this).addClass('hidden');
         });
     });
 });
