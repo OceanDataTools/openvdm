@@ -473,29 +473,21 @@ $(function () {
                                     }
                                 },
                                 zoom: {
+                                    limits: {
+                                        x: {min: 'original', max: 'original', minRange: 60 * 1000},
+                                    },
                                     zoom: {
-                                        limits: {
-                                            x: {
-                                                min: 1335657660000,
-                                                max: 1335711780000,
-                                                minRange: 60000
-
-                                            }
-                                        },
                                         wheel: {
                                             enabled: true,
                                         },
                                         drag: {
+                                            modifierKey: 'shift',
                                             enabled: true,
-                                        },
-                                        pinch: {
-                                            enabled: true
                                         },
                                         mode: 'x',
                                     },
                                     pan: {
                                         enabled: true,
-                                        modifierKey: 'shift',
                                         mode: 'x',
                                     },
                                 }
