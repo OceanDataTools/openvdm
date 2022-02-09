@@ -513,7 +513,7 @@ $(function () {
 
     function showZoomResetBtn(chart, placeholder) {
 
-        console.debug('#' + placeholderID + '_zoom-reset-btn');
+        console.debug(placeholder.replace('_placeholder', '') + '_zoom-reset-btn');
         console.debug(chart);
         console.debug(chart.isZoomedOrPanned());
         if( chart.isZoomedOrPanned() ) {
