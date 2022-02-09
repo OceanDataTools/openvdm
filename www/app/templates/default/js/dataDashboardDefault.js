@@ -491,10 +491,10 @@ $(function () {
                                     drag: {
                                         enabled: true,
                                     },
-                                    pan: {
-                                        enabled: true,
-                                        mode: 'x',
-                                    },
+                                    // pan: {
+                                    //     enabled: true,
+                                    //     mode: 'x',
+                                    // },
                                 }
                             },
                         },
