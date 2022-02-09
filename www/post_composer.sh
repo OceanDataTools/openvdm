@@ -6,4 +6,10 @@ npm run build
 cd ../chartjs-adapter-luxon
 npm install
 npm run build
+cd ../chartjs-plugin-zoom
+npm install
+npm run build
+cd ../hammerjs
+npm install
+npm run build
 cd ../../
