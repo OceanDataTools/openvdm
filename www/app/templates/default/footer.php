@@ -77,7 +77,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'bower_components/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/hammerjs/dist/hammerjs.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/hammerjs/hammer.min.js');
         } else if ($jsFile === 'datetimepicker') {
             array_push($jsFileArray, DIR . 'bower_components/moment/moment.js');
             array_push($jsFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js');   
