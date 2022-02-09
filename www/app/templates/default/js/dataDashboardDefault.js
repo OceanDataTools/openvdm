@@ -621,5 +621,9 @@ $(function () {
             $(this).removeClass(chartObjects[i]['expanded'] ? 'fa-expand' : 'fa-compress');
             $(this).addClass(chartObjects[i]['expanded'] ? 'fa-compress' : 'fa-expand');
         });
+
+        $( '#' + chartObjects[i]['dataType'] + '_zoom-reset-btn').click(function() {
+            chartObjects[i]['chart'].resetZoom();
+        });
     });
 });
