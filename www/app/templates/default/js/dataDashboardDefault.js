@@ -476,6 +476,7 @@ $(function () {
                                     zoom: {
                                         limits: {
                                             x: {
+                                                min: 'original',
                                                 max: 'original'
                                             }
                                         },
