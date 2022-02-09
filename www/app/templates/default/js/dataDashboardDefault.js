@@ -512,11 +512,14 @@ $(function () {
     }
 
     function showZoomResetBtn(chart, placeholderID) {
+
+        console.debug('#' + placeholderID + '_zoom-reset-btn');
+        console.debug(chart.isZoomedOrPanned);
         if( chart.isZoomedOrPanned ) {
-            $( "#" + placeholderID + '_zoom-reset-btn').removeClass('hidden');
+            $( '#' + placeholderID + '_zoom-reset-btn').removeClass('hidden');
         }
         else {
-            $( "#" + placeholderID + '_zoom-reset-btn').addClass('hidden');   
+            $( '#' + placeholderID + '_zoom-reset-btn').addClass('hidden');   
         }
     }
     
