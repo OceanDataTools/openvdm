@@ -72,6 +72,7 @@ if (isset($data['javascript'])){
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.min.js');
         } else if ($jsFile === 'charts') {
+            array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
             array_push($jsFileArray, DIR . 'bower_components/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/node_modules/luxon/build/global/luxon.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');

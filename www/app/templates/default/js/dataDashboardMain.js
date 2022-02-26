@@ -5,8 +5,6 @@ $(function () {
 
     var max_values = 5;
     
-    const colors = ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
-    
     function displayLatestJSON(dataType, reversedY, inverted) {
         var reversedY = reversedY || false;
         var inverted = inverted || false;
@@ -49,6 +47,7 @@ $(function () {
                             borderColor: colors[i%colors.length],
                             borderWidth: 1.5,
                             backgroundColor: colors[i%colors.length],
+                            color: colors[i%colors.length]
                         });
                                 
                         scales[data[i].label] = {

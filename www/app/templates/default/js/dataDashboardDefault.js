@@ -2,8 +2,6 @@ $(function () {
     'use strict';
     
     var MAPPROXY_DIR = '/mapproxy';
-    
-    const colors = ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
 
     var greenIcon = null;
     var redIcon = null;    
@@ -430,6 +428,7 @@ $(function () {
                             borderColor: colors[i%colors.length],
                             borderWidth: 1.5,
                             backgroundColor: colors[i%colors.length],
+                            color: colors[i%colors.length]
                         });
                                 
                         scales[data[i].label] = {
