@@ -428,11 +428,13 @@ $(function () {
                             borderColor: colors[i%colors.length],
                             borderWidth: 1.5,
                             backgroundColor: colors[i%colors.length],
-                            color: colors[i%colors.length]
                         });
                                 
                         scales[data[i].label] = {
-                            type: 'linear',
+			    ticks: {
+			        color: colors[i%colors.length],
+			    },
+		            type: 'linear',
                             display: true,
                             reverse: (reversedY || data[i].label == "Depth") ? true : false,
                                         position: (i%2) ? 'left' : 'right',
