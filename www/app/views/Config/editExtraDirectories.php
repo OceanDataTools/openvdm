@@ -36,6 +36,7 @@ use Helpers\FormCustom;
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=>$data['row'][0]->name)); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=>$data['row'][0]->longName)); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=>$data['row'][0]->destDir)); ?></div>
+
 <?php
   if ( $data['showLoweringComponents']) {
 ?>

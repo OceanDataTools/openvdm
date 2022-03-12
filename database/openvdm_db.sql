@@ -48,6 +48,9 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `destDir` tinytext,
   `staleness` int(11) DEFAULT '0',
   `useStartDate` tinyint(1) DEFAULT '0',
+  `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
+  `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
+  `syncFromSource` int(1) unsigned NOT NULL DEFAULT '0';
   `transferType` int(11) unsigned NOT NULL,
   `localDirIsMountPoint` int(1) unsigned NOT NULL DEFAULT '0',
   `rsyncServer` tinytext,
@@ -126,6 +129,9 @@ CREATE TABLE `OVDM_CruiseDataTransfers` (
   `cruiseDataTransferID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` text,
+  `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
+  `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
+  `syncToDest` int(1) unsigned NOT NULL DEFAULT '0';
   `transferType` int(11) unsigned NOT NULL,
   `destDir` tinytext,
   `localDirIsMountPoint` int(1) unsigned NOT NULL DEFAULT '0',
@@ -176,6 +182,7 @@ CREATE TABLE `OVDM_ExtraDirectories` (
   `extraDirectoryID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` tinytext,
+  `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0';
   `destDir` tinytext NOT NULL,
   `enable` tinyint(1) DEFAULT '0',
   `required` tinyint(1) NOT NULL DEFAULT '0',
