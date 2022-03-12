@@ -39,7 +39,7 @@ class CruiseDataTransfers extends Controller {
         return $trueFalse;
     }
 
-    private function _buildSyncFromSourceOptions() {
+    private function _buildSyncToDestOptions() {
         
         $trueFalse = array(array('id'=>'syncToDest0', 'name'=>'syncToDest', 'value'=>'0', 'label'=>'No'), array('id'=>'syncToDest1', 'name'=>'syncToDest', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
