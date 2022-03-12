@@ -5,9 +5,9 @@
 LOCK TABLES `OVDM_CollectionSystemTransfers` WRITE;
 /*!40000 ALTER TABLE `OVDM_CollectionSystemTransfers` DISABLE KEYS */;
 ALTER TABLE `OVDM_CollectionSystemTransfers`
-ADD `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
-ADD `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
-ADD `syncFromSource` int(1) unsigned NOT NULL DEFAULT '0';
+ADD `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT 1,
+ADD `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT 1,
+ADD `syncFromSource` int(0) unsigned NOT NULL DEFAULT 0;
 
 /*!40000 ALTER TABLE `OVDM_CollectionSystemTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -18,9 +18,9 @@ UNLOCK TABLES;
 LOCK TABLES `OVDM_CruiseDataTransfers` WRITE;
 /*!40000 ALTER TABLE `OVDM_CruiseDataTransfers` DISABLE KEYS */;
 ALTER TABLE `OVDM_CruiseDataTransfers`
-ADD `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
-ADD `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
-ADD `syncToDest` int(1) unsigned NOT NULL DEFAULT '0';
+ADD `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT 1,
+ADD `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT 1,
+ADD `syncToDest` int(0) unsigned NOT NULL DEFAULT 0;
 
 /*!40000 ALTER TABLE `OVDM_CruiseDataTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -31,7 +31,7 @@ UNLOCK TABLES;
 LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` DISABLE KEYS */;
 ALTER TABLE `OVDM_ExtraDirectories`
-ADD `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0';
+ADD `cruiseOrLowering` int(0) unsigned NOT NULL DEFAULT 0;
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;
