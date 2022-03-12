@@ -71,6 +71,7 @@ class ExtraDirectories extends Controller {
         $data['title'] = 'Add Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
+        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -118,6 +119,8 @@ class ExtraDirectories extends Controller {
         $data['title'] = 'Edit Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
+        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
+        
         $data['row'] = $this->_extraDirectoriesModel->getExtraDirectory($id);
 
         if(isset($_POST['submit'])){
