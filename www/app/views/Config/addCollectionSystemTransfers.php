@@ -49,7 +49,6 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group"><label>Skip empty directories?</label><?php echo FormCustom::radioInline($data['skipEmptyDirsOptions'], $_POST['skipEmptyDirs']); ?></div>
                                 <div class="form-group"><label>Skip empty files?</label><?php echo FormCustom::radioInline($data['skipEmptyFilesOptions'], $_POST['skipEmptyFiles']); ?></div>
                                 <div class="form-group"><label>Sync (--delete) with source directory?</label><?php echo FormCustom::radioInline($data['syncFromSourceOptions'], $_POST['syncFromSource']); ?></div>
-                                <div class="form-group"><label>Skip files create/modified outside of cruise start/stop times?</label><?php echo FormCustom::radioInline($data['useStartDateOptions'], $_POST['useStartDate']); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $_POST['bandwidthLimit'], 'size'=>'7', 'length'=>'8')); ?></label></div>
 <?php
   if ( $data['showLoweringComponents']) {

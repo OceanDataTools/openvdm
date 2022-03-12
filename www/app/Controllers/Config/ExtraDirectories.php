@@ -58,7 +58,7 @@ class ExtraDirectories extends Controller {
         $data['javascript'] = array();
 
         $warehouseModel = new \Models\Warehouse();
-        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
+        $data['showLoweringComponents'] = $warehouseModel->getShowLoweringComponents();
 
         View::rendertemplate('header',$data);
         View::render('Config/extraDirectories',$data);
