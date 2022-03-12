@@ -145,8 +145,8 @@ class ExtraDirectories extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
-                    'cruiseOrLowering' => $cruiseOrLowering
-                    'destDir' => $destDir,
+                    'cruiseOrLowering' => $cruiseOrLowering,
+                    'destDir' => $destDir
                 );
             
                 
