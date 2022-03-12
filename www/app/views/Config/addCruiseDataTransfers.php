@@ -45,7 +45,6 @@ if(!isset($_POST['excludedExtraDirectories'])) {
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=> $_POST['name'])); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=> $_POST['longName'])); ?></div>
                                 <div class="form-group"><label>Include OpenVDM generated files?</label><?php echo FormCustom::radioInline($data['includeOVDMFilesOptions'], $_POST['includeOVDMFiles']); ?></div>
-                                <div class="form-group"><label>Include files pulled from PublicData?</label><?php echo FormCustom::radioInline($data['includePublicDataFilesOptions'], $_POST['includePublicDataFiles']); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $_POST['bandwidthLimit'], 'size'=>'7', 'length'=>'8')); ?></label></div>
                                 <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions']); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=> $_POST['destDir'])); ?></div>
@@ -65,17 +64,17 @@ if(!isset($_POST['excludedExtraDirectories'])) {
     if ($data['collectionSystemTransfers']) {
 ?>
                                 <div class="form-group">
-                                    <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label><br>
-                                    <select multiple="multiple" name="excludedCollectionSystems[]">
-                                        <option value="0" <?php echo (in_array("0", $_POST['excludedCollectionSystems']))? 'selected="selected"': '' ?>></option>
+                                    <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label>
+                                    <div class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
-                                        <option value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $_POST['excludedCollectionSystems']))? 'selected="selected"': '' ?>><?php echo $value->longName;?></option>
+                                        <label><input type="checkbox" name="excludedCollectionSystems[]" value=<?php echo $value->collectionSystemTransferID;?> <?php echo (in_array($value->collectionSystemTransferID, $_POST['excludedCollectionSystems']))? 'checked': '' ?>>
+                                        <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
-                                    </select>
+                                    </div>
                                 </div>
 <?php
     } else {
@@ -88,17 +87,17 @@ if(!isset($_POST['excludedExtraDirectories'])) {
     if ($data['extraDirectories']) {
 ?>
                                 <div class="form-group">
-                                    <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label><br>
-                                    <select multiple="multiple" name="excludedExtraDirectories[]">
-                                    <option value="0" <?php echo (in_array("0", $_POST['excludedExtraDirectories']))? 'selected="selected"': '' ?>></option>
+                                    <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label>
+                                    <div class="checkbox">
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
 ?>
-                                        <option value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $_POST['excludedExtraDirectories']))? 'selected="selected"': '' ?>><?php echo $value->longName;?></option>
+                                        <label><input type="checkbox" name="excludedExtraDirectories[]" value=<?php echo $value->extraDirectoryID;?> <?php echo (in_array($value->extraDirectoryID, $_POST['excludedExtraDirectories']))? 'checked': '' ?>>
+                                        <?php echo $value->longName;?></label></br>
 <?php
         }
 ?>  
-                                    </select>
+                                    </div>
                                 </div>
 <?php
     } else {
@@ -124,8 +123,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
             <p>This form is for adding a new <?php echo CRUISE_NAME; ?> Data Transfer to OpenVDM. A <?php echo CRUISE_NAME; ?> Data Transfer is an OpenVDM-managed copy of all collected data from the current cruise data directory on the Shipboard Data Warehouse to a remote server, NAS box or external HDD connected to the Shipboard Data Warehouse.</p>
             <p>The <strong>Name</strong> field is a short name for the Collection System Transfer (i.e. WH300).  These names should NOT have spaces in them.</p>
             <p>The <strong>Long Name</strong> field is a longer name for the Collection System Transfer (i.e. RDI Workhorse 300kHz ADCP ).  These names can have spaces in them.</p>
-            <p>The <strong>Include OVDM Files</strong> option is to specifiy wether the transfer should include files generated by OpenVDM such as the transfer logs, data dashboard datasets and the cruise configuration file.</p>
-            <p>The <strong>Include files pulled from PubicData</strong> option is to specifiy wether the transfer should include files already transferred into the cruise data directory from the PublicData share.</p>
+            <p>The <strong>Include OVDM Files</strong> option is to specifiy wether the transfer should include files generated by OpenVDM such as the MD5 file manifest and the cruise configuration file.</p>
             <p>The <strong>Transfer bandwidth limit</strong> option will limit the amount of network bandwidth use for the cruise data transfer.  Setting this option to 0 or leaving it empty will removing any bandwidth restrictions</p>
             <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the cruise data directory on the Data Warehouse to the desired destination.  <strong>Local Directory</strong> is a transfer of the cruise data to another location on the Data Warehouse outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of cruise data to a destination system running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of cruise data to a destination system with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).</p>
             <p>The <strong>Destination Directory</strong> is the location where the cruise data will be copied to.</p>

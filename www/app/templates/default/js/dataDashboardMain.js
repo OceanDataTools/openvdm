@@ -5,10 +5,6 @@ $(function () {
 
     var max_values = 5;
     
-    Highcharts.setOptions({
-        colors: ['#337ab7', '#5cb85c', '#d9534f', '#f0ad4e', '#606060']
-    });
-    
     function displayLatestJSON(dataType, reversedY, inverted) {
         var reversedY = reversedY || false;
         var inverted = inverted || false;
@@ -16,162 +12,89 @@ $(function () {
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
                 
-                var placeholder = '#' + dataType + '-placeholder';
+                var placeholderID = dataType + '-placeholder',
+                    placeholder = '#' + placeholderID;
                 if (data.indexOf('error') > 0) {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    var seriesData = [],
-                        yAxes = [],
-                        xAxes = [],
-                        i = 0;
-                    
-                    for (i = 0; i < data.length; i++) {
-                        yAxes[i] = {
-                            reversed: reversedY || data[i].label == "Depth",
-                            labels: {
-                                enabled: false
-                            },
-                            title: {
-                                enabled: false
+
+                    var scales = { x: (inverted === true) ? { type: null } : {
+                        type: 'time',
+                        adapters: { date: { zone: 0 } },
+                        time: {
+                            displayFormats: {
+                                millisecond: 'HH:MM:ss.SSS',
+                                second: 'HH:mm:ss',
+                                minute: 'HH:mm',
+                                hour: 'HH:mm',
+                                day: 'LL/dd ',
+                                month: 'LL/yyyy',
+                                year: 'yyyy'
                             }
-                        };
+                        }
+                    }}
 
-                        // if (reversedY || data[i].label == "Depth") {
-                        //     yAxes[i].reversed = true;
-                        // }
+                    var seriesData = { datasets: []}
 
-                        seriesData[i] = {
-                            name: data[i].label,
-                            yAxis: i,
-                            data: data[i].data,
-                            animation: false
-                        };
+                    var i = 0;
+                    for (i = 0; i < data.length; i++) {
+                        seriesData['datasets'].push({
+                            data: data[i].data.map(elem => {
+                                return { x:luxon.DateTime.fromMillis(elem[0], { zone: 'UTC'}).toISO(), y:elem[1] }
+                            }),
+                            label: data[i].label + ' (' + data[i].unit + ')',
+                            yAxisID: data[i].label,
+                            borderColor: colors[i%colors.length],
+                            borderWidth: 1.5,
+                            backgroundColor: colors[i%colors.length],
+                            color: colors[i%colors.length]
+                        });
+                                
+                        scales[data[i].label] = {
+                            type: 'linear',
+                            display: false,
+                            reverse: (reversedY || data[i].label == "Depth") ? true : false,
+                            position: (i%2) ? 'left' : 'right',
+                            grid: {
+                                drawOnChartArea: (i==0) ? true : false
+                            }
+                        }
                     }
                 
                     var chartOptions = {
-                        chart: {
-                            inverted: inverted,
-                            type: 'line',
-                            events: {
-                                click: function (e) {
-                                    window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
+                        type: 'line',
+                        options: {
+                            animation: false,
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: scales,
+                            radius: 0,
+                            interaction: {
+                                mode: 'none'
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
                                 }
+                            },
+                            onClick: function (e) {
+                                window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
                             }
                         },
-                        plotOptions: {
-                            series: {
-                                events: {
-                                    legendItemClick: function () {
-                                        return false;
-                                    }
-                                },
-                                states: {
-                                    hover: {
-                                        enabled: false
-                                    }
-                                }
+                        data: seriesData,
+                        events: {
+                            click: function (e) {
+                                window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
                             }
-                        },
-                        title: {text: ''},
-                        tooltip: false,
-                        legend: {
-                            enabled: true
-                        },
-                        xAxis: {
-                            type: inverted ? 'linear' : 'datetime',
-                            title: {text: ''},
-                            dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
-                        },
-                        yAxis: yAxes,
-                        series: seriesData
+                        }
                     };
-                    $(placeholder).highcharts(chartOptions);
+
+                    const ctx = document.getElementById(placeholderID).getContext('2d');
+                    var chart = new Chart(ctx, chartOptions);
                 }
             }
         });
     }
-
-
-    // function displayLatestInvertedJSON(dataType) {
-    //     var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
-    //     $.getJSON(getVisualizerDataURL, function (data, status) {
-    //         if (status === 'success' && data !== null) {
-                
-    //             var placeholder = '#' + dataType + '-placeholder';
-    //             if (data.indexOf('error') > 0) {
-    //                 $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
-    //             } else {
-    //                 var seriesData = [],
-    //                     yAxes = [],
-    //                     xAxes = [],
-    //                     i = 0;
-                    
-    //                 for (i = 0; i < data.length; i++) {
-    //                     yAxes[i] = {
-    //                         reversed: true,
-    //                         labels: {
-    //                             enabled: false
-    //                         },
-    //                         title: {
-    //                             enabled: false
-    //                         }
-    //                     };
-                    
-    //                     //if (data[i].label === "Humidity (%)") {
-    //                     //    yAxes[i].min = 0;
-    //                     //    yAxes[i].max = 100;
-    //                     //}
-                    
-    //                     seriesData[i] = {
-    //                         name: data[i].label,
-    //                         yAxis: i,
-    //                         data: data[i].data,
-    //                         animation: false
-    //                     };
-    //                 }
-                
-    //                 var chartOptions = {
-    //                     chart: {
-    //                         type: 'line',
-    //                         events: {
-    //                             click: function (e) {
-    //                                 window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
-    //                             }
-    //                         }
-    //                     },
-    //                     plotOptions: {
-    //                         series: {
-    //                             events: {
-    //                                 legendItemClick: function () {
-    //                                     return false;
-    //                                 }
-    //                             },
-    //                             states: {
-    //                                 hover: {
-    //                                     enabled: false
-    //                                 }
-    //                             }
-    //                         }
-    //                     },
-    //                     title: {text: ''},
-    //                     tooltip: false,
-    //                     legend: {
-    //                         enabled: true
-    //                     },
-    //                     xAxis: {
-    //                         type: 'datetime',
-    //                         title: {text: ''},
-    //                         dateTimeLabelFormats: {millisecond: '%H', second: '%H:%M:%S', minute: '%H:%M', hour: '%H:%M', day: '%b %e', week: '%b %e', month: '%b \'%y', year: '%Y'}
-    //                     },
-    //                     yAxis: yAxes,
-    //                     series: seriesData
-    //                 };
-    //                 $(placeholder).highcharts(chartOptions);
-    //             }
-    //         }
-    //     });
-    // }
-    
         
     function displayLatestGeoJSON(dataType) {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
@@ -316,7 +239,7 @@ $(function () {
         }
         for (i = 0; i < jsonTypes.length; i++) {
             if ($('#' + jsonTypes[i] + '-placeholder').length) {
-                displayLatestJSON(jsonTypes[i]);
+        displayLatestJSON(jsonTypes[i]);
             }
         }
         for (i = 0; i < jsonReversedYTypes.length; i++) {

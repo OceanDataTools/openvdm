@@ -7,10 +7,9 @@
 #         BUGS:
 #        NOTES:
 #       AUTHOR:  Webb Pinner
-#      COMPANY:  Capable Solutions
-#      VERSION:  2.6
+#      VERSION:  2.7
 #      CREATED:  2016-03-04
-#     REVISION:  2021-02-13
+#     REVISION:  2022-02-04
 #
 # ----------------------------------------------------------------------------------- #
 
@@ -22,7 +21,7 @@
 #  - leaflet
 #  jsArray:
 #  - dataDashboardDefault
-#  - highcharts
+#  - charts
 #  - leaflet
 #  placeholderArray:
 #  - plotType: map
@@ -66,11 +65,10 @@
 #
 # SPECIAL CASES:
 # If the view needs to leverage leaflet simple add "leaflet".
-# If the view needs to leverage highcharts, simple add "highcharts"
-# If the view needs to leverage the highcharts export plugin use "highcharts-exporting"
+# If the view needs to leverage charts.js, simple add "charts"
 #  jsArray:
 #  - dataDashboardDefault
-#  - highcharts
+#  - charts
 #  - leaflet
 
 # Placeholders are the bootstrap-styled panels that contain the <div> blocks where data
@@ -105,7 +103,7 @@
   - leaflet
   jsArray:
   - dataDashboardDefault
-  - highcharts
+  - charts
   - leaflet
   - lowering
   placeholderArray:
@@ -153,7 +151,7 @@
   - leaflet
   jsArray:
   - dataDashboardDefault
-  - highcharts
+  - charts
   - leaflet
   - lowering
   placeholderArray:
@@ -171,9 +169,8 @@
   view: default
   jsArray:
   - dataDashboardDefault
-  - highcharts
-  - highcharts-exporting
-  placeholderArray:
+  - charts
+    placeholderArray:
   - plotType: chart
     id: met
     heading: Meterological Sensor
@@ -192,9 +189,8 @@
   view: default
   jsArray:
   - dataDashboardDefault
-  - highcharts
-  - highcharts-exporting
-  placeholderArray:
+  - charts
+    placeholderArray:
   - plotType: chart
     id: tsg
     heading: Thermosalinograph Sensor

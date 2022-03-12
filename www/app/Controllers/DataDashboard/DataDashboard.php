@@ -29,7 +29,7 @@ class DataDashboard extends Controller {
         $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
         $data['dataWarehouseApacheDir'] = $this->_warehouseModel->getShipboardDataWarehouseApacheDir();
         $data['css'] = array('leaflet');
-        $data['javascript'] = array('dataDashboardMain', 'dataDashboardMainCustom', 'leaflet', 'highcharts');
+        $data['javascript'] = array('dataDashboardMain', 'dataDashboardMainCustom', 'leaflet', 'charts');
         $data['dataTypes'] = $this->_dashboardDataModel->getDashboardDataTypes();
         $data['geoJSONTypes'] = $this->_dataDashboardModel->getGeoJSONTypes();
         $data['tmsTypes'] = $this->_dataDashboardModel->getTMSTypes();

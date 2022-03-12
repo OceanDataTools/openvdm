@@ -201,7 +201,7 @@ class Warehouse extends Controller {
         $warehouseBaseDir = $this->_warehouseModel->getShipboardDataWarehouseBaseDir();
         $cruiseID = $this->_warehouseModel->getCruiseID();
         $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
-        $requiredExtraDirectories = $extraDirectoriesModel->getRequiredExtraDirectories();
+        $requiredExtraDirectories = $extraDirectoriesModel->getExtraDirectories(true, true);
         $transferLogDir ='';
         foreach($requiredExtraDirectories as $row) {
             if(strcmp($row->name, "Transfer_Logs") === 0) {

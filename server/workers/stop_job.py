@@ -9,7 +9,7 @@ DESCRIPTION:  Gearman worker that handles the manual termination of other OVDM
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.6
+  VERSION:  2.7
   CREATED:  2015-01-01
  REVISION:  2021-02-13
 """

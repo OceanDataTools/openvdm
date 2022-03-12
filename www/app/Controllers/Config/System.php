@@ -60,7 +60,7 @@ class System extends Controller {
         $data['javascript'] = array('system');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
-        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getRequiredExtraDirectories();
+        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
         $data['links'] = $this->_linksModel->getLinks();
         $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
         $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
@@ -462,7 +462,7 @@ class System extends Controller {
         $data['javascript'] = array('system');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
-        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getRequiredExtraDirectories();
+        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
         $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
         $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
         $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
@@ -525,7 +525,7 @@ class System extends Controller {
         $data['javascript'] = array('system');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
-        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getRequiredExtraDirectories();
+        $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
         $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
         $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
         $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();

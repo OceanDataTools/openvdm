@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.6
+  VERSION:  2.7
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-02-04
 """
 
 import argparse
@@ -119,11 +119,11 @@ def build_exclude_filterlist(gearman_worker):
     exclude_filterlist = []
 
     if gearman_worker.cruise_data_transfer['includeOVDMFiles'] == '0':
-        dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
-        exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
+        # dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
+        # exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
 
-        transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
-        exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
+        # transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
+        # exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
 
         exclude_filterlist.append("*{}".format(DEFAULT_CRUISE_CONFIG_FN))
         exclude_filterlist.append("*{}".format(DEFAULT_MD5_SUMMARY_FN))
@@ -131,11 +131,11 @@ def build_exclude_filterlist(gearman_worker):
 
         # TODO - exclude the lowering.json files for each of the lowerings
 
-    if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
-        from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
-        exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
+    # if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
+    #     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
+    #     exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
 
-    excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',')
+    excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',') if gearman_worker.cruise_data_transfer['excludedCollectionSystems'] != '' else []
     for collection_system_id in excluded_collection_system_ids:
 
         if collection_system_id == '0':
@@ -155,7 +155,7 @@ def build_exclude_filterlist(gearman_worker):
             logging.warning("Could not retrieve collection system transfer %s", collection_system_id)
             logging.warning(str(err))
 
-    excluded_extra_directory_ids = gearman_worker.cruise_data_transfer['excludedExtraDirectories'].split(',')
+    excluded_extra_directory_ids = gearman_worker.cruise_data_transfer['excludedExtraDirectories'].split(',') if gearman_worker.cruise_data_transfer['excludedExtraDirectories'] != '' else []
     for excluded_extra_directory_id in excluded_extra_directory_ids:
 
         if excluded_extra_directory_id == '0':
@@ -215,6 +215,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
             logging.info("File Count: %d", file_count)
             break
 
+    output_results = None
     if file_count == 0:
         logging.debug("Nothing to tranfser")
 
@@ -265,7 +266,9 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("delete tmp dir: %s", tmpdir)
     shutil.rmtree(tmpdir)
 
-    if not output_results['verdict']:
+    logging.debug("output_results: %s", output_results)
+
+    if output_results is not None and not output_results['verdict']:
         logging.error("Error setting ownership/permissions for cruise data at destination: %s", os.path.join(dest_dir, gearman_worker.cruise_id))
         return output_results
 

@@ -71,11 +71,14 @@ if (isset($data['javascript'])){
             //array_push($jsFileArray, Url::templatePath() . "js/esriCredit.js");
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.min.js');
-        } else if ($jsFile === 'highcharts') {
-            array_push($jsFileArray, DIR . 'bower_components/highcharts.com/lib/highcharts.js');
-            array_push($jsFileArray, Url::templatePath() . 'js/highcharts-fa-plugin.js');
-        } else if ($jsFile === 'highcharts-exporting') {
-            array_push($jsFileArray, DIR . 'bower_components/highcharts.com/lib/modules/exporting.js');
+        } else if ($jsFile === 'charts') {
+            array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
+            array_push($jsFileArray, DIR . 'bower_components/chart.js/dist/chart.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/node_modules/luxon/build/global/luxon.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');
+        } else if ($jsFile === 'charts-zoom') {
+            array_push($jsFileArray, DIR . 'bower_components/hammerjs/hammer.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
         } else if ($jsFile === 'datetimepicker') {
             array_push($jsFileArray, DIR . 'bower_components/moment/moment.js');
             array_push($jsFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js');   

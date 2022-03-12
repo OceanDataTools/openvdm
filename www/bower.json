@@ -1,6 +1,6 @@
 {
   "name": "openvdm",
-  "version": "2.6.10",
+  "version": "2.7.0",
   "homepage": "https://github.com/oceandatatools/openvdm",
   "authors": [
     {
@@ -29,23 +29,25 @@
     "dist/js/sb-admin-2.js"
   ],
   "dependencies": {
-    "bootstrap": "~3.3.6",
-    "datatables": "~1.10.4",
-    "datatables-plugins": "~1.0.1",
-    "datatables-responsive": "1.0.6",
-    "font-awesome": "~4.2.0",
-    "metisMenu": "~1.1.3",
-    "highcharts.com": "~4.2.3",
-    "leaflet": "~0.7.7",
-    "esri-leaflet": "~1.0.3",
-    "leaflet-fullscreen-bower": "~1.0.1",
-    "leaflet.awesome-markers": "~2.0.2",
+    "bootstrap": "~3.3.7",
+    "chart.js": "~3.7.1",
+    "chartjs-adapter-luxon": "chartjs/chartjs-adapter-luxon",
+    "chartjs-plugin-zoom": "chartjs/chartjs-plugin-zoom",
+    "datatables": "~1.10.21",
+    "datatables-plugins": "~1.11.4",
+    "datatables-responsive": "1.0.7",
+    "eonasdan-bootstrap-datetimepicker": "~4.17.45",
+    "esri-leaflet": "~1.0.5",
+    "font-awesome": "~4.7.0",
+    "hammerjs": "hammerjs/hammer.js",
     "ionicons": "~2.0.1",
-    "js-cookie": "~2.1.0",
-    "eonasdan-bootstrap-datetimepicker": "~4.17.37",
-    "leaflet-timedimension": "~1.0.6",
-    "moment": "~2.17.1",
+    "js-cookie": "~2.1.4",
+    "leaflet": "~0.7.7",
+    "leaflet-color-markers": "pointhi/leaflet-color-markers",
     "leaflet-easyprint": "https://github.com/rowanwins/leaflet-easyPrint.git#gh-pages",
-    "leaflet-color-markers": "https://github.com/pointhi/leaflet-color-markers"
+    "leaflet-fullscreen-bower": "~1.0.1",
+    "leaflet-timedimension": "~1.0.6",
+    "leaflet.awesome-markers": "~2.0.2",
+    "metisMenu": "~1.1.3"
   }
 }

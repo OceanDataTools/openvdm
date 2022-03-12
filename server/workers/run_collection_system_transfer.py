@@ -10,7 +10,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
     NOTES:
    AUTHOR:  Webb Pinner
   COMPANY:  Capable Solutions
-  VERSION:  2.6
+  VERSION:  2.7
   CREATED:  2015-01-01
  REVISION:  2021-05-25
 """

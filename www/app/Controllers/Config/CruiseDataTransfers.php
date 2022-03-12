@@ -45,12 +45,6 @@ class CruiseDataTransfers extends Controller {
         return $trueFalse;
     }
 
-    private function _buildIncludePublicDataFilesOptions() {
-        
-        $trueFalse = array(array('id'=>'includePublicDataFilesOptions0', 'name'=>'includePublicDataFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'includePublicDataFilesOptions1', 'name'=>'includePublicDataFiles', 'value'=>'1', 'label'=>'Yes'));
-        return $trueFalse;
-    }
-
     public function __construct(){
         if(!Session::get('loggedin')){
             Url::redirect('config/login');
@@ -78,15 +72,13 @@ class CruiseDataTransfers extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
-        $data['includePublicDataFilesOptions'] = $this->_buildIncludePublicDataFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
-        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories();
+        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -104,8 +96,8 @@ class CruiseDataTransfers extends Controller {
             $sshPass = $_POST['sshPass'];
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -241,7 +233,6 @@ class CruiseDataTransfers extends Controller {
                     'name' => $name,
                     'longName' => $longName,
                     'includeOVDMFiles' => $includeOVDMFiles,
-                    'includePublicDataFiles' => $includePublicDataFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -272,7 +263,6 @@ class CruiseDataTransfers extends Controller {
             $name = $_POST['name'];
             $longName = $_POST['longName'];
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -290,8 +280,8 @@ class CruiseDataTransfers extends Controller {
             $sshPass = $_POST['sshPass'];
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -428,7 +418,6 @@ class CruiseDataTransfers extends Controller {
                     'name' => $name,
                     'longName' => $longName,
                     'includeOVDMFiles' => $includeOVDMFiles,
-                    'includePublicDataFiles' => $includePublicDataFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -475,9 +464,8 @@ class CruiseDataTransfers extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
-        $data['includePublicDataFilesOptions'] = $this->_buildIncludePublicDataFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
-        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories();
+        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         $data['row'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id);
 
@@ -485,7 +473,6 @@ class CruiseDataTransfers extends Controller {
             $name = $_POST['name'];
             $longName = $_POST['longName'];
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -501,8 +488,8 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'];
             $sshUseKey = $_POST['sshUseKey'];
             $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -636,7 +623,6 @@ class CruiseDataTransfers extends Controller {
                     'name' => $name,
                     'longName' => $longName,
                     'includeOVDMFiles' => $includeOVDMFiles,
-                    'includePublicDataFiles' => $includePublicDataFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
                     'destDir' => $destDir,
@@ -666,7 +652,6 @@ class CruiseDataTransfers extends Controller {
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
-                $data['row'][0]->includePublicDataFiles = $includePublicDataFiles;
                 $data['row'][0]->bandwidthLimit = $bandwidthLimit;
                 $data['row'][0]->transferType = $transferType;
                 $data['row'][0]->destDir = $destDir;
@@ -690,7 +675,6 @@ class CruiseDataTransfers extends Controller {
             $name = $_POST['name'];
             $longName = $_POST['longName'];
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $includePublicDataFiles = $_POST['includePublicDataFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
             $destDir = $_POST['destDir'];
@@ -706,8 +690,8 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'];
             $sshUseKey = $_POST['sshUseKey'];
             $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = join(",", $_POST['excludedCollectionSystems']);
-            $excludedExtraDirectories = join(",", $_POST['excludedExtraDirectories']);
+            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -843,7 +827,6 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->name = $name;
                 $gmData['cruiseDataTransfer']->longName = $longName;
                 $gmData['cruiseDataTransfer']->includeOVDMFiles = $includeOVDMFiles;
-                $gmData['cruiseDataTransfer']->includePublicDataFiles = $includePublicDataFiles;
                 $gmData['cruiseDataTransfer']->bandwidthLimit = $bandwidthLimit;
                 $gmData['cruiseDataTransfer']->transferType = $transferType;
                 $gmData['cruiseDataTransfer']->destDir = $destDir;
@@ -877,7 +860,6 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->name = $name;
             $data['row'][0]->longName = $longName;
             $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
-            $data['row'][0]->includePublicDataFiles = $includePublicDataFiles;
             $data['row'][0]->bandwidthLimit = $bandwidthLimit;
             $data['row'][0]->transferType = $transferType;
             $data['row'][0]->destDir = $destDir;
