@@ -37,6 +37,23 @@ class CollectionSystemTransfers extends Controller {
         return $trueFalse;
     }
     
+    private function _buildSkipEmptyDirsOptions() {
+        
+        $trueFalse = array(array('id'=>'skipEmptyDirs0', 'name'=>'skipEmptyDirs', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyDirs1', 'name'=>'skipEmptyDirs', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
+    private function _buildSkipEmptyFilesOptions() {
+        
+        $trueFalse = array(array('id'=>'skipEmptyFiles0', 'name'=>'skipEmptyFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyFiles1', 'name'=>'skipEmptyFiles', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
+    private function _buildSyncFromSourceOptions() {
+        
+        $trueFalse = array(array('id'=>'syncFromSource0', 'name'=>'syncFromSource', 'value'=>'0', 'label'=>'No'), array('id'=>'syncFromSource1', 'name'=>'syncFromSource', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
 
     private function _buildUseSSHKeyOptions() {
         
@@ -55,7 +72,6 @@ class CollectionSystemTransfers extends Controller {
         $output = array(array('id'=>'cruiseOrLowering0', 'name'=>'cruiseOrLowering', 'value'=>'0', 'label'=>CRUISE_NAME), array('id'=>'cruiseOrLowering1', 'name'=>'cruiseOrLowering', 'value'=>'1', 'label'=>LOWERING_NAME));
         return $output;
     }
-
 
     private function updateDestinationDirectory() {
         $_warehouseModel = new \Models\Warehouse();
@@ -115,6 +131,9 @@ class CollectionSystemTransfers extends Controller {
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['stalenessOptions'] = $this->_buildStalenessOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncFromSourceOptions'] = $this->_buildSyncFromSourceOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
@@ -128,6 +147,9 @@ class CollectionSystemTransfers extends Controller {
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
             $useStartDate = $_POST['useStartDate'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncFromSource = $_POST['syncFromSource'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
@@ -309,6 +331,9 @@ class CollectionSystemTransfers extends Controller {
                     'destDir' => $destDir,
                     'staleness' => $staleness,
                     'useStartDate' => $useStartDate,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncFromSource' => $syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
                     'cruiseOrLowering' => $cruiseOrLowering,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
@@ -342,6 +367,9 @@ class CollectionSystemTransfers extends Controller {
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = $_POST['staleness'];
             $useStartDate = $_POST['useStartDate'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncFromSource = $_POST['syncFromSource'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
@@ -507,6 +535,9 @@ class CollectionSystemTransfers extends Controller {
                     'destDir' => $destDir,
                     'staleness' => $staleness,
                     'useStartDate' => $useStartDate,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncFromSource' => $syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
                     'cruiseOrLowering' => $cruiseOrLowering,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
@@ -553,6 +584,9 @@ class CollectionSystemTransfers extends Controller {
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncFromSourceOptions'] = $this->_buildSyncFromSourceOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
@@ -570,6 +604,9 @@ class CollectionSystemTransfers extends Controller {
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
             $useStartDate = $_POST['useStartDate'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncFromSource = $_POST['syncFromSource'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
@@ -750,6 +787,9 @@ class CollectionSystemTransfers extends Controller {
                     'destDir' => $destDir,
                     'staleness' => $staleness,
                     'useStartDate' => $useStartDate,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncFromSource' => $syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
                     'cruiseOrLowering' => $cruiseOrLowering,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
@@ -788,6 +828,9 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->destDir = $destDir;
                 $data['row'][0]->staleness = $staleness;
                 $data['row'][0]->useStartDate = $useStartDate;
+                $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
+                $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
+                $data['row'][0]->syncFromSource = $syncFromSource;
                 $data['row'][0]->bandwidthLimit = $bandwidthLimit;
                 $data['row'][0]->cruiseOrLowering = $cruiseOrLowering;
                 $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
@@ -815,6 +858,9 @@ class CollectionSystemTransfers extends Controller {
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = $_POST['staleness'];
             $useStartDate = $_POST['useStartDate'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncFromSource = $_POST['syncFromSource'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
@@ -981,6 +1027,9 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->destDir = $destDir;
                 $gmData['collectionSystemTransfer']->staleness = $staleness;
                 $gmData['collectionSystemTransfer']->useStartDate = $useStartDate;
+                $gmData['collectionSystemTransfer']->skipEmptyDirs = $skipEmptyDirs;
+                $gmData['collectionSystemTransfer']->skipEmptyFiles = $skipEmptyFiles;
+                $gmData['collectionSystemTransfer']->syncFromSource = $syncFromSource;
                 $gmData['collectionSystemTransfer']->bandwidthLimit = $bandwidthLimit;
                 $gmData['collectionSystemTransfer']->cruiseOrLowering = $cruiseOrLowering;
                 $gmData['collectionSystemTransfer']->localDirIsMountPoint = $localDirIsMountPoint;
@@ -1020,6 +1069,9 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->destDir = $destDir;
             $data['row'][0]->staleness = $staleness;
             $data['row'][0]->useStartDate = $useStartDate;
+            $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
+            $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
+            $data['row'][0]->syncFromSource = $syncFromSource;
             $data['row'][0]->bandwidthLimit = $bandwidthLimit;
             $data['row'][0]->cruiseOrLowering = $cruiseOrLowering;
             $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
