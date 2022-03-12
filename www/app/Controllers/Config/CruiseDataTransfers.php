@@ -87,9 +87,9 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
-        $data['skipEmptyDirs'] = $this->_buildSkipEmptyDirsOptions();
-        $data['skipEmptyFiles'] = $this->_buildSkipEmptyFilesOptions();
-        $data['syncToDest'] = $this->_buildSyncToDestOptions();
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
@@ -494,9 +494,9 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
-        $data['skipEmptyDirs'] = $this->_buildSkipEmptyDirsOptions();
-        $data['skipEmptyFiles'] = $this->_buildSkipEmptyFilesOptions();
-        $data['syncToDest'] = $this->_buildSyncToDestOptions();
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
