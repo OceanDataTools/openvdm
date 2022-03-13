@@ -475,30 +475,32 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     while (proc.poll() is None):
 
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
+        for line in proc.stdout:
 
-        line = proc.stdout.readline().rstrip('\n')
+            if gearman_worker.stop:
+                logging.debug("Stopping")
+                proc.terminate()
+                break
 
-        if not line:
-            continue
+            line = line.rstrip('\n')
 
-        logging.debug("%s", line)
+            if not line:
+                continue
 
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            new_files.append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            updated_files.append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
+            logging.debug("%s", line)
+
+            if line.startswith( '>f+++++++++' ):
+                filename = line.split(' ',1)[1]
+                new_files.append(filename)
+                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                file_index += 1
+            elif line.startswith( '>f.' ):
+                filename = line.split(' ',1)[1]
+                updated_files.append(filename)
+                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                file_index += 1
 
     new_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
     updated_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
