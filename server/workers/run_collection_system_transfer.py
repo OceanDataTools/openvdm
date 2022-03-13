@@ -446,7 +446,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     while (proc.poll() is None):
 
-        for line in proc.stdout.splitlines():
+        for line in proc.stdout:
 
             if gearman_worker.stop:
                 logging.debug("Stopping")
