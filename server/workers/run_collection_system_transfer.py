@@ -473,11 +473,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
-
-        logging.debug("Proc.returncode: {}", proc.returncode)
-
-        proc.poll()
+    while (proc.poll() is None):
 
         if gearman_worker.stop:
             logging.debug("Stopping")
