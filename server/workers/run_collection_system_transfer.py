@@ -426,13 +426,14 @@ def build_logfile_dirpath(gearman_worker):
     return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
-def run_transfer_command(gearman_worker, command):
+def run_transfer_command(gearman_worker, command, file_count):
     """
     run the rsync command and return the list of new/updated files
     """
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
+    file_index = 0
     new_files = []
     updated_files = []
 
@@ -498,9 +499,6 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Files: %s", json.dumps(files['include'], indent=2))
 
-    file_index = 0
-    file_count = len(files['include'])
-
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -542,7 +540,7 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -600,9 +598,6 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("File List: %s", json.dumps(files['include'], indent=2))
 
-    file_index = 0
-    file_count = len(files['include'])
-
     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
     try:
@@ -633,7 +628,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
 
     # Cleanup
     time.sleep(2)
@@ -669,9 +664,6 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
-
-    file_index = 0
-    file_count = len(files['include'])
 
     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
 
@@ -718,7 +710,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -754,9 +746,6 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     ssh_filelist_filepath = os.path.join(tmpdir, 'sshFileList.txt')
 
-    file_index = 0
-    file_count = len(files['include'])
-
     try:
         with open(ssh_filelist_filepath, 'w') as ssh_filelist_file:
             ssh_filelist_file.write('\n'.join(files['include']))
@@ -783,7 +772,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
