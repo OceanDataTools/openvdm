@@ -174,7 +174,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
     command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd', 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir + '/']
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
@@ -292,7 +292,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
     command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
     
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
@@ -568,7 +568,7 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
         command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
@@ -656,7 +656,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
@@ -738,7 +738,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
         command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
@@ -800,7 +800,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=0')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
