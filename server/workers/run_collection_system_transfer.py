@@ -128,8 +128,11 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
 
     del return_files['filesize']
 
-    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']].sort()
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']].sort()
+    return_files['include'].sort()
+    return_files['exclude'].sort()
+
+    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
+    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
 
     return {'verdict': True, 'files': return_files}
 
