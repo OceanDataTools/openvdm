@@ -28,6 +28,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.directory_utils import create_directories, lockdown_directory
 from server.lib.openvdm import OpenVDM
 
 
@@ -51,9 +52,10 @@ def build_dest_dir(gearman_worker, dest_dir):
     Replace any wildcards in the provided directory
     """
 
-    return_dest_dir = dest_dir.replace('{loweringID}', gearman_worker.lowering_id)
+    return_dest_dir = dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)
     return_dest_dir = return_dest_dir.replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'],)
-    return_dest_dir = return_dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)
+    return_dest_dir = return_dest_dir.replace('{loweringID}', gearman_worker.lowering_id)
+
     return return_dest_dir
 
 
@@ -68,43 +70,10 @@ def build_directorylist(gearman_worker):
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(cruise=False)
     return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
+    extra_directories = gearman_worker.ovdm.get_active_extra_directories(cruise=False)
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+
     return return_directories
-
-
-def create_directories(directorylist):
-    """
-    Create the directories in the provide directory list
-    """
-
-    reasons = []
-    for directory in directorylist:
-        try:
-            os.makedirs(directory)
-        except OSError as exception:
-            if exception.errno != errno.EEXIST:
-                logging.error("Unable to create directory: %s", directory)
-                reasons.append("Unable to create directory: %s", directory)
-
-    if len(reasons) > 0:
-        return {'verdict': False, 'reason': '\n'.join(reasons)}
-
-    return {'verdict': True}
-
-
-def lockdown_directory(base_dir, exempt_dir):
-    """
-    Lockdown permissions on the base directory, skip the exempt directory if present
-    """
-
-    dir_contents = [ os.path.join(base_dir,f) for f in os.listdir(base_dir)]
-    files = filter(os.path.isfile, dir_contents)
-    for file in files:
-        os.chmod(file, 0o600)
-
-    directories = filter(os.path.isdir, dir_contents)
-    for directory in directories:
-        if not directory == exempt_dir:
-            os.chmod(directory, 0o700)
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes

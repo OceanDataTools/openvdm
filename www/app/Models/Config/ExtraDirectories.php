@@ -22,6 +22,16 @@ class ExtraDirectories extends Model {
         }
     }
 
+    public function getActiveExtraDirectories(){
+
+        $_warehouseModel = new \Models\Warehouse();
+        if ($_warehouseModel->getShowLoweringComponents()) {
+            return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE enable = :enable ORDER BY name", array(':enable' => 1));
+        }
+        return $this->db->select("SELECT * FROM ".PREFIX."ExtraDirectories WHERE cruiseOrLowering = :cruiseOrLowering AND enable = :enable ORDER BY name", array(':cruiseOrLowering' => 0, ':enable' => 1));
+
+    }
+
     // public function getRequiredExtraDirectories($sort = "name"){
 
     //     return $this->getExtraDirectories(true, true, $sort);

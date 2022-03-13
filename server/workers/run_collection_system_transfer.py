@@ -48,12 +48,6 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    # staleness = int(gearman_worker.collection_system_transfer['staleness'])# * 60 #5 Mintues
-    # logging.debug("Staleness: %s", staleness)
-
-    # threshold_time = time.time() - staleness
-    # logging.debug("Threshold: %s", threshold_time)
-
     logging.debug("data_start_date: %s", gearman_worker.data_start_date) 
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     logging.debug("Start: %s", data_start_time)
@@ -179,6 +173,12 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
 
     command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd', 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir + '/']
 
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -280,19 +280,23 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
-    # threshold_time = time.time() - staleness # 5 minutes
     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
-    # logging.debug("Threshold: %s", threshold_time)
     logging.debug("    Start: %s", data_start_time)
     logging.debug("      End: %s", data_end_time)
 
     filters = build_filters(gearman_worker)
 
     command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
+    
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -314,7 +318,6 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
                 continue
 
             for ignore_filter in filters['ignoreFilter'].split(','):
-                #logging.debug("filt")
                 if fnmatch.fnmatch(filepath, ignore_filter):
                     logging.debug("%s ignored because file matched ignore filter", filepath)
                     ignore = True
@@ -423,6 +426,52 @@ def build_logfile_dirpath(gearman_worker):
     return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
+def run_transfer_command(gearman_worker, command):
+    """
+    run the rsync command and return the list of new/updated files
+    """
+
+    logging.debug('Transfer Command: %s', ' '.join(command))
+
+    new_files = []
+    updated_files = []
+
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
+
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '>f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            new_files.append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '>f.' ):
+            filename = line.split(' ',1)[1]
+            updated_files.append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+
+    new_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
+    updated_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
+
+    return new_files, updated_files
+
+
 def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
     """
     Preform a collection system transfer from a local directory
@@ -479,44 +528,21 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Done")
 
-    bandwidth_limit = '--bwlimit=' + gearman_worker.collection_system_transfer['bandwidthLimit'] if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, source_dir + '/', dest_dir]
 
-    command = ['rsync', '-tri', bandwidth_limit, '--files-from=' + rsync_filelist_filepath, source_dir + '/', dest_dir]
+    if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
 
-    logging.debug('Transfer Command: %s', ' '.join(command))
+    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+        command.insert(2, '--delete')
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
 
-        proc.poll()
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if not line:
-            continue
-
-        logging.debug("%s", line)
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-
-    files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -593,47 +619,21 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files': []}
 
-    bandwidth_limit = '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, source_dir, dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        bandwidth_limit = '--bwlimit=' + gearman_worker.collection_system_transfer['bandwidthLimit']
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
 
-    command = ['rsync', '-trim', bandwidth_limit, '--files-from=' + rsync_filelist_filepath, source_dir, dest_dir]
+    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+        command.insert(2, '--delete')
 
-    logging.debug("Transfer Command: %s", ' '.join(command))
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
-        proc.poll()
-
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if not line:
-            continue
-
-        logging.debug("%s", line)
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-
-    files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
 
     # Cleanup
     time.sleep(2)
@@ -704,44 +704,21 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files':[]}
 
-    bandwidth_limit = '--bwlimit=' + gearman_worker.collection_system_transfer['bandwidthLimit'] if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+    command = ['rsync', '-tri', '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir, dest_dir]
 
-    command = ['rsync', '-tri', bandwidth_limit, '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir, dest_dir]
+    if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
 
-    logging.debug('Transfer Command: %s', ' '.join(command))
+    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+        command.insert(2, '--delete')
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
 
-        proc.poll()
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if not line:
-            continue
-
-        logging.debug("%s", line)
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-
-    files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -792,44 +769,21 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + ssh_filelist_filepath, 'files':[]}
 
-    bandwidth_limit = '--bwlimit=' + gearman_worker.collection_system_transfer['bandwidthLimit'] if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-tri', '--protect-args', bandwidth_limit, '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
 
-    command = ['rsync', '-tri', bandwidth_limit, '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-tri', '--protect-args', bandwidth_limit, '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
+    if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
 
-    logging.debug("Transfer Command: %s", ' '.join(command))
+    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+        command.insert(2, '--delete')
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
 
-        proc.poll()
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
-        if gearman_worker.stop:
-            logging.debug("Stopping")
-            proc.terminate()
-            break
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if not line:
-            continue
-
-        logging.debug("%s", line)
-
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_index += 1
-
-    files['new'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'),filename) for filename in files['updated']]
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, command)
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -896,8 +850,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
-        # set temporal bounds for transfer
-
+        ### Sset temporal bounds for transfer
         # if temporal bands are not used then set to absolute min/max
         if self.collection_system_transfer['useStartDate'] == '0':
             self.data_start_date = "1970/01/01 00:00"

@@ -407,6 +407,25 @@ class OpenVDM():
             logging.error("Unable to retrieve extra directories from OpenVDM API")
             raise err
 
+    def get_active_extra_directories(self, cruise=True, lowering=True):
+        """
+        Return all active extra directory configurations
+        """
+
+        url = self.config['siteRoot'] + 'api/extraDirectories/getActiveExtraDirectories'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            if not cruise:
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "0", return_obj))
+            if not lowering:
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "1", return_obj))
+            return return_obj
+        except Exception as err:
+            logging.error("Unable to retrieve active extra directories from OpenVDM API")
+            raise err
+
     def get_required_extra_directory(self, extra_directory_id):
         """
         Return the required extra directory configuration based on the extra_directory_id

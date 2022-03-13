@@ -174,6 +174,7 @@ Router::any('api/dashboardData/getDashboardObjectQualityTestsByJsonName/(:any)/(
 Router::any('api/dashboardData/getDashboardObjectQualityTestsByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByRawName');
 
 Router::any('api/extraDirectories/getExtraDirectories', 'Controllers\Api\ExtraDirectories@getExtraDirectories');
+Router::any('api/ExtraDirectories/getActiveExtraDirectories', 'Controllers\Api\ExtraDirectories@getActiveExtraDirectories');
 Router::any('api/extraDirectories/getExtraDirectory/(:num)', 'Controllers\Api\ExtraDirectories@getExtraDirectory');
 Router::any('api/extraDirectories/getRequiredExtraDirectories', 'Controllers\Api\ExtraDirectories@getRequiredExtraDirectories');
 

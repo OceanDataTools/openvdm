@@ -202,7 +202,14 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -220,9 +227,20 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         logging.debug("Nothing to tranfser")
 
     else:
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+        command = ['rsync', '-triv', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=0')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
         logging.debug('Transfer Command: %s', ' '.join(command))
 
@@ -332,7 +350,13 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -349,9 +373,19 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', bandwidth_imit, '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=0')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
         logging.debug('Transfer Command: %s', ' '.join(command))
 
@@ -451,7 +485,13 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -468,14 +508,19 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', '--no-motd', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
 
-        # # Work around to create CruiseID at the destination
-        # os.mkdir(os.path.join(tmpdir, gearman_worker.cruise_id))
-        # command = ['rsync', '-a', bandwidthLimit, '--no-motd', '--password-file=' + rsync_password_filepath, os.path.join(tmpdir, gearman_worker.cruise_id), 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
-        # popen = subprocess.Popen(command, stdout=subprocess.PIPE)
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--no-motd', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=0')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
         logging.debug('Transfer Command: %s', ' '.join(command))
 
@@ -550,7 +595,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=0')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -568,14 +619,19 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
-        # command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'mkdir ' + os.path.join(dest_dir, gearman_worker.cruise_id)] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'mkdir ' + os.path.join(dest_dir, gearman_worker.cruise_id)]
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        # proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-        # proc.communicate()
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=0')
+
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
         logging.debug("Transfer Command: %s", ' '.join(command))
 
