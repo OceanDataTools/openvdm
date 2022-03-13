@@ -433,6 +433,9 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
+    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    dest_dir = command[-1]
+
     file_index = 0
     new_files = []
     updated_files = []
