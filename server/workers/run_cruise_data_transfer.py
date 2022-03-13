@@ -337,7 +337,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
 
-        files['new'], file['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
+        files['new'], files['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
 
         logging.info("Setting file permissions")
         output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(dest_dir, gearman_worker.cruise_id))
@@ -449,7 +449,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
 
-        files['new'], file['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
+        files['new'], files['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
 
     # Cleanup
     time.sleep(2)
@@ -554,7 +554,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
 
-        files['new'], file['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
+        files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
 
 
     # Cleanup
@@ -636,7 +636,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
 
-        files['new'], file['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
+        files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
 
 
     # Cleanup
