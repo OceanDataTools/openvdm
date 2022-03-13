@@ -426,7 +426,7 @@ def build_logfile_dirpath(gearman_worker):
     return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
-def run_transfer_command(gearman_worker, command, file_count):
+def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     """
     run the rsync command and return the list of new/updated files
     """
@@ -540,7 +540,7 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -628,7 +628,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
     # Cleanup
     time.sleep(2)
@@ -710,7 +710,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
@@ -772,7 +772,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, command, len(files['include']))
+    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
     # Cleanup
     shutil.rmtree(tmpdir)
