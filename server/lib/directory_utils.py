@@ -1,3 +1,6 @@
+import os
+import logging
+
 def create_directories(directorylist):
     """
     Create the directories in the provide directory list

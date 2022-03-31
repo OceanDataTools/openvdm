@@ -468,7 +468,7 @@ EOF
 
 [CruiseData]
   comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/FTPRoot/CruiseData
+  path=${DATA_ROOT}/CruiseData
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -482,7 +482,7 @@ EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
-  path=${DATA_ROOT}/FTPRoot/VisitorInformation
+  path=${DATA_ROOT}/VisitorInformation
   browsable = yes
   public = yes
   guest ok = yes
@@ -495,7 +495,7 @@ EOF
 
 [PublicData]
   comment=Public Data, read/write access to all
-  path=${DATA_ROOT}/FTPRoot/PublicData
+  path=${DATA_ROOT}/PublicData
   browseable = yes
   public = yes
   guest ok = yes
@@ -550,8 +550,8 @@ function configure_apache {
       Allow from all
     </Directory>
 
-    Alias /CruiseData/ $DATA_ROOT/FTPRoot/CruiseData/
-    <Directory "$DATA_ROOT/FTPRoot/CruiseData">
+    Alias /CruiseData/ $DATA_ROOT/CruiseData/
+    <Directory "$DATA_ROOT/CruiseData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -559,8 +559,8 @@ function configure_apache {
       Require all granted
     </Directory>
   
-    Alias /PublicData/ $DATA_ROOT/FTPRoot/PublicData/
-    <Directory "$DATA_ROOT/FTPRoot/PublicData">
+    Alias /PublicData/ $DATA_ROOT/PublicData/
+    <Directory "$DATA_ROOT/PublicData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -568,8 +568,8 @@ function configure_apache {
       Require all granted
     </Directory>
 
-    Alias /VisitorInformation/ $DATA_ROOT/FTPRoot/VisitorInformation/
-    <Directory "$DATA_ROOT/FTPRoot/VisitorInformation">
+    Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
+    <Directory "$DATA_ROOT/VisitorInformation">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -772,21 +772,21 @@ function configure_directories {
     if [ ! -d $DATA_ROOT/FTPROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/TransferLogs
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
 
-        echo "[]" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
-        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.md5
-        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.txt
+        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
 
-        mkdir -p ${DATA_ROOT}/FTPRoot/PublicData
-        mkdir -p ${DATA_ROOT}/FTPRoot/VisitorInformation
+        mkdir -p ${DATA_ROOT}/PublicData
+        mkdir -p ${DATA_ROOT}/VisitorInformation
 
-        chmod -R 777 ${DATA_ROOT}/FTPRoot/PublicData
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/FTPRoot/*
+        chmod -R 777 ${DATA_ROOT}/PublicData
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
@@ -905,7 +905,7 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');|"\
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|"\
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then

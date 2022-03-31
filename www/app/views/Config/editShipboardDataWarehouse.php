@@ -65,10 +65,10 @@ use Helpers\Form;
             <h3>Page Guide</h3>
             <p>This form is for editing settings related to the Shipboard Data Warehouse (SBDW). The Shipboard Data Warehouse hosts the OpenVDM data management tools, the OpenVDM (this) web-interface and stores the cruise data.</p>
             <p>The <strong>Server IP</strong> is the IP address of the Shipboard Data Warehouse (i.e. "192.168.4.151").</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Data Base Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SBDW (i.e. "/mnt/vault/FTPRoot/CruiseData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Data Base Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SBDW (i.e. "/mnt/vault/CruiseData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
             <p>The <strong><?php echo CRUISE_NAME; ?> Data Apache Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories as defined within the webserver. (i.e. "/CruiseData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
             <p>The <strong>Server Username</strong> is the username on the SBDW with read/write permission to the files/folders in the <?php echo CRUISE_NAME; ?> Data Directories (i.e. "shipTech").</p>
-            <p>The <strong>Public Data Directory</strong> is the location of the PublicData directory on the SBDW. (i.e. "/mnt/vault/FTPRoot/PublicData").</p>
+            <p>The <strong>Public Data Directory</strong> is the location of the PublicData directory on the SBDW. (i.e. "/mnt/vault/PublicData").</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>

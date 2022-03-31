@@ -170,7 +170,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
-    placeholderArray:
+  placeholderArray:
   - plotType: chart
     id: met
     heading: Meterological Sensor
@@ -190,7 +190,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
-    placeholderArray:
+  placeholderArray:
   - plotType: chart
     id: tsg
     heading: Thermosalinograph Sensor
