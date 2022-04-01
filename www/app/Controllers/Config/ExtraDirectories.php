@@ -184,7 +184,7 @@ class ExtraDirectories extends Controller {
     public function enable($id) {
         $this->_extraDirectoriesModel->enableExtraDirectory($id);
         
-        $this->updateCruiseDirectory();
+        $this->updateDestinationDirectory();
         
         Url::redirect('config/extraDirectories');
     }
