@@ -98,7 +98,7 @@ INSERT INTO `OVDM_CoreVars` (`coreVarID`, `name`, `value`)
 VALUES
 	(1,'shipboardDataWarehouseIP','127.0.0.1'),
 	(2,'shipboardDataWarehouseUsername','survey'),
-	(3,'shipboardDataWarehousePublicDataDir','/vault/FTPRoot/PublicData'),
+	(3,'shipboardDataWarehousePublicDataDir','/vault/PublicData'),
 	(4,'shipboardDataWarehouseStatus','2'),
 	(5,'cruiseID','Test_Cruise'),
 	(6,'cruiseStartDate','2021/01/01 00:00'),
