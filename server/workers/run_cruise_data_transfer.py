@@ -598,13 +598,16 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
     if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
         command.insert(2, '--min-size=1')
 
     if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+        command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -622,7 +625,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     else:
 
-        command = ['rsync', '-triv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+        command = ['rsync', '-triv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
         if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
             command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
@@ -635,6 +638,9 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
+
+        if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+            command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
         files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
 
