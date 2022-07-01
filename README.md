@@ -54,7 +54,7 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 - *[R/V Atlantic Explorer](http://www.bios.edu/research/facilities/atlantic-explorer/)* (Bermuda Institute of Ocean Sciences)
 - *[R/V Helmer Hanssen](https://en.uit.no/om/enhet/artikkel?p_document_id=151541&p_dimension_id=88172&men=42374)* (UiT The Arctic University of Norway)
 - *[R/V OceanXplorer1](http://www.oceanx.org/oceanxplorer/)* (OceanX)
-- *[R/V Odyssey](https://www.oceef.org/) (Oceef)
+- *[R/V Odyssey](https://www.oceef.org/)* (Oceef)
 
 ## Vehicles Currently using OpenVDM ##
 - *[ROV Subastian](https://schmidtocean.org/technology/robotic-platforms/4500-m-remotely-operated-vehicle-rov/)* (Schmidt Ocean Institute)
