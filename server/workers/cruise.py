@@ -43,10 +43,11 @@ def build_filelist(source_dir):
 
     for root, _, filenames in os.walk(source_dir):
 
-        return_files['include'] = [os.path.join(root, filename) for filename in filenames]
+        include_files = [os.path.join(root, filename) for filename in filenames]
 
-        return_files['exclude'] = list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), return_files['include']))
-        return_files['include'] = list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), return_files['include']))
+        exclude_files = list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), include_files))
+
+        return_files['include'].extend(list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), include_files)))
 
     return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
@@ -78,6 +79,8 @@ def clear_directory(directory):
     #             reasons.append("Unable to delete {}".format(os.path.join(root, pd_file)))
 
     for root, dirs, files in os.walk(directory + '/', topdown=False):
+        for dirname in dirs:
+            result = clear_directory(realpath(os.path.join(root, dirname)))
         if not dirs and not files:
             try:
                 logging.debug("Deleting %s", root)
@@ -168,7 +171,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
     command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
 
     if remove_source_files:
-        command.insert('--remove-source-files', 2)
+        command.insert(2, '--remove-source-files')
 
     logging.debug("Command: %s", ' '.join(command))
 
