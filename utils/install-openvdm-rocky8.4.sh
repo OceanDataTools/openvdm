@@ -212,8 +212,10 @@ function install_python_packages {
     pip install wheel  # To help with the rest of the installations
 
 
-    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resources/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
     pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    
+    deactivate
 
 }
 
@@ -424,8 +426,8 @@ EOF
 
     echo "Updating Firewall rules for Supervisor Web Server"
     # TODO Check for firewall
-    firewall-cmd --zone=public --add-port=9001/tcp --permanent
-    firewall-cmd --reload
+    firewall-cmd --zone=public --add-port=9001/tcp --permanent || echo "No firewall installed"
+    firewall-cmd --reload || echo "No firewall installed"
 
     echo "Starting new supervisor processes"
     systemctl restart supervisord
@@ -516,8 +518,8 @@ EOF
     echo "Updating firewall rules for samba"
 
     # TODO Check if firewall installed
-    sudo firewall-cmd --add-service=samba --zone=public --permanent
-    sudo firewall-cmd --reload
+    sudo firewall-cmd --add-service=samba --zone=public --permanent || echo "No firewall installed"
+    sudo firewall-cmd --reload || echo "No firewall installed"
 
     echo "Restarting Samba Service"
     systemctl start smb
@@ -599,8 +601,8 @@ EOF
 
     echo "Updating Firewall rules for Apache Web Server"
     # TODO Check for firewall
-    firewall-cmd --permanent --add-service={http,https}
-    firewall-cmd --reload
+    firewall-cmd --permanent --add-service={http,https} || echo "No firewall installed"
+    firewall-cmd --reload || echo "No firewall installed"
 
     echo "Setting SELinux exception rules"
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}
