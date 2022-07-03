@@ -696,7 +696,7 @@ function configure_directories {
         done
     fi
 
-    if [ ! -d $DATA_ROOT/FTPROOT ]; then
+    if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
