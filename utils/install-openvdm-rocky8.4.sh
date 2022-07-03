@@ -696,7 +696,7 @@ function configure_directories {
         done
     fi
 
-    if [ ! -d $DATA_ROOT ]; then
+    if [ ! -d $DATA_ROOT/CruiseData ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
@@ -708,12 +708,21 @@ function configure_directories {
         echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
-
+    fi
+    
+    if [ ! -d $DATA_ROOT/PublicData ]; then
+        echo "Creating PublicData at: $DATA_ROOT"
+        
         mkdir -p ${DATA_ROOT}/PublicData
-        mkdir -p ${DATA_ROOT}/VisitorInformation
-
         chmod -R 777 ${DATA_ROOT}/PublicData
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/PublicData
+    fi
+
+    if [ ! -d $DATA_ROOT/VisitorInformation ]; then
+        echo "Creating VisitorInformation at: $DATA_ROOT"
+        
+        mkdir -p ${DATA_ROOT}/VisitorInformation
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/VisitorInformation
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
