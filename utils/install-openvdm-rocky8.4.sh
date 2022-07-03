@@ -10,7 +10,7 @@
 #
 # It should be re-run whenever the code has been refresh. Preferably
 # by first running 'git pull' to get the latest copy of the script,
-# and then running 'utils/build_openvdm_ubuntu20.04.sh' to run that
+# and then running 'utils/build_openvdm_rocky8.4.sh' to run that
 # script.
 #
 # The script has been designed to be idempotent, that is, if can be
@@ -96,7 +96,7 @@ function set_default_variables {
 # Save defaults in a preferences file for the next time we run.
 function save_default_variables {
     cat > $PREFERENCES_FILE <<EOF
-# Defaults written by/to be read by install_openvdm_ubuntu20.04.sh
+# Defaults written by/to be read by install_openvdm_rocky8.4.sh
 
 DEFAULT_HOSTNAME=$HOSTNAME
 DEFAULT_INSTALL_ROOT=$INSTALL_ROOT
