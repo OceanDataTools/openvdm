@@ -7,9 +7,9 @@
 #         BUGS:
 #        NOTES:
 #       AUTHOR:  Webb Pinner
-#      VERSION:  2.7
+#      VERSION:  2.8
 #      CREATED:  2016-03-04
-#     REVISION:  2022-02-04
+#     REVISION:  2022-07-01
 #
 # ----------------------------------------------------------------------------------- #
 
@@ -66,9 +66,12 @@
 # SPECIAL CASES:
 # If the view needs to leverage leaflet simple add "leaflet".
 # If the view needs to leverage charts.js, simple add "charts"
+# If the view needs to leverage charts.js and the zoom/pan featurebuild_file_manifest.sh add "charts" AND "charts-zoom"
 #  jsArray:
 #  - dataDashboardDefault
+#  - leaflet
 #  - charts
+#  - charts-zoom
 #  - leaflet
 
 # Placeholders are the bootstrap-styled panels that contain the <div> blocks where data
@@ -104,6 +107,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
+  - charts-zoom
   - leaflet
   - lowering
   placeholderArray:
@@ -152,6 +156,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
+  - charts-zoom
   - leaflet
   - lowering
   placeholderArray:
@@ -170,6 +175,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
+  - charts-zoom
   placeholderArray:
   - plotType: chart
     id: met
@@ -190,6 +196,7 @@
   jsArray:
   - dataDashboardDefault
   - charts
+  - charts-zoom
   placeholderArray:
   - plotType: chart
     id: tsg

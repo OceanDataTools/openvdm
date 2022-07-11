@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker that handles testing collection system transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-05-25
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -239,7 +239,15 @@ def test_ssh_source_dir(gearman_worker):
     """
     return_val = []
 
-    server_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PasswordAuthentication=no', 'ls'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls']
+    server_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '1':
+        server_test_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+        server_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + server_test_command + ['-o', 'PubkeyAuthentication=no']
+
+    server_test_command += ['ls']
 
     logging.debug('Server test command: %s', ' '.join(server_test_command))
 
@@ -259,7 +267,15 @@ def test_ssh_source_dir(gearman_worker):
     source_dir = build_source_dir(gearman_worker)
     logging.debug('Source Dir: %s', source_dir)
 
-    source_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PasswordAuthentication=no', 'ls', "\"" + source_dir + "\""] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls', "\"" + source_dir + "\""]
+    source_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '1':
+      server_test_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+      server_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + server_test_command + ['-o', 'PubkeyAuthentication=no']
+
+    server_test_command += ['ls', "\"" + source_dir + "\""]
 
     logging.debug('Source test command: %s', ' '.join(source_test_command))
 

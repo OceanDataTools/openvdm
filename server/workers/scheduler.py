@@ -19,9 +19,9 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
     NOTES:
    AUTHOR:  Webb Pinner
   COMPANY:  Capable Solutions
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse

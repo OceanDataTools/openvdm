@@ -10,9 +10,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
     NOTES:
    AUTHOR:  Webb Pinner
   COMPANY:  Capable Solutions
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-05-25
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -292,13 +292,16 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     filters = build_filters(gearman_worker)
 
-    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/'] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
-    
+    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
+
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '--min-size=1')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '-m')
+        command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0': 
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
     logging.debug("Command: %s", ' '.join(command))
 
@@ -762,19 +765,22 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + ssh_filelist_filepath, 'files':[]}
 
-    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
+    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir] if gearman_worker.collection_system_transfer['sshUseKey']
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
 
     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '--delete')
+        command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '--min-size=1')
+        command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-        command.insert(2 if gearman_worker.collection_system_transfer['sshUseKey'] == '1' else 5, '-m')
+        command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0': 
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 

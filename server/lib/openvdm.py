@@ -7,9 +7,9 @@ DESCRIPTION:  OpenVDM python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2016-02-02
- REVISION:  2022-02-04
+ REVISION:  2022-07-01
 """
 
 import datetime

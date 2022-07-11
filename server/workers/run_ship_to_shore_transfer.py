@@ -8,9 +8,9 @@ Shipboard Data Warehouse to a Shoreside Data Warehouse.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -136,9 +136,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
         return {'verdict': False, 'reason': 'Error Saving temporary ssh exclude filelist file: ' + ssh_includelist_filepath, 'files':[]}
 
-    bw_limit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+    command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
-    command = ['rsync', '-trim', bw_limit, '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trim', bw_limit, '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+        command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+        command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
