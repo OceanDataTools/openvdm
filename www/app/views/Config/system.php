@@ -259,7 +259,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
             <div class="modal-body">
                 <ui class="list-unstyled">
 <?php
-    for($i=0; $i<(sizeof($data['testResults']['parts']))-1; $i++){
+	    for($i=0; $i<(sizeof($data['testResults']['parts']))-1; $i++){
 ?>
                     <li><i class="fa fa-<?php echo (strcmp($data['testResults']['parts'][$i]['result'], "Pass") ? "times text-danger" : "check text-success"); ?>"></i> <?php echo $data['testResults']['parts'][$i]['partName']; ?></li>
 <?php
