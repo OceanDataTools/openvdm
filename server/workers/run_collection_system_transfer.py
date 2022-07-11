@@ -9,7 +9,6 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  COMPANY:  Capable Solutions
   VERSION:  2.8
   CREATED:  2015-01-01
  REVISION:  2022-07-01
