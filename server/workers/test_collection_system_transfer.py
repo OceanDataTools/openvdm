@@ -270,12 +270,12 @@ def test_ssh_source_dir(gearman_worker):
     source_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
 
     if gearman_worker.collection_system_transfer['sshUseKey'] == '1':
-      server_test_command += ['-o', 'PasswordAuthentication=no']
+      source_test_command += ['-o', 'PasswordAuthentication=no']
 
     else:
-      server_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + server_test_command + ['-o', 'PubkeyAuthentication=no']
+      source_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + source_test_command + ['-o', 'PubkeyAuthentication=no']
 
-    server_test_command += ['ls', "\"" + source_dir + "\""]
+    source_test_command += ['ls', "\"" + source_dir + "\""]
 
     logging.debug('Source test command: %s', ' '.join(source_test_command))
 
