@@ -69,5 +69,5 @@ OpenVDM v2.8 introducted some database schema changes that will require existing
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Backup the existing database BEFORE running the schema update script.  To do this run the `./utils/export_openvdm_db.sh` script and redirect the output to a file.  In the event there is a problem updating the database the output from this script can be used to restore the database to a known good state.
 3. Start the mysql cli `mysql -p`
-4. Select the OpenVDM database `use openvdm` (`openvdm` is the default name of the database)
+4. Select the OpenVDM database by typing: `use openvdm` (`openvdm` is the default name of the database)
 5. Run the update script: `source <path to openvdm>/database/openvdm_27_to_28.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
