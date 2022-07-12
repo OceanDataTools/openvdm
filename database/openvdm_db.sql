@@ -48,6 +48,9 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `destDir` tinytext,
   `staleness` int(11) DEFAULT '0',
   `useStartDate` tinyint(1) DEFAULT '0',
+  `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
+  `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
+  `syncFromSource` int(1) unsigned NOT NULL DEFAULT '0',
   `transferType` int(11) unsigned NOT NULL,
   `localDirIsMountPoint` int(1) unsigned NOT NULL DEFAULT '0',
   `rsyncServer` tinytext,
@@ -95,7 +98,7 @@ INSERT INTO `OVDM_CoreVars` (`coreVarID`, `name`, `value`)
 VALUES
 	(1,'shipboardDataWarehouseIP','127.0.0.1'),
 	(2,'shipboardDataWarehouseUsername','survey'),
-	(3,'shipboardDataWarehousePublicDataDir','/vault/FTPRoot/PublicData'),
+	(3,'shipboardDataWarehousePublicDataDir','/vault/PublicData'),
 	(4,'shipboardDataWarehouseStatus','2'),
 	(5,'cruiseID','Test_Cruise'),
 	(6,'cruiseStartDate','2021/01/01 00:00'),
@@ -126,6 +129,9 @@ CREATE TABLE `OVDM_CruiseDataTransfers` (
   `cruiseDataTransferID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` text,
+  `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
+  `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
+  `syncToDest` int(1) unsigned NOT NULL DEFAULT '0',
   `transferType` int(11) unsigned NOT NULL,
   `destDir` tinytext,
   `localDirIsMountPoint` int(1) unsigned NOT NULL DEFAULT '0',
@@ -159,9 +165,9 @@ CREATE TABLE `OVDM_CruiseDataTransfers` (
 LOCK TABLES `OVDM_CruiseDataTransfers` WRITE;
 /*!40000 ALTER TABLE `OVDM_CruiseDataTransfers` DISABLE KEYS */;
 
-INSERT INTO `OVDM_CruiseDataTransfers` (`cruiseDataTransferID`, `name`, `longName`, `transferType`, `destDir`, `localDirIsMountPoint`, `rsyncServer`, `rsyncUser`, `rsyncPass`, `smbServer`, `smbUser`, `smbPass`, `smbDomain`, `sshServer`, `sshUser`, `sshUseKey`, `sshPass`, `status`, `enable`, `required`, `pid`, `bandwidthLimit`, `includeOVDMFiles`, `includePublicDataFiles`, `excludedCollectionSystems`, `excludedExtraDirectories`)
+INSERT INTO `OVDM_CruiseDataTransfers` (`cruiseDataTransferID`, `name`, `longName`, `skipEmptyDirs`, `skipEmptyFiles`, `syncToDest`, `transferType`, `destDir`, `localDirIsMountPoint`, `rsyncServer`, `rsyncUser`, `rsyncPass`, `smbServer`, `smbUser`, `smbPass`, `smbDomain`, `sshServer`, `sshUser`, `sshUseKey`, `sshPass`, `status`, `enable`, `required`, `pid`, `bandwidthLimit`, `includeOVDMFiles`, `includePublicDataFiles`, `excludedCollectionSystems`, `excludedExtraDirectories`)
 VALUES
-	(1,'SSDW','Shoreside Data Warehouse',4,'/vault/Shoreside',0,'','','','','','','','ssdw.example.com','survey',0,'password',2,1,1,0,128,0,0,'0','0');
+	(1,'SSDW','Shoreside Data Warehouse',1,1,0,4,'/vault/Shoreside',0,'','','','','','','','ssdw.example.com','survey',0,'password',2,1,1,0,128,0,0,'0','0');
 
 /*!40000 ALTER TABLE `OVDM_CruiseDataTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -176,7 +182,8 @@ CREATE TABLE `OVDM_ExtraDirectories` (
   `extraDirectoryID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` tinytext,
-  `destDir` tinytext NOT NULL,
+  `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0',
+  `destDir` tinytext,
   `enable` tinyint(1) DEFAULT '0',
   `required` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`extraDirectoryID`)
@@ -185,11 +192,11 @@ CREATE TABLE `OVDM_ExtraDirectories` (
 LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` DISABLE KEYS */;
 
-INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `destDir`, `enable`, `required`)
+INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
 VALUES
-	(1,'Transfer_Logs','Transfer Logs','OpenVDM/TransferLogs',1,1),
-	(2,'Dashboard_Data','Dashboard Data','OpenVDM/DashboardData',1,1),
-	(3,'From_PublicData','Files copied from PublicData share','From_PublicData',1,1);
+	(1,'Transfer_Logs','Transfer Logs',0,'OpenVDM/TransferLogs',1,1),
+	(2,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
+	(3,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;

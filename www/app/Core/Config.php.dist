@@ -37,7 +37,7 @@ class Config
         /*
          * Define path on webserver that contains cruise data
          */
-        define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');
+        define('CRUISEDATA_BASEDIR', '/vault/CruiseData');
 
         /*
          * Define directory alias configured within the webserver that contains cruise data
@@ -120,7 +120,7 @@ class Config
         /*
          * Optional create a constant for the name of the site.
          */
-        define('SITETITLE', 'Open Vessel Data Management v2.7');
+        define('SITETITLE', 'Open Vessel Data Management v2.8');
 
         /*
          * Optionall set a site email address.

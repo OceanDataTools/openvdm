@@ -4,8 +4,8 @@
  *
  * @license   https://opensource.org/licenses/MIT
  * @author Webb Pinner - webbpinner@gmail.com
- * @version 2.6
- * @date 2021-02-13
+ * @version 2.8
+ * @date 2022-07-01
  */
 
 namespace Controllers\Api;
@@ -13,25 +13,29 @@ use Core\Controller;
 
 class ExtraDirectories extends Controller {
 
-    private $_model;
+    private $_extraDirectoriesModel;
 
     public function __construct(){
-        $this->_model = new \Models\Config\ExtraDirectories();
+        $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
     }
 
     public function getExtraDirectories(){
 
-        echo json_encode($this->_model->getExtraDirectories());
+        echo json_encode($this->_extraDirectoriesModel->getExtraDirectories());
     }
     
+    public function getActiveExtraDirectories(){
+        echo json_encode($this->_extraDirectoriesModel->getActiveExtraDirectories());
+    }
+
     public function getExtraDirectory($id){
 
-        echo json_encode($this->_model->getExtraDirectory($id));
+        echo json_encode($this->_extraDirectoriesModel->getExtraDirectory($id));
     }
 
     public function getRequiredExtraDirectories(){
 
-        echo json_encode($this->_model->getExtraDirectories(true, true));
+        echo json_encode($this->_extraDirectoriesModel->getExtraDirectories(true, true));
     }
 
 }

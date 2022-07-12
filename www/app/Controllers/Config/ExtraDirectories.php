@@ -8,13 +8,19 @@ use Helpers\Session;
 
 class ExtraDirectories extends Controller {
 
-    private $_model;
+    private $_extraDirectoriesModel;
+
+    private function _buildCruiseOrLoweringOptions() {
+        
+        $output = array(array('id'=>'cruiseOrLowering0', 'name'=>'cruiseOrLowering', 'value'=>'0', 'label'=>CRUISE_NAME), array('id'=>'cruiseOrLowering1', 'name'=>'cruiseOrLowering', 'value'=>'1', 'label'=>LOWERING_NAME));
+        return $output;
+    }
     
-    private function updateCruiseDirectory() {
+    private function updateDestinationDirectory() {
         $_warehouseModel = new \Models\Warehouse();
         $warehouseConfig = $_warehouseModel->getShipboardDataWarehouseConfig();
         $cruiseID = $_warehouseModel->getCruiseID();
-
+        
         if(is_dir($warehouseConfig['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
             $gmData['siteRoot'] = DIR;
             $gmData['shipboardDataWarehouse'] = $warehouseConfig;
@@ -28,7 +34,14 @@ class ExtraDirectories extends Controller {
 
             #submit job to Gearman
             $job_handle = $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
+
+            if($_warehouseModel->getShowLoweringComponents()) {
+                $gmData['loweringID'] = $_warehouseModel->getLoweringID();
+                $job_handle = $gmc->doBackground("rebuildLoweringDirectory", json_encode($gmData));
+            }
         }
+
+        ### There should be some error handling here
     }
 
     public function __construct(){
@@ -36,25 +49,34 @@ class ExtraDirectories extends Controller {
             Url::redirect('config/login');
         }
 
-        $this->_model = new \Models\Config\ExtraDirectories();
+        $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
     }
         
     public function index(){
         $data['title'] = 'Configuration';
+        $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(false, false, "longName");
         $data['javascript'] = array();
-        $data['extraDirectories'] = $this->_model->getExtraDirectories(false, false, "longName");
+
+        $warehouseModel = new \Models\Warehouse();
+        $data['showLoweringComponents'] = $warehouseModel->getShowLoweringComponents();
+
         View::rendertemplate('header',$data);
         View::render('Config/extraDirectories',$data);
         View::rendertemplate('footer',$data);
     }
 
     public function add(){
+        $_warehouseModel = new \Models\Warehouse();
+
         $data['title'] = 'Add Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
+        $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
+        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $destDir = $_POST['destDir'];
             $enable = 0;
 
@@ -74,11 +96,12 @@ class ExtraDirectories extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'cruiseOrLowering' => $cruiseOrLowering,
                     'destDir' => $destDir,
                     'enable' => $enable
                 );
 
-                $this->_model->insertExtraDirectory($postdata);
+                $this->_extraDirectoriesModel->insertExtraDirectory($postdata);
 
                 Session::set('message','Extra Directory Added');
                 Url::redirect('config/extraDirectories');
@@ -91,13 +114,19 @@ class ExtraDirectories extends Controller {
     }
         
     public function edit($id){
+        $_warehouseModel = new \Models\Warehouse();
+
         $data['title'] = 'Edit Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
-        $data['row'] = $this->_model->getExtraDirectory($id);
+        $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
+        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
+
+        $data['row'] = $this->_extraDirectoriesModel->getExtraDirectory($id);
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
+            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
             $destDir = $_POST['destDir'];
 
             if($name == ''){
@@ -116,15 +145,16 @@ class ExtraDirectories extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
-                    'destDir' => $destDir,
+                    'cruiseOrLowering' => $cruiseOrLowering,
+                    'destDir' => $destDir
                 );
             
                 
                 $where = array('extraDirectoryID' => $id);
-                $this->_model->updateExtraDirectory($postdata,$where);
+                $this->_extraDirectoriesModel->updateExtraDirectory($postdata,$where);
 
                 if($data['row'][0]->destDir != $destDir){
-                    $this->updateCruiseDirectory();
+                    $this->updateDestinationDirectory();
                 }
                 
                 Session::set('message','Extra Directory Updated');
@@ -133,6 +163,7 @@ class ExtraDirectories extends Controller {
                 
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->cruiseOrLowering = $cruiseOrLowering;
                 $data['row'][0]->destDir = $destDir;
             }
         }
@@ -145,21 +176,21 @@ class ExtraDirectories extends Controller {
     public function delete($id){
         
         $where = array('extraDirectoryID' => $id);
-        $this->_model->deleteExtraDirectory($where);
+        $this->_extraDirectoriesModel->deleteExtraDirectory($where);
         Session::set('message','Extra Directory Deleted');
         Url::redirect('config/extraDirectories');
     }
     
     public function enable($id) {
-        $this->_model->enableExtraDirectory($id);
+        $this->_extraDirectoriesModel->enableExtraDirectory($id);
         
-        $this->updateCruiseDirectory();
+        $this->updateDestinationDirectory();
         
         Url::redirect('config/extraDirectories');
     }
     
     public function disable($id) {
-        $this->_model->disableExtraDirectory($id);
+        $this->_extraDirectoriesModel->disableExtraDirectory($id);
         Url::redirect('config/extraDirectories');
     }
 

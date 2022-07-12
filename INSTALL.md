@@ -1,7 +1,7 @@
 # Open Vessel Data Management
 
 ## Installation Guide
-At the time of this writing OpenVDM was built and tested against the Ubuntu 20.04 LTS operating system. It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 20.04 LTS is used.
+At the time of this writing OpenVDM was built and tested against the Ubuntu 20.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 20.04 LTS is used.
 
 ### Operating System
 Goto <https://releases.ubuntu.com/20.04/>
@@ -60,8 +60,20 @@ The default username/passwd is admin/demo
  #Set the desired password and optional change the admin username.
 
 ### An error has been reported ###
-If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.  
+If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.
 
+## Upgrading from 2.7 or earlier.
 
+OpenVDM v2.8 introducted some database schema changes that will require existing user to perform some additional steps.
 
-
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Backup the existing database BEFORE running the schema update script.  To do this run the `./utils/export_openvdm_db.sh` script and redirect the output to a file.  In the event there is a problem updating the database the output from this script can be used to restore the database to a known good state.
+3. Start the mysql cli `mysql -p`
+4. Select the OpenVDM database by typing: `use openvdm` (`openvdm` is the default name of the database)
+5. Run the update script: `source <path to openvdm>/database/openvdm_27_to_28.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
+ 
+There are also some web-dependencies that were updated as part of this release. To update those run:
+```
+cd <openvdm_root>/www
+composer install
+```

@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2022-02-04
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -169,6 +169,101 @@ def build_exclude_filterlist(gearman_worker):
     return exclude_filterlist
 
 
+
+def run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count):
+    """
+    run the rsync command and return the list of new/updated files
+    """
+
+    logging.debug('Transfer Command: %s', ' '.join(command))
+
+    # cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    # dest_dir = command[-1]
+
+    file_index = 0
+    new_files = []
+    updated_files = []
+
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.poll() is None):
+
+        for line in proc.stdout:
+
+            if gearman_worker.stop:
+                logging.debug("Stopping")
+                proc.terminate()
+                break
+
+            line = line.rstrip('\n')
+
+            if not line:
+                continue
+
+            logging.debug("%s", line)
+
+            if line.startswith( '>f+++++++++' ):
+                filename = line.split(' ',1)[1]
+                new_files.append(filename)
+                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                file_index += 1
+            elif line.startswith( '>f.' ):
+                filename = line.split(' ',1)[1]
+                updated_files.append(filename)
+                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                file_index += 1
+
+    # new_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
+    # updated_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
+
+    return new_files, updated_files
+
+
+def run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count):
+    """
+    run the rsync command and return the list of new/updated files
+    """
+
+    logging.debug("Transfer Command: %s", ' '.join(command))
+
+    file_index = 0
+    new_files = []
+    updated_files = []
+
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while (proc.returncode is None):
+
+        proc.poll()
+
+        if gearman_worker.stop:
+            logging.debug("Stopping")
+            proc.terminate()
+            break
+
+        line = proc.stdout.readline().rstrip('\n')
+
+        if not line:
+            continue
+
+        logging.debug("%s", line)
+
+        if line.startswith( '<f+++++++++' ):
+            filename = line.split(' ',1)[1]
+            new_files.append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+        elif line.startswith( '<f.' ):
+            filename = line.split(' ',1)[1]
+            updated_files.append(filename)
+            logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            file_index += 1
+
+    return new_files, updated_files
+
+
 def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
     """
     Copy cruise data to a local directory
@@ -202,7 +297,14 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=1')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -220,44 +322,22 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         logging.debug("Nothing to tranfser")
 
     else:
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
+        command = ['rsync', '-triv', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
 
-        logging.debug('Transfer Command: %s', ' '.join(command))
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        while (proc.returncode is None):
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
 
-            proc.poll()
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=1')
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
-            line = proc.stdout.readline().rstrip('\n')
-
-            if not line:
-                continue
-
-            logging.debug("%s", line)
-
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                files['new'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                files['updated'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
-
-        # files['new'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['new']]
-        # files['updated'] = [os.path.join('/', gearman_worker.cruise_id, filename) for filename in files['updated']]
+        files['new'], files['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
 
         logging.info("Setting file permissions")
         output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(dest_dir, gearman_worker.cruise_id))
@@ -332,7 +412,13 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=1')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -349,41 +435,21 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        logging.debug('Transfer Command: %s', ' '.join(command))
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        while (proc.returncode is None):
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=1')
 
-            proc.poll()
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
-
-            line = proc.stdout.readline().rstrip('\n')
-
-            if not line:
-                continue
-
-            logging.debug("%s", line)
-
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                files['new'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                files['updated'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
+        files['new'], files['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
 
     # Cleanup
     time.sleep(2)
@@ -451,7 +517,13 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=1')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -468,46 +540,22 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', '--no-motd', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
 
-        # # Work around to create CruiseID at the destination
-        # os.mkdir(os.path.join(tmpdir, gearman_worker.cruise_id))
-        # command = ['rsync', '-a', bandwidthLimit, '--no-motd', '--password-file=' + rsync_password_filepath, os.path.join(tmpdir, gearman_worker.cruise_id), 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
-        # popen = subprocess.Popen(command, stdout=subprocess.PIPE)
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--no-motd', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
 
-        logging.debug('Transfer Command: %s', ' '.join(command))
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=1')
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        while (proc.returncode is None):
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
-            proc.poll()
+        files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
-
-            line = proc.stdout.readline().rstrip('\n')
-
-            if not line:
-                continue
-
-            logging.debug("%s", line)
-
-            if line.startswith( '<f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                files['new'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
-            elif line.startswith( '<f.' ):
-                filename = line.split(' ',1)[1]
-                files['updated'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)
@@ -550,7 +598,16 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     file_index = 0
     file_count = 0
-    command = ['rsync', '-trimnv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimnv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trinv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+
+    if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=1')
+
+    if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+        command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug('File count Command: %s', ' '.join(command))
 
@@ -568,46 +625,25 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     else:
 
-        bandwidth_imit = '--bwlimit=' + gearman_worker.cruise_data_transfer['bandwidthLimit'] if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0' else '--bwlimit=20000000' # 20GB/s a.k.a. stupid big
+        command = ['rsync', '-triv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
-        # command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'mkdir ' + os.path.join(dest_dir, gearman_worker.cruise_id)] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'mkdir ' + os.path.join(dest_dir, gearman_worker.cruise_id)]
+        if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
+            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
 
-        # proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-        # proc.communicate()
+        if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
+            command.insert(2, '--delete')
 
-        command = ['rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'rsync', '-trimv', bandwidth_imit, '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+        if gearman_worker.cruise_data_transfer['skipEmptyFiles'] == '1':
+            command.insert(2, '--min-size=1')
 
-        logging.debug("Transfer Command: %s", ' '.join(command))
+        if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
+            command.insert(2, '-m')
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        while (proc.returncode is None):
+        if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+            command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
-            proc.poll()
+        files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
-
-            line = proc.stdout.readline().rstrip('\n')
-
-            if not line:
-                continue
-
-            logging.debug("%s", line)
-
-            if line.startswith( '<f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                files['new'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
-            elif line.startswith( '<f.' ):
-                filename = line.split(' ',1)[1]
-                files['updated'].append(filename)
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)

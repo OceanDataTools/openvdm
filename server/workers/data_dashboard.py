@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of OVDM data
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -268,7 +268,6 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
 
         if not os.path.isfile(raw_filepath):
             job_results['parts'].append({"partName": "Verify data file exists", "result": "Fail", "reason": "Unable to find data file: " + filename})
-            logging.warning("File not found %s, skipping", filename)
             continue
 
         if os.stat(raw_filepath).st_size == 0:

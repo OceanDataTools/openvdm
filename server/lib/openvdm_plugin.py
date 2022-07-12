@@ -7,9 +7,9 @@ DESCRIPTION:  OpenVDM parser/plugin python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2016-02-02
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import fnmatch

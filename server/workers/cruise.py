@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -43,10 +43,11 @@ def build_filelist(source_dir):
 
     for root, _, filenames in os.walk(source_dir):
 
-        return_files['include'] = [os.path.join(root, filename) for filename in filenames]
+        include_files = [os.path.join(root, filename) for filename in filenames]
 
-        return_files['exclude'] = list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), return_files['include']))
-        return_files['include'] = list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), return_files['include']))
+        exclude_files = list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), include_files))
+
+        return_files['include'].extend(list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), include_files)))
 
     return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
@@ -56,26 +57,39 @@ def build_filelist(source_dir):
 
 def clear_directory(directory):
     """
-    Deletes all files and subdirectorties within the specified directory
+    Deletes all empty sub-directorties within the specified directory
     """
 
     reasons = []
 
     # Clear out PublicData
-    for root, dirs, files in os.walk(directory + '/', topdown=False):
-        for pd_dir in dirs:
-            try:
-                os.rmdir(os.path.join(root, pd_dir))
-            except OSError:
-                logging.error("Unable to delete %s", os.path.join(root, pd_dir))
-                reasons.append("Unable to delete {}".format(os.path.join(root, pd_dir)))
+    # for root, dirs, files in os.walk(directory + '/', topdown=False):
+    #     for pd_dir in dirs:
+    #         try:
+    #             os.rmdir(os.path.join(root, pd_dir))
+    #         except OSError:
+    #             logging.error("Unable to delete %s", os.path.join(root, pd_dir))
+    #             reasons.append("Unable to delete {}".format(os.path.join(root, pd_dir)))
 
-        for pd_file in files:
+    #     for pd_file in files:
+    #         try:
+    #             os.unlink(os.path.join(root, pd_file))
+    #         except OSError:
+    #             logging.error("Unable to delete %s", os.path.join(root, pd_file))
+    #             reasons.append("Unable to delete {}".format(os.path.join(root, pd_file)))
+
+    for root, dirs, files in os.walk(directory + '/', topdown=False):
+        for dirname in dirs:
+            result = clear_directory(realpath(os.path.join(root, dirname)))
+        if not dirs and not files:
             try:
-                os.unlink(os.path.join(root, pd_file))
-            except OSError:
-                logging.error("Unable to delete %s", os.path.join(root, pd_file))
-                reasons.append("Unable to delete {}".format(os.path.join(root, pd_file)))
+                logging.debug("Deleting %s", root)
+                os.rmdir(root)
+            except OSError as err:
+                logging.error("Unable to delete %s", root)
+                logging.debug(str(err))
+                reasons.append("Unable to delete {}".format(root))
+
 
     if len(reasons) > 0:
         return {'verdict': False, 'reason': "\n".join(reasons)}
@@ -117,7 +131,7 @@ def export_ovdm_config(gearman_worker, ovdm_config_file_path, finalize=False):
     return output_json_data_to_file(ovdm_config_file_path, ovdm_config)
 
 
-def transfer_publicdata_dir(gearman_worker, gearman_job):
+def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=False):
     """
     Transfer the contents of the PublicData share to the Cruise Data Directory
     """
@@ -155,6 +169,10 @@ def transfer_publicdata_dir(gearman_worker, gearman_job):
     # Build transfer command
     dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
     command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
+
+    if remove_source_files:
+        command.insert(2, '--remove-source-files')
+
     logging.debug("Command: %s", ' '.join(command))
 
     file_index = 0
@@ -501,7 +519,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
         logging.debug("Transferring files")
-        output_results = transfer_publicdata_dir(gearman_worker, gearman_job)
+        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, True)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -522,7 +540,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
             job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-        job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
+        # job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
 
         gearman_worker.send_job_status(gearman_job, 9, 10)
 

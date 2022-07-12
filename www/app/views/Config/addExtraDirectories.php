@@ -2,6 +2,7 @@
 
 use Core\Error;
 use Helpers\Form;
+use Helpers\FormCustom;
 
 ?>
     <div class="row">
@@ -34,6 +35,13 @@ use Helpers\Form;
                                 <div class="form-group"><label>Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'name', 'value'=>$_POST['name'])); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'longName', 'value'=>$_POST['longName'])); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'destDir', 'value'=>$_POST['destDir'])); ?></div>
+<?php
+  if ( $data['showLoweringComponents']) {
+?>
+                                <div class="form-group"><label><?php echo CRUISE_NAME; ?> or <?php echo LOWERING_NAME;?>?</label><?php echo FormCustom::radioInline($data['cruiseOrLoweringOptions'], $_POST['cruiseOrLowering']); ?></div>
+<?php
+  }
+?>
                             </div>
                         </div>
                         <div class="row">    

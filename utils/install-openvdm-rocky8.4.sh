@@ -10,7 +10,7 @@
 #
 # It should be re-run whenever the code has been refresh. Preferably
 # by first running 'git pull' to get the latest copy of the script,
-# and then running 'utils/build_openvdm_ubuntu20.04.sh' to run that
+# and then running 'utils/build_openvdm_rocky8.4.sh' to run that
 # script.
 #
 # The script has been designed to be idempotent, that is, if can be
@@ -96,7 +96,7 @@ function set_default_variables {
 # Save defaults in a preferences file for the next time we run.
 function save_default_variables {
     cat > $PREFERENCES_FILE <<EOF
-# Defaults written by/to be read by install_openvdm_ubuntu20.04.sh
+# Defaults written by/to be read by install_openvdm_rocky8.4.sh
 
 DEFAULT_HOSTNAME=$HOSTNAME
 DEFAULT_INSTALL_ROOT=$INSTALL_ROOT
@@ -212,8 +212,10 @@ function install_python_packages {
     pip install wheel  # To help with the rest of the installations
 
 
-    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg-resources/# pkg-resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
     pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
+    
+    deactivate
 
 }
 
@@ -424,8 +426,8 @@ EOF
 
     echo "Updating Firewall rules for Supervisor Web Server"
     # TODO Check for firewall
-    firewall-cmd --zone=public --add-port=9001/tcp --permanent
-    firewall-cmd --reload
+    firewall-cmd --zone=public --add-port=9001/tcp --permanent || echo "No firewall installed"
+    firewall-cmd --reload || echo "No firewall installed"
 
     echo "Starting new supervisor processes"
     systemctl restart supervisord
@@ -473,7 +475,7 @@ EOF
 
 [CruiseData]
   comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/FTPRoot/CruiseData
+  path=${DATA_ROOT}/CruiseData
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -487,7 +489,7 @@ EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
-  path=${DATA_ROOT}/FTPRoot/VisitorInformation
+  path=${DATA_ROOT}/VisitorInformation
   browsable = yes
   public = yes
   guest ok = yes
@@ -500,7 +502,7 @@ EOF
 
 [PublicData]
   comment=Public Data, read/write access to all
-  path=${DATA_ROOT}/FTPRoot/PublicData
+  path=${DATA_ROOT}/PublicData
   browseable = yes
   public = yes
   guest ok = yes
@@ -516,8 +518,8 @@ EOF
     echo "Updating firewall rules for samba"
 
     # TODO Check if firewall installed
-    sudo firewall-cmd --add-service=samba --zone=public --permanent
-    sudo firewall-cmd --reload
+    sudo firewall-cmd --add-service=samba --zone=public --permanent || echo "No firewall installed"
+    sudo firewall-cmd --reload || echo "No firewall installed"
 
     echo "Restarting Samba Service"
     systemctl start smb
@@ -567,8 +569,8 @@ function configure_apache {
       Require all granted
     </Directory>
 
-    Alias /CruiseData/ $DATA_ROOT/FTPRoot/CruiseData/
-    <Directory "$DATA_ROOT/FTPRoot/CruiseData">
+    Alias /CruiseData/ $DATA_ROOT/CruiseData/
+    <Directory "$DATA_ROOT/CruiseData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -576,8 +578,8 @@ function configure_apache {
       Require all granted
     </Directory>
   
-    Alias /PublicData/ $DATA_ROOT/FTPRoot/PublicData/
-    <Directory "$DATA_ROOT/FTPRoot/PublicData">
+    Alias /PublicData/ $DATA_ROOT/PublicData/
+    <Directory "$DATA_ROOT/PublicData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -585,8 +587,8 @@ function configure_apache {
       Require all granted
     </Directory>
 
-    Alias /VisitorInformation/ $DATA_ROOT/FTPRoot/VisitorInformation/
-    <Directory "$DATA_ROOT/FTPRoot/VisitorInformation">
+    Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
+    <Directory "$DATA_ROOT/VisitorInformation">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -599,11 +601,11 @@ EOF
 
     echo "Updating Firewall rules for Apache Web Server"
     # TODO Check for firewall
-    firewall-cmd --permanent --add-service={http,https}
-    firewall-cmd --reload
+    firewall-cmd --permanent --add-service={http,https} || echo "No firewall installed"
+    firewall-cmd --reload || echo "No firewall installed"
 
     echo "Setting SELinux exception rules"
-    chcon -R -t httpd_sys_content_t ${DATA_ROOT}/FTPRoot
+    chcon -R -t httpd_sys_content_t ${DATA_ROOT}
     chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
 
     chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
@@ -694,24 +696,33 @@ function configure_directories {
         done
     fi
 
-    if [ ! -d $DATA_ROOT/FTPROOT ]; then
+    if [ ! -d $DATA_ROOT/CruiseData ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/TransferLogs
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
 
-        echo "[]" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
-        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.md5
-        touch ${DATA_ROOT}/FTPRoot/CruiseData/Test_Cruise/MD5_Summary.txt
+        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
+    fi
+    
+    if [ ! -d $DATA_ROOT/PublicData ]; then
+        echo "Creating PublicData at: $DATA_ROOT"
+        
+        mkdir -p ${DATA_ROOT}/PublicData
+        chmod -R 777 ${DATA_ROOT}/PublicData
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/PublicData
+    fi
 
-        mkdir -p ${DATA_ROOT}/FTPRoot/PublicData
-        mkdir -p ${DATA_ROOT}/FTPRoot/VisitorInformation
-
-        chmod -R 777 ${DATA_ROOT}/FTPRoot/PublicData
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/FTPRoot/*
+    if [ ! -d $DATA_ROOT/VisitorInformation ]; then
+        echo "Creating VisitorInformation at: $DATA_ROOT"
+        
+        mkdir -p ${DATA_ROOT}/VisitorInformation
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/VisitorInformation
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
@@ -887,7 +898,7 @@ EOF
 
     else
         echo "Setup OpenVDM database"
-        sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
+        sed -e "s|/vault|${DATA_ROOT}|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/survey/${OPENVDM_USER}/" | \
         sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
@@ -917,7 +928,7 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/FTPRoot/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/FTPRoot/CruiseData');|" \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then

@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker that handles the manual termination of other OVDM
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse

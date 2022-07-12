@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing cruise data transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -293,7 +293,15 @@ def test_ssh_dest_dir(gearman_worker):
 
     return_val = []
 
-    server_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'ls'] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls']
+    server_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
+        server_test_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+        server_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + server_test_command + ['-o', 'PubkeyAuthentication=no']
+
+    server_test_command += ['ls']
 
     logging.debug("Connection test command: %s", ' '.join(server_test_command))
 
@@ -311,7 +319,15 @@ def test_ssh_dest_dir(gearman_worker):
 
     dest_dir = gearman_worker.cruise_data_transfer['destDir']
 
-    dest_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'ls', "\"" + dest_dir + "\""] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'ls', "\"" + dest_dir + "\""]
+    dest_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
+      dest_test_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+      dest_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + dest_test_command + ['-o', 'PubkeyAuthentication=no']
+
+    dest_test_command += ['ls', "\"" + dest_dir + "\""]
 
     logging.debug("Destination test command: %s", dest_test_command)
 
@@ -327,7 +343,15 @@ def test_ssh_dest_dir(gearman_worker):
 
     return_val.append({"partName": "Destination Directory", "result": "Pass"})
 
-    write_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'touch ' + os.path.join(dest_dir, 'writeTest.txt')] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'touch ' + os.path.join(dest_dir, 'writeTest.txt')]
+    write_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
+      write_test_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+      write_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_test_command + ['-o', 'PubkeyAuthentication=no']
+
+    write_test_command += ['touch ' + os.path.join(dest_dir, 'writeTest.txt')]
 
     logging.debug("Write test command: %s", write_test_command)
 
@@ -338,7 +362,16 @@ def test_ssh_dest_dir(gearman_worker):
 
         return return_val
 
-    write_cleanup_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', 'PasswordAuthentication=no', 'rm ' + os.path.join(dest_dir, 'writeTest.txt')] if gearman_worker.cruise_data_transfer['sshUseKey'] == '1' else ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass'], 'ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no', '-o', 'PubkeyAuthentication=no', 'rm ' + os.path.join(dest_dir, 'writeTest.txt')]
+    write_cleanup_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
+
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
+      write_cleanup_command += ['-o', 'PasswordAuthentication=no']
+
+    else:
+      write_cleanup_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_cleanup_command + ['-o', 'PubkeyAuthentication=no']
+
+    write_cleanup_command += ['rm ' + os.path.join(dest_dir, 'writeTest.txt')]
+
 
     logging.debug("Write test cleanup command: %s", ' '.join(write_cleanup_command))
 

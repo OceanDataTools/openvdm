@@ -408,8 +408,9 @@ class System extends Controller {
         $_warehouseModel = new \Models\Warehouse();
         $shipboardDataWarehouseConfig = $_warehouseModel->getShipboardDataWarehouseConfig();
         
-        $data['testResults'] = array();
-        
+	$data['testResults'] = array();
+	$parts = array();
+
         $baseDirectoryTest = (object) array();
         $publicDataDirectoryTest = (object) array();
         $usernameTest = (object) array();
@@ -426,9 +427,9 @@ class System extends Controller {
             $finalVerdict->result = 'Fail';
         }
         
-        array_push($data['testResults'], $baseDirectoryTest);
+        array_push($parts, $baseDirectoryTest);
 
-        $publicDataDirectoryTest->parttName = 'Public Data Directory';
+        $publicDataDirectoryTest->partName = 'Public Data Directory';
         if(is_dir( $shipboardDataWarehouseConfig['shipboardDataWarehousePublicDataDir'] )) {
             $publicDataDirectoryTest->result = 'Pass';
         } else {
@@ -436,7 +437,7 @@ class System extends Controller {
             $finalVerdict->result = 'Fail';
         }
         
-        array_push($data['testResults'], $publicDataDirectoryTest);
+        array_push($parts, $publicDataDirectoryTest);
         
         $command = 'getent passwd ' . $shipboardDataWarehouseConfig['shipboardDataWarehouseUsername'];
         exec($command,$op);
@@ -449,9 +450,11 @@ class System extends Controller {
             $finalVerdict->result = 'Fail';
         }
         
-        array_push($data['testResults'], $usernameTest);
-        array_push($data['testResults'], $finalVerdict);
-        
+        array_push($parts, $usernameTest);
+        array_push($parts, $finalVerdict);
+
+        $data['testResults']['parts'] = json_decode(json_encode($parts), true);
+
         if (strcmp($finalVerdict->result, "Pass") === 0 ) {
             $_warehouseModel->clearErrorShipboardDataWarehouseStatus();
         } else {

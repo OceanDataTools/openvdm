@@ -27,6 +27,24 @@ class CruiseDataTransfers extends Controller {
         return $output;
     }
 
+    private function _buildSkipEmptyDirsOptions() {
+        
+        $trueFalse = array(array('id'=>'skipEmptyDirs0', 'name'=>'skipEmptyDirs', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyDirs1', 'name'=>'skipEmptyDirs', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
+    private function _buildSkipEmptyFilesOptions() {
+        
+        $trueFalse = array(array('id'=>'skipEmptyFiles0', 'name'=>'skipEmptyFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyFiles1', 'name'=>'skipEmptyFiles', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
+    private function _buildSyncToDestOptions() {
+        
+        $trueFalse = array(array('id'=>'syncToDest0', 'name'=>'syncToDest', 'value'=>'0', 'label'=>'No'), array('id'=>'syncToDest1', 'name'=>'syncToDest', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
     private function _buildUseSSHKeyOptions() {
         
         $trueFalse = array(array('id'=>'useSSHKey0', 'name'=>'sshUseKey', 'value'=>'0', 'label'=>'No'), array('id'=>'useSSHKey1', 'name'=>'sshUseKey', 'value'=>'1', 'label'=>'Yes'));
@@ -69,6 +87,9 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
@@ -81,6 +102,9 @@ class CruiseDataTransfers extends Controller {
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncToDest = $_POST['syncToDest'];
             $destDir = $_POST['destDir'];
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
             $rsyncServer = $_POST['rsyncServer'];
@@ -235,6 +259,9 @@ class CruiseDataTransfers extends Controller {
                     'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncToDest' => $syncToDest,
                     'destDir' => $destDir,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
@@ -265,6 +292,9 @@ class CruiseDataTransfers extends Controller {
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncToDest = $_POST['syncToDest'];
             $destDir = $_POST['destDir'];
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
             $rsyncServer = $_POST['rsyncServer'];
@@ -420,6 +450,9 @@ class CruiseDataTransfers extends Controller {
                     'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncToDest' => $syncToDest,
                     'destDir' => $destDir,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
@@ -461,6 +494,9 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
+        $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
+        $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
+        $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
@@ -475,6 +511,9 @@ class CruiseDataTransfers extends Controller {
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncToDest = $_POST['syncToDest'];
             $destDir = $_POST['destDir'];
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
             $rsyncServer = $_POST['rsyncServer'];
@@ -625,6 +664,9 @@ class CruiseDataTransfers extends Controller {
                     'includeOVDMFiles' => $includeOVDMFiles,
                     'bandwidthLimit' => $bandwidthLimit,
                     'transferType' => $transferType,
+                    'skipEmptyDirs' => $skipEmptyDirs,
+                    'skipEmptyFiles' => $skipEmptyFiles,
+                    'syncToDest' => $syncToDest,
                     'destDir' => $destDir,
                     'localDirIsMountPoint' => $localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
@@ -654,6 +696,9 @@ class CruiseDataTransfers extends Controller {
                 $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
                 $data['row'][0]->bandwidthLimit = $bandwidthLimit;
                 $data['row'][0]->transferType = $transferType;
+                $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
+                $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
+                $data['row'][0]->syncToDest = $syncToDest;
                 $data['row'][0]->destDir = $destDir;
                 $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
                 $data['row'][0]->rsyncServer = $rsyncServer;
@@ -677,6 +722,9 @@ class CruiseDataTransfers extends Controller {
             $includeOVDMFiles = $_POST['includeOVDMFiles'];
             $bandwidthLimit = $_POST['bandwidthLimit'];
             $transferType = $_POST['transferType'];
+            $skipEmptyDirs = $_POST['skipEmptyDirs'];
+            $skipEmptyFiles = $_POST['skipEmptyFiles'];
+            $syncToDest = $_POST['syncToDest'];
             $destDir = $_POST['destDir'];
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
             $rsyncServer = $_POST['rsyncServer'];
@@ -829,6 +877,9 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->includeOVDMFiles = $includeOVDMFiles;
                 $gmData['cruiseDataTransfer']->bandwidthLimit = $bandwidthLimit;
                 $gmData['cruiseDataTransfer']->transferType = $transferType;
+                $gmData['cruiseDataTransfer']->skipEmptyDirs = $skipEmptyDirs;
+                $gmData['cruiseDataTransfer']->skipEmptyFiles = $skipEmptyFiles;
+                $gmData['cruiseDataTransfer']->syncToDest = $syncToDest;
                 $gmData['cruiseDataTransfer']->destDir = $destDir;
                 $gmData['cruiseDataTransfer']->localDirIsMountPoint = $localDirIsMountPoint;
                 $gmData['cruiseDataTransfer']->rsyncServer = $rsyncServer;
@@ -862,6 +913,9 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
             $data['row'][0]->bandwidthLimit = $bandwidthLimit;
             $data['row'][0]->transferType = $transferType;
+            $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
+            $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
+            $data['row'][0]->syncToDest = $syncToDest;
             $data['row'][0]->destDir = $destDir;
             $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
             $data['row'][0]->rsyncServer = $rsyncServer;

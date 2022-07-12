@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.7
+  VERSION:  2.8
   CREATED:  2015-01-01
- REVISION:  2021-05-25
+ REVISION:  2022-07-01
 """
 
 import argparse
@@ -28,6 +28,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.directory_utils import create_directories, lockdown_directory
 from server.lib.openvdm import OpenVDM
 
 CUSTOM_TASKS = [
@@ -86,47 +87,11 @@ def build_directorylist(gearman_worker):
     extra_directories = gearman_worker.ovdm.get_extra_directories()
     if extra_directories:
         for extra_directory in extra_directories:
-            if extra_directory['enable'] == "1":
+            if extra_directory['enable'] == "1" and extra_directory['cruiseOrLowering'] == "0":
                 dest_dir = build_dest_dir(gearman_worker, extra_directory['destDir'])
                 return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
 
     return return_directories
-
-
-def create_directories(directorylist):
-    """
-    Create the directories in the provide directory list
-    """
-
-    reasons = []
-    for directory in directorylist:
-        try:
-            os.makedirs(directory)
-        except OSError as exception:
-            if exception.errno != errno.EEXIST:
-                logging.error("Unable to create directory: %s", directory)
-                reasons.append("Unable to create directory: %s", directory)
-
-    if len(reasons) > 0:
-        return {'verdict': False, 'reason': '\n'.join(reasons)}
-
-    return {'verdict': True}
-
-
-def lockdown_directory(base_dir, exempt_dir):
-    """
-    Lockdown permissions on the base directory, skip the exempt directory if present
-    """
-
-    dir_contents = [ os.path.join(base_dir,f) for f in os.listdir(base_dir)]
-    files = filter(os.path.isfile, dir_contents)
-    for file in files:
-        os.chmod(file, 0o600)
-
-    directories = filter(os.path.isdir, dir_contents)
-    for directory in directories:
-        if not directory == exempt_dir:
-            os.chmod(directory, 0o700)
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes

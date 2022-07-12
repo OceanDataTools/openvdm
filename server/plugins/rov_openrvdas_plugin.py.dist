@@ -21,9 +21,9 @@ REQUIREMENTS:  Python3.8
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  1.0
+  VERSION:  2.8
   CREATED:  2016-10-23
- REVISION:  2021-02-13
+ REVISION:  2022-07-01
 """
 
 import sys
