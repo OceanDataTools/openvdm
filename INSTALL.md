@@ -71,3 +71,9 @@ OpenVDM v2.8 introducted some database schema changes that will require existing
 3. Start the mysql cli `mysql -p`
 4. Select the OpenVDM database by typing: `use openvdm` (`openvdm` is the default name of the database)
 5. Run the update script: `source <path to openvdm>/database/openvdm_27_to_28.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
+ 
+There are also some web-dependencies that were updated as part of this release. To update those run:
+```
+cd <openvdm_root>/www
+composer install
+```
