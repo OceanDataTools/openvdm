@@ -67,29 +67,50 @@ def build_directorylist(gearman_worker):
 
     return_directories = []
 
+    # Add required extra directories
+    extra_directories = gearman_worker.ovdm.get_required_extra_directories()
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+
+    # Add lowering base directory
     if gearman_worker.ovdm.get_show_lowering_components():
         return_directories.append(os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']))
 
-    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers()
+    # Add active collection system transfers
+    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
-    for collection_system_transfer in collection_system_transfers:
-        if collection_system_transfer['enable'] == "1" and collection_system_transfer['cruiseOrLowering'] == "0":
-            dest_dir = build_dest_dir(gearman_worker, collection_system_transfer['destDir'])
-            return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+    if not gearman_worker.lowering_id:
+        # Filter out collection system transfers that contain {loweringID} in the dest_dir if there is no lowering ID
+        collection_system_transfers = [ collection_system_transfer for collection_system_transfer in collection_system_transfers if '{loweringID}' not in collection_system_transfer['destDir']]
 
-    required_extra_directories = gearman_worker.ovdm.get_required_extra_directories()
-    for required_extra_directory in required_extra_directories:
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
-        if required_extra_directory['enable'] == "1":
-            dest_dir = build_dest_dir(gearman_worker, required_extra_directory['destDir'])
-            return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+    # Add active extra directories
+    extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
+    if not gearman_worker.lowering_id:
+        # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
+        extra_directories = [ extra_directory for extra_directory in extra_directories if '{loweringID}' not in extra_directory['destDir']]
 
-    extra_directories = gearman_worker.ovdm.get_extra_directories()
-    if extra_directories:
-        for extra_directory in extra_directories:
-            if extra_directory['enable'] == "1" and extra_directory['cruiseOrLowering'] == "0":
-                dest_dir = build_dest_dir(gearman_worker, extra_directory['destDir'])
-                return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+
+    # for collection_system_transfer in collection_system_transfers:
+    #     if collection_system_transfer['enable'] == "1" and collection_system_transfer['cruiseOrLowering'] == "0":
+    #         dest_dir = build_dest_dir(gearman_worker, collection_system_transfer['destDir'])
+    #         return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+
+    # required_extra_directories = gearman_worker.ovdm.get_required_extra_directories()
+    # for required_extra_directory in required_extra_directories:
+
+    #     if required_extra_directory['enable'] == "1":
+    #         dest_dir = build_dest_dir(gearman_worker, required_extra_directory['destDir'])
+    #         return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+
+    # extra_directories = gearman_worker.ovdm.get_extra_directories()
+    # if extra_directories:
+    #     for extra_directory in extra_directories:
+    #         if extra_directory['enable'] == "1" and extra_directory['cruiseOrLowering'] == "0":
+    #             dest_dir = build_dest_dir(gearman_worker, extra_directory['destDir'])
+    #             return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
 
     return return_directories
 

@@ -73,6 +73,14 @@ def build_directorylist(gearman_worker):
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(cruise=False)
     return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
+    # Special case where an collection system needs to be created outside of the lowering directory
+    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+    
+    # Special case where an extra directory needs to be created outside of the lowering directory
+    extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in collection_system_transfer['destDir']])
+
     return return_directories
 
 
@@ -127,6 +135,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
         self.lowering_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj else self.ovdm.get_lowering_start_date()
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
         return super().on_job_execute(current_job)
@@ -206,14 +215,13 @@ def task_create_lowering_directory(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-    lowering_data_base_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
+    lowering_data_base_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
 
-    if os.path.exists(cruise_dir):
+    if os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
     else:
-        logging.error("Failed to find cruise directory: %s", cruise_dir)
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to find cruise directory: " + cruise_dir})
+        logging.error("Failed to find cruise directory: %s", gearman_worker.cruise_dir)
+        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to find cruise directory: " + gearman_worker.cruise_dir})
         return json.dumps(job_results)
 
     if os.path.exists(lowering_data_base_dir):
