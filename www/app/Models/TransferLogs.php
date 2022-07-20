@@ -22,7 +22,8 @@ class TransferLogs extends Model {
 
     private function outputLogFilenames($files) {
         $returnArray = array();
-        for($i = sizeof($files)-1; $i >= 0; $i--) {
+        # for($i = sizeof($files)-1; $i >= 0; $i--) {
+        for($i = 0; $i < sizeof($files); $i++) {
             array_push($returnArray, $files[$i]);
         }
         return $returnArray;
@@ -31,7 +32,8 @@ class TransferLogs extends Model {
     private function outputLogFileSummary($files) {
         $returnArray = array();
         
-        for($i = sizeof($files)-1; $i >= 0; $i--) {
+        #for($i = sizeof($files)-1; $i >= 0; $i--) {
+        for($i = 0; $i < sizeof($files); $i++) {
             if (file_exists($files[$i]) && is_readable($files[$i])) {
 		$transferLogSummary = json_decode(file_get_contents($files[$i]));
 		$filename = basename($files[$i],'.log');

@@ -484,7 +484,7 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker, gearman_worker.source_dir)
+    output_results = build_filelist(gearman_worker)
     if not output_results['verdict']:
         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
     files = output_results['files']
@@ -579,7 +579,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     proc = subprocess.call(mount_command)
 
     logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker, gearman_worker.source_dir)
+    output_results = build_filelist(gearman_worker)
     if not output_results['verdict']:
         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
     files = output_results['files']
@@ -637,7 +637,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_rsync_filelist(gearman_worker, gearman_worker.source_dir)
+    output_results = build_rsync_filelist(gearman_worker)
 
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
@@ -711,7 +711,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_ssh_filelist(gearman_worker, gearman_worker.source_dir)
+    output_results = build_ssh_filelist(gearman_worker)
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
 
@@ -811,11 +811,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
 
-        self.cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         if not self.lowering_id:
             # exit with error if trying to run a lowering collection system transfer
-            if self.collection_system_transfer['cruiseOrLowering'] == "1"
+            if self.collection_system_transfer['cruiseOrLowering'] == "1":
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
             # exit with error if trying to run a cruise collection system transfer that has a loweringID in the destination path
@@ -863,8 +863,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # Todo - there's a chance the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
         logging.debug("End date/time filter: %s", self.data_end_date)
-
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         return super().on_job_execute(current_job)
 

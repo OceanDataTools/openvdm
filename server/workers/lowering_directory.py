@@ -79,7 +79,7 @@ def build_directorylist(gearman_worker):
     
     # Special case where an extra directory needs to be created outside of the lowering directory
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
-    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in collection_system_transfer['destDir']])
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
 
     return return_directories
 

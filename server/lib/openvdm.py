@@ -26,15 +26,15 @@ from server.lib import read_config
 
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
-DEFAULT_CRUISE_CONFIG_FN = 'ovdmConfig.json'
+DEFAULT_CRUISE_CONFIG_FN = 'ovdm_config.json'
 
 DEFAULT_DATA_DASHBOARD_MANIFEST_FN = 'manifest.json'
 
-DEFAULT_LOWERING_CONFIG_FN = 'loweringConfig.json'
+DEFAULT_LOWERING_CONFIG_FN = 'lowering_config.json'
 
-DEFAULT_MD5_SUMMARY_FN = 'MD5_Summary.txt'
+DEFAULT_MD5_SUMMARY_FN = 'md5_summary.txt'
 
-DEFAULT_MD5_SUMMARY_MD5_FN = 'MD5_Summary.md5'
+DEFAULT_MD5_SUMMARY_MD5_FN = 'md5_summary.md5'
 
 
 class OpenVDM():
