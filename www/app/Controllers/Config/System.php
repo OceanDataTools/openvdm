@@ -827,7 +827,7 @@ class System extends Controller {
         }
 
         View::rendertemplate('header',$data);
-        View::render('Config/editMd5SummaryFns',$data,$error);
+        View::render('Config/editMD5SummaryFns',$data,$error);
         View::rendertemplate('footer',$data);
     }
 }
