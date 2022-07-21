@@ -689,7 +689,7 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
                 
-                $data['cruiseConfigFn']->cruiseConfigFn = $cruiseConfigFn;
+                $data['cruiseConfigFn'] = $cruiseConfigFn;
             }
         }
 
@@ -728,7 +728,7 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
                 
-                $data['loweringConfigFn']->loweringConfigFn = $loweringConfigFn;
+                $data['loweringConfigFn'] = $loweringConfigFn;
             }
         }
 
@@ -767,7 +767,7 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
                 
-                $data['dataDashboardManifestFn']->dataDashboardManifestFn = $dataDashboardManifestFn;
+                $data['dataDashboardManifestFn'] = $dataDashboardManifestFn;
             }
         }
 

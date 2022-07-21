@@ -248,7 +248,7 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
-    public function setMd5SummaryFns(){
+    public function setMd5SummaryFns($data){
         $where = array('name' => 'md5SummaryFn');
         $this->db->update(PREFIX."CoreVars", array('value' => $data['md5SummaryFn']), $where);
         $where = array('name' => 'md5SummaryMd5Fn');
@@ -266,7 +266,8 @@ class Warehouse extends Model {
     }
     
     public function setCruiseStartDate($data){
-        $where = array('name' => 'cruiseStartDate');
+	var_dump($data);    
+	$where = array('name' => 'cruiseStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
     

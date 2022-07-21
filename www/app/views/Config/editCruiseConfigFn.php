@@ -3,6 +3,7 @@
 use Core\Error;
 use Helpers\Form;
 
+var_dump($data);
 ?>
 
     <div class="row">
@@ -32,7 +33,7 @@ use Helpers\Form;
                     <?php echo Form::open( array('role'=>'form', 'method'=>'post')); ?>
                         <div class="row">
                             <div class="col-lg-12">
-                                <div class="form-group"><label>File Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'cruiseConfigFn', 'value'=>$data['row'][0]->cruiseConfigFn)); ?></div>
+                                <div class="form-group"><label>File Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'cruiseConfigFn', 'value'=>$data['cruiseConfigFn'])); ?></div>
                             </div>
                         </div>
                         <div class="row">    
