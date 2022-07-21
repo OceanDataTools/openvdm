@@ -659,4 +659,174 @@ class System extends Controller {
         Url::redirect('config/system');
     }
 
+    public function cruiseConfigFn($id){
+        $data['title'] = 'Edit Cruise Config Filename';
+        $data['javascript'] = array('LinksFormHelper');
+        $data['cruiseConfigFn'] = $this->_coreValuesModel->getCruiseConfigFn();
+
+        if(isset($_POST['submit'])){
+            $cruiseConfigFn = $_POST['cruiseConfigFn'];
+
+            if($cruiseConfigFn == ''){
+                $error[] = 'Cruise config filename is required';
+            }
+            
+            if($cruiseConfigFn == trim($cruiseConfigFn) && strpos($cruiseConfigFn, ' ') !== false) {
+               $error[] = 'Cruise config filename contains spaces';
+            }
+
+            if(substr($cruiseConfigFn, -strlen('.json')) !== '.json') {
+               $error[] = 'Cruise config filename does not end with .json';
+            }
+
+            if(!$error){
+                $postdata = array(
+                    'cruiseConfigFn' => $cruiseConfigFn,
+                );
+            
+                $this->_coreValuesModel->setCruiseConfigFn($postdata);
+                Session::set('message','Filename Updated');
+                Url::redirect('config/system');
+            } else {
+                
+                $data['cruiseConfigFn']->cruiseConfigFn = $cruiseConfigFn;
+            }
+        }
+
+        View::rendertemplate('header',$data);
+        View::render('Config/editCruiseConfigFn',$data,$error);
+        View::rendertemplate('footer',$data);
+    }
+
+    public function loweringConfigFn($id){
+        $data['title'] = 'Edit Lowering Config Filename';
+        $data['javascript'] = array('LinksFormHelper');
+        $data['loweringConfigFn'] = $this->_coreValuesModel->getLoweringConfigFn();
+
+        if(isset($_POST['submit'])){
+            $loweringConfigFn = $_POST['loweringConfigFn'];
+
+            if($loweringConfigFn == ''){
+                $error[] = 'Lowering config filename is required';
+            }
+            
+            if($loweringConfigFn == trim($loweringConfigFn) && strpos($loweringConfigFn, ' ') !== false) {
+               $error[] = 'Lowering config filename contains spaces';
+            }
+
+            if(substr($loweringConfigFn, -strlen('.json')) !== '.json') {
+               $error[] = 'Lowering config filename does not end with .json';
+            }
+
+            if(!$error){
+                $postdata = array(
+                    'loweringConfigFn' => $loweringConfigFn,
+                );
+            
+                $this->_coreValuesModel->setLoweringConfigFn($postdata);
+                Session::set('message','Filename Updated');
+                Url::redirect('config/system');
+            } else {
+                
+                $data['loweringConfigFn']->loweringConfigFn = $loweringConfigFn;
+            }
+        }
+
+        View::rendertemplate('header',$data);
+        View::render('Config/editLoweringConfigFn',$data,$error);
+        View::rendertemplate('footer',$data);
+    }
+
+    public function dataDashboardManifestFn($id){
+        $data['title'] = 'Edit Data Dashboard Manifest Filename';
+        $data['javascript'] = array('LinksFormHelper');
+        $data['dataDashboardManifestFn'] = $this->_coreValuesModel->getDataDashboardManifestFn();
+
+        if(isset($_POST['submit'])){
+            $dataDashboardManifestFn = $_POST['dataDashboardManifestFn'];
+
+            if($dataDashboardManifestFn == ''){
+                $error[] = 'Data dashboard manifest filename is required';
+            }
+            
+            if($dataDashboardManifestFn == trim($dataDashboardManifestFn) && strpos($dataDashboardManifestFn, ' ') !== false) {
+               $error[] = 'Data dashboard manifest filename contains spaces';
+            }
+
+            if(substr($dataDashboardManifestFn, -strlen('.json')) !== '.json') {
+               $error[] = 'Data dashboard manifest filename does not end with .json';
+            }
+
+            if(!$error){
+                $postdata = array(
+                    'dataDashboardManifestFn' => $dataDashboardManifestFn,
+                );
+            
+                $this->_coreValuesModel->setDataDashboardManifestFn($postdata);
+                Session::set('message','Filename Updated');
+                Url::redirect('config/system');
+            } else {
+                
+                $data['dataDashboardManifestFn']->dataDashboardManifestFn = $dataDashboardManifestFn;
+            }
+        }
+
+        View::rendertemplate('header',$data);
+        View::render('Config/editDataDashboardManifestFn',$data,$error);
+        View::rendertemplate('footer',$data);
+    }
+
+    public function md5SummaryFns($id){
+        $data['title'] = 'Edit Data Dashboard Manifest Filename';
+        $data['javascript'] = array('LinksFormHelper');
+        $data['md5SummaryFns'] = $this->_coreValuesModel->getMd5SummaryFns();
+
+        if(isset($_POST['submit'])){
+            $md5SummaryFn = $_POST['md5SummaryFn'];
+            $md5SummaryMd5Fn = $_POST['md5SummaryMd5Fn'];
+
+            if($md5SummaryFn == ''){
+                $error[] = 'MD5 summary filename is required';
+            }
+            
+            if($md5SummaryFn == trim($md5SummaryFn) && strpos($md5SummaryFn, ' ') !== false) {
+               $error[] = 'MD5 summary filename contains spaces';
+            }
+
+            if(substr($md5SummaryFn, -strlen('.txt')) !== '.txt') {
+               $error[] = 'MD5 summary filename does not end with .txt';
+            }
+
+            if($md5SummaryMd5Fn == ''){
+                $error[] = 'MD5 summary MD5 filename is required';
+            } 
+
+            if($md5SummaryMd5Fn == trim($md5SummaryMd5Fn) && strpos($md5SummaryMd5Fn, ' ') !== false) {
+               $error[] = 'MD5 summary MD5 filename contains spaces';
+            }
+
+            if(substr($md5SummaryMd5Fn, -strlen('.md5')) !== '.md5') {
+               $error[] = 'MD5 summary MD5 filename does not end with .md5';
+            }
+
+            if(!$error){
+                $postdata = array(
+                    'md5SummaryFn' => $md5SummaryFn,
+                    'md5SummaryMd5Fn' => $md5SummaryMd5Fn,
+                );
+            
+                $this->_coreValuesModel->setMd5SummaryFns($postdata);
+                Session::set('message','Filename Updated');
+                Url::redirect('config/system');
+            } else {
+                
+                $data['md5SummaryFns']->md5SummaryFn = $md5SummaryFn;
+                $data['md5SummaryFns']->md5SummaryMd5Fn = $md5SummaryMd5Fn;
+            }
+        }
+
+        View::rendertemplate('header',$data);
+        View::render('Config/editMd5SummaryFns',$data,$error);
+        View::rendertemplate('footer',$data);
+    }
 }

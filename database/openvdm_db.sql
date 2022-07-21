@@ -23,12 +23,12 @@ LOCK TABLES `OVDM_Status` WRITE;
 
 INSERT INTO `OVDM_Status` (`statusID`, `status`)
 VALUES
-	(1,'Running'),
-	(2,'Idle'),
-	(3,'Error'),
-	(4,'Off'),
-	(5,'Stopping'),
-	(6,'Starting');
+  (1,'Running'),
+  (2,'Idle'),
+  (3,'Error'),
+  (4,'Off'),
+  (5,'Stopping'),
+  (6,'Starting');
 
 /*!40000 ALTER TABLE `OVDM_Status` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -96,25 +96,29 @@ LOCK TABLES `OVDM_CoreVars` WRITE;
 
 INSERT INTO `OVDM_CoreVars` (`coreVarID`, `name`, `value`)
 VALUES
-	(1,'shipboardDataWarehouseIP','127.0.0.1'),
-	(2,'shipboardDataWarehouseUsername','survey'),
-	(3,'shipboardDataWarehousePublicDataDir','/vault/PublicData'),
-	(4,'shipboardDataWarehouseStatus','2'),
-	(5,'cruiseID','Test_Cruise'),
-	(6,'cruiseStartDate','2021/01/01 00:00'),
-	(7,'cruiseEndDate',''),
-	(8,'cruiseSize','0'),
-	(9,'cruiseSizeUpdated','2021/01/01 00:00:00'),
-	(10,'loweringID','Test_Lowering'),
-	(11,'loweringStartDate','2021/01/01 00:00'),
-	(12,'loweringEndDate',''),
-	(13,'loweringSize','0'),
-	(14,'loweringSizeUpdated','2021/01/01 00:00:00'),
-	(15,'systemStatus','Off'),
-	(16,'shipToShoreBWLimitStatus','Off'),
-	(17,'md5FilesizeLimit','10'),
-	(18,'md5FilesizeLimitStatus','On'),
-	(19,'showLoweringComponents','No');
+  (1,'shipboardDataWarehouseIP','127.0.0.1'),
+  (2,'shipboardDataWarehouseUsername','survey'),
+  (3,'shipboardDataWarehousePublicDataDir','/vault/PublicData'),
+  (4,'shipboardDataWarehouseStatus','2'),
+  (5,'cruiseConfigFn','ovdm_config.json'),
+  (6,'cruiseID','Test_Cruise'),
+  (7,'cruiseStartDate','2022/01/01 00:00'),
+  (8,'cruiseEndDate',''),
+  (9,'cruiseSize','0'),
+  (10,'cruiseSizeUpdated','2022/01/01 00:00:00'),
+  (11,'loweringConfigFn','lowering_config.json'),
+  (12,'loweringID','Test_Lowering'),
+  (13,'loweringStartDate','2022/01/01 00:00'),
+  (14,'loweringEndDate',''),
+  (15,'loweringSize','0'),
+  (16,'loweringSizeUpdated','2022/01/01 00:00:00'),
+  (17,'systemStatus','Off'),
+  (18,'shipToShoreBWLimitStatus','Off'),
+  (19,'md5FilesizeLimit','10'),
+  (20,'md5FilesizeLimitStatus','On'),
+  (21,'md5SummaryFn','md5_summary.txt'),
+  (22,'md5SummaryMd5Fn','md5_summary.md5'),
+  (23,'dataDashboardManifestFn','manifest.json');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -167,7 +171,7 @@ LOCK TABLES `OVDM_CruiseDataTransfers` WRITE;
 
 INSERT INTO `OVDM_CruiseDataTransfers` (`cruiseDataTransferID`, `name`, `longName`, `skipEmptyDirs`, `skipEmptyFiles`, `syncToDest`, `transferType`, `destDir`, `localDirIsMountPoint`, `rsyncServer`, `rsyncUser`, `rsyncPass`, `smbServer`, `smbUser`, `smbPass`, `smbDomain`, `sshServer`, `sshUser`, `sshUseKey`, `sshPass`, `status`, `enable`, `required`, `pid`, `bandwidthLimit`, `includeOVDMFiles`, `includePublicDataFiles`, `excludedCollectionSystems`, `excludedExtraDirectories`)
 VALUES
-	(1,'SSDW','Shoreside Data Warehouse',1,1,0,4,'/vault/Shoreside',0,'','','','','','','','ssdw.example.com','survey',0,'password',2,1,1,0,128,0,0,'0','0');
+  (1,'SSDW','Shoreside Data Warehouse',1,1,0,4,'/vault/Shoreside',0,'','','','','','','','ssdw.example.com','survey',0,'password',2,1,1,0,128,0,0,'0','0');
 
 /*!40000 ALTER TABLE `OVDM_CruiseDataTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -194,9 +198,9 @@ LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 
 INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
 VALUES
-	(1,'Transfer_Logs','Transfer Logs',0,'OpenVDM/TransferLogs',1,1),
-	(2,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
-	(3,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
+  (1,'Transfer_Logs','Transfer Logs',0,'OpenVDM/TransferLogs',1,1),
+  (2,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
+  (3,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -240,10 +244,10 @@ LOCK TABLES `OVDM_Links` WRITE;
 
 INSERT INTO `OVDM_Links` (`linkID`, `name`, `url`, `enable`, `private`)
 VALUES
-	(1,'Supervisord','http://{hostIP}:9001',1,1),
-	(2,'Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
-	(3,'Public Data','http://{hostIP}/PublicData/',1,0),
-	(4,'Visitor Information','http://{hostIP}/VisitorInformation/',1,0);
+  (1,'Supervisord','http://{hostIP}:9001',1,1),
+  (2,'Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
+  (3,'Public Data','http://{hostIP}/PublicData/',1,0),
+  (4,'Visitor Information','http://{hostIP}/VisitorInformation/',1,0);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -287,10 +291,10 @@ LOCK TABLES `OVDM_ShipToShoreTransfers` WRITE;
 
 INSERT INTO `OVDM_ShipToShoreTransfers` (`shipToShoreTransferID`, `name`, `longName`, `priority`, `collectionSystem`, `extraDirectory`, `includeFilter`, `enable`, `required`)
 VALUES
-	(1,'DashboardData','Dashboard Data',1,0,2,'*',1,1),
-	(2,'TransferLogs','Transfer Logs',1,0,1,'*',0,1),
-	(3,'MD5Summary','MD5 Summary',1,0,0,'MD5_Summary.txt,MD5_Summary.md5 ',1,1),
-	(4,'OVDM_Config','OpenVDM Configuration',1,0,0,'ovdmConfig.json',1,1);
+  (1,'DashboardData','Dashboard Data',1,0,2,'*',1,1),
+  (2,'TransferLogs','Transfer Logs',1,0,1,'*',0,1),
+  (3,'MD5Summary','MD5 Summary',1,0,0,'MD5_Summary.txt,MD5_Summary.md5 ',1,1),
+  (4,'OVDM_Config','OpenVDM Configuration',1,0,0,'ovdmConfig.json',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ShipToShoreTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -319,17 +323,17 @@ LOCK TABLES `OVDM_Tasks` WRITE;
 
 INSERT INTO `OVDM_Tasks` (`taskID`, `name`, `longName`, `cruiseOrLowering`, `status`, `enable`, `pid`)
 VALUES
-	(1,'setupNewCruise','Setup New {cruise_name}',0,2,1,0),
-	(2,'finalizeCurrentCruise','Finalize Current {cruise_name}',0,2,1,0),
-	(3,'rebuildMD5Summary','Rebuild MD5 Summary',0,2,1,0),
-	(4,'rebuildDataDashboard','Rebuild Data Dashboard',0,2,1,0),
-	(5,'rebuildCruiseDirectory','Rebuild {cruise_name} Directory',0,2,1,0),
-	(6,'exportOVDMConfig','Re-export the OpenVDM Configuration',0,2,1,0),
-	(7,'rsyncPublicDataToCruiseData','Sync PublicData within {cruise_name} Directory',0,2,1,0),
-	(8,'setupNewLowering','Setup New {lowering_name}',1,2,1,0),
-	(9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
-	(10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),
-	(11,'exportLoweringConfig','Re-export the {lowering_name} Configuration',1,2,1,0);
+  (1,'setupNewCruise','Setup New {cruise_name}',0,2,1,0),
+  (2,'finalizeCurrentCruise','Finalize Current {cruise_name}',0,2,1,0),
+  (3,'rebuildMD5Summary','Rebuild MD5 Summary',0,2,1,0),
+  (4,'rebuildDataDashboard','Rebuild Data Dashboard',0,2,1,0),
+  (5,'rebuildCruiseDirectory','Rebuild {cruise_name} Directory',0,2,1,0),
+  (6,'exportOVDMConfig','Re-export the OpenVDM Configuration',0,2,1,0),
+  (7,'rsyncPublicDataToCruiseData','Sync PublicData within {cruise_name} Directory',0,2,1,0),
+  (8,'setupNewLowering','Setup New {lowering_name}',1,2,1,0),
+  (9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
+  (10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),
+  (11,'exportLoweringConfig','Re-export the {lowering_name} Configuration',1,2,1,0);
 
 /*!40000 ALTER TABLE `OVDM_Tasks` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -351,10 +355,10 @@ LOCK TABLES `OVDM_TransferTypes` WRITE;
 
 INSERT INTO `OVDM_TransferTypes` (`transferTypeID`, `transferType`)
 VALUES
-	(1,'Local Directory'),
-	(2,'Rsync Server'),
-	(3,'SMB Share'),
-	(4,'SSH Server');
+  (1,'Local Directory'),
+  (2,'Rsync Server'),
+  (3,'SMB Share'),
+  (4,'SSH Server');
 
 /*!40000 ALTER TABLE `OVDM_TransferTypes` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -378,7 +382,7 @@ LOCK TABLES `OVDM_Users` WRITE;
 
 INSERT INTO `OVDM_Users` (`userID`, `username`, `password`, `lastLogin`)
 VALUES
-	(1,'admin','$2y$12$JviETOQPkNzqZxQpswLb1ONtTLxsqdzQJEoaWjlNzb0/.xfIOVM/C','2017-10-05 10:47:49');
+  (1,'admin','$2y$12$JviETOQPkNzqZxQpswLb1ONtTLxsqdzQJEoaWjlNzb0/.xfIOVM/C','2017-10-05 10:47:49');
 
 /*!40000 ALTER TABLE `OVDM_Users` ENABLE KEYS */;
 UNLOCK TABLES;

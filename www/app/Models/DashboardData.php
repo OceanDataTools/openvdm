@@ -6,8 +6,8 @@ use Core\Model;
 
 class DashboardData extends Model {
 
-    const CONFIG_FN = 'ovdmConfig.json';
-    const MANIFEST_FN = 'manifest.json';
+    // const CONFIG_FN = 'ovdmConfig.json';
+    // const MANIFEST_FN = 'manifest.json';
     
     private $_cruiseDataDir;
     private $_manifestObj;
@@ -38,7 +38,7 @@ class DashboardData extends Model {
             //Get the list of directories
             if (is_dir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID))
             {
-                //Check each Directory for ovdmConfig.json
+                //Check each Directory for the OpenVDM config file
                 $cruiseList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID);
                 foreach ($cruiseList as $cruiseKey => $cruiseValue){
                     if (in_array($cruiseValue,array(self::CONFIG_FN))){

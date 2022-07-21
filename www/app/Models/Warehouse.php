@@ -5,9 +5,9 @@ use Core\Model;
 
 class Warehouse extends Model {
     
-    const CONFIG_FN = 'ovdmConfig.json';
-    const LOWERING_CONFIG_FN = 'loweringConfig.json';
-    const MANIFEST_FN = 'manifest.json';
+    // const CONFIG_FN = 'ovdmConfig.json';
+    // const LOWERING_CONFIG_FN = 'loweringConfig.json';
+    // const MANIFEST_FN = 'manifest.json';
 
     public function getFreeSpace() {
         $baseDir = $this->getShipboardDataWarehouseBaseDir();
@@ -80,6 +80,11 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
     
+    public function getCruiseConfigFn(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseConfigFn'");
+        return $row[0]->value;
+    }
+
     public function getCruiseID(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseID'");
         return $row[0]->value;
@@ -92,6 +97,11 @@ class Warehouse extends Model {
     
     public function getCruiseEndDate(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseEndDate'");
+        return $row[0]->value;
+    }
+
+    public function getLoweringConfigFn(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringConfigFn'");
         return $row[0]->value;
     }
 
@@ -115,6 +125,16 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
 
+    public function getMd5SummaryFn(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5SummaryFn'");
+        return $row[0]->value;
+    }
+
+    public function getMd5SummaryMd5Fn(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5SummaryMd5Fn'");
+        return $row[0]->value;
+    }
+
     public function getMd5FilesizeLimit(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5FilesizeLimit'");
         return $row[0]->value;
@@ -122,6 +142,11 @@ class Warehouse extends Model {
     
     public function getMd5FilesizeLimitStatus(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5FilesizeLimitStatus'");
+        return $row[0]->value;
+    }
+
+    public function getDataDashboardManifestFn(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'dataDashboardManifestFn'");
         return $row[0]->value;
     }
 
@@ -223,6 +248,18 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
+    public function setMd5SummaryFns(){
+        $where = array('name' => 'md5SummaryFn');
+        $this->db->update(PREFIX."CoreVars", array('value' => $data['md5SummaryFn']), $where);
+        $where = array('name' => 'md5SummaryMd5Fn');
+        $this->db->update(PREFIX."CoreVars", array('value' => $data['md5SummaryMd5Fn']), $where);
+    }
+
+    public function setCruiseConfigFn($data){
+        $where = array('name' => 'cruiseConfigFn');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseID($data){
         $where = array('name' => 'cruiseID');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -245,6 +282,11 @@ class Warehouse extends Model {
         $where = array('name' => 'cruiseSizeUpdated');
         $data = array('value' => gmdate('Y/m/d H:i:s'));
         $this->db->update(PREFIX."CoreVars", $data, $where);
+    }
+
+    public function setLoweringConfigFn($data){
+        $where = array('name' => 'loweringConfigFn');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function setLoweringID($data){
@@ -270,6 +312,11 @@ class Warehouse extends Model {
         $data = array('value' => gmdate('Y/m/d H:i:s'));
         $this->db->update(PREFIX."CoreVars", $data, $where);
 
+    }
+
+    public function setDataDashboardManifestFn($data){
+        $where = array('name' => 'dataDashboardManifestFn');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function setShipboardDataWarehouseConfig($data){
@@ -309,22 +356,24 @@ class Warehouse extends Model {
                     {
                         if (is_dir($baseDir . DIRECTORY_SEPARATOR . $rootValue) && is_readable($baseDir . DIRECTORY_SEPARATOR . $rootValue))
                         {
-                            //Check each Directory for ovdmConfig.json
+                            //Check each Directory for the OpenVDM Config file.json
                             $cruiseList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue);
-                            #var_dump($cruiseList);
                             foreach ($cruiseList as $cruiseKey => $cruiseValue){
-                                #var_dump($cruiseValue);
+
                                 if (in_array($cruiseValue,array(self::CONFIG_FN))){
-                                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
                                     $ovdmConfigContents = file_get_contents($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                                    #var_dump($ovdmConfigJSON['extraDirectoriesConfig']);
+
                                     //Get the the directory that holds the DashboardData
 				                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
+
 				                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+
                                             if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                                 $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
+
                                                 foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
+
                                                     //If a manifest file is found, add CruiseID to output
                                                     if (in_array($dataDashboardValue,array(self::MANIFEST_FN))){
                                                         $this->_cruises[] = $rootValue;
