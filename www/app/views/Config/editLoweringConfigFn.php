@@ -32,7 +32,7 @@ use Helpers\Form;
                     <?php echo Form::open( array('role'=>'form', 'method'=>'post')); ?>
                         <div class="row">
                             <div class="col-lg-12">
-                                <div class="form-group"><label>File Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'loweringConfigFn', 'value'=>$data['row'][0]->loweringConfigFn)); ?></div>
+                                <div class="form-group"><label>File Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'loweringConfigFn', 'value'=>$data['loweringConfigFn'])); ?></div>
                             </div>
                         </div>
                         <div class="row">    

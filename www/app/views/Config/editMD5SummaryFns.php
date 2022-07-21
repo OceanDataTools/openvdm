@@ -3,6 +3,7 @@
 use Core\Error;
 use Helpers\Form;
 
+var_dump($data);
 ?>
 
     <div class="row">
@@ -32,10 +33,10 @@ use Helpers\Form;
                     <?php echo Form::open( array('role'=>'form', 'method'=>'post')); ?>
                         <div class="row">
                             <div class="col-lg-12">
-                                <div class="form-group"><label>MD5 Summary Filename</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'md5SummaryFn', 'value'=>$data['row'][0]->md5SummaryFn)); ?></div>
+                                <div class="form-group"><label>MD5 Summary Filename</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'md5SummaryFn', 'value'=>$data['md5SummaryFn'])); ?></div>
                             </div>
                             <div class="col-lg-12">
-                                <div class="form-group"><label>MD5 Summary MD5 Filename</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'md5SummaryMd5Fn', 'value'=>$data['row'][0]->md5SummaryMd5Fn)); ?></div>
+                                <div class="form-group"><label>MD5 Summary MD5 Filename</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'md5SummaryMd5Fn', 'value'=>$data['md5SummaryMd5Fn'])); ?></div>
                             </div>
                         </div>
                         <div class="row">    
