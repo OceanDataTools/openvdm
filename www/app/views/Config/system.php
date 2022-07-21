@@ -213,7 +213,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                 <tr>
                     <td>Data Dashboard Mantifest File</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editDataDashboardFn">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editDataDashboardManifestFn">Edit</a>
                     </td>
                 </tr>
                 <tr>

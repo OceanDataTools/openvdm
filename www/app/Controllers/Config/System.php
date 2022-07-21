@@ -779,7 +779,8 @@ class System extends Controller {
     public function editMD5SummaryFns(){
         $data['title'] = 'Edit Data Dashboard Manifest Filename';
         $data['javascript'] = array('LinksFormHelper');
-        $data['md5SummaryFns'] = $this->_coreValuesModel->getMd5SummaryFns();
+        $data['md5SummaryFn'] = $this->_coreValuesModel->getMd5SummaryFn();
+        $data['md5SummaryMd5Fn'] = $this->_coreValuesModel->getMd5SummaryMd5Fn();
 
         if(isset($_POST['submit'])){
             $md5SummaryFn = $_POST['md5SummaryFn'];
@@ -820,8 +821,8 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
                 
-                $data['md5SummaryFns']->md5SummaryFn = $md5SummaryFn;
-                $data['md5SummaryFns']->md5SummaryMd5Fn = $md5SummaryMd5Fn;
+                $data['md5SummaryFn'] = $md5SummaryFn;
+                $data['md5SummaryMd5Fn'] = $md5SummaryMd5Fn;
             }
         }
 
