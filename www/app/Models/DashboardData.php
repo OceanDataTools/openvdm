@@ -18,7 +18,7 @@ class DashboardData extends Model {
         $this->_warehouseModel = new \Models\Warehouse();
         $this->_cruiseDataDir = $this->_warehouseModel->getShipboardDataWarehouseBaseDir();
         $this->_cruiseConfigFn = $this->_warehouseModel->getCruiseConfigFn();
-        $this->_dataDashboardManifestFn = $this->_warehouseModel->getDataDashboardManifestFn()
+        $this->_dataDashboardManifestFn = $this->_warehouseModel->getDataDashboardManifestFn();
         $this->_manifestObj = null;
         if ($cruiseID == null){
             $this->setCruiseID($this->_warehouseModel->getCruiseID());
