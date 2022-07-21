@@ -41,8 +41,8 @@ class DashboardData extends Model {
                 //Check each Directory for the OpenVDM config file
                 $cruiseList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID);
                 foreach ($cruiseList as $cruiseKey => $cruiseValue){
-                    if (in_array($cruiseValue,array(self::CONFIG_FN))){
-                        $ovdmConfigContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . self::CONFIG_FN);
+                    if (in_array($cruiseValue,array($_warehouseModel->getCruiseConfigFn()))){
+                        $ovdmConfigContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $_warehouseModel->getCruiseConfigFn());
                         $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                         //Get the the directory that holds the DashboardData
                         if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){	    
@@ -51,8 +51,8 @@ class DashboardData extends Model {
                                     $dataDashboardList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
                                     foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
                                         //If a manifest file is found, add CruiseID to output
-                                        if (in_array($dataDashboardValue,array(self::MANIFEST_FN))){
-                                            $manifestContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir'] . DIRECTORY_SEPARATOR . self::MANIFEST_FN);
+                                        if (in_array($dataDashboardValue,array($_warehouseModel->getDataDashboardManifestFn()))){
+                                            $manifestContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir'] . DIRECTORY_SEPARATOR . $_warehouseModel->getDataDashboardManifestFn());
 					    $this->_manifestObj = json_decode($manifestContents,true);
                                             break;
                                         }
