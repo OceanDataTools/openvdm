@@ -659,7 +659,7 @@ class System extends Controller {
         Url::redirect('config/system');
     }
 
-    public function cruiseConfigFn($id){
+    public function editCruiseConfigFn(){
         $data['title'] = 'Edit Cruise Config Filename';
         $data['javascript'] = array('LinksFormHelper');
         $data['cruiseConfigFn'] = $this->_coreValuesModel->getCruiseConfigFn();
@@ -698,7 +698,7 @@ class System extends Controller {
         View::rendertemplate('footer',$data);
     }
 
-    public function loweringConfigFn($id){
+    public function editLoweringConfigFn(){
         $data['title'] = 'Edit Lowering Config Filename';
         $data['javascript'] = array('LinksFormHelper');
         $data['loweringConfigFn'] = $this->_coreValuesModel->getLoweringConfigFn();
@@ -737,7 +737,7 @@ class System extends Controller {
         View::rendertemplate('footer',$data);
     }
 
-    public function dataDashboardManifestFn($id){
+    public function editDataDashboardManifestFn(){
         $data['title'] = 'Edit Data Dashboard Manifest Filename';
         $data['javascript'] = array('LinksFormHelper');
         $data['dataDashboardManifestFn'] = $this->_coreValuesModel->getDataDashboardManifestFn();
@@ -776,7 +776,7 @@ class System extends Controller {
         View::rendertemplate('footer',$data);
     }
 
-    public function md5SummaryFns($id){
+    public function editMD5SummaryFns(){
         $data['title'] = 'Edit Data Dashboard Manifest Filename';
         $data['javascript'] = array('LinksFormHelper');
         $data['md5SummaryFns'] = $this->_coreValuesModel->getMd5SummaryFns();

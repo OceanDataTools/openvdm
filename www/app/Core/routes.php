@@ -54,7 +54,7 @@ Router::any('config/system/editMD5FilesizeLimit', '\Controllers\Config\System@ed
 Router::any('config/system/editCruiseConfigFn', '\Controllers\Config\System@editCruiseConfigFn');
 Router::any('config/system/editLoweringConfigFn', '\Controllers\Config\System@editLoweringConfigFn');
 Router::any('config/system/editDataDashboardFn', '\Controllers\Config\System@editDataDashboardFn');
-Router::any('config/system/editMd5SummaryFns', '\Controllers\Config\System@editMd5SummaryFns');
+Router::any('config/system/editMD5SummaryFns', '\Controllers\Config\System@editMD5SummaryFns');
 
 Router::any('config/system/addLink', '\Controllers\Config\System@addLink');
 Router::any('config/system/editLink/(:num)', '\Controllers\Config\System@editLink');

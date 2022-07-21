@@ -219,7 +219,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                 <tr>
                     <td>MD5 Summary Files</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editMd5SummaryFns">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editMD5SummaryFns">Edit</a>
                     </td>
                 </tr>
 
