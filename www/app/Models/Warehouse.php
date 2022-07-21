@@ -360,8 +360,8 @@ class Warehouse extends Model {
                             $cruiseList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue);
                             foreach ($cruiseList as $cruiseKey => $cruiseValue){
 
-                                if (in_array($cruiseValue,array(self::CONFIG_FN))){
-                                    $ovdmConfigContents = file_get_contents($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
+                                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                                    $ovdmConfigContents = file_get_contents($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
 
                                     //Get the the directory that holds the DashboardData
@@ -375,7 +375,7 @@ class Warehouse extends Model {
                                                 foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
 
                                                     //If a manifest file is found, add CruiseID to output
-                                                    if (in_array($dataDashboardValue,array(self::MANIFEST_FN))){
+                                                    if (in_array($dataDashboardValue,array($this->getDataDashboardManifestFn()))){
                                                         $this->_cruises[] = $rootValue;
                                                         break;
                                                     }
@@ -426,9 +426,9 @@ class Warehouse extends Model {
                             #var_dump($cruiseList);
                             foreach ($loweringList as $loweringKey => $loweringValue){
                                 #var_dump($loweringValue);
-                                if (in_array($loweringValue,array(self::LOWERING_CONFIG_FN))){
-                                    #var_dump($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::LOWERING_CONFIG_FN);
-                                    $loweringConfigContents = file_get_contents($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::LOWERING_CONFIG_FN);
+                                if (in_array($loweringValue,array($this->getLoweringConfigFn()))){
+                                    #var_dump($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
+                                    $loweringConfigContents = file_get_contents($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
                                     #var_dump($ovdmConfigJSON['extraDirectoriesConfig']);
                                     //Get the the directory that holds the DashboardData
@@ -474,9 +474,9 @@ class Warehouse extends Model {
             #var_dump($cruiseList);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
                 #var_dump($cruiseValue);
-                if (in_array($cruiseValue,array(self::CONFIG_FN))){
-                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
-                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . self::CONFIG_FN);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     
                     return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']); 
@@ -502,9 +502,9 @@ class Warehouse extends Model {
             #var_dump($cruiseList);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
                 #var_dump($cruiseValue);
-                if (in_array($cruiseValue,array(self::CONFIG_FN))){
-                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
-                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . self::CONFIG_FN);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     
                     return array('cruiseFinalizedOn' => $ovdmConfigJSON['cruiseFinalizedOn']); 
@@ -534,9 +534,9 @@ class Warehouse extends Model {
             #var_dump($loweringList);
             foreach ($loweringFileList as $loweringKey => $loweringValue){
                 #var_dump($loweringValue);
-                if (in_array($loweringValue,array(self::LOWERING_CONFIG_FN))){
-                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
-                    $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . self::LOWERING_CONFIG_FN);
+                if (in_array($loweringValue,array($this->getLoweringConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
                     
                     return array('loweringStartDate' => $loweringConfigJSON['loweringStartDate'],'loweringEndDate' => $loweringConfigJSON['loweringEndDate']); 
@@ -562,9 +562,9 @@ class Warehouse extends Model {
             #var_dump($loweringList);
             foreach ($loweringFileList as $loweringKey => $loweringValue){
                 #var_dump($loweringValue);
-                if (in_array($loweringValue,array(self::LOWERING_CONFIG_FN))){
-                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . self::CONFIG_FN);
-                    $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . self::LOWERING_CONFIG_FN);
+                if (in_array($loweringValue,array($this->getLoweringConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
                     
                     return array('loweringFinalizedOn' => $loweringConfigJSON['loweringFinalizedOn']); 

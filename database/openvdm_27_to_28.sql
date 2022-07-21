@@ -3,11 +3,11 @@ LOCK TABLES `OVDM_CoreVars` WRITE;
 
 INSERT INTO `OVDM_CoreVars` (`coreVarID`, `name`, `value`)
 VALUES
-  (19,'cruiseConfigFn','ovdm_config.json'),
-  (20,'loweringConfigFn','lowering_config.json'),
-  (21,'md5SummaryFn','md5_summary.txt'),
-  (22,'md5SummaryMd5Fn','md5_summary.md5'),
-  (23,'dataDashboardManifestFn','manifest.json');
+  (20,'cruiseConfigFn','ovdm_config.json'),
+  (21,'loweringConfigFn','lowering_config.json'),
+  (22,'md5SummaryFn','md5_summary.txt'),
+  (23,'md5SummaryMd5Fn','md5_summary.md5'),
+  (24,'dataDashboardManifestFn','manifest.json');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;

@@ -116,9 +116,10 @@ VALUES
   (18,'shipToShoreBWLimitStatus','Off'),
   (19,'md5FilesizeLimit','10'),
   (20,'md5FilesizeLimitStatus','On'),
-  (21,'md5SummaryFn','md5_summary.txt'),
-  (22,'md5SummaryMd5Fn','md5_summary.md5'),
-  (23,'dataDashboardManifestFn','manifest.json');
+  (21,'showLoweringComponents','No'),
+  (22,'md5SummaryFn','md5_summary.txt'),
+  (23,'md5SummaryMd5Fn','md5_summary.md5'),
+  (24,'dataDashboardManifestFn','manifest.json');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;
