@@ -201,25 +201,25 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                 <tr>
                     <td><?php echo CRUISE_NAME ?> Config File</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editCruiseConfigFile">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editCruiseConfigFn">Edit</a>
                     </td>
                 </tr>
                 <tr>
                     <td><?php echo LOWERING_NAME ?> Config File</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editLoweringConfigFile">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editLoweringConfigFn">Edit</a>
                     </td>
                 </tr>
                 <tr>
                     <td>Data Dashboard Mantifest File</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editDataDashboardFile">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editDataDashboardFn">Edit</a>
                     </td>
                 </tr>
                 <tr>
                     <td>MD5 Summary Files</td>
                     <td>
-                        <a href="<?php echo DIR ?>config/system/editMd5SummaryFiles">Edit</a>
+                        <a href="<?php echo DIR ?>config/system/editMd5SummaryFns">Edit</a>
                     </td>
                 </tr>
 
