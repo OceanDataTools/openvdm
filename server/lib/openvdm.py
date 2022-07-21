@@ -190,6 +190,38 @@ class OpenVDM():
             raise err
 
 
+    def get_md5_summary_fn(self):
+        """
+        Return the MD5 summary filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['md5SummaryFn']
+        except Exception as err:
+            logging.error("Unable to retrieve MD5 summary filename from OpenVDM API")
+            raise err
+
+
+    def get_md5_summary_md5_fn(self):
+        """
+        Return the MD5 summary MD5 filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryMD5Fn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['md5SummaryMd5Fn']
+        except Exception as err:
+            logging.error("Unable to retrieve MD5 summary MD5 filename from OpenVDM API")
+            raise err
+
+
     def get_tasks_for_hook(self, hook_name):
         """
         Return the task associated with the given hook
@@ -273,6 +305,21 @@ class OpenVDM():
             raise err
 
 
+    def get_cruise_config_fn(self):
+        """
+        Return the cruise config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfigFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['cruiseConfigFn']
+        except Exception as err:
+            logging.error("Unable to retrieve cruise config filename from OpenVDM API")
+            raise err
+
     def get_cruises(self):
         """
         Return a list of cruises stored on the data warehouse
@@ -349,6 +396,22 @@ class OpenVDM():
             return return_obj['loweringEndDate']
         except Exception as err:
             logging.error("Unable to retrieve lowering end date from OpenVDM API")
+            raise err
+
+
+    def get_cruise_config_fn(self):
+        """
+        Return the lowering config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfigFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['loweringConfigFn']
+        except Exception as err:
+            logging.error("Unable to retrieve lowering config filename from OpenVDM API")
             raise err
 
 
@@ -1072,4 +1135,19 @@ class OpenVDM():
             requests.post(url, data=payload)
         except Exception as err:
             logging.error("Unable to set lowering size with OpenVDM API")
+            raise err
+
+    def get_data_dashboard_manifest_fn(self):
+        """
+        Return the data dashboard manifest filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['cruiseConfigFn']
+        except Exception as err:
+            logging.error("Unable to retrieve cruise config filename from OpenVDM API")
             raise err

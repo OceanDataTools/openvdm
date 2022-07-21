@@ -132,6 +132,12 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    public function getCruiseConfigFn() {
+
+        $response = $this->_warehouseModel->getCruiseConfigFn();
+        echo json_encode($response);
+    }
+
     public function getCruises() {
 
         $response = $this->_warehouseModel->getCruises();
@@ -181,6 +187,11 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    public function getLoweringConfigFn() {
+
+        $response = $this->_warehouseModel->getLoweringConfigFn();
+        echo json_encode($response);
+    }
 
     public function getLowerings() {
 
@@ -239,6 +250,18 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
     
+    public function getMD5SummaryFn() {
+
+        $response = $this->_warehouseModel->getMd5SummaryFn();
+        echo json_encode($response);
+    }
+
+    public function getMD5SummaryMD5Fn() {
+
+        $response = $this->_warehouseModel->getMd5SummaryMd5Fn();
+        echo json_encode($response);
+    }
+
     // getCruiseConfig - return OVDM cruise config
 	public function getCruiseConfig() {
         
@@ -300,4 +323,11 @@ class Warehouse extends Controller {
     
         $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes']));
     }
+
+    public function getDataDashboardManifestFn() {
+
+        $response = $this->_warehouseModel->getDataDashboardManifestFn();
+        echo json_encode($response);
+    }
+
 }

@@ -3,7 +3,6 @@
 use Core\Error;
 use Helpers\Form;
 
-var_dump($data);
 ?>
 
     <div class="row">
