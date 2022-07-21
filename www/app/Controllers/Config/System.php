@@ -8,7 +8,7 @@ use Helpers\Url;
 
 class System extends Controller {
     
-    private $_coreValuesModel;
+    private $_warehouseModel;
     private $_extraDirectoriesModel;
     private $_cruiseDataTransfersModel;
     private $_shipToShoreTransfersModel;
@@ -23,12 +23,11 @@ class System extends Controller {
 
 
     private function updateCruiseDirectory() {
-        if($this->_coreValuesModel->getSystemStatus()) {
+        if($this->_warehouseModel->getSystemStatus()) {
 
-            $warehouseModel = new \Models\Warehouse();
             $gmData['siteRoot'] = DIR;
-            $gmData['shipboardDataWarehouse'] = $warehouseModel->getShipboardDataWarehouseConfig();
-            $gmData['cruiseID'] = $warehouseModel->getCruiseID();
+            $gmData['shipboardDataWarehouse'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
+            $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
         
             # create the gearman client
             $gmc= new \GearmanClient();
@@ -47,7 +46,7 @@ class System extends Controller {
             Url::redirect('config/login');
         }
         
-        $this->_coreValuesModel = new \Models\Warehouse();
+        $this->_warehouseModel = new \Models\Warehouse();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
         $this->_shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
@@ -62,10 +61,10 @@ class System extends Controller {
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
         $data['links'] = $this->_linksModel->getLinks();
-        $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
 
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -89,7 +88,7 @@ class System extends Controller {
 
         $data['title'] = 'Configuration';
         $data['javascript'] = array();
-        $data['shipboardDataWarehouseConfig'] = $this->_coreValuesModel->getShipboardDataWarehouseConfig();
+        $data['shipboardDataWarehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
 
         if(isset($_POST['submit'])){
             $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'];
@@ -115,7 +114,7 @@ class System extends Controller {
                     'shipboardDataWarehousePublicDataDir' => $shipboardDataWarehousePublicDataDir,
                 );
                 
-                $this->_coreValuesModel->setShipboardDataWarehouseConfig($postdata);
+                $this->_warehouseModel->setShipboardDataWarehouseConfig($postdata);
                 Session::set('message','Shipboard Data Warehouse Updated');
                 Url::redirect('config/system');
             } else {
@@ -348,20 +347,20 @@ class System extends Controller {
 
     public function enableShipToShoreBWLimit() {
 
-        $this->_coreValuesModel->enableShipToShoreBWLimit();
+        $this->_warehouseModel->enableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
     
     public function disableShipToShoreBWLimit() {
 
-        $this->_coreValuesModel->disableShipToShoreBWLimit();
+        $this->_warehouseModel->disableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
     
     public function editMD5FilesizeLimit(){
         $data['title'] = 'Edit MD5 Checksum Filesize Limit';
         $data['javascript'] = array();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
 
         if(isset($_POST['submit'])){
             $md5FilesizeLimit = $_POST['md5FilesizeLimit'];
@@ -377,7 +376,7 @@ class System extends Controller {
                     'value' => $md5FilesizeLimit
                 );
 
-                $this->_coreValuesModel->setMd5FilesizeLimit($postdata);
+                $this->_warehouseModel->setMd5FilesizeLimit($postdata);
                 Session::set('message','MD5 Filesize Limit Updated');
                 Url::redirect('config/system');
             } else {
@@ -393,13 +392,13 @@ class System extends Controller {
     
     public function enableMD5FilesizeLimit() {
 
-        $this->_coreValuesModel->enableMd5FilesizeLimit();
+        $this->_warehouseModel->enableMd5FilesizeLimit();
         Url::redirect('config/system');
     }
     
     public function disableMD5FilesizeLimit() {
 
-        $this->_coreValuesModel->disableMd5FilesizeLimit();
+        $this->_warehouseModel->disableMd5FilesizeLimit();
         Url::redirect('config/system');
     }
 
@@ -466,10 +465,10 @@ class System extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
-        $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
         $data['links'] = $this->_linksModel->getLinks();
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -529,9 +528,9 @@ class System extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
         $data['links'] = $this->_linksModel->getLinks();
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -662,7 +661,7 @@ class System extends Controller {
     public function editCruiseConfigFn(){
         $data['title'] = 'Edit Cruise Config Filename';
         $data['javascript'] = array('LinksFormHelper');
-        $data['cruiseConfigFn'] = $this->_coreValuesModel->getCruiseConfigFn();
+        $data['cruiseConfigFn'] = $this->_warehouseModel->getCruiseConfigFn();
 
         if(isset($_POST['submit'])){
             $cruiseConfigFn = $_POST['cruiseConfigFn'];
@@ -681,10 +680,10 @@ class System extends Controller {
 
             if(!$error){
                 $postdata = array(
-                    'cruiseConfigFn' => $cruiseConfigFn,
+                    'value' => $cruiseConfigFn,
                 );
             
-                $this->_coreValuesModel->setCruiseConfigFn($postdata);
+                $this->_warehouseModel->setCruiseConfigFn($postdata);
                 Session::set('message','Filename Updated');
                 Url::redirect('config/system');
             } else {
@@ -701,7 +700,7 @@ class System extends Controller {
     public function editLoweringConfigFn(){
         $data['title'] = 'Edit Lowering Config Filename';
         $data['javascript'] = array('LinksFormHelper');
-        $data['loweringConfigFn'] = $this->_coreValuesModel->getLoweringConfigFn();
+        $data['loweringConfigFn'] = $this->_warehouseModel->getLoweringConfigFn();
 
         if(isset($_POST['submit'])){
             $loweringConfigFn = $_POST['loweringConfigFn'];
@@ -720,10 +719,10 @@ class System extends Controller {
 
             if(!$error){
                 $postdata = array(
-                    'loweringConfigFn' => $loweringConfigFn,
+                    'value' => $loweringConfigFn,
                 );
             
-                $this->_coreValuesModel->setLoweringConfigFn($postdata);
+                $this->_warehouseModel->setLoweringConfigFn($postdata);
                 Session::set('message','Filename Updated');
                 Url::redirect('config/system');
             } else {
@@ -740,7 +739,7 @@ class System extends Controller {
     public function editDataDashboardManifestFn(){
         $data['title'] = 'Edit Data Dashboard Manifest Filename';
         $data['javascript'] = array('LinksFormHelper');
-        $data['dataDashboardManifestFn'] = $this->_coreValuesModel->getDataDashboardManifestFn();
+        $data['dataDashboardManifestFn'] = $this->_warehouseModel->getDataDashboardManifestFn();
 
         if(isset($_POST['submit'])){
             $dataDashboardManifestFn = $_POST['dataDashboardManifestFn'];
@@ -759,10 +758,10 @@ class System extends Controller {
 
             if(!$error){
                 $postdata = array(
-                    'dataDashboardManifestFn' => $dataDashboardManifestFn,
+                    'value' => $dataDashboardManifestFn,
                 );
             
-                $this->_coreValuesModel->setDataDashboardManifestFn($postdata);
+                $this->_warehouseModel->setDataDashboardManifestFn($postdata);
                 Session::set('message','Filename Updated');
                 Url::redirect('config/system');
             } else {
@@ -779,8 +778,8 @@ class System extends Controller {
     public function editMD5SummaryFns(){
         $data['title'] = 'Edit Data Dashboard Manifest Filename';
         $data['javascript'] = array('LinksFormHelper');
-        $data['md5SummaryFn'] = $this->_coreValuesModel->getMd5SummaryFn();
-        $data['md5SummaryMd5Fn'] = $this->_coreValuesModel->getMd5SummaryMd5Fn();
+        $data['md5SummaryFn'] = $this->_warehouseModel->getMd5SummaryFn();
+        $data['md5SummaryMd5Fn'] = $this->_warehouseModel->getMd5SummaryMd5Fn();
 
         if(isset($_POST['submit'])){
             $md5SummaryFn = $_POST['md5SummaryFn'];
@@ -816,7 +815,7 @@ class System extends Controller {
                     'md5SummaryMd5Fn' => $md5SummaryMd5Fn,
                 );
             
-                $this->_coreValuesModel->setMd5SummaryFns($postdata);
+                $this->_warehouseModel->setMd5SummaryFns($postdata);
                 Session::set('message','Filename Updated');
                 Url::redirect('config/system');
             } else {
