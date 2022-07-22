@@ -3,7 +3,7 @@
 LOCK TABLES `OVDM_CoreVars` WRITE;
 /*!40000 ALTER TABLE `OVDM_CoreVars` DISABLE KEYS */;
 
-DELETE FROM `OVDM_CollectionSystemTransfers` WHERE name='shipboardDataWarehousePublicDataDir';
+DELETE FROM `OVDM_CoreVars` WHERE name='shipboardDataWarehousePublicDataDir';
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;
