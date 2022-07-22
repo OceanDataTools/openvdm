@@ -11,7 +11,7 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.read_config import read_config
-from server.lib.openvdm import OpenVDM
+from server.lib.openvdm import OpenVDM, DEFAULT_CONFIG_FILE
 
 POST_COLLECTION_SYSTEM_TRANSFER_HOOK_NAME = "postCollectionSystemTransfer"
 POST_DATA_DASHBOARD_HOOK_NAME = "postDataDashboard"
@@ -45,7 +45,7 @@ def get_post_hook_commands(gearman_worker, hook_name):
     """
 
     try:
-        openvdm_config = read_config(OpenVDM.get_cruise_config_fn())
+        openvdm_config = read_config(DEFAULT_CONFIG_FILE)
         #logging.debug("openvdm_config: %s", openvdm_config)
 
         if hook_name == POST_COLLECTION_SYSTEM_TRANSFER_HOOK_NAME:
@@ -70,7 +70,7 @@ def get_post_hook_commands(gearman_worker, hook_name):
 
     except Exception as err:
         logging.error(str(err))
-        return {"verdict": False, "reason": "Could not process command file: " + OpenVDM.get_cruise_config_fn(), "commandList": None}
+        return {"verdict": False, "reason": "Could not process command file: " + DEFAULT_CONFIG_FILE, "commandList": None}
 
     return {"verdict": True, "commandList": build_commands(gearman_worker, commands_from_file)}
 

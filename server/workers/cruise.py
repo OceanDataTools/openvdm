@@ -97,38 +97,38 @@ def clear_directory(directory):
     return {'verdict': True}
 
 
-def export_ovdm_config(gearman_worker, ovdm_config_file_path, finalize=False):
+def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False):
     """
-    Export the current OpenVDM configuration to the specified filepath
+    Export the current cruise configuration to the specified filepath
     """
 
-    ovdm_config = gearman_worker.ovdm.get_ovdm_config()
+    cruise_config = gearman_worker.ovdm.get_cruise_config()
 
     if finalize:
-        ovdm_config['cruiseFinalizedOn'] = ovdm_config['configCreatedOn']
-    elif os.path.isfile(ovdm_config_file_path):
+        cruise_config['cruiseFinalizedOn'] = cruise_config['configCreatedOn']
+    elif os.path.isfile(cruise_config_file_path):
         logging.info("Reading existing configuration file")
         try:
-            with open(ovdm_config_file_path) as json_file:
+            with open(cruise_config_file_path) as json_file:
                 data = json.load(json_file)
                 if "cruiseFinalizedOn" in data:
-                    ovdm_config['cruiseFinalizedOn'] = data['cruiseFinalizedOn']
+                    cruise_config['cruiseFinalizedOn'] = data['cruiseFinalizedOn']
 
         except OSError as err:
             logging.debug(str(err))
             return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
-    for transfer in ovdm_config['cruiseDataTransfersConfig']:
+    for transfer in cruise_config['cruiseDataTransfersConfig']:
         del transfer['sshPass']
         del transfer['rsyncPass']
         del transfer['smbPass']
 
-    for transfer in ovdm_config['collectionSystemTransfersConfig']:
+    for transfer in cruise_config['collectionSystemTransfersConfig']:
         del transfer['sshPass']
         del transfer['rsyncPass']
         del transfer['smbPass']
 
-    return output_json_data_to_file(ovdm_config_file_path, ovdm_config)
+    return output_json_data_to_file(cruise_config_file_path, cruise_config)
 
 
 def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=False):
@@ -353,7 +353,7 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
+    cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
@@ -387,15 +387,15 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     #build OpenVDM Config file
     logging.info("Exporting Cruise Configuration")
-    output_results = export_ovdm_config(gearman_worker, ovdm_config_file_path)
+    output_results = export_cruise_config(gearman_worker, cruise_config_file_path)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], ovdm_config_file_path)
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
 
     if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
@@ -456,7 +456,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
     from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
+    cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     if not os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": "Cruise directory: " + gearman_worker.cruise_dir + " could not be found"})
@@ -561,15 +561,15 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     #build OpenVDM Config file
     logging.info("Exporting OpenVDM Configuration")
-    output_results = export_ovdm_config(gearman_worker, ovdm_config_file_path, finalize=True)
+    output_results = export_cruise_config(gearman_worker, cruise_config_file_path, finalize=True)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], ovdm_config_file_path)
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
 
     if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
@@ -669,13 +669,13 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
     return json.dumps(job_results)
 
 
-def task_export_ovdm_config(gearman_worker, gearman_job):
+def task_export_cruise_config(gearman_worker, gearman_job):
     """
     Export the OpenVDM configuration to file
     """
     job_results = {'parts':[]}
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
+    cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
@@ -688,20 +688,20 @@ def task_export_ovdm_config(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 3, 10)
 
-    #build OpenVDM Config file
-    logging.info("Exporting OpenVDM Configuration")
-    output_results = export_ovdm_config(gearman_worker, ovdm_config_file_path)
+    #build Cruise Config file
+    logging.info("Exporting Cruise Configuration")
+    output_results = export_cruise_config(gearman_worker, cruise_config_file_path)
 
     if output_results['verdict']:
-        job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Pass"})
+        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
     else:
-        job_results['parts'].append({"partName": "Export OpenVDM config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
     gearman_worker.send_job_status(gearman_job, 6, 10)
 
     logging.info("Setting file ownership/permissions")
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], ovdm_config_file_path)
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Set file ownership/permissions", "result": "Pass"})
@@ -768,7 +768,7 @@ if __name__ == "__main__":
     new_worker.register_task("finalizeCurrentCruise", task_finalize_current_cruise)
 
     logging.info("\tTask: exportOVDMConfig")
-    new_worker.register_task("exportOVDMConfig", task_export_ovdm_config)
+    new_worker.register_task("exportOVDMConfig", task_export_cruise_config)
 
     logging.info("\tTask: rsyncPublicDataToCruiseData")
     new_worker.register_task("rsyncPublicDataToCruiseData", task_rsync_publicdata_to_cruise_data)

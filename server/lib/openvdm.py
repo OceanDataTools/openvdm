@@ -49,7 +49,6 @@ class OpenVDM():
             logging.error("Unable to clear Gearman Jobs from OpenVDM API")
             raise err
 
-
     def get_plugin_dir(self):
         """
         Return the directory containing the OpenVDM plugins.
@@ -90,9 +89,9 @@ class OpenVDM():
             raise err
 
 
-    def get_ovdm_config(self):
+    def get_cruise_config(self):
         """
-        Return the current OpenVDM configuration
+        Return the current cruise configuration
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfig'
