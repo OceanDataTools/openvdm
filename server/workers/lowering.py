@@ -272,7 +272,7 @@ def task_finalize_current_lowering(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, self.shipboard_data_warehouse_config['loweringConfigFn'])
+    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
 
     if os.path.exists(gearman_worker.lowering_dir) and (gearman_worker.lowering_id != ''):
         job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
