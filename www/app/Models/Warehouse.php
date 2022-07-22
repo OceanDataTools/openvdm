@@ -81,8 +81,7 @@ class Warehouse extends Model {
     }
     
     public function getCruiseConfigFn(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseConfigFn'");
-        return $row[0]->value;
+        return CRUISE_CONFIG_FM;
     }
 
     public function getCruiseID(){
@@ -101,8 +100,7 @@ class Warehouse extends Model {
     }
 
     public function getLoweringConfigFn(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringConfigFn'");
-        return $row[0]->value;
+        return LOWERING_CONFIG_FN;
     }
 
     public function getLoweringID(){
@@ -126,13 +124,11 @@ class Warehouse extends Model {
     }
 
     public function getMd5SummaryFn(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5SummaryFn'");
-        return $row[0]->value;
+        return MD5_SUMMARY_FN;
     }
 
     public function getMd5SummaryMd5Fn(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5SummaryMd5Fn'");
-        return $row[0]->value;
+        return MD5_SUMMARY_MD5_FN;
     }
 
     public function getMd5FilesizeLimit(){
@@ -146,8 +142,7 @@ class Warehouse extends Model {
     }
 
     public function getDataDashboardManifestFn(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'dataDashboardManifestFn'");
-        return $row[0]->value;
+        return DATA_DASHBOARD_MANIFEST_FN;
     }
 
     public function getShipboardDataWarehouseBaseDir(){
@@ -172,6 +167,11 @@ class Warehouse extends Model {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'shipboardDataWarehousePublicDataDir'");
         $shipboardDataWarehousePublicDataDir = $row[0]->value;
         $loweringDataBaseDir = $this->getLoweringDataBaseDir();
+        $cruiseConfigFn = $this->getCruiseConfigFn();
+        $loweringConfigFn = $this->getLoweringConfigFn();
+        $dataDashboardManifestFn = $this->getDataDashboardManifestFn();
+        $md5SummaryFn = $this->getMd5SummaryFn();
+        $md5SummaryMd5Fn = $this->getMd5SummaryMd5Fn();
          
         return array(
             'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
@@ -179,7 +179,12 @@ class Warehouse extends Model {
             'shipboardDataWarehouseApacheDir' => $shipboardDataWarehouseApacheDir,
             'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
             'shipboardDataWarehousePublicDataDir' => $shipboardDataWarehousePublicDataDir,
-            'loweringDataBaseDir' => $loweringDataBaseDir
+            'loweringDataBaseDir' => $loweringDataBaseDir,
+            'cruiseConfigFn' => $cruiseConfigFn,
+            'loweringConfigFn' => $loweringConfigFn,
+            'dataDashboardManifestFn' => $dataDashboardManifestFn,
+            'md5SummaryFn' => $md5SummaryFn,
+            'md5SummaryMd5Fn' => $md5SummaryMd5Fn
         );
     }
     
