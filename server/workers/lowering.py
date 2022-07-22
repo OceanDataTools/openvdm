@@ -214,7 +214,7 @@ def task_setup_new_lowering(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, self.shipboard_data_warehouse_config['loweringConfigFn'])
+    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 

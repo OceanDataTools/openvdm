@@ -40,10 +40,12 @@ from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 
-def build_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Build the list of files to include, exclude or ignore
     """
+    
+    source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
 
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
@@ -57,7 +59,7 @@ def build_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-b
 
     filters = build_filters(gearman_worker)
 
-    for root, _, filenames in os.walk(gearman_worker.source_dir): # pylint: disable=too-many-nested-blocks
+    for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
         for filename in filenames:
             filepath = os.path.join(root, filename)
 
@@ -130,8 +132,8 @@ def build_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-b
     return_files['include'].sort()
     return_files['exclude'].sort()
 
-    return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
+    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
+    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
 
     return {'verdict': True, 'files': return_files}
 
@@ -406,7 +408,7 @@ def build_dest_dir(gearman_worker):
     """
     Replace wildcard string in destDir
     """
-
+    
     return gearman_worker.collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
 
@@ -579,7 +581,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     proc = subprocess.call(mount_command)
 
     logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker)
+    output_results = build_filelist(gearman_worker, prefix=mntpoint)
     if not output_results['verdict']:
         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
     files = output_results['files']
@@ -602,7 +604,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files': []}
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, gearman_worker.source_dir, gearman_worker.dest_dir]
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, os.path.join(mntpoint, gearman_worker.source_dir), gearman_worker.dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
         command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
@@ -824,6 +826,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if '{loweringID}' in self.collection_system_transfer['destDir']:
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
+            self.lowering_id = ""
+        
         if self.collection_system_transfer['cruiseOrLowering'] == "1":
             self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, build_dest_dir(self))
         else:

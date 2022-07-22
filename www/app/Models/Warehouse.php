@@ -81,7 +81,7 @@ class Warehouse extends Model {
     }
     
     public function getCruiseConfigFn(){
-        return CRUISE_CONFIG_FM;
+        return CRUISE_CONFIG_FN;
     }
 
     public function getCruiseID(){
