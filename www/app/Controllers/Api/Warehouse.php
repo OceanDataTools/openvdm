@@ -134,7 +134,7 @@ class Warehouse extends Controller {
 
     public function getCruiseConfigFn() {
 
-        $response = $this->_warehouseModel->getCruiseConfigFn();
+        $response['cruiseConfigFn'] = $this->_warehouseModel->getCruiseConfigFn();
         echo json_encode($response);
     }
 
@@ -189,7 +189,7 @@ class Warehouse extends Controller {
 
     public function getLoweringConfigFn() {
 
-        $response = $this->_warehouseModel->getLoweringConfigFn();
+        $response['loweringConfigFn'] = $this->_warehouseModel->getLoweringConfigFn();
         echo json_encode($response);
     }
 
@@ -252,13 +252,13 @@ class Warehouse extends Controller {
     
     public function getMD5SummaryFn() {
 
-        $response = $this->_warehouseModel->getMd5SummaryFn();
+        $response['md5SummaryFn'] = $this->_warehouseModel->getMd5SummaryFn();
         echo json_encode($response);
     }
 
     public function getMD5SummaryMD5Fn() {
 
-        $response = $this->_warehouseModel->getMd5SummaryMd5Fn();
+        $response['md5SummaryMd5Fn'] = $this->_warehouseModel->getMd5SummaryMd5Fn();
         echo json_encode($response);
     }
 
@@ -326,7 +326,7 @@ class Warehouse extends Controller {
 
     public function getDataDashboardManifestFn() {
 
-        $response = $this->_warehouseModel->getDataDashboardManifestFn();
+        $response['dataDashboardManifestFn'] = $this->_warehouseModel->getDataDashboardManifestFn();
         echo json_encode($response);
     }
 
