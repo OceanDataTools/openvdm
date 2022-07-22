@@ -45,6 +45,11 @@ class Config
         define('CRUISEDATA_APACHEDIR', '/CruiseData');
 
         /*
+         * Define path on webserver that contains cruise data
+         */
+        define('PUBLICDATA_DIR', '/vault/PublicData');
+
+        /*
          * Define location/name of the data dashboard configuration file
          */
         define('DASHBOARD_CONF', '/opt/openvdm/www/etc/datadashboard.yaml');

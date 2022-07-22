@@ -164,8 +164,7 @@ class Warehouse extends Model {
         $shipboardDataWarehouseApacheDir = $this->getShipboardDataWarehouseApacheDir();
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'shipboardDataWarehouseUsername'");
         $shipboardDataWarehouseUsername = $row[0]->value;
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'shipboardDataWarehousePublicDataDir'");
-        $shipboardDataWarehousePublicDataDir = $row[0]->value;
+        $shipboardDataWarehousePublicDataDir = PUBLICDATA_DIR;
         $loweringDataBaseDir = $this->getLoweringDataBaseDir();
         $cruiseConfigFn = $this->getCruiseConfigFn();
         $loweringConfigFn = $this->getLoweringConfigFn();
@@ -330,8 +329,6 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseIP']), $where);
         $where = array('name' => 'shipboardDataWarehouseUsername');
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseUsername']), $where);
-        $where = array('name' => 'shipboardDataWarehousePublicDataDir');
-        $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehousePublicDataDir']), $where);
         
     }
     
