@@ -191,39 +191,6 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
         }
     }
 ?>
-            </table>
-            <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>OpenVDM Required Files</th>
-                    <th>Action</th>
-                </tr>
-                </tr>
-                <tr>
-                    <td><?php echo CRUISE_NAME ?> Config File</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editCruiseConfigFn">Edit</a>
-                    </td>
-                </tr>
-                <tr>
-                    <td><?php echo LOWERING_NAME ?> Config File</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editLoweringConfigFn">Edit</a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Data Dashboard Mantifest File</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editDataDashboardManifestFn">Edit</a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>MD5 Summary Files</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editMD5SummaryFns">Edit</a>
-                    </td>
-                </tr>
-
-            </table>
             <table class='table table-striped table-hover table-bordered responsive'>
                 <tr>
                     <th>Data Warehouses</th>
