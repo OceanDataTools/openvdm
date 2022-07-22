@@ -29,7 +29,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.output_json_data_to_file import output_json_data_to_file
-from server.lib.openvdm import OpenVDM, DEFAULT_LOWERING_CONFIG_FN
+from server.lib.openvdm import OpenVDM
 
 
 def build_filelist(source_dir):
@@ -86,10 +86,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
-        self.lowering_start_date = self.ovdm.get_lowering_start_date()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.lowering_id = None
+        self.lowering_start_date = None
+        self.shipboard_data_warehouse_config = None
         self.lowering_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
@@ -214,7 +214,7 @@ def task_setup_new_lowering(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, DEFAULT_LOWERING_CONFIG_FN)
+    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, self.shipboard_data_warehouse_config['loweringConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
@@ -272,7 +272,7 @@ def task_finalize_current_lowering(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, DEFAULT_LOWERING_CONFIG_FN)
+    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, self.shipboard_data_warehouse_config['loweringConfigFn'])
 
     if os.path.exists(gearman_worker.lowering_dir) and (gearman_worker.lowering_id != ''):
         job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
@@ -347,7 +347,7 @@ def task_export_lowering_config(gearman_worker, gearman_job):
     """
     job_results = {'parts':[]}
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, DEFAULT_LOWERING_CONFIG_FN)
+    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 

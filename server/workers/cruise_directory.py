@@ -126,8 +126,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_id = None
         self.cruise_dir = None
         self.lowering_id = None
-        self.lowering_dir = None
-        self.cruise_start_date = self.ovdm.get_cruise_start_date()
+        self.cruise_start_date = None
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
@@ -162,12 +161,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-
+        self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
-        if self.lowering_id:
-            self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
+        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
+        
         return super().on_job_execute(current_job)
 
 

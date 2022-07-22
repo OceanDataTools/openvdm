@@ -93,10 +93,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
-        self.lowering_start_date = self.ovdm.get_lowering_start_date()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.lowering_id = None
+        self.lowering_start_date = None
+        self.shipboard_data_warehouse_config = None
         self.lowering_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])

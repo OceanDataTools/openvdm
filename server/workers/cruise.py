@@ -32,7 +32,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.check_filenames import bad_filename
 from server.lib.output_json_data_to_file import output_json_data_to_file
-from server.lib.openvdm import OpenVDM, DEFAULT_CRUISE_CONFIG_FN
+from server.lib.openvdm import OpenVDM
 
 def build_filelist(source_dir):
     """
@@ -229,10 +229,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.cruise_start_date = self.ovdm.get_cruise_start_date()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
+        self.cruise_id = None
+        self.cruise_start_date = None
+        self.shipboard_data_warehouse_config = None
+        self.cruise_dir = None
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def on_job_execute(self, current_job):
@@ -257,6 +257,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
  
+        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()        
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)
@@ -352,7 +353,7 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, DEFAULT_CRUISE_CONFIG_FN)
+    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
@@ -455,7 +456,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
     from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, DEFAULT_CRUISE_CONFIG_FN)
+    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     if not os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": "Cruise directory: " + gearman_worker.cruise_dir + " could not be found"})
@@ -585,7 +586,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     # gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
     # gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
-    gm_data['files']['updated'].append(DEFAULT_CRUISE_CONFIG_FN)
+    gm_data['files']['updated'].append(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
 
@@ -674,7 +675,7 @@ def task_export_ovdm_config(gearman_worker, gearman_job):
     """
     job_results = {'parts':[]}
 
-    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, DEFAULT_CRUISE_CONFIG_FN)
+    ovdm_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 

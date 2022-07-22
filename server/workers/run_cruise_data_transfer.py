@@ -33,7 +33,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.check_filenames import is_ascii, is_rsync_patial_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.openvdm import OpenVDM, DEFAULT_CRUISE_CONFIG_FN, DEFAULT_MD5_SUMMARY_FN, DEFAULT_MD5_SUMMARY_MD5_FN
+from server.lib.openvdm import OpenVDM
 
 
 def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branches
@@ -125,9 +125,9 @@ def build_exclude_filterlist(gearman_worker):
         # transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
         # exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
 
-        exclude_filterlist.append("*{}".format(DEFAULT_CRUISE_CONFIG_FN))
-        exclude_filterlist.append("*{}".format(DEFAULT_MD5_SUMMARY_FN))
-        exclude_filterlist.append("*{}".format(DEFAULT_MD5_SUMMARY_MD5_FN))
+        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn']))
+        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['md5SummaryFn']))
+        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']))
 
         # TODO - exclude the lowering.json files for each of the lowerings
 
@@ -660,10 +660,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.system_status = self.ovdm.get_system_status()
-        self.cruise_data_transfer = {}
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.system_status = None
+        self.cruise_data_transfer = None
+        self.shipboard_data_warehouse_config = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
@@ -700,7 +701,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             logging.info("Transfer job for %s skipped because that cruise data transfer is currently disabled", self.cruise_data_transfer['name'])
             return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer Enabled", "result": "Ignore", "reason": "Transfer is disabled"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
-        self.cruise_id = self.ovdm.get_cruise_id()
+        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
 
         logging.info("Job: %s, %s transfer started at: %s", current_job.handle, self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
 

@@ -190,11 +190,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.system_status = self.ovdm.get_system_status()
+        self.cruise_id = None
+        self.system_status = None
         self.transfer_start_date = None
-        self.cruise_data_transfer = self._get_cruise_data_transfer()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_data_transfer = None
+        self.shipboard_data_warehouse_config = None
+        
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def _get_cruise_data_transfer(self):

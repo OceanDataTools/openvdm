@@ -316,10 +316,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
-        self.collection_system_transfer = {}
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.lowering_id = None
+        self.collection_system_transfer = None
+        self.shipboard_data_warehouse_config = None
+        
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def on_job_execute(self, current_job):

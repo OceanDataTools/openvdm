@@ -29,7 +29,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.output_json_data_to_file import output_json_data_to_file
-from server.lib.openvdm import OpenVDM, DEFAULT_DATA_DASHBOARD_MANIFEST_FN
+from server.lib.openvdm import OpenVDM
 
 PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
@@ -66,13 +66,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.lowering_id = self.ovdm.get_cruise_id()
-        self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
-        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
+        self.shipboard_data_warehouse_config = None
+        self.cruise_id = None
+        self.cruise_dir = None
+        self.lowering_id = None
+        self.lowering_dir = None
+        self.data_dashboard_dir = None
+        self.data_dashboard_manifest_file_path = None
 
         self.collection_system_transfer = {}
 
@@ -112,7 +112,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
         self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransferID']) if 'collectionSystemTransferID' in payload_obj else { 'name': "Unknown" }
         self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
-        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
+        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
 
         return super().on_job_execute(current_job)
 
@@ -406,7 +406,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
-        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], DEFAULT_DATA_DASHBOARD_MANIFEST_FN))
+        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], gearman_worker.shipboard_data_warehouse_config['dataDashboardManifestFn']))
 
         gearman_worker.send_job_status(gearman_job, 9, 10)
 

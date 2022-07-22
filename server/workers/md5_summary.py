@@ -28,7 +28,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.openvdm import OpenVDM, DEFAULT_MD5_SUMMARY_FN, DEFAULT_MD5_SUMMARY_MD5_FN
+from server.lib.openvdm import OpenVDM
 
 
 CUSTOM_TASKS = [
@@ -42,20 +42,20 @@ CUSTOM_TASKS = [
 BUF_SIZE = 65536  # read files in 64kb chunks
 
 
-def build_filelist(source_dir):
+def build_filelist(gearman_worker):
     """
     Build the filelist
     """
 
-    logging.debug("sourceDir: %s", source_dir)
+    logging.debug("sourceDir: %s", gearman_worker.cruise_dir)
 
     return_files = []
-    for root, _, filenames in os.walk(source_dir):
+    for root, _, filenames in os.walk(gearman_worker.cruise_dir):
         for filename in filenames:
-            if filename not in (DEFAULT_MD5_SUMMARY_FN, DEFAULT_MD5_SUMMARY_MD5_FN):
+            if filename not in (gearman_worker.shipboard_data_warehouse_config['md5SummaryFn'], gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']):
                 return_files.append(os.path.join(root, filename))
 
-    return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
+    return_files = [filename.replace(gearman_worker.cruise_dir + '/', '', 1) for filename in return_files]
     return return_files
 
 
@@ -117,16 +117,13 @@ def build_md5_summary_md5(gearman_worker):
     Build the md5 hash for the md5 summary file
     """
 
-    md5_summary_filepath = os.path.join(gearman_worker.cruise_dir, DEFAULT_MD5_SUMMARY_FN)
-    md5_summary_md5_filepath = os.path.join(gearman_worker.cruise_dir, DEFAULT_MD5_SUMMARY_MD5_FN)
-
     try:
-        with open(md5_summary_md5_filepath, 'w') as md5_summary_md5_file:
-            md5_summary_md5_file.write(hash_file(md5_summary_filepath))
+        with open(gearman_worker.md5_summary_md5_filepath, 'w') as md5_summary_md5_file:
+            md5_summary_md5_file.write(hash_file(gearman_worker.md5_summary_filepath))
 
     except IOError:
-        logging.error("Error Saving MD5 Summary MD5 file: %s", md5_summary_md5_filepath)
-        return {"verdict": False, "reason": "Error Saving MD5 Summary MD5 file: " + md5_summary_md5_filepath}
+        logging.error("Error Saving MD5 Summary MD5 file: %s", gearman_worker.md5_summary_md5_filepath)
+        return {"verdict": False, "reason": "Error Saving MD5 Summary MD5 file: " + gearman_worker.md5_summary_md5_filepath}
 
     return {"verdict": True}
 
@@ -140,11 +137,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.md5_summary_filepath = os.path.join(self.cruise_dir, DEFAULT_MD5_SUMMARY_FN)
-        self.md5_summary_md5_filepath = os.path.join(self.cruise_dir, DEFAULT_MD5_SUMMARY_MD5_FN)
+        self.cruise_id = None
+        self.cruise_dir = None
+        self.md5_summary_filepath = None
+        self.md5_summary_md5_filepath = None
+        self.shipboard_data_warehouse_config = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
@@ -178,11 +175,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.md5_summary_filepath = os.path.join(self.cruise_dir, DEFAULT_MD5_SUMMARY_FN)
-        self.md5_summary_md5_filepath = os.path.join(self.cruise_dir, DEFAULT_MD5_SUMMARY_MD5_FN)
+        self.md5_summary_filepath = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['md5SummaryFn'])
+        self.md5_summary_md5_filepath = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['md5SummaryMd5Fn'])
         return super().on_job_execute(current_job)
 
 
@@ -397,7 +394,7 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
         return json.dumps(job_results)
 
     logging.info("Building filelist")
-    filelist = build_filelist(gearman_worker.cruise_dir)
+    filelist = build_filelist(gearman_worker)
     logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})

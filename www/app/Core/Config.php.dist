@@ -65,6 +65,31 @@ class Config
         define('LOWERING_NAME', 'Lowering');
 
         /*
+         * Define what to name the cruise config file. (i.e. 'ovdm_config.json')
+         */
+        define('CRUISE_CONFIG_FN', 'ovdm_config.json');
+
+        /*
+         * Define what to name the cruise config file. (i.e. 'lowering_config.json')
+         */
+        define('LOWERING_CONFIG_FN', 'lowering_config.json');
+
+        /*
+         * Define what to name the MD5 checksum manifest file. (i.e. 'md5_summary.txt')
+         */
+        define('MD5_SUMMARY_FN', 'md5_summary.txt');
+
+        /*
+         * Define what to name the MD5 checksum of the MD5 manifest file. (i.e. 'md5_summary.md5')
+         */
+        define('MD5_SUMMARY_MD5_FN', 'md5_summary.md5');
+
+        /*
+         * Define what to name the data dashboard manifest file. (i.e. 'manifest.json')
+         */
+        define('DATA_DASHBOARD_MANIFEST_FN', 'manifest.json');
+
+        /*
          * Set default controller and method for legacy calls.
          */
         define('DEFAULT_CONTROLLER', 'welcome');

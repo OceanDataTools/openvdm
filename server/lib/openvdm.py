@@ -23,19 +23,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib import read_config
 
-
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
-
-DEFAULT_CRUISE_CONFIG_FN = 'ovdm_config.json'
-
-DEFAULT_DATA_DASHBOARD_MANIFEST_FN = 'manifest.json'
-
-DEFAULT_LOWERING_CONFIG_FN = 'lowering_config.json'
-
-DEFAULT_MD5_SUMMARY_FN = 'md5_summary.txt'
-
-DEFAULT_MD5_SUMMARY_MD5_FN = 'md5_summary.md5'
-
 
 class OpenVDM():
 
@@ -399,7 +387,7 @@ class OpenVDM():
             raise err
 
 
-    def get_cruise_config_fn(self):
+    def get_lowering_config_fn(self):
         """
         Return the lowering config filename
         """
@@ -824,6 +812,22 @@ class OpenVDM():
         return cruise_data_transfer[0] if len(cruise_data_transfer) > 0 else False
 
 
+    def get_data_dashboard_manifest_fn(self):
+        """
+        Return the data dashboard manifest filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['dataDashboardManifestFn']
+        except Exception as err:
+            logging.error("Unable to retrieve data dashboard manifest filename from OpenVDM API")
+            raise err
+
+
     def send_msg(self, message_title, message_body=''):
         """
         Send a message to OpenVDM
@@ -1135,19 +1139,4 @@ class OpenVDM():
             requests.post(url, data=payload)
         except Exception as err:
             logging.error("Unable to set lowering size with OpenVDM API")
-            raise err
-
-    def get_data_dashboard_manifest_fn(self):
-        """
-        Return the data dashboard manifest filename
-        """
-
-        url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
-
-        try:
-            req = requests.get(url)
-            return_obj = json.loads(req.text)
-            return return_obj['cruiseConfigFn']
-        except Exception as err:
-            logging.error("Unable to retrieve cruise config filename from OpenVDM API")
             raise err
