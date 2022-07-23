@@ -15,7 +15,6 @@ subdirectories must be added.
 """
 
 import argparse
-import errno
 import json
 import logging
 import os
@@ -28,7 +27,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.directory_utils import create_directories, lockdown_directory
+from server.lib.directory_utils import create_directories
 from server.lib.openvdm import OpenVDM
 
 
@@ -76,7 +75,7 @@ def build_directorylist(gearman_worker):
     # Special case where an collection system needs to be created outside of the lowering directory
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
-    
+
     # Special case where an extra directory needs to be created outside of the lowering directory
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
@@ -97,6 +96,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = None
         self.lowering_start_date = None
         self.shipboard_data_warehouse_config = None
+        self.cruise_dir = None
         self.lowering_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])

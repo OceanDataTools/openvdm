@@ -119,21 +119,11 @@ def build_exclude_filterlist(gearman_worker):
     exclude_filterlist = []
 
     if gearman_worker.cruise_data_transfer['includeOVDMFiles'] == '0':
-        # dashboard_data_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("Dashboard_Data")
-        # exclude_filterlist.append("*{}*".format(dashboard_data_dir['destDir']))
-
-        # transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name("Transfer_Logs")
-        # exclude_filterlist.append("*{}*".format(transfer_logs['destDir']))
-
-        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn']))
-        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['md5SummaryFn']))
-        exclude_filterlist.append("*{}".format(gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']))
+        exclude_filterlist.append(f"*{gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn']}")
+        exclude_filterlist.append(f"*{gearman_worker.shipboard_data_warehouse_config['md5SummaryFn']}")
+        exclude_filterlist.append(f"*{gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']}")
 
         # TODO - exclude the lowering.json files for each of the lowerings
-
-    # if gearman_worker.cruise_data_transfer['includePublicDataFiles'] == '0':
-    #     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name("From_PublicData")
-    #     exclude_filterlist.append("*{}*".format(from_publicdata_dir['destDir']))
 
     excluded_collection_system_ids = gearman_worker.cruise_data_transfer['excludedCollectionSystems'].split(',') if gearman_worker.cruise_data_transfer['excludedCollectionSystems'] != '' else []
     for collection_system_id in excluded_collection_system_ids:
@@ -145,12 +135,12 @@ def build_exclude_filterlist(gearman_worker):
 
         try:
             if collection_system_transfer['cruiseOrLowering'] == '0':
-                exclude_filterlist.append("*{}*".format(collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)))
+                exclude_filterlist.append(f"*{collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)}*")
             else:
                 lowerings = gearman_worker.ovdm.get_lowerings()
                 for lowering in lowerings:
                     # exclude_filterlist.append("*/{cruiseID}/*/" + lowering + "/" + cruiseDataTransfer['destDir'].replace('{loweringID}', lowering) + "/*")
-                    exclude_filterlist.append("*{}/{}*".format(lowering, collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering)))
+                    exclude_filterlist.append(f"*{lowering}/{collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering)}*")
         except Exception as err:
             logging.warning("Could not retrieve collection system transfer %s", collection_system_id)
             logging.warning(str(err))
@@ -162,7 +152,7 @@ def build_exclude_filterlist(gearman_worker):
             continue
 
         extra_directory = gearman_worker.ovdm.get_extra_directory(excluded_extra_directory_id)
-        exclude_filterlist.append("*{}*".format(extra_directory['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)))
+        exclude_filterlist.append(f"*{extra_directory['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)}*")
 
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
 
@@ -185,7 +175,7 @@ def run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command
     updated_files = []
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.poll() is None):
+    while proc.poll() is None:
 
         for line in proc.stdout:
 
@@ -232,7 +222,7 @@ def run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, comman
     updated_files = []
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    while proc.returncode is None:
 
         proc.poll()
 
@@ -284,7 +274,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     rsync_exclude_list_filepath = os.path.join(tmpdir, 'rsyncExcludeList.txt')
 
     try:
-        with open(rsync_exclude_list_filepath, 'w') as rsync_excludelist_file:
+        with open(rsync_exclude_list_filepath, mode='w', encoding="utf-8") as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
 
     except IOError:
@@ -295,7 +285,6 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         shutil.rmtree(tmpdir)
         return False
 
-    file_index = 0
     file_count = 0
     command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
 
@@ -326,7 +315,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         command = ['rsync', '-triv', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, dest_dir]
 
         if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+            command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
         if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
             command.insert(2, '--delete')
@@ -398,7 +387,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     rsync_exclude_list_filepath = os.path.join(tmpdir, 'rsyncExcludeList.txt')
 
     try:
-        with open(rsync_exclude_list_filepath, 'w') as rsync_excludelist_file:
+        with open(rsync_exclude_list_filepath, mode='w', encoding='utf-8') as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
 
         logging.debug('\n'.join(files['exclude']))
@@ -410,7 +399,6 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         shutil.rmtree(tmpdir)
         return False
 
-    file_index = 0
     file_count = 0
     command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
 
@@ -438,7 +426,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         command = ['rsync', '-triv', '--exclude-from=' + rsync_exclude_list_filepath, cruise_dir, os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir']).rstrip('/') if gearman_worker.cruise_data_transfer['destDir'] != '/' else mntpoint]
 
         if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+            command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
         if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
             command.insert(2, '--delete')
@@ -482,7 +470,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
 
     try:
-        with open(rsync_password_filepath, 'w') as rsync_password_file:
+        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
             rsync_password_file.write(gearman_worker.cruise_data_transfer['rsyncPass'])
 
         os.chmod(rsync_password_filepath, 0o600)
@@ -504,7 +492,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     rsync_exclude_list_filepath = os.path.join(tmpdir, 'rsyncExcludeList.txt')
 
     try:
-        with open(rsync_exclude_list_filepath, 'w') as rsync_excludelist_file:
+        with open(rsync_exclude_list_filepath, mode='w', encoding="utf-8") as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
 
     except IOError:
@@ -515,7 +503,6 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         shutil.rmtree(tmpdir)
         return False
 
-    file_index = 0
     file_count = 0
     command = ['rsync', '-trinv', '--stats', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
 
@@ -543,7 +530,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
         command = ['rsync', '-triv', '--no-motd', '--exclude-from=' + rsync_exclude_list_filepath, '--password-file=' + rsync_password_filepath, cruise_dir, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir + '/']
 
         if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+            command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
         if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
             command.insert(2, '--delete')
@@ -584,7 +571,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     ssh_excludelist_filepath = os.path.join(tmpdir, 'sshExcludeList.txt')
 
     try:
-        with open(ssh_excludelist_filepath, 'w') as ssh_exclude_filelist_file:
+        with open(ssh_excludelist_filepath, mode='w', encoding='utf-8') as ssh_exclude_filelist_file:
             ssh_exclude_filelist_file.write('\n'.join(files['exclude']))
 
     except IOError:
@@ -594,9 +581,8 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         logging.debug("delete tmp dir: %s", tmpdir)
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary ssh exclude filelist file: ' + ssh_excludelist_filepath, 'files':[]}
+        return {'verdict': False, 'reason': f'Error Saving temporary ssh exclude filelist file: {ssh_excludelist_filepath}', 'files':[]}
 
-    file_index = 0
     file_count = 0
     command = ['rsync', '-trinv', '--stats', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
@@ -606,7 +592,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug('File count Command: %s', ' '.join(command))
@@ -628,7 +614,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         command = ['rsync', '-triv', '--exclude-from=' + ssh_excludelist_filepath, '-e', 'ssh', cruise_dir, gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
         if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-            command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+            command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
         if gearman_worker.cruise_data_transfer['syncToDest'] == '1':
             command.insert(2, '--delete')
@@ -639,7 +625,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
         if gearman_worker.cruise_data_transfer['skipEmptyDirs'] == '1':
             command.insert(2, '-m')
 
-        if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+        if gearman_worker.cruise_data_transfer['sshUseKey'] == '0':
             command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
         files['new'], files['updated'] = run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, command, file_count)

@@ -109,7 +109,8 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
     if parsed_args.kml_only and parsed_args.geojson_only:
-        argparse.ArgumentParser.exit(message="Can not specify the '--kml_only' AND '--geojson_only' arguments.")
+        parser.error("Can not specify the '--kml_only' AND '--geojson_only' arguments.")
+        sys.exit(1)
 
     # build an OpenVDM object
     openVDM = OpenVDM()
@@ -216,7 +217,7 @@ if __name__ == "__main__":
                         output_filepath_kml = os.path.join(tracklineDir, cruiseID + '_' + GPSSource['device'] + "_Trackline.kml")
                         logging.info("Saving file: %s", output_filepath_kml)
                         try:
-                            with open(output_filepath_kml, 'w') as kml_file:
+                            with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
                                 kml_file.write(convert_to_kml(combined_geojson_obj))
                         except Exception as err:
                             logging.error("Problem writing output file: %s", output_filepath_kml)
@@ -234,16 +235,20 @@ if __name__ == "__main__":
                         geojson_obj = None
 
                         try:
-                            with open(file,'r') as f:
+                            with open(file, mode='r', encoding="utf-8") as f:
                                 geojson_obj = json.load(f)
 
                             geojson_obj = geojson_obj['visualizerData'][0]
 
                         # If the file cannot be processed return false.
-                        except:
-                            errPrint("ERROR: Could not proccess file: ", file)
+                        except OSError:
+                            logging.error("Could not open file: %s", file)
                             continue
-                        
+
+                        except json.decode.JSONDecodeError:
+                            logging.error("Could not proccess file: %s", file)
+                            continue
+
                         if not geojson_obj:
                             logging.error("Problem combining data files from GPS Source: %s", GPSSource['device'])
                             continue
@@ -266,7 +271,7 @@ if __name__ == "__main__":
                             output_filepath_kml = os.path.join(tracklineDir, cruiseID + '_' + os.path.basename(file).split('.')[0] + "_Trackline.kml")
                             logging.info("Saving file: %s", output_filepath_kml)
                             try:
-                                with open(output_filepath_kml, 'w') as kml_file:
+                                with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
                                     kml_file.write(convert_to_kml(geojson_obj))
                             except Exception as err:
                                 logging.error("Problem writing output file: %s", output_filepath_kml)

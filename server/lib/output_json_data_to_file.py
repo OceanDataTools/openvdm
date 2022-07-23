@@ -16,17 +16,17 @@ def output_json_data_to_file(file_path, contents):
     except OSError as exception:
         if exception.errno != errno.EEXIST:
             logging.error("Unable to create parent directory for data file")
-            return {'verdict': False, 'reason': 'Unable to create parent directory(ies) for data file: {}'.format(file_path) }
+            return {'verdict': False, 'reason': f'Unable to create parent directory(ies) for data file: {file_path}'}
     except Exception as err:
         raise err
 
-    with open(file_path, 'w') as json_file:
+    with open(file_path, mode='w', encoding="utf-8") as json_file:
         logging.debug("Saving JSON file: %s", file_path)
         try:
             json.dump(contents, json_file, indent=4)
 
         except IOError:
             logging.error("Error Saving JSON file: %s", file_path)
-            return {'verdict': False, 'reason': 'Unable to create data file: {}'.format(file_path) }
+            return {'verdict': False, 'reason': f'Unable to create data file: {file_path}'}
 
     return {'verdict': True}

@@ -125,7 +125,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     file_count = len(files['include'])
 
     try:
-        with open(ssh_includelist_filepath, 'w') as ssh_include_filelist_filepath:
+        with open(ssh_includelist_filepath, mode='w', encoding="utf-8") as ssh_include_filelist_filepath:
             ssh_include_filelist_filepath.write('\n'.join([os.path.join(gearman_worker.cruise_id, filename) for filename in files['include']]))
 
     except IOError:
@@ -139,15 +139,15 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
     if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
-    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    while proc.returncode is None:
 
         proc.poll()
 
@@ -195,7 +195,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.transfer_start_date = None
         self.cruise_data_transfer = None
         self.shipboard_data_warehouse_config = None
-        
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def _get_cruise_data_transfer(self):

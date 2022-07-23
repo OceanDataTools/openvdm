@@ -15,7 +15,6 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
 """
 
 import argparse
-import errno
 import json
 import logging
 import os
@@ -165,9 +164,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        
+
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        
+
         return super().on_job_execute(current_job)
 
 

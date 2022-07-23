@@ -42,7 +42,7 @@ def combine_geojson_files(input_files, prefix, device_name):
 
         # Open the dashboardData file
         try:
-            with open(file, 'r') as geojson_file:
+            with open(file, mode='r', encoding="utf-8") as geojson_file:
                 geojson_obj = json.load(geojson_file)
 
                 returned_geojson_obj['features'][0]['geometry']['coordinates'] += geojson_obj['visualizerData'][0]['features'][0]['geometry']['coordinates']

@@ -37,11 +37,11 @@ def is_rsync_patial_file(filename):
     """
     check to see if the filename is a rsync partial file.
     """
-    
-    file_match = False if re.match(rsync_partial_file_re, filename) is None else True
+
+    # file_match = False if re.match(rsync_partial_file_re, filename) is None else True
+    file_match = re.match(rsync_partial_file_re, filename) is not None
 
     if file_match:
         logging.warning("Ignoring %s, this is an rsync partial file", filename)
 
     return file_match
-

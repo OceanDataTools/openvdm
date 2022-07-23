@@ -38,21 +38,21 @@ class NpEncoder(json.JSONEncoder):
     """
     Custom JSON string encoder used to deal with NumPy arrays
     """
-    def default(self, obj): # pylint: disable=arguments-differ
+    def default(self, o): # pylint: disable=arguments-differ
 
-        if isinstance(obj, np.integer):
-            return int(obj)
+        if isinstance(o, np.integer):
+            return int(o)
 
-        if isinstance(obj, np.floating):
-            return float(obj)
+        if isinstance(o, np.floating):
+            return float(o)
 
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
+        if isinstance(o, np.ndarray):
+            return o.tolist()
 
-        if isinstance(obj, datetime):
-            return obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        if isinstance(o, datetime):
+            return o.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        return super().default(obj)
+        return super().default(o)
 
 
 class OpenVDMParserQualityTest():
@@ -63,7 +63,7 @@ class OpenVDMParserQualityTest():
     def __init__(self, test_name, test_value):
 
         if test_value not in QUALITY_TEST_RESULT_TYPES:
-            raise ValueError("Invalid test result type: type must be one of: %s" % ', '.join(QUALITY_TEST_RESULT_TYPES))
+            raise ValueError(f"Invalid test result type: type must be one of: {', '.join(QUALITY_TEST_RESULT_TYPES)}")
 
         self.test_data = {
         'testName':test_name,
@@ -118,7 +118,7 @@ class OpenVDMParserStat():
     def __init__(self, stat_name, stat_type, stat_value, stat_uom=''): # pylint: disable=too-many-branches
 
         if stat_type not in STAT_TYPES:
-            raise ValueError("Invalid stat type, must be one of: %s" % ', '.join(STAT_TYPES))
+            raise ValueError(f"Invalid stat type, must be one of: {', '.join(STAT_TYPES)}")
 
         if stat_type == 'bounds':
             if not isinstance(stat_value, list) or len(stat_value) != 2:

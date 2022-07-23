@@ -81,7 +81,7 @@ class PARParser(OpenVDMCSVParser):
         logging.debug("Parsing data file...")
         errors = []
         try:
-            with open(filepath, 'r') as csvfile:
+            with open(filepath, mode='r', encoding="utf-8") as csvfile:
                 reader = csv.DictReader(csvfile, self.raw_cols)
 
                 for lineno, line in enumerate(reader):
@@ -187,7 +187,7 @@ class PARParser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', 'Error(s) parsing datafile {} on row(s): {}'.format(filepath, ', '.join([str(error) for error in errors])))
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
 
 
 # -------------------------------------------------------------------------------------

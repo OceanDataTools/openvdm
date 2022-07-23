@@ -31,7 +31,7 @@ def read_config(filename):
     file
     """
     try:
-        with open(filename, 'r') as file:
+        with open(filename, mode='r', encoding="utf-8") as file:
             return parse_yaml(file)
     except IOError as err:
         logging.error("Unable to open configuration file: %s", filename)

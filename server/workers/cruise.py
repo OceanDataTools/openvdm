@@ -45,8 +45,7 @@ def build_filelist(source_dir):
 
         include_files = [os.path.join(root, filename) for filename in filenames]
 
-        exclude_files = list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), include_files))
-
+        return_files['exclude'].extend(list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), include_files)))
         return_files['include'].extend(list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), include_files)))
 
     return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
@@ -81,6 +80,8 @@ def clear_directory(directory):
     for root, dirs, files in os.walk(directory + '/', topdown=False):
         for dirname in dirs:
             result = clear_directory(realpath(os.path.join(root, dirname)))
+            if not result['verdict']:
+                reasons.extend(result['reasons'].split('\n'))
         if not dirs and not files:
             try:
                 logging.debug("Deleting %s", root)
@@ -88,7 +89,7 @@ def clear_directory(directory):
             except OSError as err:
                 logging.error("Unable to delete %s", root)
                 logging.debug(str(err))
-                reasons.append("Unable to delete {}".format(root))
+                reasons.append(f"Unable to delete {root}")
 
 
     if len(reasons) > 0:
@@ -109,7 +110,7 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
     elif os.path.isfile(cruise_config_file_path):
         logging.info("Reading existing configuration file")
         try:
-            with open(cruise_config_file_path) as json_file:
+            with open(cruise_config_file_path, mode='r', encoding='utf-8') as json_file:
                 data = json.load(json_file)
                 if "cruiseFinalizedOn" in data:
                     cruise_config['cruiseFinalizedOn'] = data['cruiseFinalizedOn']
@@ -146,7 +147,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
     if len(files['exclude']) > 0:
         logging.warning("Found %s problem filename(s):", len(files['exclude']))
         logging.warning("\t %s", "\n\t".join(files['exclude']))
-        return {'verdict': False, 'reason': "Symbolic links or Non-ASCii filenames in {}: {}".format(publicdata_dir,', '.join(files['exclude'])), 'files': files }
+        return {'verdict': False, 'reason': f"Symbolic links or Non-ASCii filenames in {publicdata_dir}: {', '.join(files['exclude'])}", 'files': files }
 
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
@@ -156,7 +157,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
 
     try:
         local_transfer_filelist = [filename.replace(publicdata_dir, '', 1) for filename in files['include']]
-        with open(rsync_filelist_path, 'w') as rsync_filelist_file:
+        with open(rsync_filelist_path, mode='w', encoding='utf-8') as rsync_filelist_file:
             rsync_filelist_file.write('\n'.join([str(file) for file in local_transfer_filelist]))
     except IOError:
         logging.error("Error Saving temporary rsync filelist file")
@@ -256,8 +257,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
- 
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()        
+
+        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)

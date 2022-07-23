@@ -35,7 +35,6 @@ import json
 import logging
 import sys
 from copy import deepcopy
-from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
 
@@ -79,7 +78,7 @@ class SVProfileParser(OpenVDMCSVParser):
         logging.debug("Parsing data file...")
         errors = []
         try:
-            with open(filepath, 'r', encoding='latin-1') as csvfile:
+            with open(filepath, mode='r', encoding='latin-1') as csvfile:
 
                 for line in csvfile:
                     if line.startswith("[Data]"):
@@ -124,11 +123,6 @@ class SVProfileParser(OpenVDMCSVParser):
         # Build DataFrame
         logging.debug("Building dataframe from parsed data...")
         df_proc = pd.DataFrame(raw_into_df)
-
-        # Convert Date/time column to datetime objects
-        # logging.debug("Converting data_time to datetime datatype...")
-
-        # df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
 
         # Optionally crop data by start/stop times
         if self.start_dt or self.stop_dt:
@@ -195,7 +189,7 @@ class SVProfileParser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', 'Error(s) parsing datafile {} on row(s): {}'.format(filepath, ', '.join([str(error) for error in errors])))
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
 
 
 # -------------------------------------------------------------------------------------
@@ -208,14 +202,6 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    # parser.add_argument('--timeFormat', default=DEFAULT_TIME_FORMAT,
-    #                     help='timestamp format, default: %(default)')
-    # parser.add_argument('--startDT', default=None,
-    #                     type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-    #                     help=' crop start timestamp (iso8601)')
-    # parser.add_argument('--stopDT', default=None,
-    #                     type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-    #                     help=' crop stop timestamp (iso8601)')
     parser.add_argument('dataFile', metavar='dataFile',
                         help='the raw data file to process')
 

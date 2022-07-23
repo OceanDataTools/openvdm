@@ -58,15 +58,15 @@ def test_local_source_dir(gearman_worker):
     logging.debug("Source Dir: %s", source_dir)
 
     if not os.path.isdir(source_dir):
-        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": "Unable to find source directory: {} on the Data Warehouse".format(source_dir)})
+        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} on the Data Warehouse"})
         if gearman_worker.collection_system_transfer['localDirIsMountPoint'] == '1':
-            return_val.append({"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": "Unable to find source directory: {} on the Data Warehouse".format(source_dir)})
+            return_val.append({"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} on the Data Warehouse"})
     else:
         return_val.append({"partName": "Source Directory", "result": "Pass"})
 
         if gearman_worker.collection_system_transfer['localDirIsMountPoint'] == '1':
             if not os.path.ismount(source_dir):
-                return_val.append({"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": "Source directory: {} is not a mountpoint on the Data Warehouse".format(source_dir)})
+                return_val.append({"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the Data Warehouse"})
             else:
                 return_val.append({"partName": "Source Directory is a Mountpoint", "result": "Pass"})
 
@@ -106,9 +106,9 @@ def test_smb_source_dir(gearman_worker):
     if not found_server:
         logging.warning("Server Test Failed")
         return_val.extend([
-            {"partName": "SMB Server", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.collection_system_transfer['smbServer'], gearman_worker.collection_system_transfer['smbUser'])},
-            {"partName": "SMB Share", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.collection_system_transfer['smbServer'], gearman_worker.collection_system_transfer['smbUser'])},
-            {"partName": "Source Directory", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.collection_system_transfer['smbServer'], gearman_worker.collection_system_transfer['smbUser'])}
+            {"partName": "SMB Server", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.collection_system_transfer['smbServer']} as {gearman_worker.collection_system_transfer['smbUser']}"},
+            {"partName": "SMB Share", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.collection_system_transfer['smbServer']} as {gearman_worker.collection_system_transfer['smbUser']}"},
+            {"partName": "Source Directory", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.collection_system_transfer['smbServer']} as {gearman_worker.collection_system_transfer['smbUser']}"}
         ])
 
         return return_val
@@ -130,8 +130,8 @@ def test_smb_source_dir(gearman_worker):
     if proc.returncode != 0:
         logging.warning("Connection test failed")
         return_val.extend([
-            {"partName": "SMB Share", "result": "Fail", "reason": "Could not connect to SMB Share: {} as {}".format( gearman_worker.collection_system_transfer['smbServer'],  gearman_worker.collection_system_transfer['smbUser'])},
-            {"partName": "Source Directory", "result": "Fail", "reason": "Could not connect to SMB Share: {} as {}".format( gearman_worker.collection_system_transfer['smbServer'],  gearman_worker.collection_system_transfer['smbUser'])}
+            {"partName": "SMB Share", "result": "Fail", "reason": f"Could not connect to SMB Share: {gearman_worker.collection_system_transfer['smbServer']} as {gearman_worker.collection_system_transfer['smbUser']}"},
+            {"partName": "Source Directory", "result": "Fail", "reason": f"Could not connect to SMB Share: {gearman_worker.collection_system_transfer['smbServer']} as {gearman_worker.collection_system_transfer['smbUser']}"}
         ])
 
         # Unmount SMB Share
@@ -152,7 +152,7 @@ def test_smb_source_dir(gearman_worker):
         return_val.append({"partName": "Source Directory", "result": "Pass"})
     else:
         logging.warning("Source Directory Test Failed")
-        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": "Unable to find source directory: {} within the SMB Share: {}".format(source_dir, gearman_worker.collection_system_transfer['smbServer'])})
+        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} within the SMB Share: {gearman_worker.collection_system_transfer['smbServer']}"})
 
     # Unmount SMB Share
     if os.path.ismount(mntpoint):
@@ -178,7 +178,7 @@ def test_rsync_source_dir(gearman_worker):
     try:
 
         logging.debug("Saving rsync password file %s", rsync_password_filepath)
-        with open(rsync_password_filepath, 'w') as rsync_password_file:
+        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
 
             if gearman_worker.collection_system_transfer['rsyncUser'] != 'anonymous':
                 rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
@@ -187,7 +187,7 @@ def test_rsync_source_dir(gearman_worker):
 
     except IOError:
         logging.error("Error Saving temporary rsync password file %s", rsync_password_filepath)
-        return_val.append({"partName": "Writing temporary rsync password file", "result": "Fail", "reason": "Unable to create temporary rsync password file: {}".format(rsync_password_filepath)})
+        return_val.append({"partName": "Writing temporary rsync password file", "result": "Fail", "reason": f"Unable to create temporary rsync password file: {rsync_password_filepath}"})
 
         # Cleanup
         shutil.rmtree(tmpdir)
@@ -205,8 +205,8 @@ def test_rsync_source_dir(gearman_worker):
     if proc.returncode != 0:
         logging.warning("Connection test failed")
         return_val.extend([
-            {"partName": "Rsync Connection", "result": "Fail", "reason": "Unable to connect to rsync server: {} as {}".format(gearman_worker.collection_system_transfer['rsyncServer'], gearman_worker.collection_system_transfer['rsyncUser'])},
-            {"partName": "Source Directory", "result": "Fail", "reason": "Unable to connect to rsync server: {} as {}".format(gearman_worker.collection_system_transfer['rsyncServer'], gearman_worker.collection_system_transfer['rsyncUser'])}
+            {"partName": "Rsync Connection", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.collection_system_transfer['rsyncServer']} as {gearman_worker.collection_system_transfer['rsyncUser']}"},
+            {"partName": "Source Directory", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.collection_system_transfer['rsyncServer']} as {gearman_worker.collection_system_transfer['rsyncUser']}"}
         ])
 
     else:
@@ -223,7 +223,7 @@ def test_rsync_source_dir(gearman_worker):
 
         if proc.returncode != 0:
             logging.warning("Source Directory Test Failed")
-            return_val.append({"partName": "Source Directory", "result": "Fail", "reason": "Unable to find source directory: " + source_dir + " on the Rsync Server: " + gearman_worker.collection_system_transfer['rsyncServer']})
+            return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} on the Rsync Server: {gearman_worker.collection_system_transfer['rsyncServer']}"})
         else:
             return_val.append({"partName": "Source Directory", "result": "Pass"})
 
@@ -256,8 +256,8 @@ def test_ssh_source_dir(gearman_worker):
     if proc.returncode != 0:
         logging.warning("Connection test failed")
         return_val.extend([
-            {"partName": "SSH Connection", "result": "Fail", "reason": "Unable to connect to ssh server: {} as {}".format(gearman_worker.collection_system_transfer['sshServer'], gearman_worker.collection_system_transfer['sshUser'])},
-            {"partName": "Source Directory", "result": "Fail", "reason":"Unable to connect to ssh server: {} as {}".format(gearman_worker.collection_system_transfer['sshServer'], gearman_worker.collection_system_transfer['sshUser'])}
+            {"partName": "SSH Connection", "result": "Fail", "reason": f"Unable to connect to ssh server: {gearman_worker.collection_system_transfer['sshServer']} as {gearman_worker.collection_system_transfer['sshUser']}"},
+            {"partName": "Source Directory", "result": "Fail", "reason": f"Unable to connect to ssh server: {gearman_worker.collection_system_transfer['sshServer']} as {gearman_worker.collection_system_transfer['sshUser']}"}
         ])
 
         return return_val
@@ -270,10 +270,10 @@ def test_ssh_source_dir(gearman_worker):
     source_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
 
     if gearman_worker.collection_system_transfer['sshUseKey'] == '1':
-      source_test_command += ['-o', 'PasswordAuthentication=no']
+        source_test_command += ['-o', 'PasswordAuthentication=no']
 
     else:
-      source_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + source_test_command + ['-o', 'PubkeyAuthentication=no']
+        source_test_command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + source_test_command + ['-o', 'PubkeyAuthentication=no']
 
     source_test_command += ['ls', "\"" + source_dir + "\""]
 
@@ -283,7 +283,7 @@ def test_ssh_source_dir(gearman_worker):
 
     if proc.returncode != 0:
         logging.warning("Source directory test failed")
-        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": "Unable to find source directory: {} on the SSH Server: {}".format(source_dir, gearman_worker.collection_system_transfer['sshServer'])})
+        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} on the SSH Server: {gearman_worker.collection_system_transfer['sshServer']}"})
     else:
         return_val.append({"partName": "Source Directory", "result": "Pass"})
 
@@ -305,7 +305,7 @@ def test_dest_dir(gearman_worker):
 
     logging.debug('Destination Directory: %s', dest_dir)
 
-    return [{"partName": "Destination Directory", "result": "Pass"}] if os.path.isdir(dest_dir) else [{"partName": "Destination Directory", "result": "Fail", "reason": "Unable to find destination directory: {} on Data Warehouse".format(dest_dir)}]
+    return [{"partName": "Destination Directory", "result": "Pass"}] if os.path.isdir(dest_dir) else [{"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to find destination directory: {dest_dir} on Data Warehouse"}]
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
@@ -320,7 +320,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.lowering_id = None
         self.collection_system_transfer = None
         self.shipboard_data_warehouse_config = None
-        
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def on_job_execute(self, current_job):
@@ -337,7 +337,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransfer']['collectionSystemTransferID'])
 
             if not self.collection_system_transfer:
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"},{"partName": "Final Verdict", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}]}))
+                return self.on_job_complete(current_job, json.dumps({'parts':[
+                    {"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"},
+                    {"partName": "Final Verdict", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}
+                ]}))
 
             self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
 
@@ -349,7 +352,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         if self.collection_system_transfer['cruiseOrLowering'] == '1' and self.lowering_id is None:
             try:
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Retrieve Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"},{"partName": "Final Verdict", "result": "Fail", "reason": "Lowering ID is not defined"}]}))
+                return self.on_job_complete(current_job, json.dumps({'parts':[
+                    {"partName": "Retrieve Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"},
+                    {"partName": "Final Verdict", "result": "Fail", "reason": "Lowering ID is not defined"}]
+                }))
             except Exception as err:
                 raise err
 

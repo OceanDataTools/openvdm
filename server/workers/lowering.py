@@ -60,7 +60,7 @@ def export_lowering_config(gearman_worker, lowering_config_filepath, finalize=Fa
     elif os.path.isfile(lowering_config_filepath):
         logging.info("Reading existing configuration file")
         try:
-            with open(lowering_config_filepath) as json_file:
+            with open(lowering_config_filepath, mode='r', encoding='utf-8') as json_file:
                 data = json.load(json_file)
                 if "loweringFinalizedOn" in data:
                     lowering_config['loweringFinalizedOn'] = data['loweringFinalizedOn']

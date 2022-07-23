@@ -65,7 +65,7 @@ def hash_file(filepath):
     """
     try:
         md5 = hashlib.md5()
-        with open(filepath, 'rb') as file:
+        with open(filepath, mode='rb') as file:
             while True:
                 data = file.read(BUF_SIZE)
                 if not data:
@@ -118,7 +118,7 @@ def build_md5_summary_md5(gearman_worker):
     """
 
     try:
-        with open(gearman_worker.md5_summary_md5_filepath, 'w') as md5_summary_md5_file:
+        with open(gearman_worker.md5_summary_md5_filepath, mode='w', encoding="utf-8") as md5_summary_md5_file:
             md5_summary_md5_file.write(hash_file(gearman_worker.md5_summary_filepath))
 
     except IOError:
@@ -289,7 +289,7 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("Processing existing MD5 summary file")
 
     try:
-        with open(gearman_worker.md5_summary_filepath, 'r') as md5_summary_file:
+        with open(gearman_worker.md5_summary_filepath, mode='r', encoding="utf-8") as md5_summary_file:
 
             for line in md5_summary_file:
                 (md5_hash, filename) = line.split(' ', 1)
@@ -331,7 +331,7 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Building MD5 Summary file")
     try:
-        with open(gearman_worker.md5_summary_filepath, 'w') as md5_summary_file:
+        with open(gearman_worker.md5_summary_filepath, mode='w', encoding="utf-8") as md5_summary_file:
 
             for filehash in sorted_hashes:
                 md5_summary_file.write(filehash['hash'] + ' ' + filehash['filename'] + '\n')
@@ -421,7 +421,7 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
     logging.info("Building MD5 Summary file")
     try:
         #logging.debug("Saving new MD5 Summary file")
-        with open(gearman_worker.md5_summary_filepath, 'w') as md5_summary_file:
+        with open(gearman_worker.md5_summary_filepath, mode='w', encoding='utf-8') as md5_summary_file:
 
             for filehash in sorted_hashes:
                 md5_summary_file.write(filehash['hash'] + ' ' + filehash['filename'] + '\n')

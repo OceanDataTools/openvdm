@@ -353,7 +353,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
         existing_manifest_entries = []
 
         try:
-            with open(gearman_worker.data_dashboard_manifest_file_path, 'r') as dashboard_manifest_file:
+            with open(gearman_worker.data_dashboard_manifest_file_path, mode='r', encoding='utf-8') as dashboard_manifest_file:
                 existing_manifest_entries = json.load(dashboard_manifest_file)
 
             job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})

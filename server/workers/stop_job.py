@@ -155,7 +155,7 @@ def task_stop_job(gearman_worker, gearman_job):
             else:
                 logging.error("Error killing PID: %s", gearman_worker.job_info['pid'])
                 logging.error(str(err))
-                job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": "Error killing PID: {} --> {}".format(gearman_worker.job_info['pid'], err) })
+                job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": f"Error killing PID: {gearman_worker.job_info['pid']} --> {err}"})
 
         finally:
             if gearman_worker.job_info['type'] == 'collectionSystemTransfer':

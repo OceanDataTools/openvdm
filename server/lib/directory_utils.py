@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Utilities for creating directories and managing their permissions.
+"""
 import os
 import errno
 import logging
