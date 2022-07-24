@@ -77,3 +77,16 @@ There are also some web-dependencies that were updated as part of this release. 
 cd <openvdm_root>/www
 composer install
 ```
+
+## Upgrading from 2.8.
+
+OpenVDM v2.9 introducted some configuration file and database changes that will require existing user to perform some additional steps.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Backup the existing database BEFORE running the schema update script.  To do this run the `./utils/export_openvdm_db.sh` script (you may need to run via sudo) and redirect the output to a file.  In the event there is a problem updating the database the output from this script can be used to restore the database to a known good state.
+3. Start the mysql cli `mysql -p`
+4. Select the OpenVDM database by typing: `use openvdm` (`openvdm` is the default name of the database)
+5. Run the update script: `source <path to openvdm>/database/openvdm_28_to_29.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
+6. Make a backup the webUI config file: `./www/app/Core/Config.php`
+7. Make a new webUI config file using the default template: `cp ./www/app/Core/Config.php.dist ./www/app/Core/Config.php`
+8. Transfer any customizations from the the backup configuration file to the new configuration file.
