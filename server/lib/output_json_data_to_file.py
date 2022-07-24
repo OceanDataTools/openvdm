@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Utilities for writing JSON-formatted data to file.
 """
+
 import errno
 import json
 import logging
@@ -11,6 +12,7 @@ def output_json_data_to_file(file_path, contents):
     Write contents to the specified file_path.  Assumes contents is a json
     string-able object
     """
+
     try:
         os.makedirs(os.path.dirname(file_path))
     except OSError as exception:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Utilities for reading/processing JSON data.
 """
+
 import logging
 
 try:
@@ -13,6 +14,7 @@ def parse_yaml(source):
     """Read the passed text/stream assuming it's YAML or JSON (a subset of
     YAML) and try to parse it into a Python dict.
     """
+
     try:
         return load(source, Loader=FullLoader)
     except NameError as name_error:
@@ -30,6 +32,7 @@ def read_config(filename):
     """Read the passed text/stream assuming it's a valid OpenVDM configuration
     file
     """
+
     try:
         with open(filename, mode='r', encoding="utf-8") as file:
             return parse_yaml(file)

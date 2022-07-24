@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  run_cruise_data_transfer.py
 
 DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -87,10 +86,6 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
                 if not exclude:
                     logging.debug("%s is a valid file for transfer", filepath)
                     return_files['include'].append(filepath)
-
-            # if include or exclude or ignore:
-            #     logging.debug("{} excluded because file does not match any of the filters".format(filename))
-            #     return_files['exclude'].append(os.path.join(root, filename))
 
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
     return_files['exclude'] = [filename.split(source_dir + '/',1).pop().replace("[", "\[").replace("]", "\]") for filename in return_files['exclude']]
@@ -737,6 +732,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -745,6 +741,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -863,6 +860,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -870,6 +868,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  run_collection_system_transfer.py
 
 DESCRIPTION:  Gearman worker that handles the transfer of data from the Collection
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -549,8 +548,6 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer from SMB Source")
 
-    # filters = build_filters(gearman_worker)
-
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
 
@@ -843,7 +840,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
-        ### Sset temporal bounds for transfer
+        ### Set temporal bounds for transfer
         # if temporal bands are not used then set to absolute min/max
         if self.collection_system_transfer['useStartDate'] == '0':
             self.data_start_date = "1970/01/01 00:00"
@@ -934,6 +931,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -942,6 +940,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -1133,6 +1132,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -1140,6 +1140,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

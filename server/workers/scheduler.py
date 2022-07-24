@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-
 FILE:  scheduler.py
 
 DESCRIPTION:  This program handles the scheduling of the transfer-related Gearman
     tasks.
 
-    USAGE: scheduler.py [--interval <interval>] <siteRoot>
+USAGE: scheduler.py [--interval <interval>] <siteRoot>
 
 ARGUMENTS: --interval <interval> The interval in minutes between transfer job
             submissions.  If this argument is not provided the default inteval
@@ -18,9 +17,9 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse

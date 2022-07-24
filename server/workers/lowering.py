@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  lowering.py
 
 DESCRIPTION:  Gearman worker the handles the tasks of initializing a new
@@ -9,7 +8,7 @@ lowering and finalizing the current lowering.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
  REVISION:  2022-07-01
 """
@@ -109,8 +108,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
-#        else:
-#            self.ovdm.trackGearmanJob(taskLookup[current_job.task], os.getpid(), current_job.handle)
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -192,6 +189,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -200,6 +198,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -209,6 +208,7 @@ def task_setup_new_lowering(gearman_worker, gearman_job):
     """
     Setup a new lowering
     """
+
     job_results = {'parts':[]}
 
     payload_obj = json.loads(gearman_job.data)
@@ -268,6 +268,7 @@ def task_finalize_current_lowering(gearman_worker, gearman_job):
     """
     Finalize the current lowering
     """
+
     job_results = {'parts':[]}
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
@@ -345,6 +346,7 @@ def task_export_lowering_config(gearman_worker, gearman_job):
     """
     Export the Lowering configuration to file
     """
+
     job_results = {'parts':[]}
 
     lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
@@ -418,6 +420,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -425,6 +428,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Utilities for setting file permissions/ownership.
 """
+
 import logging
 from os import chown, chmod, walk
 from os.path import isfile, join
@@ -10,13 +11,16 @@ def remove_prefix(text, prefix):
     """
     Remove the specified prefix from the provided text if it exists
     """
+
     return text[text.startswith(prefix) and len(prefix):]
+
 
 def set_owner_group_permissions(user, path):
     """
     Recursively set the ownership and permissions for the files and sub-
     directories for the given path.
     """
+
     reasons = []
 
     uid = getpwnam(user).pw_uid

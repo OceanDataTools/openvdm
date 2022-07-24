@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing cruise data transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -30,10 +30,12 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
+
 def write_test(dest_dir):
     """
     Verify the current user has write permissions to the dest_dir
     """
+
     if os.path.isdir(dest_dir):
         try:
             filepath = os.path.join(dest_dir, 'writeTest.txt')
@@ -488,6 +490,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -496,6 +499,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -577,6 +581,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -584,6 +589,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

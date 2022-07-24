@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  size_cacher.py
 
 DESCRIPTION:  This program handles calculating the cruise and lowering
@@ -14,9 +13,9 @@ ARGUMENTS: --interval <interval> The minimum interval in second between director
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2017-09-30
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse

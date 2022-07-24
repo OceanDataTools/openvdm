@@ -769,7 +769,7 @@ function configure_directories {
         done
     fi
 
-    if [ ! -d $DATA_ROOT/FTPROOT ]; then
+    if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
@@ -875,8 +875,7 @@ EOF
 
     else
         echo "Setup OpenVDM database"
-        sed -e "s|/vault/FTPRoot|${DATA_ROOT}/FTPRoot|" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
-        sed -e "s/survey/${OPENVDM_USER}/" | \
+        sed -e "s/survey/${OPENVDM_USER}/" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
@@ -905,7 +904,8 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|"\
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
+    sed -e "s|define('PUBLICDATA_DIR', '/vault/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then

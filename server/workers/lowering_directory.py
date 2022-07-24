@@ -9,9 +9,9 @@ subdirectories must be added.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -29,7 +29,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.directory_utils import create_directories
 from server.lib.openvdm import OpenVDM
-
 
 CUSTOM_TASKS = [
     {
@@ -126,8 +125,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
-        # else:
-        #     self.ovdm.track_gearman_job(taskLookup[current_job.task], os.getpid(), current_job.handle)
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -190,6 +187,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -198,6 +196,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -297,6 +296,7 @@ def task_set_lowering_data_directory_permissions(gearman_worker, gearman_job):
 
     return json.dumps(job_results)
 
+
 def task_rebuild_lowering_directory(gearman_worker, gearman_job):
     """
     Verify and create if necessary all the lowering sub-directories
@@ -390,6 +390,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -397,6 +398,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

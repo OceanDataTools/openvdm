@@ -16,6 +16,7 @@ def combine_geojson_files(input_files, prefix, device_name):
     files to process the fuction returns Null.  Otherwise the fuction returns the
     combined geoJSON object
     """
+
     # Blank geoJson object
     returned_geojson_obj = {
         "type":"FeatureCollection",
@@ -38,7 +39,6 @@ def combine_geojson_files(input_files, prefix, device_name):
         return None
 
     for file in input_files:
-        #print file
 
         # Open the dashboardData file
         try:
@@ -56,6 +56,7 @@ def combine_geojson_files(input_files, prefix, device_name):
 
     # If processing is successful, return the (geo)json object
     return returned_geojson_obj
+
 
 def convert_to_kml(geojson_obj):
     """

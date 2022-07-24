@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-     FILE:  run_ship_to_shore_transfer.py
+FILE:  run_ship_to_shore_transfer.py
 
 DESCRIPTION:  Gearman worker that handles the transfer of data from the
-Shipboard Data Warehouse to a Shoreside Data Warehouse.
+    Shipboard Data Warehouse to a Shoreside Data Warehouse.
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -82,6 +82,7 @@ def build_logfile_dirpath(gearman_worker):
     """
     Build the path for saving the transfer logfile
     """
+
     cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
 
     return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
@@ -288,6 +289,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -296,6 +298,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -438,6 +441,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -445,6 +449,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

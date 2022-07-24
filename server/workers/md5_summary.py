@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  md5_summary.py
 
 DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -29,7 +28,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
-
 
 CUSTOM_TASKS = [
     {
@@ -497,6 +495,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -504,6 +503,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

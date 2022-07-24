@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -33,6 +33,7 @@ from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.check_filenames import bad_filename
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.openvdm import OpenVDM
+
 
 def build_filelist(source_dir):
     """
@@ -62,21 +63,6 @@ def clear_directory(directory):
     reasons = []
 
     # Clear out PublicData
-    # for root, dirs, files in os.walk(directory + '/', topdown=False):
-    #     for pd_dir in dirs:
-    #         try:
-    #             os.rmdir(os.path.join(root, pd_dir))
-    #         except OSError:
-    #             logging.error("Unable to delete %s", os.path.join(root, pd_dir))
-    #             reasons.append("Unable to delete {}".format(os.path.join(root, pd_dir)))
-
-    #     for pd_file in files:
-    #         try:
-    #             os.unlink(os.path.join(root, pd_file))
-    #         except OSError:
-    #             logging.error("Unable to delete %s", os.path.join(root, pd_file))
-    #             reasons.append("Unable to delete {}".format(os.path.join(root, pd_file)))
-
     for root, dirs, files in os.walk(directory + '/', topdown=False):
         for dirname in dirs:
             result = clear_directory(realpath(os.path.join(root, dirname)))
@@ -208,8 +194,6 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
             proc.terminate()
             break
 
-    # logging.info('cruise_dir: %s', gearman_worker.cruise_dir)
-    # logging.info('dest_dir: %s', dest_dir)
     files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
     files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
 
@@ -236,10 +220,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.cruise_dir = None
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
         """
+
         logging.debug("current_job: %s", current_job)
 
         payload_obj = json.loads(current_job.data)
@@ -250,8 +236,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
-#        else:
-#            self.ovdm.track_gearman_job(task_lookup[current_job.task], os.getpid(), current_job.handle)
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -332,6 +316,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -340,6 +325,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -349,6 +335,7 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
     """
     Setup a new cruise
     """
+
     job_results = {'parts':[]}
 
     payload_obj = json.loads(gearman_job.data)
@@ -446,10 +433,12 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     return json.dumps(job_results)
 
+
 def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable=too-many-return-statements,too-many-statements
     """
     Finalize the current cruise
     """
+
     job_results = {'parts':[]}
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
@@ -542,8 +531,6 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
             job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-        # job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Pass"})
-
         gearman_worker.send_job_status(gearman_job, 9, 10)
 
         if len(files['new']) > 0 or len(files['updated']) > 0:
@@ -585,15 +572,11 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         'files': files
     }
 
-    # gm_data['files']['new'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['new']]
-    # gm_data['files']['updated'] = [from_publicdata_dir.replace(gearman_worker.cruise_dir, '') + '/' + filename for filename in gm_data['files']['updated']]
     gm_data['files']['updated'].append(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
     gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
 
     logging.debug("MD5 Summary Task Complete")
-
-    # need to add code for cruise data transfers
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
@@ -602,6 +585,7 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
     """
     Sync the contents of the PublicData share to the from_PublicData Extra Directory
     """
+
     job_results = {'parts':[]}
 
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
@@ -664,7 +648,7 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
 
         logging.info("MD5 Summary Task Complete")
 
-    # need to verify update MD5 completed successfully
+    # TODO: verify update MD5 completed successfully
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
@@ -674,6 +658,7 @@ def task_export_cruise_config(gearman_worker, gearman_job):
     """
     Export the OpenVDM configuration to file
     """
+
     job_results = {'parts':[]}
 
     cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
@@ -747,6 +732,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -754,6 +740,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  post_hooks.py
 
 DESCRIPTION:  Gearman worker that runs user-defined scripts following the
@@ -11,9 +10,9 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-02-09
- REVISION:  2020-02-13
+ REVISION:  2020-02-24
 """
 
 import argparse
@@ -174,6 +173,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -182,6 +182,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()

@@ -79,6 +79,7 @@ def run_commands(command_list):
     """
     Run the commands in the command_list
     """
+
     reasons = []
 
     for command in command_list:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  stop_job.py
 
 DESCRIPTION:  Gearman worker that handles the manual termination of other OVDM
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the manual termination of other OVDM
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -86,6 +85,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         return super().on_job_execute(current_job)
 
+
     def on_job_exception(self, current_job, exc_info):
         """
         Function run whenever the current job has an exception
@@ -99,6 +99,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
         return super().on_job_exception(current_job, exc_info)
+
 
     def on_job_complete(self, current_job, job_result):
         """
@@ -117,6 +118,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -125,6 +127,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -209,6 +212,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -216,6 +220,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

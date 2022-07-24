@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  test_collection_system_transfer.py
 
 DESCRIPTION:  Gearman worker that handles testing collection system transfer
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing collection system transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -31,10 +30,12 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
+
 def build_dest_dir(gearman_worker):
     """
     Replace any wildcards in the provided directory
     """
+
     lowering_id = gearman_worker.lowering_id if gearman_worker.lowering_id is not None else ""
     return gearman_worker.collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
@@ -43,6 +44,7 @@ def build_source_dir(gearman_worker):
     """
     Replace any wildcards in the provided directory
     """
+
     lowering_id = gearman_worker.lowering_id if gearman_worker.lowering_id is not None else ""
     return gearman_worker.collection_system_transfer['sourceDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
@@ -83,7 +85,6 @@ def test_smb_source_dir(gearman_worker):
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
 
-
     # Verify the server exists
     server_test_command = ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-N'] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-U', gearman_worker.collection_system_transfer['smbUser'] + '%' + gearman_worker.collection_system_transfer['smbPass']]
     logging.debug('SMB Server test command: %s', ' '.join(server_test_command))
@@ -118,7 +119,6 @@ def test_smb_source_dir(gearman_worker):
     # Create mountpoint
     mntpoint = os.path.join(tmpdir, 'mntpoint')
     os.mkdir(mntpoint, 0o755)
-
 
     # Mount SMB Share
     mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',username='+gearman_worker.collection_system_transfer['smbUser']+',password='+gearman_worker.collection_system_transfer['smbPass']+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]
@@ -168,6 +168,7 @@ def test_rsync_source_dir(gearman_worker):
     """
     Verify the source directory exists for a rsync server transfer
     """
+
     return_val = []
 
     # Create temp directory
@@ -237,6 +238,7 @@ def test_ssh_source_dir(gearman_worker):
     """
     Verify the source directory exists for a ssh server transfer
     """
+
     return_val = []
 
     server_test_command = ['ssh', gearman_worker.collection_system_transfer['sshServer'], '-l', gearman_worker.collection_system_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
@@ -410,6 +412,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -418,10 +421,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
-
 
 
 def task_test_collection_system_transfer(gearman_worker, current_job):
@@ -500,6 +503,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -507,6 +511,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 
