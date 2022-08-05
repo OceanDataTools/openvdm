@@ -993,10 +993,10 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     gearman_worker.send_job_status(current_job, 2, 10)
 
-    if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" and gearman_worker.lowering_id is None:
-        logging.info("Verifying lowering_id is set")
-        job_results['parts'].append({'partName': 'Destination Directory Test', "result": "Fail", 'reason': 'Lowering ID is not defined'})
-        return json.dumps(job_results)
+    # if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" and gearman_worker.lowering_id is None:
+    #     logging.info("Verifying lowering_id is set")
+    #     job_results['parts'].append({'partName': 'Destination Directory Test', "result": "Fail", 'reason': 'Lowering ID is not defined'})
+    #     return json.dumps(job_results)
 
     logging.info("Transferring files")
     output_results = None
