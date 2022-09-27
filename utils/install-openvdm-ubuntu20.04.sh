@@ -756,10 +756,8 @@ function configure_directories {
             read -p "Root data directory ${DATA_ROOT} does not exists... create it? (yes) " yn
             case $yn in
                 [Yy]* )
-                    mkdir -p ${DATA_ROOT}
                     break;;
                 "" )
-                    mkdir -p ${DATA_ROOT}
                     break;;
                 [Nn]* )
                     echo "Quitting"

@@ -113,7 +113,7 @@ VALUES
   (15,'shipToShoreBWLimitStatus','Off'),
   (16,'md5FilesizeLimit','10'),
   (17,'md5FilesizeLimitStatus','On'),
-  (18,'showLoweringComponents','No'),
+  (18,'showLoweringComponents','No');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;
