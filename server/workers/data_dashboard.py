@@ -116,7 +116,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
 
         if not self.collection_system_transfer: # doesn't exists
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Retrieve Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}] }))
+            return self.on_job_complete(current_job, json.dumps({
+                'parts':[{
+                    "partName": "Retrieve Collection System Tranfer Data",
+                    "result": "Fail",
+                    "reason": "Could not find configuration data for collection system transfer"
+                }],
+                'files': {
+                    'new':[],
+                    'updated':[]
+                }
+            }))
 
         return super().on_job_execute(current_job)
 
