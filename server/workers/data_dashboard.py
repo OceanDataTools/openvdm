@@ -72,6 +72,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_dir = None
         self.data_dashboard_dir = None
         self.data_dashboard_manifest_file_path = None
+        self.collection_system_transfer = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
@@ -110,8 +111,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
+        self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransferID']) if 'collectionSystemTransferID' in payload_obj else None
         self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
+
+        if current_job.task == 'updateDataDashboard' and not self.collection_system_transfer: # doesn't exists
+            return self.on_job_complete(current_job, json.dumps({
+                'parts':[{
+                    "partName": "Retrieve Collection System Tranfer Data",
+                    "result": "Fail",
+                    "reason": "Could not find configuration data for collection system transfer"
+                }],
+                'files': {
+                    'new':[],
+                    'updated':[]
+                }
+            }))
 
         return super().on_job_execute(current_job)
 

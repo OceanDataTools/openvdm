@@ -233,7 +233,7 @@ def test_rsync_dest_dir(gearman_worker):
 
     dest_dir = gearman_worker.cruise_data_transfer['destDir']
 
-    dest_test_command = ['rsync', '--no-motd', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir]
+    dest_test_command = ['rsync', '--contimeout=5', '--no-motd', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir]
 
     logging.debug("Destination test command: %s", ' '.join(dest_test_command))
 

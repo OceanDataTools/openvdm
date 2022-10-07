@@ -197,7 +197,7 @@ def test_rsync_source_dir(gearman_worker):
 
     os.chmod(rsync_password_filepath, 0o600)
 
-    server_test_command = ['rsync', '--no-motd', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer']]
+    server_test_command = ['rsync', '--no-motd', '--contimeout=5', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer']]
 
     logging.debug('Server test command: %s', ' '.join(server_test_command))
 
