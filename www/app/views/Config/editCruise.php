@@ -66,7 +66,7 @@ use Helpers\Form;
                                     </div>
                                 </div>
                             </div>
-                            <div>
+                            <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> Start Port</label>
                                     <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
