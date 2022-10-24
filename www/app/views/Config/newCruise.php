@@ -53,9 +53,7 @@ use Helpers\Form;
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> Start Port</label>
-                                    <div class="input-group">
-                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
-                                    </div>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
                                 </div>
                             </div>
                         </div>
@@ -72,9 +70,7 @@ use Helpers\Form;
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> End Port</label>
-                                    <div class="input-group">
-                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
-                                    </div>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
                                 </div>
                             </div>
                         </div>
