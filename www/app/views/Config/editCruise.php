@@ -54,32 +54,44 @@ use Helpers\Form;
 ?>
                                     </select>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> Start Date/Time</label>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
                                 <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Start Date/Time</label>
                                     <div id="cruiseStartDate", class="input-group date datetimepicker">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartDate', 'value'=>$data['cruiseStartDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                                     </div>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> End Date/Time</label>
+                            </div>
+                            <div>
                                 <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Start Port</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> End Date/Time</label>
                                     <div  id="cruiseEndDate", class="input-group date datetimepicker">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndDate', 'value'=>$data['cruiseEndDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                                     </div>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> Start Port</label>
+                            </div>
+                            <div class="col-md-6">
                                 <div class="form-group">
-                                    <div id="cruiseStartPort", class="input-group">
-                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
-                                    </div>
+                                    <label><?php echo CRUISE_NAME; ?> End Port</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> End Port</label>
-                                <div class="form-group">
-                                    <div id="cruiseEndPort", class="input-group">
-                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
-                                    </div>
-                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-12">
                                 <label>Other Options</label>
                                 <table class='table table-striped table-hover table-bordered responsive'>
                                     <tr>
@@ -90,7 +102,6 @@ use Helpers\Form;
                                         <td>Show <?php echo LOWERING_NAME; ?> Components</td><td style='width:20px; text-align:center'><?php echo $data['showLoweringComponents'] === True ? Form::submit(array('name'=>'hideLoweringComponents', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'showLoweringComponents', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
                                     </tr>
                                 </table>
-
                             </div>
                         </div>
                         <div class="row">
