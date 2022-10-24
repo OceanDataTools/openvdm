@@ -126,6 +126,28 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    // getCruisePorts - return the current cruise start/end ports.
+    public function getCruisePorts() {
+
+        $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
+        $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
+        echo json_encode($response);
+    }
+    
+    // getCruiseStartPort - return the current cruise start date.
+    public function getCruiseStartPort() {
+
+        $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
+        echo json_encode($response);
+    }
+    
+    // getCruiseEndPort - return the current cruise end date.
+    public function getCruiseEndPort() {
+
+        $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
+        echo json_encode($response);
+    }
+
     public function getCruiseFinalizedDate() {
 
         $response = $this->_warehouseModel->getCruiseFinalizedDate();
@@ -273,6 +295,8 @@ class Warehouse extends Controller {
         $response['cruiseID'] = $this->_warehouseModel->getCruiseID();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
+        $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
+        $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         $response['warehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getCruiseOnlyCollectionSystemTransfers();
         $response['extraDirectoriesConfig'] = $extraDirectoriesModel->getExtraDirectoriesConfig();

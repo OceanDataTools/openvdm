@@ -99,6 +99,16 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
 
+    public function getCruiseStartPort(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseStartPort'");
+        return $row[0]->value;
+    }
+
+    public function getCruiseEndPort(){
+        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseEndPort'");
+        return $row[0]->value;
+    }
+
     public function getLoweringConfigFn(){
         return LOWERING_CONFIG_FN;
     }
@@ -277,6 +287,17 @@ class Warehouse extends Model {
     
     public function setCruiseEndDate($data){
         $where = array('name' => 'cruiseEndDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
+    public function setCruiseStartPort($data){
+    var_dump($data);    
+    $where = array('name' => 'cruiseStartPort');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+    
+    public function setCruiseEndPort($data){
+        $where = array('name' => 'cruiseEndPort');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 

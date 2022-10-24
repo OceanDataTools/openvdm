@@ -51,6 +51,18 @@ use Helpers\Form;
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                                     </div>
                                 </div>
+                                <label><?php echo CRUISE_NAME; ?> Start Port</label>
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
+                                    </div>
+                                </div>
+                                <label><?php echo CRUISE_NAME; ?> End Port</label>
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
+                                    </div>
+                                </div>
                                 <label>Collection Systems</label>
                                 <table class='table table-striped table-hover table-bordered responsive'>
                                     <tr>
