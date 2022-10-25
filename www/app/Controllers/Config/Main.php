@@ -74,9 +74,12 @@ class Main extends Controller {
 
             if (strcmp($cruiseID, $this->_warehouseModel->getCruiseID()) != 0) {
                 $setLatestLowering = true;
+                
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
                 $cruiseStartDate = $cruiseDates['cruiseStartDate'];
                 $cruiseEndDate = $cruiseDates['cruiseEndDate'];
+
+                $cruisePorts = $this->_warehouseModel->getCruisePorts($_POST['cruiseID']);
                 $cruiseStartPort = $cruisePorts['cruiseStartPort'];
                 $cruiseEndPort = $cruisePorts['cruiseEndPort'];
             }

@@ -5,7 +5,7 @@
  *
  * @license   https://opensource.org/licenses/MIT
  * @author Webb Pinner - webbpinner@gmail.com
- * @version 2.8
+ * @version 2.9
  * @date 2022-07-01
  */
 
