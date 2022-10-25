@@ -48,7 +48,7 @@ class Main extends Controller {
 
         $data['title'] = 'Configuration';
         $data['css'] = array('datetimepicker');
-        $data['javascript'] = array('datetimepicker', 'cruiseFormHelper');
+        $data['javascript'] = array('datetimepicker', 'cruiseIDFormHelper');
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
         $data['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $data['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
