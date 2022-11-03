@@ -121,9 +121,7 @@
 <?php
                 } else {
 ?>
-                                                    <div class='col-lg-12'>No data found
-							<?php var_dump($data['placeholders'][$i]['dataArray'][$j]); ?>
-						    </div>
+                                                    <div class='col-lg-12'>No data found</div>
 <?php
                 }
             }

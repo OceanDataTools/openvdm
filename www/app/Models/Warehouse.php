@@ -280,7 +280,7 @@ class Warehouse extends Model {
     }
     
     public function setCruiseStartDate($data){
-	var_dump($data);    
+	// var_dump($data);    
 	$where = array('name' => 'cruiseStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
@@ -291,7 +291,7 @@ class Warehouse extends Model {
     }
 
     public function setCruiseStartPort($data){
-    var_dump($data);    
+    // var_dump($data);    
     $where = array('name' => 'cruiseStartPort');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }

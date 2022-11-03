@@ -195,6 +195,10 @@ if __name__ == "__main__":
             if collection_system['transferType'] == "3":
                 make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + "%" + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
 
+            if collection_system['transferType'] == "4":
+                # ssh remote-host-ip '. ~/your_profile; test -d your_directory || mkdir your_directory'
+                make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "test", "-d", "mkdir \"" + source_dir + "\"", "||", "mkdir \"" + source_dir + "\""])
+
         for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
             root = root.replace(template_directory, '').lstrip('/')
             for name in dirs:
@@ -210,6 +214,10 @@ if __name__ == "__main__":
                 if collection_system['transferType'] == "3":
                     make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
 
+                if collection_system['transferType'] == "4":
+                    # ssh remote-host-ip '. ~/your_profile; mkdir your_directory'
+                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "mkdir \"" + os.path.join(source_dir, root, name) + "\""])
+
             for name in files:
                 new_name = name.replace("{cruiseID}", cruise_id)
                 if lowering_id is not None:
@@ -222,3 +230,7 @@ if __name__ == "__main__":
 
                 if collection_system['transferType'] == "3":
                     make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
+
+                if collection_system['transferType'] == "4":
+                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "scp",  os.path.join(source_dir, root, name), collection_system['sshUser'] + '@' + collection_system['sshServer'] + ':' + os.path.join(source_dir, root, new_name)])
+
