@@ -203,7 +203,7 @@ def test_rsync_source_dir(gearman_worker):
 
     proc = subprocess.run(server_test_command, capture_output=True, check=False)
 
-    if proc.returncode != 0:
+    if proc.returncode not in [0,24]:
         logging.warning("Connection test failed")
         return_val.extend([
             {"partName": "Rsync Connection", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.collection_system_transfer['rsyncServer']} as {gearman_worker.collection_system_transfer['rsyncUser']}"},
@@ -222,7 +222,7 @@ def test_rsync_source_dir(gearman_worker):
 
         proc = subprocess.run(source_test_command, capture_output=True, check=False)
 
-        if proc.returncode != 0:
+        if proc.returncode not in [0,24]:
             logging.warning("Source Directory Test Failed")
             return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} on the Rsync Server: {gearman_worker.collection_system_transfer['rsyncServer']}"})
         else:

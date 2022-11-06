@@ -43,7 +43,7 @@ use Helpers\Form;
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label><?php echo CRUISE_NAME; ?> Start Date/Time</label>
+                                    <label><?php echo CRUISE_NAME; ?> Start Date/Time (UTC)</label>
                                     <div class="input-group date datetimepickerToday">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartDate', 'value'=>$data['cruiseStartDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
@@ -60,7 +60,7 @@ use Helpers\Form;
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label><?php echo CRUISE_NAME; ?> End Date/Time</label>
+                                    <label><?php echo CRUISE_NAME; ?> End Date/Time (UTC)</label>
                                     <div class="input-group date datetimepicker">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndDate', 'value'=>$data['cruiseEndDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>

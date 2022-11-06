@@ -88,8 +88,8 @@ class Main extends Controller {
                 $error[] = CRUISE_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseStartDate)){
                 $error[] = 'Valid ' . CRUISE_NAME . ' Start Date is required';              
-            } elseif(strcmp($cruiseEndDate,'') != 0 && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
-                $error[] = 'Improperly formatted ' . CRUISE_NAME . ' End Date';
+            } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
+                $error[] = 'Valid ' . CRUISE_NAME . ' End Date is required';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();
                 
@@ -143,7 +143,8 @@ class Main extends Controller {
                 Url::redirect('config');
             } else {
                 $data['cruiseID'] = $cruiseID;
-                $data['cruiseStartDate'] = $cruiseStartDate;
+		$data['cruiseStartDate'] = $cruiseStartDate;
+		$data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
@@ -416,8 +417,8 @@ class Main extends Controller {
                 $error[] = CRUISE_NAME . ' ID is required';
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseStartDate)){
                 $error[] = 'Valid ' . CRUISE_NAME . ' Start Date is required';
-            } elseif($cruiseEndDate != '' && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
-                $error[] = 'Improperly formatted ' . CRUISE_NAME . ' End Date';
+            } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
+                $error[] = 'Valid ' . CRUISE_NAME . ' End Date is required';
             } else {
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();  
                 if (is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
