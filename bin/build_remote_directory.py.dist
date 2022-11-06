@@ -158,8 +158,8 @@ if __name__ == "__main__":
             logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collection_system)
             sys.exit(1)
 
-        if collection_system['transferType'] not in ["1","3"]:
-            logging.info("Collection System: %s is not a Local Directory or Samba Server Transfer!", parsed_args.collection_system)
+        if collection_system['transferType'] not in ["1","3", "4"]:
+            logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", parsed_args.collection_system)
             sys.exit(1)
 
         if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
@@ -173,8 +173,8 @@ if __name__ == "__main__":
     for collection_system in collection_systems:
 
         logging.debug(json.dumps(collection_system, indent=2))
-        if collection_system['transferType'] not in ["1","3"]:
-            logging.info("Skipping Collection System: %s. Transfer type is not Local Directory or Samba Server.", collection_system['name'])
+        if collection_system['transferType'] not in ["1","3", "4"]:
+            logging.info("Skipping Collection System: %s. Transfer type is not Local Directory SSH or Samba Server.", collection_system['name'])
             continue
 
         if not os.path.isdir(os.path.join(template_directory, collection_system['name'])):
