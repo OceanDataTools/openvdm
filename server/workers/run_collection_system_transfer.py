@@ -182,6 +182,9 @@ def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
+
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -299,6 +302,9 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
@@ -533,6 +539,9 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
+
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
     # Cleanup
@@ -614,6 +623,9 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
@@ -746,6 +758,9 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
