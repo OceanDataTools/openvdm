@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2023-02-11
 """
 
 import argparse
