@@ -31,6 +31,12 @@ class CollectionSystemTransfers extends Controller {
         return $trueFalse;
     }
     
+    private function _buildRemoveSourceFilesOptions() {
+        
+        $trueFalse = array(array('id'=>'removeSourceFiles0', 'name'=>'removeSourceFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'removeSourceFiles1', 'name'=>'removeSourceFiles', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
     private function _buildUseStartDateOptions() {
         
         $trueFalse = array(array('id'=>'useStartDate0', 'name'=>'useStartDate', 'value'=>'0', 'label'=>'No'), array('id'=>'useStartDate1', 'name'=>'useStartDate', 'value'=>'1', 'label'=>'Yes'));
@@ -130,6 +136,7 @@ class CollectionSystemTransfers extends Controller {
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['stalenessOptions'] = $this->_buildStalenessOptions();
+        $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
@@ -588,6 +595,7 @@ class CollectionSystemTransfers extends Controller {
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
+        $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
         $data['syncFromSourceOptions'] = $this->_buildSyncFromSourceOptions();

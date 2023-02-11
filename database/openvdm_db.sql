@@ -47,6 +47,7 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `sourceDir` tinytext,
   `destDir` tinytext,
   `staleness` int(11) DEFAULT '0',
+  `removeSourceFiles` int(1) unsigned NOT NULL DEFAULT '0',
   `useStartDate` tinyint(1) DEFAULT '0',
   `skipEmptyDirs` int(1) unsigned NOT NULL DEFAULT '1',
   `skipEmptyFiles` int(1) unsigned NOT NULL DEFAULT '1',
