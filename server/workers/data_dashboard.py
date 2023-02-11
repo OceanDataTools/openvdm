@@ -8,7 +8,7 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of OVDM data
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.9
   CREATED:  2015-01-01
  REVISION:  2022-07-24
 """
