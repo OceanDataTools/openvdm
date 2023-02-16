@@ -72,7 +72,6 @@
 #  - leaflet
 #  - charts
 #  - charts-zoom
-#  - leaflet
 
 # Placeholders are the bootstrap-styled panels that contain the <div> blocks where data
 # will be visualized that are rendered by the view.

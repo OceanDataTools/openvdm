@@ -167,17 +167,18 @@ function install_packages {
 
     # add-apt-repository -y ppa:ubuntugis/ppa
 
+    curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh
+    bash /tmp/nodesource_setup.sh
+
     apt-get update
 
     apt install -y openssh-server sshpass rsync curl git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev nodejs \
-        python3 python3-dev python3-pip python3-venv libgdal-dev \
-        gdal-bin libgeos-dev libgdal-dev supervisor mysql-server mysql-client \
-        npm ntp apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-        php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-        php7.3-yaml proj-bin python3-pyproj
-
-    pip3 install MapProxy
+        cifs-utils gearman-job-server libgearman-dev nodejs python3 \
+        python3-dev python3-pip python3-venv libgdal-dev gdal-bin libgeos-dev \
+        libgdal-dev supervisor mysql-server mysql-client ntp apache2 \
+        libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 php7.3-cli \
+        php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman php7.3-yaml \
+        proj-bin python3-pyproj pip3 install MapProxy
     
     # TODO Install these via virtualenv
     #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests

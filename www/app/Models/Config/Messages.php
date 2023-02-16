@@ -28,8 +28,13 @@ class Messages extends Model {
     public function insertMessage($data){
         if(!isset($data['messageTS'])) {
             $data['messageTS'] = gmdate('Y-m-d H:i:s');         
-            $data['messageViewed'] = 0;         
+            $data['messageViewed'] = 0;
         }
+
+        if(strlen($data['messageBody'] > 10000)){
+            $data['messageBody'] = substr($data['messageBody'], 0, 10000);
+        }
+
         $this->db->insert(PREFIX."Messages",$data);
     }
     

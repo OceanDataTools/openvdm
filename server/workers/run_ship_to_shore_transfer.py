@@ -94,7 +94,7 @@ def build_filters(gearman_worker, raw_filters):
     """
 
     return_filters = raw_filters
-    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', gearman_worker.cruise_id) for include_filter in return_filters['includeFilter']]
+    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', gearman_worker.cruise_id).replace('{cruise_config_fn}', gearman_worker.ovdm.get_cruise_config_fn()).replace('{md5_summary_fn}', gearman_worker.ovdm.get_md5_summary_fn()).replace('{md5_summary_md5_fn}', gearman_worker.ovdm.get_md5_summary_md5_fn()) for include_filter in return_filters['includeFilter']]
 
     return return_filters
 

@@ -1,10 +1,10 @@
 # Open Vessel Data Management
 
 ## Installation Guide
-At the time of this writing OpenVDM was built and tested against the Ubuntu 20.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 20.04 LTS is used.
+At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
 
 ### Operating System
-Goto <https://releases.ubuntu.com/20.04/>
+Goto <https://releases.ubuntu.com/22.04/>
 
 ### If you are installing OpenVDM remotely
 
