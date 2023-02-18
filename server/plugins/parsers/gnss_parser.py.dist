@@ -42,7 +42,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.openvdm import OpenVDM
+
 
 RAW_COLS = ['date_time','hdr','fix_time','lat_dd','ns','lon_dd','ew','alt_m','heading','pitch','roll','mrms','brms_checksum'] # OpenRVDAS style
 # RAW_COLS = ['date','time','hdr','fix_time','lat_dd','ns','lon_dd','ew','alt_m','heading','pitch','roll','mrms','brms_checksum'] # SCS style
@@ -65,12 +65,9 @@ class GNSSParser(OpenVDMCSVParser):
     Custom OpenVDM CSV file parser
     """
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=DEFAULT_TIME_FORMAT, use_openvdm_api=True):
-        super().__init__(start_dt=start_dt, stop_dt=stop_dt)
-        self.raw_cols = RAW_COLS
-        self.proc_cols = PROC_COLS
-        self.time_format = time_format
-        self.openvdm = OpenVDM() if use_openvdm_api else None
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
+        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+
 
     @staticmethod
     def _hemisphere_correction(lat_lon, hemisphere):
@@ -92,6 +89,9 @@ class GNSSParser(OpenVDMCSVParser):
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
                 reader = csv.DictReader(csvfile, self.raw_cols)
+
+                if self.skip_header:
+                    next(reader)
 
                 for lineno, line in enumerate(reader):
 
@@ -221,8 +221,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('--timeFormat', default=DEFAULT_TIME_FORMAT,
-                        help='timestamp format, default: %(default)')
+    parser.add_argument('--timeFormat', help='timestamp format', default=None)
     parser.add_argument('--startDT', default=None,
                         type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
                         help=' crop start timestamp (iso8601)')
@@ -245,7 +244,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = GNSSParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, use_openvdm_api=False)
+    ovdm_parser = GNSSParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

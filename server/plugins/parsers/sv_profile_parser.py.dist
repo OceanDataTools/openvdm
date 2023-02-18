@@ -41,7 +41,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.openvdm import OpenVDM
+
 
 RAW_COLS = ['Date/Time','Depth','Sound Velocity','Pressure','Temperature','Salinity','Density'] # Valeport
 PROC_COLS = ['Depth','Sound Velocity']
@@ -61,12 +61,7 @@ class SVProfileParser(OpenVDMCSVParser):
     """
 
     def __init__(self, use_openvdm_api=False):
-        super().__init__()
-        self.raw_cols = RAW_COLS
-        self.proc_cols = PROC_COLS
-        # self.time_format = time_format
-        self.openvdm = OpenVDM() if use_openvdm_api else None
-
+        super().__init__(RAW_COLS, PROC_COLS, use_openvdm_api=use_openvdm_api)
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """

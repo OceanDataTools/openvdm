@@ -19,6 +19,8 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+from server.lib.openvdm import OpenVDM
+
 STAT_TYPES = [
     'bounds',
     'geoBounds',
@@ -33,6 +35,9 @@ QUALITY_TEST_RESULT_TYPES = [
     'Warning',
     'Passed'
 ]
+
+DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
+# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 class NpEncoder(json.JSONEncoder):
     """
@@ -247,7 +252,8 @@ class OpenVDMParser():
     Root Class for a OpenVDM parser object
     """
 
-    def __init__(self):
+    def __init__(self, use_openvdm_api=False):
+        self.self.openvdm = OpenVDM() if use_openvdm_api else None
         self.plugin_data = {
             'visualizerData': [],
             'qualityTests': [],
@@ -375,11 +381,16 @@ class OpenVDMCSVParser(OpenVDMParser):
     OpenVDM parser for a CSV-style input file
     """
 
-    def __init__(self, start_dt=None, stop_dt=None):
+    def __init__(self, raw_cols, proc_cols, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
+        self.raw_cols = raw_cols
+        self.proc_cols = proc_cols
         self.start_dt = start_dt
         self.stop_dt = stop_dt
+        self.time_format = time_format or DEFAULT_TIME_FORMAT
+        self.skip_header = skip_header
+        self.use_openvdm_api = use_openvdm_api
         self.tmpdir = None
-        super().__init__()
+        super().__init__(use_openvdm_api=use_openvdm_api)
 
 
     def process_file(self, filepath):

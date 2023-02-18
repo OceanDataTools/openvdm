@@ -37,7 +37,6 @@ from osgeo import gdal
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMParser
-from server.lib.openvdm import OpenVDM
 
 # DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
@@ -47,10 +46,9 @@ class GeoTIFFParser(OpenVDMParser):
     Custom OpenVDM file parser
     """
 
-    def __init__(self, use_openvdm_api=True, output_dir=None):
-        super().__init__()
+    def __init__(self, use_openvdm_api=False, output_dir=None):
+        super().__init__(use_openvdm_api=use_openvdm_api)
         # self.time_format = time_format
-        self.openvdm = OpenVDM() if use_openvdm_api else None
 
         if output_dir is not None and not os.path.isdir(output_dir):
             raise FileNotFoundError("Output directory does not exist")
