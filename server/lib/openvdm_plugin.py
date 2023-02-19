@@ -253,7 +253,7 @@ class OpenVDMParser():
     """
 
     def __init__(self, use_openvdm_api=False):
-        self.self.openvdm = OpenVDM() if use_openvdm_api else None
+        self.openvdm = OpenVDM() if use_openvdm_api else None
         self.plugin_data = {
             'visualizerData': [],
             'qualityTests': [],

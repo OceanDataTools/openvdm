@@ -51,7 +51,8 @@ PROC_COLS = ['date_time','heading','pitch', 'roll', 'heave']
 ROUNDING = {
     'heading': 3,
     'pitch': 3,
-    'roll': 3
+    'roll': 3,
+    'heave': 3
 }
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
@@ -91,6 +92,7 @@ class PashrParser(OpenVDMCSVParser):
                         heading = float(line['heading'])
                         pitch = float(line['pitch'])
                         roll = float(line['roll'])
+                        heave = float(line['heave'])
 
                     except Exception as err:
                         errors.append(lineno)
@@ -103,6 +105,7 @@ class PashrParser(OpenVDMCSVParser):
                         raw_into_df['heading'].append(heading)
                         raw_into_df['pitch'].append(pitch)
                         raw_into_df['roll'].append(roll)
+                        raw_into_df['heave'].append(heave)
 
         except Exception as err:
             logging.error("Problem accessing input file: %s", filepath)
