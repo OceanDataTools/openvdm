@@ -163,7 +163,7 @@ function install_packages {
 
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
 
     # add-apt-repository -y ppa:ubuntugis/ppa
 
