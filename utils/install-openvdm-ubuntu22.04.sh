@@ -178,7 +178,9 @@ function install_packages {
         libgdal-dev supervisor mysql-server mysql-client ntp apache2 \
         libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 php7.3-cli \
         php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman php7.3-yaml \
-        proj-bin python3-pyproj pip3 install MapProxy
+        proj-bin python3-pyproj
+	
+    pip3 install MapProxy
     
     # TODO Install these via virtualenv
     #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests
