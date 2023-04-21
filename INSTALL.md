@@ -28,8 +28,8 @@ apt install -y curl
 
 Run the install script
 ```
-chmod +x ~/install-openvdm-ubuntu20.04.sh
-~/install-openvdm-ubuntu20.04.sh
+chmod +x ~/install-openvdm-ubuntu22.04.sh
+~/install-openvdm-ubuntu22.04.sh
 ```
 
 You will need to answer some questions about your configuration.
