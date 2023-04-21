@@ -1,5 +1,5 @@
 #!/bin/bash
-/usr/local/bin/bower --allow-root install
+/usr/bin/bower --allow-root install
 cd bower_components/chart.js
 npm install
 npm run build
