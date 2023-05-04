@@ -222,7 +222,9 @@ function install_python_packages {
 
     pip install -r $INSTALL_ROOT/openvdm/requirements.txt
 
-    pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
+       pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
+    fi
 }
 
 
