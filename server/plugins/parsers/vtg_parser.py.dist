@@ -25,9 +25,9 @@ REQUIREMENTS:  Python3.8
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-08-29
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import csv
@@ -42,7 +42,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.openvdm import OpenVDM
+
 
 RAW_COLS = ['date_time','hdr','cog_t','T','cog_m','M','sog_kts','N','sog_kph','K','checksum'] # OpenRVDAS style
 # RAW_COLS = ['date', 'time','hdr','cog_t','T','cog_m','M','sog_kts','N','sog_kph','K','checksum'] # SCS style
@@ -63,21 +63,16 @@ MAX_SOG_KPH = MAX_SOG_KTS * 1.852
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
-
 
 class VTGParser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=DEFAULT_TIME_FORMAT, use_openvdm_api=True):
-        super().__init__(start_dt=start_dt, stop_dt=stop_dt)
-        self.raw_cols = RAW_COLS
-        self.proc_cols = PROC_COLS
-        self.time_format = time_format
-        self.openvdm = OpenVDM() if use_openvdm_api else None
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False, no_mag=False):
+        self.no_mag = no_mag
+        proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'cog_m']
+        super().__init__(RAW_COLS, proc_cols, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
 
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -90,8 +85,11 @@ class VTGParser(OpenVDMCSVParser):
         logging.debug("Parsing data file...")
         errors = []
         try:
-            with open(filepath, 'r') as csvfile:
+            with open(filepath, mode='r', encoding="utf-8") as csvfile:
                 reader = csv.DictReader(csvfile, self.raw_cols)
+
+                if self.skip_header:
+                    next(reader)
 
                 for lineno, line in enumerate(reader):
 
@@ -100,7 +98,8 @@ class VTGParser(OpenVDMCSVParser):
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
                         cog_t = float(line['cog_t']) if line['cog_t'] != '' else None
-                        cog_m = float(line['cog_m']) if line['cog_m'] != '' else None
+                        if not self.no_mag:
+                            cog_m = float(line['cog_m']) if line['cog_m'] != '' else None
                         sog_kts = float(line['sog_kts']) if line['sog_kts'] != '' else None
                         sog_kph = float(line['sog_kph']) if line['sog_kph'] != '' else None
 
@@ -113,7 +112,8 @@ class VTGParser(OpenVDMCSVParser):
                     else:
                         raw_into_df['date_time'].append(date_time)
                         raw_into_df['cog_t'].append(cog_t)
-                        raw_into_df['cog_m'].append(cog_m)
+                        if not self.no_mag:
+                            raw_into_df['cog_m'].append(cog_m)
                         raw_into_df['sog_kts'].append(sog_kts)
                         raw_into_df['sog_kph'].append(sog_kph)
 
@@ -162,8 +162,9 @@ class VTGParser(OpenVDMCSVParser):
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
         self.add_bounds_stat([round(df_proc['cog_t'].min(),3), round(df_proc['cog_t'].max(),3)], "COG True Bounds", "deg")
         self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG True Validity")
-        self.add_bounds_stat([round(df_proc['cog_m'].min(),3), round(df_proc['cog_m'].max(),3)], "COG Magnetic Bounds", "deg")
-        self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
+        if not self.no_mag:
+            self.add_bounds_stat([round(df_proc['cog_m'].min(),3), round(df_proc['cog_m'].max(),3)], "COG Magnetic Bounds", "deg")
+            self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
         self.add_bounds_stat([round(df_proc['sog_kts'].min(),3), round(df_proc['sog_kts'].max(),3)], 'SOG Knots Bounds', 'deg')
         self.add_value_validity_stat([len(df_proc[(df_proc['sog_kts'] <= MAX_SOG_KTS)]),len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)])], "SOG Knots Validity")
         self.add_bounds_stat([round(df_proc['sog_kph'].min(),3), round(df_proc['sog_kph'].max(),3)], 'SOG KPH Bounds', 'deg')
@@ -213,13 +214,14 @@ class VTGParser(OpenVDMCSVParser):
         else:
             self.add_quality_test_passed("COG True")
 
-        error_rate = len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("COG Magnetic")
-        elif error_rate > .10:
-            self.add_quality_test_warning("COG Magnetic")
-        else:
-            self.add_quality_test_passed("COG Magnetic")
+        if not self.no_mag:
+            error_rate = len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)]) / len(df_proc)
+            if error_rate > .25:
+                self.add_quality_test_failed("COG Magnetic")
+            elif error_rate > .10:
+                self.add_quality_test_warning("COG Magnetic")
+            else:
+                self.add_quality_test_passed("COG Magnetic")
 
         # set index
         logging.debug('Setting index...')
@@ -242,10 +244,11 @@ class VTGParser(OpenVDMCSVParser):
         visualizer_data_obj['label'] = 'COG, True'
         self.add_visualization_data(deepcopy(visualizer_data_obj))
 
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_m']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'deg'
-        visualizer_data_obj['label'] = 'COG, Magnetic'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
+        if not self.no_mag:
+            visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_m']].to_json(orient='values'))
+            visualizer_data_obj['unit'] = 'deg'
+            visualizer_data_obj['label'] = 'COG, Magnetic'
+            self.add_visualization_data(deepcopy(visualizer_data_obj))
 
         visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sog_kts']].to_json(orient='values'))
         visualizer_data_obj['unit'] = 'kts'
@@ -259,7 +262,7 @@ class VTGParser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', 'Error(s) parsing datafile {} on row(s): {}'.format(filepath, ', '.join([str(error) for error in errors])))
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
 
 
 # -------------------------------------------------------------------------------------
@@ -272,14 +275,14 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('--timeFormat', default=DEFAULT_TIME_FORMAT,
-                        help='timestamp format, default: %(default)')
+    parser.add_argument('--timeFormat', help='timestamp format', default=None)
     parser.add_argument('--startDT', default=None,
                         type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
                         help=' crop start timestamp (iso8601)')
     parser.add_argument('--stopDT', default=None,
                         type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
                         help=' crop stop timestamp (iso8601)')
+    parser.add_argument('--noMag', action='store_true', default=False, help='skip processing for COG magnetic')
     parser.add_argument('dataFile', metavar='dataFile',
                         help='the raw data file to process')
 
@@ -296,7 +299,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = VTGParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
+    ovdm_parser = VTGParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, no_mag=parsed_args.noMag)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

@@ -50,9 +50,9 @@ DESCRIPTION:
     BUGS:
    NOTES:
   AUTHOR:  Webb Pinner
- VERSION:  2.8
+ VERSION:  2.9
  CREATED:  2020-11-19
-REVISION:  2022-07-01
+REVISION:  2022-07-24
 """
 
 import os
@@ -94,10 +94,10 @@ def make_local_directory(directory, create_source_dir=False):
     logging.debug("Create directory: %s, Create Source: %s", directory, "Yes" if create_source_dir else "No")
     pathlib.Path(directory).mkdir(mode=755, parents=create_source_dir, exist_ok=True)
 
-def main(argv):
-    """
-    The main function of the script
-    """
+# -------------------------------------------------------------------------------------
+# Required python code for running the script as a stand-alone utility
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
 
     # Define the command-line structure
     parser = argparse.ArgumentParser(description='build remote directory structure based on template')
@@ -133,18 +133,18 @@ def main(argv):
         sys.exit(1)
 
     # build an OpenVDM object
-    openVDM = OpenVDM()
+    openvdm = OpenVDM()
 
     # Retrieve the shipboard data warehouse configuration
-    warehouse_config = openVDM.get_shipboard_data_warehouse_config()
+    warehouse_config = openvdm.get_shipboard_data_warehouse_config()
 
     # Retrieve the current cruiseID
-    cruiseID = openVDM.get_cruise_id()
+    cruise_id = openvdm.get_cruise_id()
 
     # Retrieve the current loweringID
-    loweringID = openVDM.get_lowering_id()
+    lowering_id = openvdm.get_lowering_id()
 
-    if parsed_args.lowering is True and loweringID is None:
+    if parsed_args.lowering is True and lowering_id is None:
         logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
         sys.exit(1)
 
@@ -153,28 +153,28 @@ def main(argv):
     # Retrieve the information for the collection system defined in the command-line argument
     if parsed_args.collection_system:
 
-        collection_system = openVDM.get_collection_system_transfer_by_name(parsed_args.collection_system)
+        collection_system = openvdm.get_collection_system_transfer_by_name(parsed_args.collection_system)
         if not collection_system:
             logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collection_system)
             sys.exit(1)
 
-        if collection_system['transferType'] not in ["1","3"]:
-            logging.info("Collection System: %s is not a Local Directory or Samba Server Transfer!", parsed_args.collection_system)
+        if collection_system['transferType'] not in ["1","3", "4"]:
+            logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", parsed_args.collection_system)
             sys.exit(1)
 
-        if collection_system['cruiseOrLowering'] == "1" and loweringID is None:
+        if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
             logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
             sys.exit(1)
 
         collection_systems.append(collection_system)
     else:
-        collection_systems = openVDM.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openVDM.get_active_collection_system_transfers(cruise=False)
+        collection_systems = openvdm.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openvdm.get_active_collection_system_transfers(cruise=False)
 
     for collection_system in collection_systems:
 
         logging.debug(json.dumps(collection_system, indent=2))
-        if collection_system['transferType'] not in ["1","3"]:
-            logging.info("Skipping Collection System: %s. Transfer type is not Local Directory or Samba Server.", collection_system['name'])
+        if collection_system['transferType'] not in ["1","3", "4"]:
+            logging.info("Skipping Collection System: %s. Transfer type is not Local Directory SSH or Samba Server.", collection_system['name'])
             continue
 
         if not os.path.isdir(os.path.join(template_directory, collection_system['name'])):
@@ -182,9 +182,9 @@ def main(argv):
             continue
 
         logging.info("Collection System: %s", collection_system['name'])
-        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruiseID)
-        if loweringID is not None:
-            source_dir = source_dir.replace("{loweringID}", loweringID)
+        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruise_id)
+        if lowering_id is not None:
+            source_dir = source_dir.replace("{loweringID}", lowering_id)
 
         if parsed_args.create_source is True:
             logging.info("  - Creating source directory: %s", source_dir)
@@ -195,12 +195,16 @@ def main(argv):
             if collection_system['transferType'] == "3":
                 make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + "%" + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
 
+            if collection_system['transferType'] == "4":
+                # ssh remote-host-ip '. ~/your_profile; test -d your_directory || mkdir your_directory'
+                make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "test", "-d", "mkdir \"" + source_dir + "\"", "||", "mkdir \"" + source_dir + "\""])
+
         for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
             root = root.replace(template_directory, '').lstrip('/')
             for name in dirs:
-                name = name.replace("{cruiseID}", cruiseID)
-                if loweringID is not None:
-                    name = name.replace("{loweringID}", loweringID)
+                name = name.replace("{cruiseID}", cruise_id)
+                if lowering_id is not None:
+                    name = name.replace("{loweringID}", lowering_id)
 
                 logging.info("  - Creating directory: %s", os.path.join(source_dir, root, name))
                 if collection_system['transferType'] == "1":
@@ -210,11 +214,15 @@ def main(argv):
                 if collection_system['transferType'] == "3":
                     make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
 
+                if collection_system['transferType'] == "4":
+                    # ssh remote-host-ip '. ~/your_profile; mkdir your_directory'
+                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "mkdir \"" + os.path.join(source_dir, root, name) + "\""])
+
             for name in files:
-                new_name = name.replace("{cruiseID}", cruiseID)
-                if loweringID is not None:
-                    new_name = new_name.replace("{loweringID}", loweringID)
-                    
+                new_name = name.replace("{cruiseID}", cruise_id)
+                if lowering_id is not None:
+                    new_name = new_name.replace("{loweringID}", lowering_id)
+
                 logging.info("  - Creating file:      %s", os.path.join(source_dir, root, new_name))
                 if collection_system['transferType'] == "1":
                     shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(source_dir, root, new_name))
@@ -223,5 +231,6 @@ def main(argv):
                 if collection_system['transferType'] == "3":
                     make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
 
-if __name__ == "__main__":
-    main(sys.argv[1:])
+                if collection_system['transferType'] == "4":
+                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "scp",  os.path.join(source_dir, root, name), collection_system['sshUser'] + '@' + collection_system['sshServer'] + ':' + os.path.join(source_dir, root, new_name)])
+

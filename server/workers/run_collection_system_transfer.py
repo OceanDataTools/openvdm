@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  run_collection_system_transfer.py
 
 DESCRIPTION:  Gearman worker that handles the transfer of data from the Collection
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -26,10 +25,10 @@ import subprocess
 import sys
 import tempfile
 import time
-import pytz
 from datetime import datetime, timedelta
 from os.path import dirname, realpath
 from random import randint
+import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -40,14 +39,16 @@ from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 
-def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Build the list of files to include, exclude or ignore
     """
 
+    source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
+
     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-    logging.debug("data_start_date: %s", gearman_worker.data_start_date) 
+    logging.debug("data_start_date: %s", gearman_worker.data_start_date)
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     logging.debug("Start: %s", data_start_time)
 
@@ -136,7 +137,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-local
     return {'verdict': True, 'files': return_files}
 
 
-def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Build the list of files to include, exclude or ignore, for an rsync server
     transfer
@@ -161,7 +162,7 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
 
     try:
-        with open(rsync_password_filepath, 'w') as rsync_password_file:
+        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
             rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
         os.chmod(rsync_password_filepath, 0o600)
 
@@ -173,13 +174,16 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
 
         return {'verdict': False, 'reason': 'Error Saving temporary rsync password file: ' + rsync_password_filepath}
 
-    command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd', 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir + '/']
+    command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd', 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + gearman_worker.source_dir + '/']
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
         command.insert(2, '--min-size=1')
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     logging.debug("Command: %s", ' '.join(command))
 
@@ -266,15 +270,15 @@ def build_rsync_filelist(gearman_worker, source_dir): # pylint: disable=too-many
     # Cleanup
     shutil.rmtree(tmpdir)
 
-    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
+    return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
+    return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
 
     logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
     return {'verdict': True, 'files': return_files}
 
 
-def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
     """
     Build the list of files to include, exclude or ignore for a ssh server
     transfer
@@ -291,7 +295,7 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     filters = build_filters(gearman_worker)
 
-    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir + '/']
+    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
         command.insert(2, '--min-size=1')
@@ -299,7 +303,10 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0': 
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
     logging.debug("Command: %s", ' '.join(command))
@@ -382,8 +389,8 @@ def build_ssh_filelist(gearman_worker, source_dir): # pylint: disable=too-many-b
 
     del return_files['filesize']
 
-    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
+    return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
+    return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
 
     logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
@@ -395,12 +402,10 @@ def build_filters(gearman_worker):
     Replace wildcard string in filters
     """
 
-    lowering_id = gearman_worker.lowering_id if gearman_worker.lowering_id is not None else ""
-
     return {
-        'includeFilter': gearman_worker.collection_system_transfer['includeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id),
-        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id),
-        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id)
+        'includeFilter': gearman_worker.collection_system_transfer['includeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
+        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
+        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id)
     }
 
 
@@ -409,8 +414,7 @@ def build_dest_dir(gearman_worker):
     Replace wildcard string in destDir
     """
 
-    lowering_id = gearman_worker.lowering_id if gearman_worker.lowering_id is not None else ""
-    return gearman_worker.collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+    return gearman_worker.collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
 
 def build_source_dir(gearman_worker):
@@ -418,8 +422,7 @@ def build_source_dir(gearman_worker):
     Replace wildcard string in sourceDir
     """
 
-    lowering_id = gearman_worker.lowering_id if gearman_worker.lowering_id is not None else ""
-    return gearman_worker.collection_system_transfer['sourceDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+    return gearman_worker.collection_system_transfer['sourceDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
 
 def build_logfile_dirpath(gearman_worker):
@@ -427,8 +430,7 @@ def build_logfile_dirpath(gearman_worker):
     build the path to save transfer logfiles
     """
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-    return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+    return os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
 def run_transfer_command(gearman_worker, gearman_job, command, file_count):
@@ -438,7 +440,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
     dest_dir = command[-1]
 
     file_index = 0
@@ -446,7 +447,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     updated_files = []
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.poll() is None):
+    while proc.poll() is None:
 
         for line in proc.stdout:
 
@@ -473,8 +474,8 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
                 gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
                 file_index += 1
 
-    new_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
-    updated_files = [os.path.join(dest_dir.replace(cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
+    new_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
+    updated_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
 
     return new_files, updated_files
 
@@ -486,19 +487,11 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Transfer from Local Directory")
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-
-    if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1":
-        dest_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'], gearman_worker.lowering_id, build_dest_dir(gearman_worker))
-    else:
-        dest_dir = os.path.join(cruise_dir, build_dest_dir(gearman_worker))
-
-    source_dir = build_source_dir(gearman_worker)
-    logging.debug("Source Dir: %s", source_dir)
-    logging.debug("Destination Dir: %s", dest_dir)
+    logging.debug("Source Dir: %s", gearman_worker.source_dir)
+    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker, source_dir)
+    output_results = build_filelist(gearman_worker)
     if not output_results['verdict']:
         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
     files = output_results['files']
@@ -511,11 +504,11 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Mod file list")
     local_transfer_filelist = files['include']
-    local_transfer_filelist = [filename.replace(source_dir, '', 1) for filename in local_transfer_filelist]
+    local_transfer_filelist = [filename.replace(gearman_worker.source_dir, '', 1) for filename in local_transfer_filelist]
 
     logging.debug("Start")
     try:
-        with open(rsync_filelist_filepath, 'w') as rsync_filelist_file:
+        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
             for file in local_transfer_filelist:
                 try:
                     rsync_filelist_file.write(str(file) + '\n')
@@ -532,10 +525,10 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Done")
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, source_dir + '/', dest_dir]
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, gearman_worker.source_dir + '/', gearman_worker.dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
 
     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
         command.insert(2, '--delete')
@@ -545,6 +538,9 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
@@ -561,10 +557,6 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer from SMB Source")
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-
-    # filters = build_filters(gearman_worker)
-
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
 
@@ -572,10 +564,8 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     mntpoint = os.path.join(tmpdir, 'mntpoint')
     os.mkdir(mntpoint, 0o755)
 
-    dest_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'], gearman_worker.lowering_id, build_dest_dir(gearman_worker)) if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" else  os.path.join(cruise_dir, build_dest_dir(gearman_worker))
-    source_dir = os.path.join(mntpoint, build_source_dir(gearman_worker)).rstrip('/')
-    logging.debug("Source Dir: %s", source_dir)
-    logging.debug("Destination Dir: %s", dest_dir)
+    logging.debug("Source Dir: %s", gearman_worker.source_dir)
+    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     # Mount SMB Share
     logging.debug("Mounting SMB Share")
@@ -597,7 +587,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     proc = subprocess.call(mount_command)
 
     logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker, source_dir)
+    output_results = build_filelist(gearman_worker, prefix=mntpoint)
     if not output_results['verdict']:
         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
     files = output_results['files']
@@ -607,7 +597,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
     try:
-        with open(rsync_filelist_filepath, 'w') as rsync_filelist_file:
+        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
             rsync_filelist_file.write('\n'.join(files['include']))
 
     except IOError:
@@ -618,12 +608,12 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         subprocess.call(['umount', mntpoint])
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files': []}
+        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files': []}
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, source_dir, dest_dir]
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, os.path.join(mntpoint, gearman_worker.source_dir), gearman_worker.dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
 
     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
         command.insert(2, '--delete')
@@ -633,6 +623,9 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
+
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
@@ -651,17 +644,11 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
 
     logging.debug("Transfer from RSYNC Server")
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-
-    dest_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'], gearman_worker.lowering_id, build_dest_dir(gearman_worker)) if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" else os.path.join(cruise_dir, build_dest_dir(gearman_worker))
-
-    source_dir = build_source_dir(gearman_worker)
-
-    logging.debug("Source Dir: %s", source_dir)
-    logging.debug("Destination Dir: %s", dest_dir)
+    logging.debug("Source Dir: %s", gearman_worker.source_dir)
+    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_rsync_filelist(gearman_worker, source_dir)
+    output_results = build_rsync_filelist(gearman_worker)
 
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
@@ -674,7 +661,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
 
     try:
-        with open(rsync_password_filepath, 'w') as rsync_password_file:
+        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
             rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
 
         os.chmod(rsync_password_filepath, 0o600)
@@ -686,12 +673,12 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
         # Cleanup
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync password file: ' + rsync_password_filepath}
+        return {'verdict': False, 'reason': f'Error Saving temporary rsync password file: {rsync_password_filepath}'}
 
     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
     try:
-        with open(rsync_filelist_filepath, 'w') as rsync_filelist_file:
+        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
             rsync_filelist_file.write('\n'.join(files['include']))
 
     except IOError:
@@ -700,12 +687,12 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
         # Cleanup
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files':[]}
+        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files':[]}
 
-    command = ['rsync', '-tri', '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + source_dir, dest_dir]
+    command = ['rsync', '-tri', '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + gearman_worker.source_dir, gearman_worker.dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
 
     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
         command.insert(2, '--delete')
@@ -731,17 +718,11 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer from SSH Server")
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-
-    dest_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'], gearman_worker.lowering_id, build_dest_dir(gearman_worker)) if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" else os.path.join(cruise_dir, build_dest_dir(gearman_worker))
-
-    source_dir = build_source_dir(gearman_worker)
-
-    logging.debug("Source Dir: %s", source_dir)
-    logging.debug("Destination Dir: %s", dest_dir)
+    logging.debug("Source Dir: %s", gearman_worker.source_dir)
+    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
     logging.debug("Build file list")
-    output_results = build_ssh_filelist(gearman_worker, source_dir)
+    output_results = build_ssh_filelist(gearman_worker)
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
 
@@ -753,7 +734,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     ssh_filelist_filepath = os.path.join(tmpdir, 'sshFileList.txt')
 
     try:
-        with open(ssh_filelist_filepath, 'w') as ssh_filelist_file:
+        with open(ssh_filelist_filepath, mode='w', encoding='utf-8') as ssh_filelist_file:
             ssh_filelist_file.write('\n'.join(files['include']))
 
     except IOError:
@@ -762,12 +743,12 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         # Cleanup
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + ssh_filelist_filepath, 'files':[]}
+        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
-    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + source_dir, dest_dir]
+    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.collection_system_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
 
     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
         command.insert(2, '--delete')
@@ -778,7 +759,10 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0': 
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
@@ -798,13 +782,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.stop = False
         self.ovdm = OpenVDM()
         self.transfer_start_date = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
+        self.cruise_id = None
+        self.cruise_dir = None
+        self.source_dir = None
+        self.dest_dir = None
+        self.lowering_id = None
         self.data_start_date = None
         self.data_end_date = None
-        self.system_status = self.ovdm.get_system_status()
-        self.collection_system_transfer = {}
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.system_status = None
+        self.collection_system_transfer = None
+        self.shipboard_data_warehouse_config = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def on_job_execute(self, current_job):
@@ -841,14 +829,33 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
 
-        if self.collection_system_transfer['cruiseOrLowering'] == "1" and not self.lowering_id:
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
+
+        if not self.lowering_id:
+            # exit with error if trying to run a lowering collection system transfer
+            if self.collection_system_transfer['cruiseOrLowering'] == "1":
+                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+
+            # exit with error if trying to run a cruise collection system transfer that has a loweringID in the destination path
+            if '{loweringID}' in self.collection_system_transfer['destDir']:
+                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+
+            self.lowering_id = ""
+
+        if self.collection_system_transfer['cruiseOrLowering'] == "1":
+            self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, build_dest_dir(self))
+        else:
+            self.dest_dir = os.path.join(self.cruise_dir, build_dest_dir(self))
+
+        self.source_dir = build_source_dir(self)
 
         logging.info("Job: %s, %s transfer started at: %s", current_job.handle, self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
 
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
-        ### Sset temporal bounds for transfer
+        ### Set temporal bounds for transfer
         # if temporal bands are not used then set to absolute min/max
         if self.collection_system_transfer['useStartDate'] == '0':
             self.data_start_date = "1970/01/01 00:00"
@@ -878,8 +885,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # Todo - there's a chance the dates are not set and stay set to None... which errors here.
         logging.debug("Start date/time filter: %s", self.data_start_date)
         logging.debug("End date/time filter: %s", self.data_end_date)
-
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         return super().on_job_execute(current_job)
 
@@ -941,6 +946,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -949,6 +955,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -972,10 +979,6 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             'exclude':[]
         }
     }
-
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-    collection_system_dest_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'], gearman_worker.lowering_id, build_dest_dir(gearman_worker)) if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" else os.path.join(cruise_dir, build_dest_dir(gearman_worker))
-    # collection_system_source_dir = build_source_dir(gearman_worker)
 
     logging.debug("Setting transfer status to 'Running'")
     gearman_worker.ovdm.set_running_collection_system_transfer(gearman_worker.collection_system_transfer['collectionSystemTransferID'], os.getpid(), current_job.handle)
@@ -1005,10 +1008,10 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     gearman_worker.send_job_status(current_job, 2, 10)
 
-    if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" and gearman_worker.lowering_id is None:
-        logging.info("Verifying lowering_id is set")
-        job_results['parts'].append({'partName': 'Destination Directory Test', "result": "Fail", 'reason': 'Lowering ID is not defined'})
-        return json.dumps(job_results)
+    # if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" and gearman_worker.lowering_id is None:
+    #     logging.info("Verifying lowering_id is set")
+    #     job_results['parts'].append({'partName': 'Destination Directory Test', "result": "Fail", 'reason': 'Lowering ID is not defined'})
+    #     return json.dumps(job_results)
 
     logging.info("Transferring files")
     output_results = None
@@ -1047,10 +1050,10 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
         logging.info("Setting file permissions")
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), collection_system_dest_dir))
+        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
 
         if not output_results['verdict']:
-            logging.error("Error setting destination directory file/directory ownership/permissions: %s", collection_system_dest_dir)
+            logging.error("Error setting destination directory file/directory ownership/permissions: %s", gearman_worker.dest_dir)
             job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
@@ -1144,6 +1147,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -1151,6 +1155,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

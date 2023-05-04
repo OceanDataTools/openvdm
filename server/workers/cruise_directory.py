@@ -9,13 +9,12 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
-import errno
 import json
 import logging
 import os
@@ -50,6 +49,7 @@ def build_dest_dir(gearman_worker, dest_dir):
     """
     Replace any wildcards in the provided directory
     """
+
     return_dest_dir = dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)
     return_dest_dir = return_dest_dir.replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'],)
 
@@ -67,29 +67,31 @@ def build_directorylist(gearman_worker):
 
     return_directories = []
 
+    # Add required extra directories
+    extra_directories = gearman_worker.ovdm.get_required_extra_directories()
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+
+    # Add lowering base directory
     if gearman_worker.ovdm.get_show_lowering_components():
         return_directories.append(os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']))
 
-    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers()
+    # Add active collection system transfers
+    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
-    for collection_system_transfer in collection_system_transfers:
-        if collection_system_transfer['enable'] == "1" and collection_system_transfer['cruiseOrLowering'] == "0":
-            dest_dir = build_dest_dir(gearman_worker, collection_system_transfer['destDir'])
-            return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+    # Filter out collection system transfers that contain {loweringID} in the dest_dir if there is no lowering ID
+    if not gearman_worker.lowering_id:
+        collection_system_transfers = [ collection_system_transfer for collection_system_transfer in collection_system_transfers if '{loweringID}' not in collection_system_transfer['destDir']]
 
-    required_extra_directories = gearman_worker.ovdm.get_required_extra_directories()
-    for required_extra_directory in required_extra_directories:
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
-        if required_extra_directory['enable'] == "1":
-            dest_dir = build_dest_dir(gearman_worker, required_extra_directory['destDir'])
-            return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+    # Add active extra directories
+    extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
 
-    extra_directories = gearman_worker.ovdm.get_extra_directories()
-    if extra_directories:
-        for extra_directory in extra_directories:
-            if extra_directory['enable'] == "1" and extra_directory['cruiseOrLowering'] == "0":
-                dest_dir = build_dest_dir(gearman_worker, extra_directory['destDir'])
-                return_directories.append(os.path.join(gearman_worker.cruise_dir, dest_dir))
+    # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
+    if not gearman_worker.lowering_id:
+        extra_directories = [ extra_directory for extra_directory in extra_directories if '{loweringID}' not in extra_directory['destDir']]
+
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
     return return_directories
 
@@ -103,12 +105,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.cruise_start_date = self.ovdm.get_cruise_start_date()
+        self.cruise_id = None
+        self.cruise_dir = None
+        self.lowering_id = None
+        self.cruise_start_date = None
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.lowering_id = self.ovdm.get_cruise_id()
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
+
 
     @staticmethod
     def _get_custom_task(current_job):
@@ -135,16 +139,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
-        # else:
-        #     self.ovdm.track_gearman_job(taskLookup[current_job.task], os.getpid(), current_job.handle)
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-
+        self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
+
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)
 
@@ -199,6 +203,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -207,6 +212,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -230,7 +236,6 @@ def task_create_cruise_directory(gearman_worker, gearman_job):
         logging.error("Failed to find base directory: %s", gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'])
         job_results['parts'].append({"partName": "Verify Base Directory exists", "result": "Fail", "reason": "Failed to find base directory: " + gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']})
         return json.dumps(job_results)
-
 
     if not os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory does not exists", "result": "Pass"})
@@ -333,6 +338,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
 
     if os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
+
     else:
         logging.error("Cruise directory not found")
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to locate the cruise directory: " + gearman_worker.cruise_dir})
@@ -346,6 +352,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
 
     if len(directorylist) > 0:
         job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
+
     else:
         logging.error("Directory list is empty")
         job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
@@ -359,6 +366,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
+
     else:
         logging.error("Failed to create any/all of the cruise data directory structure")
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
@@ -371,6 +379,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
+
     else:
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
@@ -412,6 +421,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -419,6 +429,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

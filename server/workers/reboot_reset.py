@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  reboot_reset.py
 
 DESCRIPTION:  This program resets OVDM state information in the database.
@@ -8,9 +7,9 @@ DESCRIPTION:  This program resets OVDM state information in the database.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-06-22
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -22,6 +21,7 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+
 
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility

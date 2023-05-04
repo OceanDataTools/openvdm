@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing cruise data transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -30,14 +30,16 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
+
 def write_test(dest_dir):
     """
     Verify the current user has write permissions to the dest_dir
     """
+
     if os.path.isdir(dest_dir):
         try:
             filepath = os.path.join(dest_dir, 'writeTest.txt')
-            with open(filepath, 'w') as filehandle:
+            with open(filepath, mode='w', encoding='utf-8') as filehandle:
                 filehandle.write("this file tests if the parent directory can be written to.  You can delete this file if desired")
 
             os.remove(filepath)
@@ -59,10 +61,10 @@ def test_local_dest_dir(gearman_worker):
     dest_dir = gearman_worker.cruise_data_transfer['destDir']
 
     if not os.path.isdir(dest_dir):
-        return_val.append({"partName": "Destination Directory", "result": "Fail", "reason": "Unable to locate destination directory: {}".format(dest_dir)})
+        return_val.append({"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to locate destination directory: {dest_dir}"})
         if gearman_worker.cruise_data_transfer['localDirIsMountPoint'] == '1':
-            return_val.append({"partName": "Destination Directory is a Mountpoint", "result": "Fail", "reason": "Unable to locate destination directory: {}".format(dest_dir)})
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to locate destination directory: {}".format(dest_dir)})
+            return_val.append({"partName": "Destination Directory is a Mountpoint", "result": "Fail", "reason": f"Unable to locate destination directory: {dest_dir}"})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to locate destination directory: {dest_dir}"})
 
         return return_val
 
@@ -71,8 +73,8 @@ def test_local_dest_dir(gearman_worker):
     if gearman_worker.cruise_data_transfer['localDirIsMountPoint'] == '1':
         if not os.path.ismount(dest_dir):
             return_val.extend([
-                {"partName": "Destination Directory is a Mountpoint", "result": "Fail", "reason": "Destination directory: {} is not a mountpoint".format(dest_dir)},
-                {"partName": "Write Test", "result": "Fail", "reason": "Destination directory: {} is not a mountpoint".format(dest_dir)}
+                {"partName": "Destination Directory is a Mountpoint", "result": "Fail", "reason": f"Destination directory: {dest_dir} is not a mountpoint"},
+                {"partName": "Write Test", "result": "Fail", "reason": f"Destination directory: {dest_dir} is not a mountpoint"}
             ])
 
             return return_val
@@ -80,7 +82,7 @@ def test_local_dest_dir(gearman_worker):
         return_val.append({"partName": "Destination Directory is a Mountpoint", "result": "Pass"})
 
     if not write_test(dest_dir):
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to write data to desination directory: " + dest_dir})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to write data to desination directory: {dest_dir}"})
         return return_val
 
     return_val.append({"partName": "Write Test", "result": "Pass"})
@@ -119,10 +121,10 @@ def test_smb_dest_dir(gearman_worker):
 
     if not found_server:
         return_val.extend([
-            {"partName": "SMB Server", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
-            {"partName": "SMB Share", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Could not connect to SMB Server: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
+            {"partName": "SMB Server", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"},
+            {"partName": "SMB Share", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"},
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Could not connect to SMB Server: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"}
         ])
 
         return return_val
@@ -142,9 +144,9 @@ def test_smb_dest_dir(gearman_worker):
 
     if proc.returncode != 0:
         return_val.extend([
-            {"partName": "SMB Share", "result": "Fail", "reason": "Could not connect to SMB Share: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Could not connect to SMB Share: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Could not connect to SMB Share: {} as {}".format(gearman_worker.cruise_data_transfer['smbServer'], gearman_worker.cruise_data_transfer['smbUser'])}
+            {"partName": "SMB Share", "result": "Fail", "reason": f"Could not connect to SMB Share: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"},
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Could not connect to SMB Share: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Could not connect to SMB Share: {gearman_worker.cruise_data_transfer['smbServer']} as {gearman_worker.cruise_data_transfer['smbUser']}"}
         ])
 
         # Cleanup
@@ -156,14 +158,14 @@ def test_smb_dest_dir(gearman_worker):
 
     dest_dir = os.path.join(mntpoint, gearman_worker.cruise_data_transfer['destDir'])
     if not os.path.isdir(dest_dir):
-        return_val.append({"partName": "Destination Directory", "result": "Fail", "reason": "Unable to find destination directory: {} within the SMB Share: {}".format(gearman_worker.cruise_data_transfer['destDir'], gearman_worker.cruise_data_transfer['smbServer'])})
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to find destination directory: {} within the SMB Share: {}".format(gearman_worker.cruise_data_transfer['destDir'], gearman_worker.cruise_data_transfer['smbServer'])})
+        return_val.append({"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to find destination directory: {gearman_worker.cruise_data_transfer['destDir']} within the SMB Share: {gearman_worker.cruise_data_transfer['smbServer']}"})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to find destination directory: {gearman_worker.cruise_data_transfer['destDir']} within the SMB Share: {gearman_worker.cruise_data_transfer['smbServer']}"})
 
     else:
         return_val.append({"partName": "Destination Directory", "result": "Pass"})
 
         if not write_test(dest_dir):
-            return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to write to destination directory: {} within the SMB Share: {}".format(dest_dir, gearman_worker.cruise_data_transfer['smbServer'])})
+            return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to write to destination directory: {dest_dir} within the SMB Share: {gearman_worker.cruise_data_transfer['smbServer']}"})
         else:
             return_val.append({"partName": "Write Test", "result": "Pass"})
 
@@ -191,7 +193,7 @@ def test_rsync_dest_dir(gearman_worker):
     rsync_password_filepath = os.path.join(tmpdir,'passwordFile')
 
     try:
-        with open(rsync_password_filepath, 'w') as rsync_password_file:
+        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
 
             if gearman_worker.cruise_data_transfer['rsyncUser'] != 'anonymous':
                 rsync_password_file.write(gearman_worker.cruise_data_transfer['rsyncPass'])
@@ -200,7 +202,7 @@ def test_rsync_dest_dir(gearman_worker):
 
     except IOError:
         logging.error("Error Saving temporary rsync password file %s", rsync_password_filepath)
-        return_val.append({"partName": "Writing temporary rsync password file", "result": "Fail", "reason": "Unable to create temporary rsync password file: {}".format(rsync_password_filepath)})
+        return_val.append({"partName": "Writing temporary rsync password file", "result": "Fail", "reason": f"Unable to create temporary rsync password file: {rsync_password_filepath}"})
 
         # Cleanup
         shutil.rmtree(tmpdir)
@@ -217,9 +219,9 @@ def test_rsync_dest_dir(gearman_worker):
 
     if proc.returncode != 0:
         return_val.extend([
-            {"partName": "Rsync Connection", "result": "Fail", "reason": "Unable to connect to rsync server: {} as {}".format(gearman_worker.cruise_data_transfer['rsyncServer'], gearman_worker.cruise_data_transfer['rsyncUser'])},
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Unable to connect to rsync server: {} as {}".format(gearman_worker.cruise_data_transfer['rsyncServer'], gearman_worker.cruise_data_transfer['rsyncUser'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Unable to connect to rsync server: {} as {}".format(gearman_worker.cruise_data_transfer['rsyncServer'], gearman_worker.cruise_data_transfer['rsyncUser'])}
+            {"partName": "Rsync Connection", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.cruise_data_transfer['rsyncServer']} as {gearman_worker.cruise_data_transfer['rsyncUser']}"},
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.cruise_data_transfer['rsyncServer']} as {gearman_worker.cruise_data_transfer['rsyncUser']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Unable to connect to rsync server: {gearman_worker.cruise_data_transfer['rsyncServer']} as {gearman_worker.cruise_data_transfer['rsyncUser']}"}
         ])
 
         # Cleanup
@@ -231,7 +233,7 @@ def test_rsync_dest_dir(gearman_worker):
 
     dest_dir = gearman_worker.cruise_data_transfer['destDir']
 
-    dest_test_command = ['rsync', '--no-motd', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir]
+    dest_test_command = ['rsync', '--contimeout=5', '--no-motd', '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir]
 
     logging.debug("Destination test command: %s", ' '.join(dest_test_command))
 
@@ -239,8 +241,8 @@ def test_rsync_dest_dir(gearman_worker):
 
     if proc.returncode != 0:
         return_val.extend([
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Unable to find destination directory: {} on the Rsync Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['rsyncServer'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Unable to find destination directory: {} on the Rsync Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['rsyncServer'])}
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to find destination directory: {dest_dir} on the Rsync Server: {gearman_worker.cruise_data_transfer['rsyncServer']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Unable to find destination directory: {dest_dir} on the Rsync Server: {gearman_worker.cruise_data_transfer['rsyncServer']}"}
         ])
 
         # Cleanup
@@ -251,7 +253,7 @@ def test_rsync_dest_dir(gearman_worker):
     return_val.append({"partName": "Destination Directory", "result": "Pass"})
 
     write_test_file = os.path.join(tmpdir, 'writeTest.txt')
-    with open(write_test_file, 'a') as write_test_file_handle:
+    with open(write_test_file, mode='a', encoding='utf-8') as write_test_file_handle:
         write_test_file_handle.write("This file proves this directory can be written to by OpenVDM")
 
     write_test_command = ['rsync', '-vi', '--no-motd', '--password-file=' + rsync_password_filepath, write_test_file, 'rsync://' + gearman_worker.cruise_data_transfer['rsyncUser'] + '@' + gearman_worker.cruise_data_transfer['rsyncServer'] + dest_dir]
@@ -261,7 +263,7 @@ def test_rsync_dest_dir(gearman_worker):
     proc = subprocess.run(write_test_command, capture_output=True, check=False)
 
     if proc.returncode != 0:
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to write to destination directory: {} on the Rsync Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['rsyncServer'])})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to write to destination directory: {dest_dir} on the Rsync Server: {gearman_worker.cruise_data_transfer['rsyncServer']}"})
 
     else:
 
@@ -275,7 +277,7 @@ def test_rsync_dest_dir(gearman_worker):
         logging.debug(proc.stderr)
 
         if proc.returncode != 0:
-            return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to write to destination directory: {} on the Rsync Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['rsyncServer'])})
+            return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to write to destination directory: {dest_dir} on the Rsync Server: {gearman_worker.cruise_data_transfer['rsyncServer']}"})
 
         else:
             return_val.append({"partName": "Write Test", "result": "Pass"})
@@ -309,9 +311,9 @@ def test_ssh_dest_dir(gearman_worker):
 
     if proc.returncode != 0:
         return_val.extend([
-            {"partName": "SSH Connection", "result": "Fail", "reason": "Unable to connect to ssh server: {} as {}".format(gearman_worker.cruise_data_transfer['sshServer'], gearman_worker.cruise_data_transfer['sshUser'])},
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Unable to connect to ssh server: {} as {}".format(gearman_worker.cruise_data_transfer['sshServer'], gearman_worker.cruise_data_transfer['sshUser'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Unable to connect to ssh server: {} as {}".format(gearman_worker.cruise_data_transfer['sshServer'], gearman_worker.cruise_data_transfer['sshUser'])}
+            {"partName": "SSH Connection", "result": "Fail", "reason": f"Unable to connect to ssh server: {gearman_worker.cruise_data_transfer['sshServer']} as {gearman_worker.cruise_data_transfer['sshUser']}"},
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to connect to ssh server: {gearman_worker.cruise_data_transfer['sshServer']} as {gearman_worker.cruise_data_transfer['sshUser']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Unable to connect to ssh server: {gearman_worker.cruise_data_transfer['sshServer']} as {gearman_worker.cruise_data_transfer['sshUser']}"}
         ])
         return return_val
 
@@ -322,10 +324,10 @@ def test_ssh_dest_dir(gearman_worker):
     dest_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
 
     if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
-      dest_test_command += ['-o', 'PasswordAuthentication=no']
+        dest_test_command += ['-o', 'PasswordAuthentication=no']
 
     else:
-      dest_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + dest_test_command + ['-o', 'PubkeyAuthentication=no']
+        dest_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + dest_test_command + ['-o', 'PubkeyAuthentication=no']
 
     dest_test_command += ['ls', "\"" + dest_dir + "\""]
 
@@ -335,8 +337,8 @@ def test_ssh_dest_dir(gearman_worker):
 
     if proc.returncode != 0:
         return_val.extend([
-            {"partName": "Destination Directory", "result": "Fail", "reason": "Unable to find destination directory: {} on the SSH Server: {}".format(dest_dir,gearman_worker.cruise_data_transfer['sshServer'])},
-            {"partName": "Write Test", "result": "Fail", "reason": "Unable to find destination directory: {} on the SSH Server: {}".format(dest_dir,gearman_worker.cruise_data_transfer['sshServer'])}
+            {"partName": "Destination Directory", "result": "Fail", "reason": f"Unable to find destination directory: {dest_dir} on the SSH Server: {gearman_worker.cruise_data_transfer['sshServer']}"},
+            {"partName": "Write Test", "result": "Fail", "reason": f"Unable to find destination directory: {dest_dir} on the SSH Server: {gearman_worker.cruise_data_transfer['sshServer']}"}
         ])
 
         return return_val
@@ -346,10 +348,10 @@ def test_ssh_dest_dir(gearman_worker):
     write_test_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
 
     if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
-      write_test_command += ['-o', 'PasswordAuthentication=no']
+        write_test_command += ['-o', 'PasswordAuthentication=no']
 
     else:
-      write_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_test_command + ['-o', 'PubkeyAuthentication=no']
+        write_test_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_test_command + ['-o', 'PubkeyAuthentication=no']
 
     write_test_command += ['touch ' + os.path.join(dest_dir, 'writeTest.txt')]
 
@@ -358,17 +360,17 @@ def test_ssh_dest_dir(gearman_worker):
     proc = subprocess.run(write_test_command, capture_output=True, check=False)
 
     if proc.returncode != 0:
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to write to destination directory: {} on the SSH Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['sshServer'])})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to write to destination directory: {dest_dir} on the SSH Server: {gearman_worker.cruise_data_transfer['sshServer']}"})
 
         return return_val
 
     write_cleanup_command = ['ssh', gearman_worker.cruise_data_transfer['sshServer'], '-l', gearman_worker.cruise_data_transfer['sshUser'], '-o', 'StrictHostKeyChecking=no']
 
     if gearman_worker.cruise_data_transfer['sshUseKey'] == '1':
-      write_cleanup_command += ['-o', 'PasswordAuthentication=no']
+        write_cleanup_command += ['-o', 'PasswordAuthentication=no']
 
     else:
-      write_cleanup_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_cleanup_command + ['-o', 'PubkeyAuthentication=no']
+        write_cleanup_command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + write_cleanup_command + ['-o', 'PubkeyAuthentication=no']
 
     write_cleanup_command += ['rm ' + os.path.join(dest_dir, 'writeTest.txt')]
 
@@ -378,7 +380,7 @@ def test_ssh_dest_dir(gearman_worker):
     proc = subprocess.run(write_cleanup_command, capture_output=True, check=False)
 
     if proc.returncode != 0:
-        return_val.append({"partName": "Write Test", "result": "Fail", "reason": "Unable to cleanup test file from destination directory: {} on the SSH Server: {}".format(dest_dir, gearman_worker.cruise_data_transfer['sshServer'])})
+        return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to cleanup test file from destination directory: {dest_dir} on the SSH Server: {gearman_worker.cruise_data_transfer['sshServer']}"})
 
         return return_val
 
@@ -394,7 +396,7 @@ def test_source_dir(gearman_worker):
 
     cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
 
-    return [{"partName": "Source Directory", "result": "Pass"}] if os.path.isdir(cruise_dir) else [{"partName": "Source Directory", "result": "Fail", "reason": "Unable to find cruise directory: {} on the Data Warehouse".format(cruise_dir)}]
+    return [{"partName": "Source Directory", "result": "Pass"}] if os.path.isdir(cruise_dir) else [{"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find cruise directory: {cruise_dir} on the Data Warehouse"}]
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
@@ -405,9 +407,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.cruise_data_transfer = {}
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.cruise_data_transfer = None
+        self.shipboard_data_warehouse_config = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
@@ -487,6 +490,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -495,6 +499,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -576,6 +581,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -583,6 +589,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

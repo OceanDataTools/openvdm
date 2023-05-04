@@ -25,7 +25,7 @@ REQUIREMENTS:  Python3.8
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-08-29
  REVISION:  2021-07-01
 """
@@ -42,7 +42,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.openvdm import OpenVDM
+
 
 RAW_COLS = ['date_time','water_temp'] # OpenRVDAS style
 # RAW_COLS = ['date','time','water_temp'] # SCS style
@@ -56,21 +56,14 @@ MIN_DEPTH = 0
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
-
 
 class SBE38Parser(OpenVDMCSVParser):
     """
     Custom OpenVDM CSV file parser
     """
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=DEFAULT_TIME_FORMAT, use_openvdm_api=True):
-        super().__init__(start_dt=start_dt, stop_dt=stop_dt)
-        self.raw_cols = RAW_COLS
-        self.proc_cols = PROC_COLS
-        self.time_format = time_format
-        self.openvdm = OpenVDM() if use_openvdm_api else None
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
+        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
 
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -83,8 +76,11 @@ class SBE38Parser(OpenVDMCSVParser):
         logging.debug("Parsing data file...")
         errors = []
         try:
-            with open(filepath, 'r') as csvfile:
+            with open(filepath, mode='r', encoding="utf-8") as csvfile:
                 reader = csv.DictReader(csvfile, self.raw_cols)
+
+                if self.skip_header:
+                    next(reader)
 
                 for lineno, line in enumerate(reader):
 
@@ -189,7 +185,7 @@ class SBE38Parser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', 'Error(s) parsing datafile {} on row(s): {}'.format(filepath, ', '.join([str(error) for error in errors])))
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
 
 
 # -------------------------------------------------------------------------------------
@@ -202,8 +198,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('--timeFormat', default=DEFAULT_TIME_FORMAT,
-                        help='timestamp format, default: %(default)')
+    parser.add_argument('--timeFormat', help='timestamp format', default=None)
     parser.add_argument('--startDT', default=None,
                         type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
                         help=' crop start timestamp (iso8601)')

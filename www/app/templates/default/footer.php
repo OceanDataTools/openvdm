@@ -75,7 +75,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
             array_push($jsFileArray, DIR . 'bower_components/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/node_modules/luxon/build/global/luxon.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'bower_components/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');

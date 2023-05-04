@@ -7,9 +7,9 @@
 #         BUGS:
 #        NOTES:
 #       AUTHOR:  Webb Pinner
-#      VERSION:  2.8
+#      VERSION:  2.9
 #      CREATED:  2016-03-04
-#     REVISION:  2022-07-01
+#     REVISION:  2022-07-24
 #
 # ----------------------------------------------------------------------------------- #
 
@@ -72,7 +72,6 @@
 #  - leaflet
 #  - charts
 #  - charts-zoom
-#  - leaflet
 
 # Placeholders are the bootstrap-styled panels that contain the <div> blocks where data
 # will be visualized that are rendered by the view.

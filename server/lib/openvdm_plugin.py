@@ -7,9 +7,9 @@ DESCRIPTION:  OpenVDM parser/plugin python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-02-02
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import fnmatch
@@ -18,6 +18,8 @@ import logging
 from datetime import datetime
 import numpy as np
 import pandas as pd
+
+from server.lib.openvdm import OpenVDM
 
 STAT_TYPES = [
     'bounds',
@@ -34,25 +36,29 @@ QUALITY_TEST_RESULT_TYPES = [
     'Passed'
 ]
 
+DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
+# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
+
 class NpEncoder(json.JSONEncoder):
     """
     Custom JSON string encoder used to deal with NumPy arrays
     """
-    def default(self, obj): # pylint: disable=arguments-differ
 
-        if isinstance(obj, np.integer):
-            return int(obj)
+    def default(self, o): # pylint: disable=arguments-differ
 
-        if isinstance(obj, np.floating):
-            return float(obj)
+        if isinstance(o, np.integer):
+            return int(o)
 
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
+        if isinstance(o, np.floating):
+            return float(o)
 
-        if isinstance(obj, datetime):
-            return obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        if isinstance(o, np.ndarray):
+            return o.tolist()
 
-        return super().default(obj)
+        if isinstance(o, datetime):
+            return o.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        return super().default(o)
 
 
 class OpenVDMParserQualityTest():
@@ -63,7 +69,7 @@ class OpenVDMParserQualityTest():
     def __init__(self, test_name, test_value):
 
         if test_value not in QUALITY_TEST_RESULT_TYPES:
-            raise ValueError("Invalid test result type: type must be one of: %s" % ', '.join(QUALITY_TEST_RESULT_TYPES))
+            raise ValueError(f"Invalid test result type: type must be one of: {', '.join(QUALITY_TEST_RESULT_TYPES)}")
 
         self.test_data = {
         'testName':test_name,
@@ -75,6 +81,7 @@ class OpenVDMParserQualityTest():
         """
         Return test data object
         """
+
         return self.test_data
 
 
@@ -82,6 +89,7 @@ class OpenVDMParserQualityTest():
         """
         Return test data object as a json-formatted string
         """
+
         return json.dumps(self.get_test_data(), cls=NpEncoder)
 
 
@@ -98,6 +106,7 @@ class OpenVDMParserQualityTestWarning(OpenVDMParserQualityTest):
     """
     Defines data object for a partially failed (warning) OpenVDM QA test
     """
+
     def __init__(self, test_name):
         super().__init__(test_name=test_name, test_value='Warning')
 
@@ -106,6 +115,7 @@ class OpenVDMParserQualityTestPassed(OpenVDMParserQualityTest):
     """
     Defines data object for a passing OpenVDM QA test
     """
+
     def __init__(self, test_name):
         super().__init__(test_name=test_name, test_value='Passed')
 
@@ -118,7 +128,7 @@ class OpenVDMParserStat():
     def __init__(self, stat_name, stat_type, stat_value, stat_uom=''): # pylint: disable=too-many-branches
 
         if stat_type not in STAT_TYPES:
-            raise ValueError("Invalid stat type, must be one of: %s" % ', '.join(STAT_TYPES))
+            raise ValueError(f"Invalid stat type, must be one of: {', '.join(STAT_TYPES)}")
 
         if stat_type == 'bounds':
             if not isinstance(stat_value, list) or len(stat_value) != 2:
@@ -171,6 +181,7 @@ class OpenVDMParserStat():
         """
         Return the statistic data
         """
+
         return self.stat_data
 
 
@@ -178,6 +189,7 @@ class OpenVDMParserStat():
         """
         Return the statistic data as a json-formatted string
         """
+
         return json.dumps(self.get_stat_data(), cls=NpEncoder)
 
 
@@ -212,6 +224,7 @@ class OpenVDMParserTimeBoundsStat(OpenVDMParserStat):
     """
     Defines data object and methods for OpenVDM timeBounds statistic
     """
+
     def __init__(self, stat_value, stat_name='Temporal Bounds', stat_uom='seconds'):
         super().__init__(stat_name=stat_name, stat_type="timeBounds", stat_value=stat_value, stat_uom=stat_uom)
 
@@ -220,6 +233,7 @@ class OpenVDMParserTotalValueStat(OpenVDMParserStat):
     """
     Defines data object and methods for OpenVDM totalValue statistic
     """
+
     def __init__(self, stat_value, stat_name, stat_uom=''):
         super().__init__(stat_name=stat_name, stat_type="totalValue", stat_value=stat_value, stat_uom=stat_uom)
 
@@ -228,6 +242,7 @@ class OpenVDMParserValueValidityStat(OpenVDMParserStat):
     """
     Defines data object and methods for OpenVDM valueValidity statistic
     """
+
     def __init__(self, stat_value, stat_name):
         super().__init__(stat_name=stat_name, stat_type="valueValidity", stat_value=stat_value, stat_uom='')
 
@@ -237,7 +252,8 @@ class OpenVDMParser():
     Root Class for a OpenVDM parser object
     """
 
-    def __init__(self):
+    def __init__(self, use_openvdm_api=False):
+        self.openvdm = OpenVDM() if use_openvdm_api else None
         self.plugin_data = {
             'visualizerData': [],
             'qualityTests': [],
@@ -249,6 +265,7 @@ class OpenVDMParser():
         """
         Return the plugin data
         """
+
         if len(self.plugin_data['visualizerData']) > 0 or len(self.plugin_data['qualityTests']) > 0 or len(self.plugin_data['stats']) > 0:
             return self.plugin_data
 
@@ -258,6 +275,7 @@ class OpenVDMParser():
         """
         Process the given file
         """
+
         raise NotImplementedError('process_file must be implemented by subclass')
 
 
@@ -265,6 +283,7 @@ class OpenVDMParser():
         """
         Add the visualization data to the
         """
+
         self.plugin_data['visualizerData'].append(data)
 
 
@@ -272,6 +291,7 @@ class OpenVDMParser():
         """
         Add a failed QA test with the provided name
         """
+
         test = OpenVDMParserQualityTestFailed(name)
         self.plugin_data['qualityTests'].append(test.get_test_data())
 
@@ -280,6 +300,7 @@ class OpenVDMParser():
         """
         Add a partially failed QA test with the provided name
         """
+
         test = OpenVDMParserQualityTestWarning(name)
         self.plugin_data['qualityTests'].append(test.get_test_data())
 
@@ -288,6 +309,7 @@ class OpenVDMParser():
         """
         Add a passing QA test with the provided name
         """
+
         test = OpenVDMParserQualityTestPassed(name)
         self.plugin_data['qualityTests'].append(test.get_test_data())
 
@@ -296,6 +318,7 @@ class OpenVDMParser():
         """
         Add a bounds statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserBoundsStat(value, name, uom)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -304,6 +327,7 @@ class OpenVDMParser():
         """
         Add a geoBounds statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserGeoBoundsStat(value, name, uom)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -312,6 +336,7 @@ class OpenVDMParser():
         """
         Add a rowValidity statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserRowValidityStat(value)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -320,6 +345,7 @@ class OpenVDMParser():
         """
         Add a timeBounds statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserTimeBoundsStat(value, name, uom)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -328,6 +354,7 @@ class OpenVDMParser():
         """
         Add a totalValue statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserTotalValueStat(value, name, uom)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -336,6 +363,7 @@ class OpenVDMParser():
         """
         Add a valueValidity statistic with the given name, value and unit of measure
         """
+
         stat = OpenVDMParserValueValidityStat(value, name)
         self.plugin_data['stats'].append(stat.get_stat_data())
 
@@ -344,6 +372,7 @@ class OpenVDMParser():
         """
         Return the plugin data and a json-formatted string
         """
+
         return json.dumps(self.get_plugin_data())
 
 
@@ -351,17 +380,24 @@ class OpenVDMCSVParser(OpenVDMParser):
     """
     OpenVDM parser for a CSV-style input file
     """
-    def __init__(self, start_dt=None, stop_dt=None):
+
+    def __init__(self, raw_cols, proc_cols, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
+        self.raw_cols = raw_cols
+        self.proc_cols = proc_cols
         self.start_dt = start_dt
         self.stop_dt = stop_dt
+        self.time_format = time_format or DEFAULT_TIME_FORMAT
+        self.skip_header = skip_header
+        self.use_openvdm_api = use_openvdm_api
         self.tmpdir = None
-        super().__init__()
+        super().__init__(use_openvdm_api=use_openvdm_api)
 
 
     def process_file(self, filepath):
         """
         Process the given file
         """
+
         raise NotImplementedError('process_file must be implemented by subclass')
 
 
@@ -369,6 +405,7 @@ class OpenVDMCSVParser(OpenVDMParser):
         """
         Crop the data to the start/stop time specified in the parser object
         """
+
         try:
             if self.start_dt is not None:
                 logging.debug("  start_dt: %s", self.start_dt)
@@ -407,6 +444,7 @@ class OpenVDMCSVParser(OpenVDMParser):
         """
         Round the data to the specified precision
         """
+
         if precision is None or bool(precision):
             try:
                 decimals = pd.Series(precision.values(), index=precision.keys())
@@ -417,10 +455,12 @@ class OpenVDMCSVParser(OpenVDMParser):
                 raise err
         return data_frame
 
+
     def to_json(self):
         """
         Output the plugin data as a json-formatted string.
         """
+
         return json.dumps(self.get_plugin_data(), cls=NpEncoder)
 
 
@@ -455,10 +495,10 @@ class OpenVDMPlugin():
 
 
     def get_json_str(self, filepath):
-
         """
         Return the plugin output corresponding to the given file.
         """
+
         parser = self.get_parser(filepath)
 
         if parser is None:

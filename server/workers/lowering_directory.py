@@ -9,13 +9,12 @@ subdirectories must be added.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
-import errno
 import json
 import logging
 import os
@@ -28,9 +27,8 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.directory_utils import create_directories, lockdown_directory
+from server.lib.directory_utils import create_directories
 from server.lib.openvdm import OpenVDM
-
 
 CUSTOM_TASKS = [
     {
@@ -73,6 +71,14 @@ def build_directorylist(gearman_worker):
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(cruise=False)
     return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
+    # Special case where an collection system needs to be created outside of the lowering directory
+    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+
+    # Special case where an extra directory needs to be created outside of the lowering directory
+    extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
+
     return return_directories
 
 
@@ -85,10 +91,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
-        self.lowering_start_date = self.ovdm.get_lowering_start_date()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_id = None
+        self.lowering_id = None
+        self.lowering_start_date = None
+        self.shipboard_data_warehouse_config = None
+        self.cruise_dir = None
         self.lowering_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
@@ -118,8 +125,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
-        # else:
-        #     self.ovdm.track_gearman_job(taskLookup[current_job.task], os.getpid(), current_job.handle)
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -127,6 +132,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
         self.lowering_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj else self.ovdm.get_lowering_start_date()
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
         return super().on_job_execute(current_job)
@@ -181,6 +187,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -189,6 +196,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -206,14 +214,13 @@ def task_create_lowering_directory(gearman_worker, gearman_job):
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
-    lowering_data_base_dir = os.path.join(cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
+    lowering_data_base_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
 
-    if os.path.exists(cruise_dir):
+    if os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
     else:
-        logging.error("Failed to find cruise directory: %s", cruise_dir)
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to find cruise directory: " + cruise_dir})
+        logging.error("Failed to find cruise directory: %s", gearman_worker.cruise_dir)
+        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to find cruise directory: " + gearman_worker.cruise_dir})
         return json.dumps(job_results)
 
     if os.path.exists(lowering_data_base_dir):
@@ -288,6 +295,7 @@ def task_set_lowering_data_directory_permissions(gearman_worker, gearman_job):
     gearman_worker.send_job_status(gearman_job, 10, 10)
 
     return json.dumps(job_results)
+
 
 def task_rebuild_lowering_directory(gearman_worker, gearman_job):
     """
@@ -382,6 +390,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -389,6 +398,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

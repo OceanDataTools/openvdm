@@ -1,4 +1,3 @@
-
 # Add columnes to table OVDM_CollectionSystemTransfers
 # ------------------------------------------------------------
 

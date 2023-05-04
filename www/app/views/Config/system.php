@@ -191,7 +191,6 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
         }
     }
 ?>
-            </table>
             <table class='table table-striped table-hover table-bordered responsive'>
                 <tr>
                     <th>Data Warehouses</th>

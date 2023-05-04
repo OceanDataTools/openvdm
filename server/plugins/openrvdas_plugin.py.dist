@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  openrvdas_plugin.py
 
 USAGE:  openrvdas_plugin.py [-h] [--dataType] <dataFile>
@@ -22,9 +21,9 @@ REQUIREMENTS:  Python3.8
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-10-23
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import sys
@@ -68,6 +67,7 @@ class OpeRVDASPlugin(OpenVDMPlugin):
 
     def __init__(self):
         super().__init__(fileTypeFilters)
+
 
     def get_parser(self, filepath): # pylint: disable=too-many-return-statements
         """

@@ -1,12 +1,8 @@
 certifi==2021.10.8
 chardet==4.0.0
-GDAL==3.0.4
-geographiclib==1.52
-geopy==2.2.0
 idna==3.3
 numpy==1.22.2
 pandas==1.4.1
-pkg_resources==0.0.0
 python-dateutil==2.8.2
 python3-gearman==0.1.0
 pytz==2021.3

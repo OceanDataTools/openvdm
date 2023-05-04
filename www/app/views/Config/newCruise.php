@@ -35,22 +35,47 @@ use Helpers\Form;
                         <div class="row">
                             <div class="col-lg-12">
                                 <div class="form-group">
-                                    <label><?php echo CRUISE_NAME; ?> ID</label><?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseID', 'value'=>$data['cruiseID'])); ?>
+                                    <label><?php echo CRUISE_NAME; ?> ID</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseID', 'value'=>$data['cruiseID'])); ?>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> Start Date/Time</label>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
                                 <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Start Date/Time (UTC)</label>
                                     <div class="input-group date datetimepickerToday">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartDate', 'value'=>$data['cruiseStartDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                                     </div>
                                 </div>
-                                <label><?php echo CRUISE_NAME; ?> End Date/Time</label>
+                            </div>
+                            <div class="col-md-6">
                                 <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Start Port</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseStartPort', 'value'=>$data['cruiseStartPort'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> End Date/Time (UTC)</label>
                                     <div class="input-group date datetimepicker">
                                         <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndDate', 'value'=>$data['cruiseEndDate'])); ?>
                                         <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> End Port</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseEndPort', 'value'=>$data['cruiseEndPort'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-12">
                                 <label>Collection Systems</label>
                                 <table class='table table-striped table-hover table-bordered responsive'>
                                     <tr>
@@ -104,7 +129,8 @@ use Helpers\Form;
             <h3>Page Guide</h3>
             <p>This page is for creating a new cruiseID and associated cruise data directory.  This page is NOT for configuring OpenVDM to use a previously created cruiseID.  If you are trying to configure OpenVDM to use a previously created cruiseID click <a href="<?php echo DIR; ?>config/editCruise">here</a>.</p>
             <p>The <strong><?php echo CRUISE_NAME; ?> ID</strong> is the unique indentifier for the cruise (i.e. CS1801)</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Start Date/Time </strong> is the designated start date/time of the cruise. This date/time is exported as part of the cruise finialization process and optionally used for identifying old data files that should be skipped during file transfers.  The required format of this date is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Date/Time </strong> is the designated start/end date/time of the cruise. This is exported as part of the cruise finialization process and optionally used for identifying files that should be skipped during file transfers.  The required format of this date/time is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Port </strong> is the designated starting and ending ports of the cruise. This is exported as part of the cruise finialization process.</p>
             <p>The <strong>Collection Systems</strong> table is for specifying what collection system will be used during the cruise.  These can always be changed later from the Collection System Transfers tab.</p>
             <p>Click the <strong>Create</strong> button to save the change and exit back to the main configuration page.  If you enter a cruiseID for a cruise that already exists you will be asked to enter a different cruiseID.</p>
             <p>Click the <strong>Cancel</strong> button to exit back to the main configuration page without creating a new cruise.</p>

@@ -48,9 +48,9 @@ DESCRIPTION:
     BUGS:
    NOTES:
   AUTHOR:  Webb Pinner
- VERSION:  2.8
+ VERSION:  2.9
  CREATED:  2016-03-06
-REVISION:  2022-07-01
+REVISION:  2022-07-24
 """
 
 import argparse
@@ -228,7 +228,7 @@ if __name__ == "__main__":
                 output_filepath_kml = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.kml")
                 logging.info("Saving file: %s", output_filepath_kml)
                 try:
-                    with open(output_filepath_kml, 'w') as kml_file:
+                    with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
                         kml_file.write(convert_to_kml(combineGeoJsonObj))
                 except Exception as err:
                     logging.error("Problem writing output file: %s", output_filepath_kml)

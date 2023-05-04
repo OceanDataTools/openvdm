@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-     FILE:  run_ship_to_shore_transfer.py
+FILE:  run_ship_to_shore_transfer.py
 
 DESCRIPTION:  Gearman worker that handles the transfer of data from the
-Shipboard Data Warehouse to a Shoreside Data Warehouse.
+    Shipboard Data Warehouse to a Shoreside Data Warehouse.
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -82,6 +82,7 @@ def build_logfile_dirpath(gearman_worker):
     """
     Build the path for saving the transfer logfile
     """
+
     cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
 
     return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
@@ -93,7 +94,7 @@ def build_filters(gearman_worker, raw_filters):
     """
 
     return_filters = raw_filters
-    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', gearman_worker.cruise_id) for include_filter in return_filters['includeFilter']]
+    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', gearman_worker.cruise_id).replace('{cruise_config_fn}', gearman_worker.ovdm.get_cruise_config_fn()).replace('{md5_summary_fn}', gearman_worker.ovdm.get_md5_summary_fn()).replace('{md5_summary_md5_fn}', gearman_worker.ovdm.get_md5_summary_md5_fn()) for include_filter in return_filters['includeFilter']]
 
     return return_filters
 
@@ -125,7 +126,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     file_count = len(files['include'])
 
     try:
-        with open(ssh_includelist_filepath, 'w') as ssh_include_filelist_filepath:
+        with open(ssh_includelist_filepath, mode='w', encoding="utf-8") as ssh_include_filelist_filepath:
             ssh_include_filelist_filepath.write('\n'.join([os.path.join(gearman_worker.cruise_id, filename) for filename in files['include']]))
 
     except IOError:
@@ -139,15 +140,15 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
     if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-        command.insert(2, '--bwlimit={}'.format(gearman_worker.cruise_data_transfer['bandwidthLimit']))
+        command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
 
-    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0': 
+    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while (proc.returncode is None):
+    while proc.returncode is None:
 
         proc.poll()
 
@@ -190,11 +191,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.system_status = self.ovdm.get_system_status()
+        self.cruise_id = None
+        self.system_status = None
         self.transfer_start_date = None
-        self.cruise_data_transfer = self._get_cruise_data_transfer()
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.cruise_data_transfer = None
+        self.shipboard_data_warehouse_config = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def _get_cruise_data_transfer(self):
@@ -287,6 +289,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -295,6 +298,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -437,6 +441,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -444,6 +449,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 FILE:  data_dashboard.py
@@ -9,9 +8,9 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of OVDM data
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2015-01-01
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import argparse
@@ -29,11 +28,11 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.output_json_data_to_file import output_json_data_to_file
-from server.lib.openvdm import OpenVDM, DEFAULT_DATA_DASHBOARD_MANIFEST_FN
+from server.lib.openvdm import OpenVDM
 
 PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
-customTasks = [
+CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": "updateDataDashboard",
@@ -66,25 +65,27 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.lowering_id = self.ovdm.get_cruise_id()
-        self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
-        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
-
-        self.collection_system_transfer = {}
+        self.shipboard_data_warehouse_config = None
+        self.cruise_id = None
+        self.cruise_dir = None
+        self.lowering_id = None
+        self.lowering_dir = None
+        self.data_dashboard_dir = None
+        self.data_dashboard_manifest_file_path = None
+        self.collection_system_transfer = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
+
 
     @staticmethod
     def get_custom_task(current_job):
         """
         Retrieve task metadata
         """
-        task = list(filter(lambda task: task['name'] == current_job.task, customTasks))
+
+        task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
+
 
     def on_job_execute(self, current_job):
         """
@@ -110,9 +111,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
-        self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransferID']) if 'collectionSystemTransferID' in payload_obj else { 'name': "Unknown" }
+        self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransferID']) if 'collectionSystemTransferID' in payload_obj else None
         self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
-        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, DEFAULT_DATA_DASHBOARD_MANIFEST_FN)
+        self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
+
+        if current_job.task == 'updateDataDashboard' and not self.collection_system_transfer: # doesn't exists
+            return self.on_job_complete(current_job, json.dumps({
+                'parts':[{
+                    "partName": "Retrieve Collection System Tranfer Data",
+                    "result": "Fail",
+                    "reason": "Could not find configuration data for collection system transfer"
+                }],
+                'files': {
+                    'new':[],
+                    'updated':[]
+                }
+            }))
 
         return super().on_job_execute(current_job)
 
@@ -193,6 +207,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -201,6 +216,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -210,6 +226,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
     """
     Update the existing dashboard files with new/updated raw data
     """
+
     job_results = {
         'parts':[],
         'files':{
@@ -330,7 +347,6 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
                 gearman_worker.ovdm.send_msg(error_title,error_body)
                 remove_manifest_entries.append({"dd_json": json_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
 
-                #job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail"})
                 if data_proc.stderr:
                     logging.error("Err: %s", data_proc.stderr)
         else:
@@ -353,7 +369,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
         existing_manifest_entries = []
 
         try:
-            with open(gearman_worker.data_dashboard_manifest_file_path, 'r') as dashboard_manifest_file:
+            with open(gearman_worker.data_dashboard_manifest_file_path, mode='r', encoding='utf-8') as dashboard_manifest_file:
                 existing_manifest_entries = json.load(dashboard_manifest_file)
 
             job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
@@ -406,7 +422,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
-        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], DEFAULT_DATA_DASHBOARD_MANIFEST_FN))
+        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], gearman_worker.shipboard_data_warehouse_config['dataDashboardManifestFn']))
 
         gearman_worker.send_job_status(gearman_job, 9, 10)
 
@@ -659,6 +675,7 @@ if __name__ == "__main__":
         """
         Signal Handler for QUIT
         """
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -666,6 +683,7 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
 

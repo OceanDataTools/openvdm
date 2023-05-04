@@ -8,7 +8,7 @@ use Helpers\Url;
 
 class System extends Controller {
     
-    private $_coreValuesModel;
+    private $_warehouseModel;
     private $_extraDirectoriesModel;
     private $_cruiseDataTransfersModel;
     private $_shipToShoreTransfersModel;
@@ -23,12 +23,11 @@ class System extends Controller {
 
 
     private function updateCruiseDirectory() {
-        if($this->_coreValuesModel->getSystemStatus()) {
+        if($this->_warehouseModel->getSystemStatus()) {
 
-            $warehouseModel = new \Models\Warehouse();
             $gmData['siteRoot'] = DIR;
-            $gmData['shipboardDataWarehouse'] = $warehouseModel->getShipboardDataWarehouseConfig();
-            $gmData['cruiseID'] = $warehouseModel->getCruiseID();
+            $gmData['shipboardDataWarehouse'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
+            $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
         
             # create the gearman client
             $gmc= new \GearmanClient();
@@ -47,7 +46,7 @@ class System extends Controller {
             Url::redirect('config/login');
         }
         
-        $this->_coreValuesModel = new \Models\Warehouse();
+        $this->_warehouseModel = new \Models\Warehouse();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
         $this->_shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
@@ -62,10 +61,10 @@ class System extends Controller {
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
         $data['links'] = $this->_linksModel->getLinks();
-        $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
 
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -89,12 +88,11 @@ class System extends Controller {
 
         $data['title'] = 'Configuration';
         $data['javascript'] = array();
-        $data['shipboardDataWarehouseConfig'] = $this->_coreValuesModel->getShipboardDataWarehouseConfig();
+        $data['shipboardDataWarehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
 
         if(isset($_POST['submit'])){
             $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'];
             $shipboardDataWarehouseUsername = $_POST['shipboardDataWarehouseUsername'];
-            $shipboardDataWarehousePublicDataDir = $_POST['shipboardDataWarehousePublicDataDir'];
 
             if($shipboardDataWarehouseIP == ''){
                 $error[] = 'Shipboard Data Warehouse IP is required';
@@ -104,25 +102,19 @@ class System extends Controller {
                 $error[] = 'Shipboard Data Warehouse Username is required';
             }
             
-            if($shipboardDataWarehousePublicDataDir == ''){
-                $error[] = 'Shipboard Data Warehouse Public Data Directory is required';
-            }
-
             if(!$error){
                 $postdata = array(
                     'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
                     'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
-                    'shipboardDataWarehousePublicDataDir' => $shipboardDataWarehousePublicDataDir,
                 );
                 
-                $this->_coreValuesModel->setShipboardDataWarehouseConfig($postdata);
+                $this->_warehouseModel->setShipboardDataWarehouseConfig($postdata);
                 Session::set('message','Shipboard Data Warehouse Updated');
                 Url::redirect('config/system');
             } else {
                 $data['shipboardDataWarehouseConfig'] = array(
                     'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
                     'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
-                    'shipboardDataWarehousePublicDataDir' => $shipboardDataWarehousePublicDataDir,
                 );
             }
         }
@@ -348,20 +340,20 @@ class System extends Controller {
 
     public function enableShipToShoreBWLimit() {
 
-        $this->_coreValuesModel->enableShipToShoreBWLimit();
+        $this->_warehouseModel->enableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
     
     public function disableShipToShoreBWLimit() {
 
-        $this->_coreValuesModel->disableShipToShoreBWLimit();
+        $this->_warehouseModel->disableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
     
     public function editMD5FilesizeLimit(){
         $data['title'] = 'Edit MD5 Checksum Filesize Limit';
         $data['javascript'] = array();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
 
         if(isset($_POST['submit'])){
             $md5FilesizeLimit = $_POST['md5FilesizeLimit'];
@@ -377,7 +369,7 @@ class System extends Controller {
                     'value' => $md5FilesizeLimit
                 );
 
-                $this->_coreValuesModel->setMd5FilesizeLimit($postdata);
+                $this->_warehouseModel->setMd5FilesizeLimit($postdata);
                 Session::set('message','MD5 Filesize Limit Updated');
                 Url::redirect('config/system');
             } else {
@@ -393,13 +385,13 @@ class System extends Controller {
     
     public function enableMD5FilesizeLimit() {
 
-        $this->_coreValuesModel->enableMd5FilesizeLimit();
+        $this->_warehouseModel->enableMd5FilesizeLimit();
         Url::redirect('config/system');
     }
     
     public function disableMD5FilesizeLimit() {
 
-        $this->_coreValuesModel->disableMd5FilesizeLimit();
+        $this->_warehouseModel->disableMd5FilesizeLimit();
         Url::redirect('config/system');
     }
 
@@ -466,10 +458,10 @@ class System extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
-        $data['shipboardDataWarehouseStatus'] = $this->_coreValuesModel->getShipboardDataWarehouseStatus();
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
         $data['links'] = $this->_linksModel->getLinks();
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -529,9 +521,9 @@ class System extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
-        $data['shipToShoreBWLimitStatus'] = $this->_coreValuesModel->getShipToShoreBWLimitStatus();
-        $data['md5FilesizeLimit'] = $this->_coreValuesModel->getMd5FilesizeLimit();
-        $data['md5FilesizeLimitStatus'] = $this->_coreValuesModel->getMd5FilesizeLimitStatus();
+        $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
+        $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
         $data['links'] = $this->_linksModel->getLinks();
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -658,5 +650,4 @@ class System extends Controller {
         $this->_linksModel->publicLink($id);
         Url::redirect('config/system');
     }
-
 }

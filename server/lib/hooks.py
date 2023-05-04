@@ -66,11 +66,11 @@ def get_post_hook_commands(gearman_worker, hook_name):
             commands_from_file = openvdm_config['postHookCommands']['postFinalizeCurrentLowering']['commandList'] if openvdm_config['postHookCommands']['postFinalizeCurrentLowering'] is not None else []
         else:
             logging.warning("Invalid hook name: '%s'", hook_name)
-            return {"verdict": False, "reason": "Invalid hook name: {}".format(hook_name), "commandList": None}
+            return {"verdict": False, "reason": f"Invalid hook name: {hook_name}", "commandList": None}
 
     except Exception as err:
         logging.error(str(err))
-        return {"verdict": False, "reason": "Could not process command file: " + DEFAULT_CONFIG_FILE, "commandList": None}
+        return {"verdict": False, "reason": f"Could not process command file: {DEFAULT_CONFIG_FILE}", "commandList": None}
 
     return {"verdict": True, "commandList": build_commands(gearman_worker, commands_from_file)}
 
@@ -79,6 +79,7 @@ def run_commands(command_list):
     """
     Run the commands in the command_list
     """
+
     reasons = []
 
     for command in command_list:
@@ -95,7 +96,7 @@ def run_commands(command_list):
         except Exception as err:
             logging.error("Error executing the %s command: %s", command['name'], ' '.join(command['command']))
             logging.debug(str(err))
-            reasons.append("Error executing the {} command: {}".format(command['name'], ' '.join(command['command'])))
+            reasons.append(f"Error executing the {command['name']} command: {' '.join(command['command'])}")
 
     if len(reasons) > 0:
         return {"verdict": False, "reason": '\n'.join(reasons)}

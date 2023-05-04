@@ -50,6 +50,12 @@ Router::any('config/system/editShipToShoreBWLimit', '\Controllers\Config\System@
 Router::any('config/system/enableMD5FilesizeLimit', '\Controllers\Config\System@enableMD5FilesizeLimit');
 Router::any('config/system/disableMD5FilesizeLimit', '\Controllers\Config\System@disableMD5FilesizeLimit');
 Router::any('config/system/editMD5FilesizeLimit', '\Controllers\Config\System@editMD5FilesizeLimit');
+
+Router::any('config/system/editCruiseConfigFn', '\Controllers\Config\System@editCruiseConfigFn');
+Router::any('config/system/editLoweringConfigFn', '\Controllers\Config\System@editLoweringConfigFn');
+Router::any('config/system/editDataDashboardManifestFn', '\Controllers\Config\System@editDataDashboardManifestFn');
+Router::any('config/system/editMD5SummaryFns', '\Controllers\Config\System@editMD5SummaryFns');
+
 Router::any('config/system/addLink', '\Controllers\Config\System@addLink');
 Router::any('config/system/editLink/(:num)', '\Controllers\Config\System@editLink');
 Router::any('config/system/deleteLink/(:num)', '\Controllers\Config\System@deleteLink');
@@ -119,23 +125,30 @@ Router::any('api/warehouse/getCruiseID', 'Controllers\Api\Warehouse@getCruiseID'
 Router::any('api/warehouse/getCruiseSize', 'Controllers\Api\Warehouse@getCruiseSize');
 Router::any('api/warehouse/getCruiseStartDate', 'Controllers\Api\Warehouse@getCruiseStartDate');
 Router::any('api/warehouse/getCruiseEndDate', 'Controllers\Api\Warehouse@getCruiseEndDate');
+Router::any('api/warehouse/getCruiseStartPort', 'Controllers\Api\Warehouse@getCruiseStartPort');
+Router::any('api/warehouse/getCruiseEndPort', 'Controllers\Api\Warehouse@getCruiseEndPort');
 Router::any('api/warehouse/getCruiseFinalizedDate', 'Controllers\Api\Warehouse@getCruiseFinalizedDate');
 Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
+Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');
 Router::any('api/warehouse/getLoweringConfig', 'Controllers\Api\Warehouse@getLoweringConfig');
 Router::any('api/warehouse/getLoweringID', 'Controllers\Api\Warehouse@getLoweringID');
 Router::any('api/warehouse/getLoweringSize', 'Controllers\Api\Warehouse@getLoweringSize');
 Router::any('api/warehouse/getLoweringStartDate', 'Controllers\Api\Warehouse@getLoweringStartDate');
 Router::any('api/warehouse/getLoweringEndDate', 'Controllers\Api\Warehouse@getLoweringEndDate');
 Router::any('api/warehouse/getLoweringFinalizedDate', 'Controllers\Api\Warehouse@getLoweringFinalizedDate');
+Router::any('api/warehouse/getLoweringConfigFn', 'Controllers\Api\Warehouse@getLoweringConfigFn');
 Router::any('api/warehouse/getLowerings', 'Controllers\Api\Warehouse@getLowerings');
 Router::any('api/warehouse/getFreeSpace', 'Controllers\Api\Warehouse@getFreeSpace');
 Router::any('api/warehouse/getMD5FilesizeLimit', 'Controllers\Api\Warehouse@getMD5FilesizeLimit');
 Router::any('api/warehouse/getMD5FilesizeLimitStatus', 'Controllers\Api\Warehouse@getMD5FilesizeLimitStatus');
+Router::any('api/warehouse/getMD5SummaryFn', 'Controllers\Api\Warehouse@getMD5SummaryFn');
+Router::any('api/warehouse/getMD5SummaryMD5Fn', 'Controllers\Api\Warehouse@getMD5SummaryMD5Fn');
 Router::any('api/warehouse/getShipboardDataWarehouseConfig', 'Controllers\Api\Warehouse@getShipboardDataWarehouseConfig');
 Router::any('api/warehouse/getShipboardDataWarehouseStatus', 'Controllers\Api\Warehouse@getShipboardDataWarehouseStatus');
 Router::any('api/warehouse/getShipToShoreBWLimitStatus', 'Controllers\Api\Warehouse@getShipToShoreBWLimitStatus');
 Router::any('api/warehouse/getSystemStatus', 'Controllers\Api\Warehouse@getSystemStatus');
 Router::any('api/warehouse/getShowLoweringComponents', 'Controllers\Api\Warehouse@getShowLoweringComponents');
+Router::any('api/warehouse/getDataDashboardManifestFn', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::post('api/warehouse/setCruiseSize', 'Controllers\Api\Warehouse@setCruiseSize');
 Router::post('api/warehouse/setLoweringSize', 'Controllers\Api\Warehouse@setLoweringSize');
 

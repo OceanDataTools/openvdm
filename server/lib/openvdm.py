@@ -7,9 +7,9 @@ DESCRIPTION:  OpenVDM python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-02-02
- REVISION:  2022-07-01
+ REVISION:  2022-07-24
 """
 
 import datetime
@@ -23,22 +23,9 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib import read_config
 
-
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
-DEFAULT_CRUISE_CONFIG_FN = 'ovdmConfig.json'
-
-DEFAULT_DATA_DASHBOARD_MANIFEST_FN = 'manifest.json'
-
-DEFAULT_LOWERING_CONFIG_FN = 'loweringConfig.json'
-
-DEFAULT_MD5_SUMMARY_FN = 'MD5_Summary.txt'
-
-DEFAULT_MD5_SUMMARY_MD5_FN = 'MD5_Summary.md5'
-
-
 class OpenVDM():
-
     """
     Class is a python wrapper around the OpenVDM API
     """
@@ -102,9 +89,9 @@ class OpenVDM():
             raise err
 
 
-    def get_ovdm_config(self):
+    def get_cruise_config(self):
         """
-        Return the current OpenVDM configuration
+        Return the current cruise configuration
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfig'
@@ -151,6 +138,7 @@ class OpenVDM():
 
         return self.config['siteRoot']
 
+
     def get_transfer_public_data(self):
         """
         Return whether to transfer the contents of PublicData to the cruise
@@ -158,6 +146,7 @@ class OpenVDM():
         """
 
         return self.config['transferPubicData']
+
 
     def get_md5_filesize_limit(self):
         """
@@ -173,6 +162,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve MD5 filesize limit from OpenVDM API")
             raise err
+
 
     def get_md5_filesize_limit_status(self):
         """
@@ -190,6 +180,38 @@ class OpenVDM():
             raise err
 
 
+    def get_md5_summary_fn(self):
+        """
+        Return the MD5 summary filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['md5SummaryFn']
+        except Exception as err:
+            logging.error("Unable to retrieve MD5 summary filename from OpenVDM API")
+            raise err
+
+
+    def get_md5_summary_md5_fn(self):
+        """
+        Return the MD5 summary MD5 filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryMD5Fn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['md5SummaryMd5Fn']
+        except Exception as err:
+            logging.error("Unable to retrieve MD5 summary MD5 filename from OpenVDM API")
+            raise err
+
+
     def get_tasks_for_hook(self, hook_name):
         """
         Return the task associated with the given hook
@@ -201,6 +223,7 @@ class OpenVDM():
             return []
         else:
             return self.config['hooks'][hook_name]
+
 
     def get_transfer_interval(self):
         """
@@ -224,6 +247,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve CruiseID from OpenVDM API")
             raise err
+
 
     def get_cruise_size(self):
         """
@@ -270,6 +294,22 @@ class OpenVDM():
             return return_obj['cruiseEndDate']
         except Exception as err:
             logging.error("Unable to retrieve cruise end date from OpenVDM API")
+            raise err
+
+
+    def get_cruise_config_fn(self):
+        """
+        Return the cruise config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfigFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['cruiseConfigFn']
+        except Exception as err:
+            logging.error("Unable to retrieve cruise config filename from OpenVDM API")
             raise err
 
 
@@ -336,6 +376,7 @@ class OpenVDM():
             logging.error("Unable to retrieve lowering start date from OpenVDM API")
             raise err
 
+
     def get_lowering_end_date(self):
         """
         Return the end date for the current lowering
@@ -349,6 +390,22 @@ class OpenVDM():
             return return_obj['loweringEndDate']
         except Exception as err:
             logging.error("Unable to retrieve lowering end date from OpenVDM API")
+            raise err
+
+
+    def get_lowering_config_fn(self):
+        """
+        Return the lowering config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfigFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['loweringConfigFn']
+        except Exception as err:
+            logging.error("Unable to retrieve lowering config filename from OpenVDM API")
             raise err
 
 
@@ -383,6 +440,7 @@ class OpenVDM():
             logging.error("Unable to retrieve extra directory: %s from OpenVDM API", extra_directory_id)
             raise err
 
+
     def get_extra_directory_by_name(self, extra_directory_name):
         """
         Return the extra directory configuration based on the extra_directory_name
@@ -391,10 +449,10 @@ class OpenVDM():
         extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_extra_directories()))
         return extra_directory[0] if len(extra_directory) > 0 else None
 
+
     def get_extra_directories(self):
         """
         Return all extra directory configurations
-
         """
 
         url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectories'
@@ -406,6 +464,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve extra directories from OpenVDM API")
             raise err
+
 
     def get_active_extra_directories(self, cruise=True, lowering=True):
         """
@@ -426,10 +485,10 @@ class OpenVDM():
             logging.error("Unable to retrieve active extra directories from OpenVDM API")
             raise err
 
+
     def get_required_extra_directory(self, extra_directory_id):
         """
         Return the required extra directory configuration based on the extra_directory_id
-
         """
 
         url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
@@ -442,6 +501,7 @@ class OpenVDM():
             logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
             raise err
 
+
     def get_required_extra_directory_by_name(self, extra_directory_name):
         """
         Return the required extra directory configuration based on the extra_directory_name
@@ -449,6 +509,7 @@ class OpenVDM():
 
         extra_directory = list(filter(lambda directory: directory['name'] == extra_directory_name, self.get_required_extra_directories()))
         return extra_directory[0] if len(extra_directory) > 0 else None
+
 
     def get_required_extra_directories(self):
         """
@@ -465,6 +526,7 @@ class OpenVDM():
             logging.error("Unable to retrieve required extra directories from OpenVDM API")
             raise err
 
+
     def get_shipboard_data_warehouse_config(self):
         """
         Return the shipboard data warehouse configuration
@@ -479,6 +541,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve shipboard data warehouse configuration from OpenVDM API")
             raise err
+
 
     def get_ship_to_shore_bw_limit_status(self):
         """
@@ -495,10 +558,10 @@ class OpenVDM():
             logging.error("Unable to retrieve ship-to-shore bandwidth limit status from OpenVDM API")
             raise err
 
+
     def get_ship_to_shore_transfer(self, ship_to_shore_transfer_id):
         """
         Return the ship-to-shore configuration based on the ship_to_shore_transfer_id
-
         """
 
         url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfer/' + ship_to_shore_transfer_id
@@ -509,6 +572,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve ship-to-shore transfer: %s from OpenVDM API", ship_to_shore_transfer_id)
             raise err
+
 
     def get_ship_to_shore_transfers(self):
         """
@@ -554,6 +618,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve system status from OpenVDM API")
             raise err
+
 
     def get_tasks(self):
         """
@@ -623,7 +688,6 @@ class OpenVDM():
     def get_collection_system_transfers(self):
         """
         Return all collection system transfer configurations
-
         """
 
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfers'
@@ -697,6 +761,7 @@ class OpenVDM():
             logging.error("Unable to retrieve cruise data transfers from OpenVDM API")
             raise err
 
+
     def get_required_cruise_data_transfers(self):
         """
         Return all requried cruise data transfers
@@ -711,6 +776,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to retrieve required cruise data transfers from OpenVDM API")
             raise err
+
 
     def get_cruise_data_transfer(self, cruise_data_transfer_id):
         """
@@ -743,6 +809,7 @@ class OpenVDM():
             logging.error("Unable to retrieve required cruise data transfer: %s from OpenVDM API", cruise_data_transfer_id)
             raise err
 
+
     def get_cruise_data_transfer_by_name(self, cruise_data_transfer_name):
         """
         Return the cruise data transfer based on the cruise_data_transfer_name
@@ -759,6 +826,22 @@ class OpenVDM():
 
         cruise_data_transfer = list(filter(lambda transfer: transfer['name'] == cruise_data_transfer_name, self.get_required_cruise_data_transfers()))
         return cruise_data_transfer[0] if len(cruise_data_transfer) > 0 else False
+
+
+    def get_data_dashboard_manifest_fn(self):
+        """
+        Return the data dashboard manifest filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
+
+        try:
+            req = requests.get(url)
+            return_obj = json.loads(req.text)
+            return return_obj['dataDashboardManifestFn']
+        except Exception as err:
+            logging.error("Unable to retrieve data dashboard manifest filename from OpenVDM API")
+            raise err
 
 
     def send_msg(self, message_title, message_body=''):
@@ -792,6 +875,7 @@ class OpenVDM():
                 logging.error("Unable to clear error status for collection system transfer: %s with OpenVDM API", collection_system_transfer_id)
                 raise err
 
+
     def clear_error_cruise_data_transfer(self, cruise_data_transfer_id, job_status):
         """
         Clear the status flag for the cruise data transfer specified by the cruise_data_transfer_id
@@ -808,6 +892,7 @@ class OpenVDM():
                 logging.error("Unable to clear error status for cruise data transfer: %s with OpenVDM API", cruise_data_transfer_id)
                 raise err
 
+
     def clear_error_task(self, task_id):
         """
         Clear the status flag for the task specified by the task_id
@@ -817,6 +902,7 @@ class OpenVDM():
 
         if task['status'] == '3':
             self.set_idle_task(task_id)
+
 
     def set_error_collection_system_transfer(self, collection_system_transfer_id, reason=''):
         """
@@ -834,6 +920,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to set status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
             raise err
+
 
     def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason=''):
         """
@@ -870,6 +957,7 @@ class OpenVDM():
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
             raise err
 
+
     def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason = ''):
         """
         Set the status flag to error for the cruise data transfer specified by the cruise_data_transfer_id
@@ -888,6 +976,7 @@ class OpenVDM():
             logging.error("Unable to set test status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
             raise err
 
+
     def set_error_task(self, task_id, reason=''):
         """
         Set the status flag to error for the task specified by the task_id
@@ -905,6 +994,7 @@ class OpenVDM():
             logging.error("Unable to set error status of task: %s with OpenVDM API", task_id)
             raise err
 
+
     def set_idle_collection_system_transfer(self, collection_system_transfer_id):
         """
         Set the status flag to idle for the collection system transfer specified by the collection_system_transfer_id
@@ -918,6 +1008,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to set collection system transfer: %s to idle with OpenVDM API", collection_system_transfer_id)
             raise err
+
 
     def set_idle_cruise_data_transfer(self, cruise_data_transfer_id):
         """
@@ -949,6 +1040,7 @@ class OpenVDM():
             logging.error("Unable to set task: %s to idle with OpenVDM API", task_id)
             raise err
 
+
     def set_running_collection_system_transfer(self, collection_system_transfer_id, job_pid, job_handle):
         """
         Set the status flag to running for the collection system transfer specified by the collection_system_transfer_id
@@ -978,6 +1070,7 @@ class OpenVDM():
         # Add to gearman job tracker
         self.track_gearman_job('Transfer test for ' + collection_system_transfer_name, job_pid, job_handle)
 
+
     def set_running_cruise_data_transfer(self, cruise_data_transfer_id, job_pid, job_handle):
         """
         Set the status flag to running for the cruise data transfer specified by the cruise_data_transfer_id
@@ -997,6 +1090,7 @@ class OpenVDM():
             logging.error("Unable to set cruise data transfer: %s to running with OpenVDM API", cruise_data_transfer_name)
             raise err
 
+
     def set_running_cruise_data_transfer_test(self, cruise_data_transfer_id, job_pid, job_handle):
         """
         Set the status flag to running for the cruise data transfer specified by the cruise_data_transfer_id
@@ -1006,6 +1100,7 @@ class OpenVDM():
 
         # Add to gearman job tracker
         self.track_gearman_job('Transfer test for ' + cruise_data_transfer_name, job_pid, job_handle)
+
 
     def set_running_task(self, task_id, job_pid, job_handle):
         """
@@ -1058,6 +1153,7 @@ class OpenVDM():
         except Exception as err:
             logging.error("Unable to set cruise size with OpenVDM API")
             raise err
+
 
     def set_lowering_size(self, size_in_bytes=None):
         """

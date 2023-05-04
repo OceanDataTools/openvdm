@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-
 FILE:  post_hooks.py
 
 DESCRIPTION:  Gearman worker that runs user-defined scripts following the
@@ -11,9 +10,9 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.8
+  VERSION:  2.9
   CREATED:  2016-02-09
- REVISION:  2020-02-13
+ REVISION:  2020-02-24
 """
 
 import argparse
@@ -75,11 +74,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
-        self.files = { 'new':[], 'updated':[] }
-        self.cruise_id = self.ovdm.get_cruise_id()
-        self.lowering_id = self.ovdm.get_lowering_id()
-        self.collection_system_transfer = { 'name': "" }
-        self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        self.files = None
+        self.cruise_id = None
+        self.lowering_id = None
+        self.collection_system_transfer = None
+        self.shipboard_data_warehouse_config = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
@@ -174,6 +173,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -182,6 +182,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()

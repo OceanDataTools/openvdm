@@ -31,6 +31,12 @@ class CollectionSystemTransfers extends Controller {
         return $trueFalse;
     }
     
+    private function _buildRemoveSourceFilesOptions() {
+        
+        $trueFalse = array(array('id'=>'removeSourceFiles0', 'name'=>'removeSourceFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'removeSourceFiles1', 'name'=>'removeSourceFiles', 'value'=>'1', 'label'=>'Yes'));
+        return $trueFalse;
+    }
+
     private function _buildUseStartDateOptions() {
         
         $trueFalse = array(array('id'=>'useStartDate0', 'name'=>'useStartDate', 'value'=>'0', 'label'=>'No'), array('id'=>'useStartDate1', 'name'=>'useStartDate', 'value'=>'1', 'label'=>'Yes'));
@@ -130,6 +136,7 @@ class CollectionSystemTransfers extends Controller {
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['stalenessOptions'] = $this->_buildStalenessOptions();
+        $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
@@ -146,6 +153,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -330,6 +338,7 @@ class CollectionSystemTransfers extends Controller {
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
                     'staleness' => $staleness,
+                    'removeSourceFiles' => $removeSourceFiles,
                     'useStartDate' => $useStartDate,
                     'skipEmptyDirs' => $skipEmptyDirs,
                     'skipEmptyFiles' => $skipEmptyFiles,
@@ -366,6 +375,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = $_POST['staleness'];
+            $removeSourceFiles = $_POST['removeSourceFiles'];
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -534,6 +544,7 @@ class CollectionSystemTransfers extends Controller {
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
                     'staleness' => $staleness,
+                    'removeSourceFiles' => $removeSourceFiles,
                     'useStartDate' => $useStartDate,
                     'skipEmptyDirs' => $skipEmptyDirs,
                     'skipEmptyFiles' => $skipEmptyFiles,
@@ -584,6 +595,7 @@ class CollectionSystemTransfers extends Controller {
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
+        $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
         $data['syncFromSourceOptions'] = $this->_buildSyncFromSourceOptions();
@@ -603,6 +615,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -786,6 +799,7 @@ class CollectionSystemTransfers extends Controller {
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
                     'staleness' => $staleness,
+                    'removeSourceFiles' => $removeSourceFiles,
                     'useStartDate' => $useStartDate,
                     'skipEmptyDirs' => $skipEmptyDirs,
                     'skipEmptyFiles' => $skipEmptyFiles,
@@ -827,6 +841,7 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->sourceDir = $sourceDir;
                 $data['row'][0]->destDir = $destDir;
                 $data['row'][0]->staleness = $staleness;
+                $data['row'][0]->removeSourceFiles = $removeSourceFiles;
                 $data['row'][0]->useStartDate = $useStartDate;
                 $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
                 $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
@@ -857,6 +872,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = $_POST['staleness'];
+            $removeSourceFiles = $_POST['removeSourceFiles'];
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -1026,6 +1042,7 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->sourceDir = $sourceDir;
                 $gmData['collectionSystemTransfer']->destDir = $destDir;
                 $gmData['collectionSystemTransfer']->staleness = $staleness;
+                $gmData['collectionSystemTransfer']->removeSourceFiles = $removeSourceFiles;
                 $gmData['collectionSystemTransfer']->useStartDate = $useStartDate;
                 $gmData['collectionSystemTransfer']->skipEmptyDirs = $skipEmptyDirs;
                 $gmData['collectionSystemTransfer']->skipEmptyFiles = $skipEmptyFiles;
@@ -1068,6 +1085,7 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->sourceDir = $sourceDir;
             $data['row'][0]->destDir = $destDir;
             $data['row'][0]->staleness = $staleness;
+            $data['row'][0]->removeSourceFiles = $removeSourceFiles;
             $data['row'][0]->useStartDate = $useStartDate;
             $data['row'][0]->skipEmptyDirs = $skipEmptyDirs;
             $data['row'][0]->skipEmptyFiles = $skipEmptyFiles;
