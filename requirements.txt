@@ -1,7 +1,5 @@
 certifi==2021.10.8
 chardet==4.0.0
-geographiclib==1.52
-geopy==2.2.0
 idna==3.3
 numpy==1.22.2
 pandas==1.4.1
