@@ -77,6 +77,8 @@ function set_default_variables {
     DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
+    
+    DEFAULT_INSTALL_MAPPROXY=no
 
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
@@ -108,6 +110,8 @@ DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
 DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
+
+DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
@@ -174,23 +178,19 @@ function install_packages {
 
     apt install -y openssh-server sshpass rsync curl git samba smbclient \
         cifs-utils gearman-job-server libgearman-dev nodejs python3 \
-        python3-dev python3-pip python3-venv libgdal-dev gdal-bin libgeos-dev \
-        libgdal-dev supervisor mysql-server mysql-client ntp apache2 \
-        libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 php7.3-cli \
-        php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman php7.3-yaml \
-        proj-bin python3-pyproj
-	
-    pip3 install MapProxy
+        python3-dev python3-pip python3-venv supervisor mysql-server \
+	mysql-client ntp apache2 libapache2-mod-wsgi-py3 php7.3 \
+	libapache2-mod-php7.3 php7.3-cli php7.3-mysql php7.3-zip \
+	php7.3-curl php7.3-gearman php7.3-yaml
+
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
-    # TODO Install these via virtualenv
-    #python-pip python-pip python-pil python-gdal python-lxml python-shapely python-requests
-
-    # pip install python3_gearman pandas geopy gdal pyyaml requests
-
-    # change from cgi import escape to from html import escape in 
-    # /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py 
-    # (line 16)
-
+        apt install -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
+	python3-pyproj
+        
+	pip3 install MapProxy
+    fi
+    
     npm install -g bower
 
     startingDir=${PWD}
@@ -602,13 +602,15 @@ EOF
 ###########################################################################
 # Install and configure database
 function configure_mapproxy {
-	
-    startingDir=${PWD}
 
-    cd ~
-    mapproxy-util create -t base-config --force mapproxy
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
 
-    cat > ~/mapproxy/mapproxy.yaml <<EOF
+        startingDir=${PWD}
+
+        cd ~
+        mapproxy-util create -t base-config --force mapproxy
+
+        cat > ~/mapproxy/mapproxy.yaml <<EOF
 # -------------------------------
 # MapProxy configuration.
 # -------------------------------
@@ -674,17 +676,17 @@ grids:
 globals:
 EOF
 
-    cp -r ~/mapproxy /var/www/
-    mkdir -p /var/www/mapproxy/cache_data
-    chmod 777 /var/www/mapproxy/cache_data
-    chown -R root:root /var/www/mapproxy
+        cp -r ~/mapproxy /var/www/
+        mkdir -p /var/www/mapproxy/cache_data
+        chmod 777 /var/www/mapproxy/cache_data
+        chown -R root:root /var/www/mapproxy
 
-    cd /var/www/mapproxy
-    mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
+        cd /var/www/mapproxy
+        mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
 
-    # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
-    cd ${startingDir}
-
+        # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
+        cd ${startingDir}
+    fi
 }
 
 
@@ -1033,6 +1035,15 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 
     fi
 fi
+
+#########################################################################
+# Install MapProxy?
+echo "#####################################################################"
+echo "Optionally install: MapProxy for caching mapping tiles from ESRI &"
+echo "Google."
+echo
+yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
+INSTALL_MAPPROXY=$YES_NO_RESULT
 
 #########################################################################
 #########################################################################
