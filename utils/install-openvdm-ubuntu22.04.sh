@@ -223,6 +223,7 @@ function install_python_packages {
     pip install -r $INSTALL_ROOT/openvdm/requirements.txt
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
+       pip install geographiclib==1.52 geopy==2.2.0
        pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
     fi
 }
