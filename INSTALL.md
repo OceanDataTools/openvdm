@@ -19,7 +19,7 @@ Log into the Server as root
 Download the install script
 ```
 cd ~
-curl https://raw.githubusercontent.com/oceandatatools/openvdm/dev/utils/install-openvdm-ubuntu22.04.sh > ~/install-openvdm-ubuntu22.04.sh
+curl https://raw.githubusercontent.com/oceandatatools/openvdm/master/utils/install-openvdm-ubuntu22.04.sh > ~/install-openvdm-ubuntu22.04.sh
 ```
 If you see an error it could be because curl is not yet installed. Run the following command and try to download the install script again.
 ```
