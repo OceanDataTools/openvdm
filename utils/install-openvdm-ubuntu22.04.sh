@@ -845,7 +845,7 @@ function install_openvdm {
         echo "Downloading OpenVDM repository"
         cd $INSTALL_ROOT
         git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
-        chown ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
 
     else
         cd ${INSTALL_ROOT}/openvdm
