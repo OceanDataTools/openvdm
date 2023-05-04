@@ -90,3 +90,11 @@ OpenVDM v2.9 introducted some configuration file and database changes that will 
 6. Make a backup the webUI config file: `./www/app/Core/Config.php`
 7. Make a new webUI config file using the default template: `cp ./www/app/Core/Config.php.dist ./www/app/Core/Config.php`
 8. Transfer any customizations from the the backup configuration file to the new configuration file.
+
+There are also some web-dependencies that were updated as part of this release. To update those run:
+```
+cd <openvdm_root>/www
+rm -r bower_components
+bower install
+composer install
+```
