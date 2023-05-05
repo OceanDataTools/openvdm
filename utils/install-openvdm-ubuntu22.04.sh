@@ -931,6 +931,7 @@ EOF
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
         cat ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | sed -e "s/127.0.0.1/${HOSTNAME}/" > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+	chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
     fi
 
     cd ${startingDir}
