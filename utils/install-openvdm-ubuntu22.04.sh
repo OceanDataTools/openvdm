@@ -22,6 +22,9 @@
 # produce the desired result.  Bug reports, and even better, bug
 # fixes, will be greatly appreciated.
 
+set -o nounset
+set -o errexit
+set -o pipefail
 
 PREFERENCES_FILE='.install_openvdm_preferences'
 
@@ -80,6 +83,9 @@ function set_default_variables {
     
     DEFAULT_INSTALL_MAPPROXY=no
 
+    DEFAULT_INSTALL_PUBLICDATA=yes
+    DEFAULT_INSTALL_VISITORINFORMATION=no
+
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_PORT=9001
@@ -112,6 +118,9 @@ DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
 
 DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
+
+DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
+DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISTORINFORMATION
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
@@ -167,9 +176,6 @@ function install_packages {
 
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/pkg-gearman
-
-    # add-apt-repository -y ppa:ubuntugis/ppa
 
     curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh
     bash /tmp/nodesource_setup.sh
@@ -179,16 +185,16 @@ function install_packages {
     apt install -y openssh-server sshpass rsync curl git samba smbclient \
         cifs-utils gearman-job-server libgearman-dev nodejs python3 \
         python3-dev python3-pip python3-venv supervisor mysql-server \
-	mysql-client ntp apache2 libapache2-mod-wsgi-py3 php7.3 \
-	libapache2-mod-php7.3 php7.3-cli php7.3-mysql php7.3-zip \
-	php7.3-curl php7.3-gearman php7.3-yaml
+        mysql-client ntp apache2 libapache2-mod-wsgi-py3 php7.3 \
+        libapache2-mod-php7.3 php7.3-cli php7.3-mysql php7.3-zip php7.3-curl \
+        php7.3-gearman php7.3-yaml
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
         apt install -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
-	python3-pyproj
+            python3-pyproj
         
-	pip3 install MapProxy
+        pip3 install MapProxy
     fi
     
     npm install -g bower
@@ -215,9 +221,8 @@ function install_python_packages {
     python3 -m venv $VENV_PATH
     source $VENV_PATH/bin/activate  # activate virtual environment
 
-    pip install \
-      --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-      --upgrade pip
+    pip install --trusted-host pypi.org \
+        --trusted-host files.pythonhosted.org --upgrade pip
     pip install wheel  # To help with the rest of the installations
 
     pip install -r $INSTALL_ROOT/openvdm/requirements.txt
@@ -485,6 +490,10 @@ EOF
   directory mask = 0755
   veto files = /._*/.DS_Store/.Trashes*/
   delete veto files = yes
+EOF
+
+if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+    cat >> /etc/samba/openvdm.conf <<EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
@@ -498,6 +507,11 @@ EOF
   directory mask = 0755
   veto files = /._*/.DS_Store/.Trashes*/
   delete veto files = yes
+EOF
+fi
+
+if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+    cat >> /etc/samba/openvdm.conf <<EOF
 
 [PublicData]
   comment=Public Data, read/write access to all
@@ -513,7 +527,7 @@ EOF
   force create mode = 666
   force directory mode = 777
 EOF
-
+fi
     echo "Restarting Samba Service"
     systemctl restart smbd.service
 }
@@ -548,6 +562,10 @@ function configure_apache {
     <Directory "/var/www/openvdm">
       AllowOverride all
     </Directory>
+EOF
+
+if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
     WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
 
@@ -555,6 +573,10 @@ function configure_apache {
       Order deny,allow
       Allow from all
     </Directory>
+EOF
+fi
+
+cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
     Alias /CruiseData/ $DATA_ROOT/CruiseData/
     <Directory "$DATA_ROOT/CruiseData">
@@ -564,7 +586,11 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
-  
+EOF
+
+if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+
     Alias /PublicData/ $DATA_ROOT/PublicData/
     <Directory "$DATA_ROOT/PublicData">
       AllowOverride None
@@ -573,6 +599,11 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
+EOF
+fi
+
+if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
     Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
     <Directory "$DATA_ROOT/VisitorInformation">
@@ -582,6 +613,10 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
+EOF
+fi
+
+cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
 </VirtualHost>
 EOF
@@ -788,10 +823,15 @@ function configure_directories {
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
 
-        mkdir -p ${DATA_ROOT}/PublicData
-        mkdir -p ${DATA_ROOT}/VisitorInformation
+        if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+            mkdir -p ${DATA_ROOT}/PublicData
+            chmod -R 777 ${DATA_ROOT}/PublicData
+        fi
 
-        chmod -R 777 ${DATA_ROOT}/PublicData
+        if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+            mkdir -p ${DATA_ROOT}/VisitorInformation
+        fi
+
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
     fi
 
@@ -885,12 +925,24 @@ EOF
         sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
+        if [ $INSTALL_PUBLICDATA == 'no' ]; then
+            sed -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
+            > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+        fi
+
+        if [ $INSTALL_VISTORINFORMATION == 'no' ]; then
+            sed -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
+            > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+        fi
+
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 create database if not exists openvdm character set utf8;
 GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
 USE openvdm;
 source ./database/openvdm_db_custom.sql;
 flush privileges;
+INSERT INTO users (username, password)
+VALUES ('${OPENVDM_USER}', SHA2('${OPENVDM_DATABASE_PASSWORD}', 256));
 \q
 EOF
     fi
@@ -930,7 +982,12 @@ EOF
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
-        cat ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | sed -e "s/127.0.0.1/${HOSTNAME}/" > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+        sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+
+        if [ $INSTALL_PUBLICDATA == 'no' ]; then
+            sed -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml \
+            > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+        fi
     fi
 
     cd ${startingDir}
@@ -1035,7 +1092,6 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 
         read -p "Password? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_PASS
         SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_USER}
-
     fi
 fi
 
@@ -1047,6 +1103,29 @@ echo "Google."
 echo
 yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
 INSTALL_MAPPROXY=$YES_NO_RESULT
+
+
+#########################################################################
+# Install PublicData?
+echo "#####################################################################"
+echo "Setup a PublicData SMB Share for scientists and crew to share files,"
+echo "pictures, etc. These files will be copied to the cruise data "
+echo "directory at the end of the cruise. This behavior can be disabled in"
+echo "the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
+echo
+yes_no "Setup PublicData Share? " $DEFAULT_INSTALL_PUBLICDATA
+INSTALL_PUBLICDATA=$YES_NO_RESULT
+
+
+#########################################################################
+# Install VisitorInformation?
+echo "#####################################################################"
+echo "Setup a VistorInformation SMB Share for sharing documentation, print"
+echo "drivers, etc with crew and scientists."
+echo
+yes_no "Setup VisitorInformation Share? " $DEFAULT_INSTALL_VISITORINFORMATION
+INSTALL_VISITORINFORMATION=$YES_NO_RESULT
+
 
 #########################################################################
 #########################################################################
