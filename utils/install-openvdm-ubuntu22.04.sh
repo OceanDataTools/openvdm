@@ -22,9 +22,9 @@
 # produce the desired result.  Bug reports, and even better, bug
 # fixes, will be greatly appreciated.
 
-set -o nounset
-set -o errexit
-set -o pipefail
+# set -o nounset
+# set -o errexit
+# set -o pipefail
 
 PREFERENCES_FILE='.install_openvdm_preferences'
 
@@ -894,15 +894,16 @@ function install_openvdm {
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            git pull
-            git checkout $OPENVDM_BRANCH
-            git pull
+            sudo -u $OPENVDM_USER git pull
+            sudo -u $OPENVDM_USER git checkout $OPENVDM_BRANCH
+            sudo -u $OPENVDM_USER git pull
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
             cd ..
             rm -rf openvdm
             git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
+	    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
         fi
     fi
 
@@ -923,14 +924,19 @@ EOF
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
         if [ $INSTALL_PUBLICDATA == 'no' ]; then
-            sed -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
-            > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+            sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql 
         fi
 
         if [ $INSTALL_VISITORINFORMATION == 'no' ]; then
-            sed -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
-            > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+            sed -i -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
+
+        hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
+	cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF 
+
+INSERT INTO OVDM_Users (username, password)
+VALUES ('${OPENVDM_USER}', '${hashed_password}');
+EOF
 
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 create database if not exists openvdm character set utf8;
@@ -938,8 +944,6 @@ GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
 USE openvdm;
 source ./database/openvdm_db_custom.sql;
 flush privileges;
-INSERT INTO users (username, password)
-VALUES ('${OPENVDM_USER}', SHA2('${OPENVDM_DATABASE_PASSWORD}', 256));
 \q
 EOF
     fi
@@ -982,8 +986,7 @@ EOF
         sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 
         if [ $INSTALL_PUBLICDATA == 'no' ]; then
-            sed -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml \
-            > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+            sed -i -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
         fi
     fi
 
