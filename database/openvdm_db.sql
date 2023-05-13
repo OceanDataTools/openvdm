@@ -243,9 +243,9 @@ LOCK TABLES `OVDM_Links` WRITE;
 INSERT INTO `OVDM_Links` (`name`, `url`, `enable`, `private`)
 VALUES
   ('Supervisord','http://{hostIP}:9001',1,1),
-  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
   ('Public Data','http://{hostIP}/PublicData/',1,0),
-  ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0);
+  ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
+  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
