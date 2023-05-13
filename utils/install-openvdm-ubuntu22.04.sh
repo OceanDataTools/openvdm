@@ -120,7 +120,7 @@ DEFAULT_OPENVDM_USER=$OPENVDM_USER
 DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
 
 DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
-DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISTORINFORMATION
+DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
@@ -491,7 +491,7 @@ EOF
   delete veto files = yes
 EOF
 
-if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
     cat >> /etc/samba/openvdm.conf <<EOF
 
 [VisitorInformation]
@@ -601,7 +601,7 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
 EOF
 fi
 
-if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
     cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
     Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
@@ -827,7 +827,7 @@ function configure_directories {
             chmod -R 777 ${DATA_ROOT}/PublicData
         fi
 
-        if [ $INSTALL_VISTORINFORMATION == 'yes' ]; then
+        if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
             mkdir -p ${DATA_ROOT}/VisitorInformation
         fi
 
@@ -929,7 +929,7 @@ EOF
             > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
 
-        if [ $INSTALL_VISTORINFORMATION == 'no' ]; then
+        if [ $INSTALL_VISITORINFORMATION == 'no' ]; then
             sed -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
             > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
