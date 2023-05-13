@@ -88,7 +88,6 @@ function set_default_variables {
 
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
-    DEFAULT_SUPERVISORD_WEBINTERFACE_PORT=9001
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e $PREFERENCES_FILE ]; then
