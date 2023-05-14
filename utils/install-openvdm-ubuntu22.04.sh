@@ -455,8 +455,8 @@ function configure_gearman {
 # Install and configure database
 function configure_samba {
 
-    echo "Set smbpasswd for ${OPENVDM_USER}, recommended to use same password as system user"
-    smbpasswd -a ${OPENVDM_USER}
+    echo "Creating SMB user: ${OPENVDM_USER}, password set to same as OpenVDM DB user"
+    echo ${OPENVDM_DATABASE_PASSWORD} | smbpasswd -s -a ${OPENVDM_USER}
 
     mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
 
@@ -792,22 +792,6 @@ EOF
 function configure_directories {
 
     if [ ! -d $DATA_ROOT ]; then
-        while true; do
-            read -p "Root data directory ${DATA_ROOT} does not exists... create it? (yes) " yn
-            case $yn in
-                [Yy]* )
-                    break;;
-                "" )
-                    break;;
-                [Nn]* )
-                    echo "Quitting"
-                    exit_gracefully;;
-                * ) echo "Please answer yes or no.";;
-            esac
-        done
-    fi
-
-    if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
@@ -867,7 +851,7 @@ function setup_ssh {
         chmod 600 /home/${OPENVDM_USER}/.ssh/authorized_keys
     fi
 
-    ssh ${OPENVDM_USER}@${HOSTNAME} ls > /dev/null
+    ssh ${OPENVDM_USER}@${HOSTNAME} -o StrictHostKeyChecking=accept-new ls > /dev/null
 }
 
 
@@ -1066,6 +1050,22 @@ NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_
 
 read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
 DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
+
+if [ ! -d $DATA_ROOT ]; then
+    while true; do
+        read -p "Root data directory ${DATA_ROOT} does not exists... create it? (yes) " yn
+        case $yn in
+            [Yy]* )
+                break;;
+            "" )
+                break;;
+            [Nn]* )
+                echo "Quitting"
+                exit_gracefully;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+fi
 
 
 #########################################################################
