@@ -1174,5 +1174,11 @@ echo "#####################################################################"
 echo "Configuring Supervisor"
 configure_supervisor
 
+echo "#####################################################################"
+echo "OpenVDM Installation: Complete"
+echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
+echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
+echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+
 #########################################################################
 #########################################################################
