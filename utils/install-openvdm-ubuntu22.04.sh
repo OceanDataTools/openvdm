@@ -1052,21 +1052,12 @@ read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
 DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
 
 if [ ! -d $DATA_ROOT ]; then
-    while true; do
-        read -p "Root data directory ${DATA_ROOT} does not exists... create it? (yes) " yn
-        case $yn in
-            [Yy]* )
-                break;;
-            "" )
-                break;;
-            [Nn]* )
-                echo "Quitting"
-                exit_gracefully;;
-            * ) echo "Please answer yes or no.";;
-        esac
-    done
+    yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
+    
+    if $YES_NO_RESULT == "no"; then
+        exit_gracefully
+    fi
 fi
-
 
 #########################################################################
 # Enable Supervisor web-interface?
