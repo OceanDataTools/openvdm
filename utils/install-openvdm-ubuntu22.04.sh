@@ -456,7 +456,7 @@ function configure_gearman {
 function configure_samba {
 
     echo "Creating SMB user: ${OPENVDM_USER}, password set to same as OpenVDM DB user"
-    echo ${OPENVDM_DATABASE_PASSWORD} | smbpasswd -s -a ${OPENVDM_USER}
+    (echo ${OPENVDM_DATABASE_PASSWORD}; echo ${OPENVDM_DATABASE_PASSWORD}) | smbpasswd -s -a ${OPENVDM_USER}
 
     mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
 
