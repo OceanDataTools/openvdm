@@ -1005,10 +1005,8 @@ echo "Hostname will be '$HOSTNAME'"
 set_hostname $HOSTNAME
 echo
 
-read -p "OpenVDM install root? ($DEFAULT_INSTALL_ROOT) " INSTALL_ROOT
+read -p "OpenVDM install root directory? ($DEFAULT_INSTALL_ROOT) " INSTALL_ROOT
 INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
-echo "Install root will be '$INSTALL_ROOT'"
-echo
 
 read -p "Repository to install from? ($DEFAULT_OPENVDM_REPO) " OPENVDM_REPO
 OPENVDM_REPO=${OPENVDM_REPO:-$DEFAULT_OPENVDM_REPO}
@@ -1044,17 +1042,27 @@ echo "is the initial installation, hit "return" when prompted for root"
 echo "database password, otherwise enter the password you used during the"
 echo "initial installation."
 echo
-echo "Current root database password (hit return if this is the initial"
-read -p "installation)? " CURRENT_ROOT_DATABASE_PASSWORD
-read -p "New database password for root? ($CURRENT_ROOT_DATABASE_PASSWORD) " NEW_ROOT_DATABASE_PASSWORD
+echo "Current root user password for MySQL (hit return if this is the"
+read -p "initial installation)? " CURRENT_ROOT_DATABASE_PASSWORD
+read -p "New/updated root user password for MySQL? ($CURRENT_ROOT_DATABASE_PASSWORD) " NEW_ROOT_DATABASE_PASSWORD
 NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_PASSWORD}
 echo
 
-read -p "New database password for user $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
+read -p "New password for MySQL user: $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
 OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$OPENVDM_USER}
 echo
 
 echo "#####################################################################"
+echo "Gathering information on where OpenVDM should store cruise data files"
+echo "The root data directory needs to be large enough to store at least a"
+echo "single cruise worth of data but ideally should be large enougn to"
+echo "hold several cruises worth of data."
+echo
+echo "It is recommended that the root data directory be located on a"
+echo "mounted volume that is independent of the volume used for the"
+echo "operating system. This simplifies disaster recovery and system"
+echo "updates"
+echo
 read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
 DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
 
