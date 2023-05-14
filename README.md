@@ -55,8 +55,8 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 - *[R/V Helmer Hanssen](https://en.uit.no/om/enhet/artikkel?p_document_id=151541&p_dimension_id=88172&men=42374)* (UiT The Arctic University of Norway)
 - *[R/V OceanXplorer](http://www.oceanx.org/oceanxplorer/)* (OceanX)
 - *[RSV Nuyina](https://www.antarctica.gov.au/nuyina/) (Australian Antarctic Division)*
-- *[R/V Roger Revelle](https://www.sio.ucsd.edu/)* (Scripps)
-- *[R/V Sally Ride](https://www.sio.ucsd.edu/)* (Scripps)
+- *[R/V Roger Revelle](https://www.scripps.ucsd.edu/)* (Scripps)
+- *[R/V Sally Ride](https://www.scripps.ucsd.edu/)* (Scripps)
 
 ## Vehicles Currently using OpenVDM ##
 - *[ROV Subastian](https://schmidtocean.org/technology/robotic-platforms/4500-m-remotely-operated-vehicle-rov/)* (Schmidt Ocean Institute)
