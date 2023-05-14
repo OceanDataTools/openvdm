@@ -972,6 +972,8 @@ EOF
         if [ $INSTALL_PUBLICDATA == 'no' ]; then
             sed -i -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
         fi
+
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
     fi
 
     cd ${startingDir}
