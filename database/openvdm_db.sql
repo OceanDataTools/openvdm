@@ -240,12 +240,12 @@ CREATE TABLE `OVDM_Links` (
 LOCK TABLES `OVDM_Links` WRITE;
 /*!40000 ALTER TABLE `OVDM_Links` DISABLE KEYS */;
 
-INSERT INTO `OVDM_Links` (`linkID`, `name`, `url`, `enable`, `private`)
+INSERT INTO `OVDM_Links` (`name`, `url`, `enable`, `private`)
 VALUES
-  (1,'Supervisord','http://{hostIP}:9001',1,1),
-  (2,'Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
-  (3,'Public Data','http://{hostIP}/PublicData/',1,0),
-  (4,'Visitor Information','http://{hostIP}/VisitorInformation/',1,0);
+  ('Supervisord','http://{hostIP}:9001',1,1),
+  ('Public Data','http://{hostIP}/PublicData/',1,0),
+  ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
+  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -378,9 +378,9 @@ CREATE TABLE `OVDM_Users` (
 LOCK TABLES `OVDM_Users` WRITE;
 /*!40000 ALTER TABLE `OVDM_Users` DISABLE KEYS */;
 
-INSERT INTO `OVDM_Users` (`userID`, `username`, `password`, `lastLogin`)
-VALUES
-  (1,'admin','$2y$12$JviETOQPkNzqZxQpswLb1ONtTLxsqdzQJEoaWjlNzb0/.xfIOVM/C','2017-10-05 10:47:49');
+-- INSERT INTO `OVDM_Users` (`userID`, `username`, `password`, `lastLogin`)
+-- VALUES
+--   (1,'admin','$2y$12$JviETOQPkNzqZxQpswLb1ONtTLxsqdzQJEoaWjlNzb0/.xfIOVM/C','2017-10-05 10:47:49');
 
 /*!40000 ALTER TABLE `OVDM_Users` ENABLE KEYS */;
 UNLOCK TABLES;
