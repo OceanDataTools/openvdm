@@ -1054,8 +1054,8 @@ DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
 if [ ! -d $DATA_ROOT ]; then
     yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
     
-    if $YES_NO_RESULT == "no"; then
-        exit_gracefully
+    if [ $YES_NO_RESULT == "no" ]; then
+        exit
     fi
 fi
 
