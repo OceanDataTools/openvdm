@@ -167,9 +167,9 @@ function create_user {
 # Install and configure required packages
 function install_packages {
 
-    apt-get update
+    apt-get update -qq
 
-    apt-get install -y software-properties-common
+    apt-get install -q -y software-properties-common
 
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
@@ -177,9 +177,9 @@ function install_packages {
     curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh
     bash /tmp/nodesource_setup.sh
 
-    apt-get update
+    apt-get update -qq
 
-    apt install -y openssh-server sshpass rsync curl git samba smbclient \
+    apt install -q -y openssh-server sshpass rsync curl git samba smbclient \
         cifs-utils gearman-job-server libgearman-dev nodejs python3 \
         python3-dev python3-pip python3-venv supervisor mysql-server \
         mysql-client ntp apache2 libapache2-mod-wsgi-py3 php7.3 \
@@ -188,13 +188,13 @@ function install_packages {
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
-        apt install -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
+        apt install -q -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
             python3-pyproj
         
-        pip3 install MapProxy
+        pip3 install MapProxy --quiet
     fi
     
-    npm install -g bower
+    npm install --quiet -g bower
 
     startingDir=${PWD}
 
@@ -219,14 +219,14 @@ function install_python_packages {
     source $VENV_PATH/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
-        --trusted-host files.pythonhosted.org --upgrade pip
-    pip install wheel  # To help with the rest of the installations
+        --trusted-host files.pythonhosted.org --upgrade pip --quiet
+    pip install wheel --quiet # To help with the rest of the installations
 
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt
+    pip install -r $INSTALL_ROOT/openvdm/requirements.txt --quiet
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
-       pip install geographiclib==1.52 geopy==2.2.0
-       pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version`
+       pip install geographiclib==1.52 geopy==2.2.0 --quiet
+       pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version` --quiet
     fi
 }
 
@@ -618,16 +618,16 @@ cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 </VirtualHost>
 EOF
 
-    echo "Enabling ReWrite Module"
-    a2enmod rewrite
+    echo "Enabling rewrite Module"
+    a2enmod -q rewrite
 
     echo "Disabling default vhost"
-    a2dissite 000-default
+    a2dissite -q 000-default
 
     echo "Enabling new vhost"
-    a2ensite openvdm
+    a2ensite -q openvdm
 
-    echo "Restarting Apache Web Server"
+    echo "Restarting Apache WebServer"
     systemctl restart apache2.service
 
 }
@@ -740,7 +740,7 @@ function configure_mysql {
     systemctl restart mysql    # to manually start db server
     systemctl enable mysql     # to make it start on boot
 
-    echo "Setting up database root user and permissions"
+    echo "Setting up root user"
     # Verify current root password for mysql
     while true; do
         # Check whether they're right about the current password; need
@@ -828,7 +828,7 @@ function configure_directories {
 ###########################################################################
 # Set system timezone
 function setup_timezone {
-    echo "Etc/UTC" | tee /etc/timezone
+    echo "Etc/UTC" > /etc/timezone
     dpkg-reconfigure --frontend noninteractive tzdata
 }
 
@@ -870,7 +870,7 @@ function install_openvdm {
     if [ ! -d ${INSTALL_ROOT}/openvdm ]; then  # New install
         echo "Downloading OpenVDM repository"
         cd $INSTALL_ROOT
-        git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
+        git clone -q -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
 
     else
@@ -886,7 +886,7 @@ function install_openvdm {
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
             cd ..
             rm -rf openvdm
-            git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
+            git clone -q -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
 	    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
         fi
     fi
@@ -894,7 +894,7 @@ function install_openvdm {
     cd ${INSTALL_ROOT}/openvdm
 
     if mysql --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} -e 'use openvdm' 2> /dev/null; then
-        echo "openvdm database found, skipping database setup"
+        echo "OpenVDM database found, skipping database setup"
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 GRANT ALL PRIVILEGES ON openvdm.* TO '$OPENVDM_USER'@'localhost';
 flush privileges;
@@ -1044,8 +1044,8 @@ echo "is the initial installation, hit "return" when prompted for root"
 echo "database password, otherwise enter the password you used during the"
 echo "initial installation."
 echo
-echo "Current root database password \(hit return if this is the"
-read -p "initial installation)? " CURRENT_ROOT_DATABASE_PASSWORD
+echo "Current root database password (hit return if this is the initial"
+read -p "installation)? " CURRENT_ROOT_DATABASE_PASSWORD
 read -p "New database password for root? ($CURRENT_ROOT_DATABASE_PASSWORD) " NEW_ROOT_DATABASE_PASSWORD
 NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_PASSWORD}
 echo
@@ -1079,9 +1079,7 @@ SUPERVISORD_WEBINTERFACE=$YES_NO_RESULT
 
 if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 
-    echo Would you like to enable a password on the supervisord web-interface?
-    echo
-    yes_no "Enable Supervisor Web-interface user/pass? " $DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH
+    yes_no "Enable user/pass on Supervisor Web-interface? " $DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH
     SUPERVISORD_WEBINTERFACE_AUTH=$YES_NO_RESULT
 
     if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
@@ -1098,8 +1096,9 @@ echo
 #########################################################################
 # Install MapProxy?
 echo "#####################################################################"
-echo "Optionally install: MapProxy for caching mapping tiles from ESRI &"
-echo "Google."
+echo "Optionally install: MapProxy"
+echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
+echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
 echo
 yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
 INSTALL_MAPPROXY=$YES_NO_RESULT
@@ -1138,10 +1137,9 @@ save_default_variables
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
 install_packages
-echo
 
 echo "#####################################################################"
-echo "Setting system timezone to UTC"
+echo "Setting system timezone to Etc/UTC"
 setup_timezone
 echo
 
