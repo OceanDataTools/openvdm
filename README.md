@@ -49,13 +49,14 @@ Want to join in the fun?  Please join the [#openvdm](https://oceandatarat.slack.
 
 ## Vessels Currently using OpenVDM ##
 - *[R/V Endeavor](https://techserv.gso.uri.edu/)* (URI Graduate School of Oceanography)
-- *[R/V Falkor](https://schmidtocean.org/rv-falkor/)* (Schmidt Ocean Institute)
+- *[R/V Falkor (too)](https://schmidtocean.org/)* (Schmidt Ocean Institute)
 - *[R/V Annie](http://engineeringfordiscovery.org/technology/rv-annie/)* (Global Foundation for Ocean Exploration)
 - *[R/V Atlantic Explorer](http://www.bios.edu/research/facilities/atlantic-explorer/)* (Bermuda Institute of Ocean Sciences)
 - *[R/V Helmer Hanssen](https://en.uit.no/om/enhet/artikkel?p_document_id=151541&p_dimension_id=88172&men=42374)* (UiT The Arctic University of Norway)
-- *[R/V OceanXplorer1](http://www.oceanx.org/oceanxplorer/)* (OceanX)
+- *[R/V OceanXplorer](http://www.oceanx.org/oceanxplorer/)* (OceanX)
 - *[RSV Nuyina](https://www.antarctica.gov.au/nuyina/) (Australian Antarctic Division)*
-- *[R/V Odyssey](https://www.oceef.org/)* (Oceef)
+- *[R/V Roger Revelle](https://www.sio.ucsd.edu/)* (Scripps)
+- *[R/V Sally Ride](https://www.sio.ucsd.edu/)* (Scripps)
 
 ## Vehicles Currently using OpenVDM ##
 - *[ROV Subastian](https://schmidtocean.org/technology/robotic-platforms/4500-m-remotely-operated-vehicle-rov/)* (Schmidt Ocean Institute)
