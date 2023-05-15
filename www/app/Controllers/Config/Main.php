@@ -646,6 +646,14 @@ class Main extends Controller {
             Url::redirect('config');
         }
 
+        if ($this->_warehouseModel->getLoweringFinalizedDate() == null) {
+            date_default_timezone_set('Etc/UTC');
+        
+            $timestamp = time();
+            $roundedTimestamp = ceil($timestamp / (15 * 60)) * (15 * 60);
+        
+            $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+        }
 
         $gmData = array();
         
