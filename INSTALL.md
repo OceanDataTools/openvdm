@@ -18,46 +18,125 @@ Log into the Server as root
 
 Download the install script
 ```
-cd ~
-curl https://raw.githubusercontent.com/oceandatatools/openvdm/master/utils/install-openvdm-ubuntu22.04.sh > ~/install-openvdm-ubuntu22.04.sh
-```
-If you see an error it could be because curl is not yet installed. Run the following command and try to download the install script again.
-```
-apt install -y curl
-```
-
-Run the install script
-```
-chmod +x ~/install-openvdm-ubuntu22.04.sh
-~/install-openvdm-ubuntu22.04.sh
+OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
+BRANCH=master
+wget https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
+chmod +x install-openvdm-ubuntu22.04.sh
+sudo ./install-openvdm-ubuntu22.04.sh
 ```
 
-You will need to answer some questions about your configuration.
+You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
 
- - Name to assign to host? --> *This is the host name of the server*
+```
+#####################################################################
+OpenVDM configuration script
+#####################################################################
+Name to assign to host (openvdm)? 
+Hostname will be 'openvdm-2vcpu-4gb-nyc2-01'
+Hostname already in /etc/hosts
 
- - Repository to install from? --> *This is the which OpenVDM repo you want to install from*
+OpenVDM install root? (/opt) 
+Install root will be '/opt'
+
+Repository to install from? (https://github.com/oceandatatools/openvdm) 
+Repository branch to install? (master) 
+
+Will install from github.com
+Repository: 'https://github.com/oceandatatools/openvdm'
+Branch: 'master'
+Installation Directory: /opt
+```
+```
+#####################################################################
+IP Address or URL users will access OpenVDM from? (127.0.0.1) 
+
+Access URL: 'http://127.0.0.1'
+```
  
- - Repository branch to install? --> *This is the branch of the specified repo to download*
+```
+#####################################################################
+OpenVDM user to create? (survey) 
+Checking if user survey exists yet
+id: ‘survey’: no such user
+...
+New password: 
+Retype new password: 
+passwd: password updated successfully
+```
 
- - OpenVDM user to create? --> *This is the system user that will own the cruise data files.  This is also the username used to connect the OpenVDM web-app to the backend database*
+```
+#####################################################################
+Gathing information for MySQL installation/configuration
+Root database password will be empty on initial installation. If this
+is the initial installation, hit return when prompted for root
+database password, otherwise enter the password you used during the
+initial installation.
+
+Current root database password (hit return if this is the initial
+installation)? 
+New database password for root? () weak_password
+
+New database password for user survey? (survey) weak_password
+```
+
+```
+#####################################################################
+Root data directory for OpenVDM? (/vault) 
+Root data directory /vault does not exists... create it?  (yes) 
+```
+
+```
+#####################################################################
+The supervisord service provides an optional web-interface that enables
+operators to start/stop/restart the OpenVDM main processes from a web-
+browser.
+
+Enable Supervisor Web-interface?  (no) yes
+Enable user/pass on Supervisor Web-interface?  (no) yes
+Username? (survey) 
+Password? (survey) weak_password
+```
+
+```
+#####################################################################
+Optionally install: MapProxy
+MapProxy is used for caching map tiles from ESRI and Google. This can
+reduce ship-to-shore network traffic for GIS-enabled webpages.
+
+Install MapProxy?  (no) 
+```
+
+```
+#####################################################################
+Setup a PublicData SMB Share for scientists and crew to share files,
+pictures, etc. These files will be copied to the cruise data 
+directory at the end of the cruise. This behavior can be disabled in
+the /opt/openvdm/server/etc/openvdm.yaml file.
+
+Setup PublicData Share?  (yes) 
+```
  
- - OpenVDM Database password to use for user <user>? --> *This is the DATABASE user password for the database user.*
+```
+#####################################################################
+Setup a VistorInformation SMB Share for sharing documentation, print
+drivers, etc with crew and scientists.
 
- - Current database password for root (hit return if this is the initial installation)? --> *This is the root password for the database*
-
- - Root data directory for OpenVDM? --> *This is the root directory that will contain all the cruise data for all cruises managed by OpenVDM. If this directory does not already exist you will be asked if you want it created.*
+Setup VisitorInformation Share?  (no) 
+```
 
 ### All done... almost ###
-At this point the warehouse should have a working installation of OpenVDM however the vessel operator will still need to configure data dashboard collection system transfers, cruise data transfers and the shoreside data warehouse.
+When the script completes successfully there will a message containing how to access the OpenVDM web-interface:
+```
+#####################################################################
+OpenVDM Installation: Complete
+OpenVDM WebUI available at: http://127.0.0.1
+Login with user: survey, pass: weak_password
+Cruise Data will be stored at: /vault/CruiseData
+```
+ 
+At this point there should be a working installation of OpenVDM however the vessel operator will still need to configure data dashboard collection system transfers, cruise data transfers and the shoreside data warehouse.
 
-To access the OpenVDM web-application goto: `<http://<hostname>>`
-The default username/passwd is admin/demo
-
-#### Reset the default password
- #Goto `<http://<hostname>>` and login (user icon, upper-right)
- #Click the user icon again and select "User Settings"
- #Set the desired password and optional change the admin username.
+To access the OpenVDM web-application go to address specified in the completetion message.
 
 ### An error has been reported ###
 If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.
