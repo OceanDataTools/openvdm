@@ -657,7 +657,7 @@ class Main extends Controller {
 
             }
             else {
-                $prev_date=strptime($loweringEndDate, "Y/m/d H:i:S")
+                $prev_date=strptime($loweringEndDate, "Y/m/d H:i:S");
                 $now_date = getdate($roundedTimestamp);
                 if ($prev_date > $now_date) {
                     $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
