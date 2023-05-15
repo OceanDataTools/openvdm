@@ -646,7 +646,7 @@ class Main extends Controller {
             Url::redirect('config');
         }
 
-        if ($this->_warehouseModel->getLoweringFinalizedDate() == null) {
+        if ($this->_warehouseModel->getLoweringFinalizedDate()['loweringFinalizedOn'] === null) {
             date_default_timezone_set('Etc/UTC');
         
             $timestamp = time();
