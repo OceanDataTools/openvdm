@@ -5,6 +5,8 @@ use Helpers\Session;
 
 $_warehouseModel = new \Models\Warehouse();
 
+var_dump($_warehouseModel->getLoweringEndDate());
+
 ?>
 
     <div class="row">
