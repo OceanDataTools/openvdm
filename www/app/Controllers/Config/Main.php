@@ -651,19 +651,19 @@ class Main extends Controller {
             $timestamp = time();
             $roundedTimestamp = ceil($timestamp / (15 * 60)) * (15 * 60);
 
-            $loweringEndDate = $this->_warehouseModel->getLoweringEndDate()['loweringEndDate'];
-            if ($loweringEndDate === null) {
+            $loweringEndDate = $this->_warehouseModel->getLoweringEndDate();
+	    
+	    if ($loweringEndDate === "") {
                 $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
-
             }
             else {
-                $prev_date=strptime($loweringEndDate, "Y/m/d H:i:S");
-                $now_date = getdate($roundedTimestamp);
-                if ($prev_date > $now_date) {
-                    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
-                }
-            }
-        
+                $prev_time = strtotime($loweringEndDate);
+		var_dump($prev_time);
+		var_dump($roundedTimestamp);
+		if ($prev_time > $roundedTimestamp) {
+		    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+		}
+	    }
         }
 
         $gmData = array();
