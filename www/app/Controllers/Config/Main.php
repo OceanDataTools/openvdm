@@ -648,11 +648,22 @@ class Main extends Controller {
 
         if ($this->_warehouseModel->getLoweringFinalizedDate()['loweringFinalizedOn'] === null) {
             date_default_timezone_set('Etc/UTC');
-        
             $timestamp = time();
             $roundedTimestamp = ceil($timestamp / (15 * 60)) * (15 * 60);
+
+            $loweringEndDate = $this->_warehouseModel->getLoweringEndDate()['loweringEndDate'];
+            if ($loweringEndDate === null) {
+                $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+
+            }
+            else {
+                $prev_date=strptime($loweringEndDate, "Y/m/d H:i:S")
+                $now_date = getdate($roundedTimestamp);
+                if ($prev_date > $now_date) {
+                    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+                }
+            }
         
-            $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
         }
 
         $gmData = array();
