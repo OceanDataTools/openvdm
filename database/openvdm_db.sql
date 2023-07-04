@@ -214,8 +214,8 @@ CREATE TABLE `OVDM_Gearman` (
   `jobHandle` tinytext,
   `jobKnown` tinyint(11) unsigned DEFAULT '1',
   `jobRunning` tinyint(11) unsigned DEFAULT '1',
-  `jobNumerator` tinyint(11) unsigned DEFAULT '0',
-  `jobDenominator` tinyint(11) unsigned DEFAULT '0',
+  `jobNumerator` int(11) unsigned DEFAULT '0',
+  `jobDenominator` int(11) unsigned DEFAULT '0',
   `jobName` tinytext,
   `jobPid` int(11) unsigned DEFAULT NULL,
   PRIMARY KEY (`jobID`)
