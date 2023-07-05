@@ -21,4 +21,4 @@ www/vendor
 www/.htaccess
 www/composer.lock
 www/errorlog.html
-
+www/node_modules
