@@ -270,8 +270,9 @@ def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-
     # Cleanup
     shutil.rmtree(tmpdir)
 
-    return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
+    if gearman_worker.source_dir != '':
+        return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
+        return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
 
     logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
