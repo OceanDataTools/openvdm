@@ -65,7 +65,7 @@ if (isset($data['javascript'])){
     foreach ($data['javascript'] as &$jsFile) {
         if ($jsFile === 'leaflet') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet/dist/leaflet.js');
-            array_push($jsFileArray, DIR . 'bower_components/leaflet-fullscreen/dist/Leaflet.fullscreen.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/leaflet-fullscreen/Leaflet.fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.min.js');
@@ -73,7 +73,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
             array_push($jsFileArray, DIR . 'bower_components/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/node_modules/luxon/build/global/luxon.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'bower_components/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'bower_components/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
