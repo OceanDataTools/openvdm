@@ -42,7 +42,7 @@ $(function () {
             attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
             maxZoom: 20
         }),
-        gmrtBase = L.tileLayer('https://www.gmrt.org/services/mapserver/wms_merc?', {
+        gmrtBase = L.tileLayer.wms('https://www.gmrt.org/services/mapserver/wms_merc?', {
             layers: 'topo',
             format: 'image/png',
             attribution: '<a href="http://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
