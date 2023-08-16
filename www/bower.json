@@ -37,7 +37,6 @@
     "datatables-plugins": "~1.11.4",
     "datatables-responsive": "1.0.7",
     "eonasdan-bootstrap-datetimepicker": "~4.17.45",
-    "esri-leaflet": "~1.0.5",
     "font-awesome": "~4.7.0",
     "hammerjs": "hammerjs/hammer.js",
     "ionicons": "~2.0.1",

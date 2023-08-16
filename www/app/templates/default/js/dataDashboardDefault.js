@@ -62,52 +62,25 @@ $(function () {
         }).setView(L.latLng(0, 0), 2);
 
         //Add basemap layer, use ESRI Oceans Base Layer
-        //var worldOceanBase = L.esri.basemapLayer('Oceans'),
-        //    worldOceanReference = L.esri.basemapLayer('OceansLabels'),
-        //    gmrtBase = L.tileLayer.wms('http://gmrt.marine-geo.org/cgi-bin/mapserv?map=/public/mgg/web/gmrt.marine-geo.org/htdocs/services/map/wms_merc.map', {
-        //        layers: 'topo',
-        //        transparent: true,
-        //        //format: 'image/png',
-        //        version: '1.1.1',
-        //        crs: L.CRS.EPSG4326,
-        //        attribution: '<a href="http://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
-        //    });
-        
-        var worldOceanBase = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/WorldOceanBase/EPSG900913/{z}/{x}/{y}.png', {
-            tms:true,
-            zoomOffset:-1,
-            minZoom:1,
-            maxNativeZoom:9,
-            attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
+        var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
+            attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
+            maxZoom: 20
         }),
-        worldOceanReference = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/WorldOceanReference/EPSG900913/{z}/{x}/{y}.png', {
-            tms:true,
-            zoomOffset:-1,
-            minZoom:1,
-            maxNativeZoom:9,
-            attribution: '<a href="http://www.esri.com" target="_blank" style="border: none;">esri</a>'
-        }),
-        gmrtBase = L.tileLayer(window.location.origin + MAPPROXY_DIR +'/tms/1.0.0/GMRTBase/EPSG900913/{z}/{x}/{y}.png', {
-            tms:true,
-            zoomOffset:-1,
-            minZoom:1,
+        gmrtBase = L.tileLayer('https://www.gmrt.org/services/mapserver/wms_merc?', {
+            layers: 'topo',
+            format: 'image/png',
             attribution: '<a href="http://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
         });
         
-        worldOceanBase.addTo(mapObject['map']);
-        worldOceanBase.bringToBack();
-        worldOceanReference.addTo(mapObject['map']);
+        openStreetMap.addTo(mapObject['map']);
+        openStreetMap.bringToBack();
         
         var baseLayers = {
-            "World Ocean Base" : worldOceanBase,
+            "OpenStreetMap" : openStreetMap,
             "GMRT Base" : gmrtBase
         };
-
-        var overlays = {
-            "World Ocean Reference" : worldOceanReference
-        };
         
-        L.control.layers(baseLayers, overlays).addTo(mapObject['map']);
+        L.control.layers(baseLayers).addTo(mapObject['map']);
 
         L.easyPrint({
             title: 'Export current map view',
