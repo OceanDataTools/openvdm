@@ -141,7 +141,7 @@ use Helpers\Hooks;
         foreach ($data['css'] as &$cssFile) {
             if ($cssFile === 'leaflet') {
                 array_push($cssFileArray, DIR . 'bower_components/leaflet/dist/leaflet.css');
-                array_push($cssFileArray, DIR . 'bower_components/leaflet-fullscreen/leaflet.fullscreen.css');
+                array_push($cssFileArray, DIR . 'bower_components/leaflet-fullscreen-bower/leaflet.fullscreen.css');
             } else if ($cssFile === 'leaflet-timedimension') {
                 array_push($cssFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.control.css');
             } else if ($cssFile === 'datetimepicker') {

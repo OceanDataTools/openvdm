@@ -65,7 +65,7 @@ if (isset($data['javascript'])){
     foreach ($data['javascript'] as &$jsFile) {
         if ($jsFile === 'leaflet') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet/dist/leaflet.js');
-            array_push($jsFileArray, DIR . 'bower_components/leaflet-fullscreen/Leaflet.fullscreen.min.js');
+            array_push($jsFileArray, DIR . 'bower_components/leaflet-fullscreen-bower/Leaflet.fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.min.js');
