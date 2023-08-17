@@ -61,9 +61,9 @@ $(function () {
             fullscreenControl: true,
         }).setView(L.latLng(0, 0), 2);
 
-        //Add basemap layer, use OpenStreenMap
+        //Add basemap layer, use OpenStreetMap
         var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-            attribution: '&copy <a href="https://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
             maxZoom: 20
         }),
         gmrtBase = L.tileLayer.wms('http://www.gmrt.org/services/mapserver/wms_merc?', {
