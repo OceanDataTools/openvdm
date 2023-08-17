@@ -377,8 +377,6 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     subprocess.run(mount_command, capture_output=True, text=True, check=False)
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
     rsync_exclude_list_filepath = os.path.join(tmpdir, 'rsyncExcludeList.txt')
 
     try:
