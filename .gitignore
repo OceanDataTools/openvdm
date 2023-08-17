@@ -14,6 +14,7 @@ server/plugins/*.py
 server/plugins/parsers/*.py
 server/etc/openvdm.yaml
 www/app/Core/Config.php
+www/app/templates/default/js/chartColors.js
 www/app/templates/default/js/dataDashboardMainCustom.js
 www/bower_components
 www/etc/datadashboard.yaml
