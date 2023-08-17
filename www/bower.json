@@ -30,9 +30,6 @@
   ],
   "dependencies": {
     "bootstrap": "~3.3.7",
-    "chart.js": "~3.7.1",
-    "chartjs-adapter-luxon": "chartjs/chartjs-adapter-luxon",
-    "chartjs-plugin-zoom": "chartjs/chartjs-plugin-zoom",
     "datatables": "~1.10.21",
     "datatables-plugins": "~1.11.4",
     "datatables-responsive": "1.0.7",

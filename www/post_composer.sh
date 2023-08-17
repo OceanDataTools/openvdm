@@ -1,16 +1,15 @@
 #!/bin/bash
 /usr/bin/bower --allow-root install
-npm install leaflet
-npm install leaflet-easyprint 
-cd bower_components/chart.js
 npm install
-npm run build
-cd ../chartjs-adapter-luxon
-npm install
-npm run build
-cd ../chartjs-plugin-zoom
-npm install
-npm run build
+# cd bower_components/chart.js
+# npm install
+# npm run build
+# cd ../chartjs-adapter-luxon
+# npm install
+# npm run build
+# cd ../chartjs-plugin-zoom
+# npm install
+# npm run build
 
 cd ../../
 
