@@ -30,7 +30,6 @@ $(function () {
         mapObject['geoJSONLayers'] = [];
         mapObject['tmsLayers'] = [];
         mapObject['mapBounds'] = [];
-        mapObject['attribution'] = [];
 
         //Build the map
         mapObject['map'] = L.map(mapObject['placeholderID'], {
@@ -38,8 +37,9 @@ $(function () {
             fullscreenControl: true,
         }).setView(L.latLng(0, 0), 2);
 
+        //Add basemap layer, use OpenStreetMap
         var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-            attribution: '&copy <a href="https://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
             maxZoom: 20
         }),
         gmrtBase = L.tileLayer.wms('http://www.gmrt.org/services/mapserver/wms_merc?', {
@@ -48,16 +48,15 @@ $(function () {
             attribution: '<a href="https://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
         });
 
-        worldOceanBase.addTo(mapObject['map']);
-        worldOceanBase.bringToBack();
-        worldOceanReference.addTo(mapObject['map']);
+        openStreetMap.addTo(mapObject['map']);
+        openStreetMap.bringToBack();
         
         var baseLayers = {
             "OpenStreetMap" : openStreetMap,
             "GMRT Base" : gmrtBase
         };
 
-        L.control.layers(baseLayers, overlays).addTo(mapObject['map']);
+        L.control.layers(baseLayers).addTo(mapObject['map']);
 
         L.easyPrint({
             title: 'Export current map view',
@@ -70,7 +69,7 @@ $(function () {
         }).addTo(mapObject['map']);
 
         mapObject['map'].on('fullscreenchange', function () {
-        updateBounds(mapObject);
+            updateBounds(mapObject);
         });
 
         return mapObject;
@@ -81,10 +80,8 @@ $(function () {
             if ($(this).hasClass("lp-checkbox")) {
                 addLatestPositionToMap(mapObject, $(this).val());
             } else if ($(this).hasClass("geoJSON-checkbox")) {
-                //alert($(this).val());
                 addGeoJSONToMap(mapObject, $(this).val());
             } else if ($(this).hasClass("tms-checkbox")) {
-                //alert($(this).val());
                 addTMSToMap(mapObject, $(this).val());
             }
         });        
@@ -262,7 +259,6 @@ $(function () {
                     }
                     
                     mapObject['mapBounds'][tmsObjectJsonName] = L.latLngBounds(southwest, northeast);
-                    //console.log(mapObject['mapBounds'][tmsObjectJsonName]);
                         
                     // Add the layer to the map
                     mapObject['tmsLayers'][tmsObjectJsonName].addTo(mapObject['map']);
@@ -290,7 +286,6 @@ $(function () {
         var tempArray = mapPlaceholderID.split("_");
         tempArray.pop();
         var objectListPlaceholderID =  tempArray.join('_') + '_objectList-placeholder';
-        //alert(objectListPlaceholderID);
         mapObjects.push(initMapObject(mapPlaceholderID, objectListPlaceholderID));
     });
     
@@ -306,24 +301,18 @@ $(function () {
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
             if ($(this).is(":checked")) {
                 if ($(this).hasClass("lp-checkbox")) {
-                    //alert($(this).val());
                     addLatestPositionToMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("geoJSON-checkbox")) {
-                    //alert($(this).val());
                     addGeoJSONToMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("tms-checkbox")) {
-                    //alert($(this).val());
                     addTMSToMap(mapObjects[i], $(this).val());
                 }
             } else {
                 if ($(this).hasClass("lp-checkbox")) {
-                    //alert($(this).val());
                     removeLatestPositionFromMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("geoJSON-checkbox")) {
-                    //alert($(this).val());
                     removeGeoJSONFromMap(mapObjects[i], $(this).val());
                 } else if ($(this).hasClass("tms-checkbox")) {
-                    //alert($(this).val());
                     removeTMSFromMap(mapObjects[i], $(this).val());
                 }
             }

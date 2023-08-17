@@ -1,18 +1,16 @@
 #!/bin/bash
-/usr/bin/bower --allow-root install
-npm install leaflet
-npm install leaflet-easyprint 
-cd bower_components/chart.js
+bower --allow-root install
 npm install
-npm run build
-cd ../chartjs-adapter-luxon
-npm install
-npm run build
-cd ../chartjs-plugin-zoom
-npm install
-npm run build
-
-cd ../../
+# cd bower_components/chart.js
+# npm install
+# npm run build
+# cd ../chartjs-adapter-luxon
+# npm install
+# npm run build
+# cd ../chartjs-plugin-zoom
+# npm install
+# npm run build
+# cd ../../
 
 if [[ ! -f './app/templates/default/js/chartColors.js' ]]; then
     cp ./app/templates/default/js/chartColors.js.dist ./app/templates/default/js/chartColors.js
