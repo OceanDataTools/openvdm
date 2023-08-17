@@ -1,5 +1,7 @@
 #!/bin/bash
 /usr/bin/bower --allow-root install
+npm install leaflet
+npm install leaflet-easyprint 
 cd bower_components/chart.js
 npm install
 npm run build

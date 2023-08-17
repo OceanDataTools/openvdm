@@ -646,6 +646,25 @@ class Main extends Controller {
             Url::redirect('config');
         }
 
+        if ($this->_warehouseModel->getLoweringFinalizedDate()['loweringFinalizedOn'] === null) {
+            date_default_timezone_set('Etc/UTC');
+            $timestamp = time();
+            $roundedTimestamp = ceil($timestamp / (15 * 60)) * (15 * 60);
+
+            $loweringEndDate = $this->_warehouseModel->getLoweringEndDate();
+	    
+	    if ($loweringEndDate === "") {
+                $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+            }
+            else {
+                $prev_time = strtotime($loweringEndDate);
+		var_dump($prev_time);
+		var_dump($roundedTimestamp);
+		if ($prev_time > $roundedTimestamp) {
+		    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+		}
+	    }
+        }
 
         $gmData = array();
         
