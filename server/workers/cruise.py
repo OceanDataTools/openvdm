@@ -444,7 +444,6 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
     cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
@@ -494,6 +493,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     if gearman_worker.ovdm.get_transfer_public_data():
 
         logging.info("Transferring files from PublicData to the cruise data directory")
+        from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
         logging.debug("Verify From_PublicData directory exists within the cruise data directory")
         if not os.path.exists(from_publicdata_dir):
