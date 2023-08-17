@@ -64,19 +64,19 @@ $jsFileArray = array(
 if (isset($data['javascript'])){
     foreach ($data['javascript'] as &$jsFile) {
         if ($jsFile === 'leaflet') {
-            array_push($jsFileArray, DIR . 'bower_components/leaflet/dist/leaflet.js');
-            array_push($jsFileArray, DIR . 'bower_components/leaflet-fullscreen-bower/Leaflet.fullscreen.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/leaflet/dist/leaflet.js');
+            array_push($jsFileArray, DIR . 'node_modules/leaflet-fullscreen/dist/Leaflet.fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
         } else if ($jsFile === 'leaflet-timedimension') {
-            array_push($jsFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.min.js');
         } else if ($jsFile === 'charts') {
             array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
-            array_push($jsFileArray, DIR . 'bower_components/chart.js/dist/chart.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/node_modules/luxon/build/global/luxon.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/chart.js/dist/chart.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/luxon/build/global/luxon.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
         } else if ($jsFile === 'charts-zoom') {
-            array_push($jsFileArray, DIR . 'bower_components/hammerjs/hammer.min.js');
-            array_push($jsFileArray, DIR . 'bower_components/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/hammerjs/hammer.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
         } else if ($jsFile === 'datetimepicker') {
             array_push($jsFileArray, DIR . 'bower_components/moment/moment.js');
             array_push($jsFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js');   
