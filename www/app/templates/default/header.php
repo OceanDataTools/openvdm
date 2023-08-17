@@ -140,10 +140,10 @@ use Helpers\Hooks;
     if (isset($data['css'])){
         foreach ($data['css'] as &$cssFile) {
             if ($cssFile === 'leaflet') {
-                array_push($cssFileArray, DIR . 'bower_components/leaflet/dist/leaflet.css');
-                array_push($cssFileArray, DIR . 'bower_components/leaflet-fullscreen-bower/leaflet.fullscreen.css');
+                array_push($cssFileArray, DIR . 'node_modules/leaflet/dist/leaflet.css');
+                array_push($cssFileArray, DIR . 'node_modules/leaflet-fullscreen-bower/leaflet.fullscreen.css');
             } else if ($cssFile === 'leaflet-timedimension') {
-                array_push($cssFileArray, DIR . 'bower_components/leaflet-timedimension/dist/leaflet.timedimension.control.css');
+                array_push($cssFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.control.min.css');
             } else if ($cssFile === 'datetimepicker') {
                 array_push($cssFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/css/bootstrap-datetimepicker.min.css');
             } else {

@@ -5,6 +5,8 @@
     "chartjs-plugin-zoom": "^2.0.1",
     "leaflet": "^1.9.4",
     "leaflet-easyprint": "^2.1.9",
-    "leaflet.fullscreen": "^2.4.0",
+    "leaflet-fullscreen": "^1.0.2",
+    "leaflet-timedimension": "^1.1.1",
+    "luxon": "^3.4.0"
   }
 }
