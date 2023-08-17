@@ -65,7 +65,7 @@ if (isset($data['javascript'])){
     foreach ($data['javascript'] as &$jsFile) {
         if ($jsFile === 'leaflet') {
             array_push($jsFileArray, DIR . 'node_modules/leaflet/dist/leaflet.js');
-            array_push($jsFileArray, DIR . 'node_modules/leaflet-fullscreen/Leaflet-fullscreen.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/leaflet-fullscreen/dist/Leaflet-fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.min.js');
@@ -73,7 +73,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, Url::templatePath() . "js/chartColors.js");
             array_push($jsFileArray, DIR . 'node_modules/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'node_modules/luxon/build/global/luxon.min.js');
-            array_push($jsFileArray, DIR . 'node_modules/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.udm.min.js');
+            array_push($jsFileArray, DIR . 'node_modules/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'node_modules/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
