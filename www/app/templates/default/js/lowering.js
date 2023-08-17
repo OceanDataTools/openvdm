@@ -62,11 +62,11 @@ $(function () {
         }).setView(L.latLng(0, 0), 2);
 
         //Add basemap layer
-        var openStreetMap = L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
+        var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
             attribution: '&copy <a href="https://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
             maxZoom: 20
         }),
-        gmrtBase = L.tileLayer.wms('https://www.gmrt.org/services/mapserver/wms_merc?', {
+        gmrtBase = L.tileLayer.wms('http://www.gmrt.org/services/mapserver/wms_merc?', {
             layers: 'topo',
             format: 'image/png',
             attribution: '<a href="https://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
