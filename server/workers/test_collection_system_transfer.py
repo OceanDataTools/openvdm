@@ -141,7 +141,7 @@ def test_smb_source_dir(gearman_worker):
     os.mkdir(mntpoint, 0o755)
 
     # Set read vs read/write
-    read_write = 'rw' if gearman_worker.collection_system_transfer['removeSourceFiles'] != 0 else 'ro'
+    read_write = 'file_mode=0664,dir_mode=0775' if gearman_worker.collection_system_transfer['removeSourceFiles'] != 0 else 'ro'
 
     # Mount SMB Share
     mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write+',username='+gearman_worker.collection_system_transfer['smbUser']+',password='+gearman_worker.collection_system_transfer['smbPass']+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]

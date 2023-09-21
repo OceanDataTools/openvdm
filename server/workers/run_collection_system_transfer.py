@@ -583,7 +583,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
             break
 
     # Set read vs read/write
-    read_write = 'rw' if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1' else 'ro'
+    read_write = 'file_mode=0664,dir_mode=0775' if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1' else 'ro'
 
     mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write + ',guest' + ',domain=' + gearman_worker.collection_system_transfer['smbDomain'] + ',vers=' + vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write + ',username=' + gearman_worker.collection_system_transfer['smbUser'] + ',password=' + gearman_worker.collection_system_transfer['smbPass'] + ',domain=' + gearman_worker.collection_system_transfer['smbDomain'] + ',vers=' + vers]
     logging.debug("Mount command: %s", ' '.join(mount_command))
