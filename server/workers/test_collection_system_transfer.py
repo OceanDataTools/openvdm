@@ -49,6 +49,26 @@ def build_source_dir(gearman_worker):
     return gearman_worker.collection_system_transfer['sourceDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
 
 
+def write_test(target_dir):
+    """
+    Verify the current user has write permissions to the target_dir
+    """
+
+    if os.path.isdir(target_dir):
+        try:
+            filepath = os.path.join(target_dir, 'writeTest.txt')
+            with open(filepath, mode='w', encoding='utf-8') as filehandle:
+                filehandle.write("this file tests if the parent directory can be written to.  You can delete this file if desired")
+
+            os.remove(filepath)
+        except Exception as err:
+            logging.warning("Unable to write to %s", target_dir)
+            logging.warning(str(err))
+            return False
+        return True
+    return False
+
+
 def test_local_source_dir(gearman_worker):
     """
     Verify the source directory exists for a local directory transfer
@@ -120,8 +140,11 @@ def test_smb_source_dir(gearman_worker):
     mntpoint = os.path.join(tmpdir, 'mntpoint')
     os.mkdir(mntpoint, 0o755)
 
+    # Set read vs read/write
+    read_write = 'rw' if gearman_worker.collection_system_transfer['removeSourceFiles'] != 0 else 'ro'
+
     # Mount SMB Share
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', 'ro'+',username='+gearman_worker.collection_system_transfer['smbUser']+',password='+gearman_worker.collection_system_transfer['smbPass']+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]
+    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write+',guest'+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', read_write+',username='+gearman_worker.collection_system_transfer['smbUser']+',password='+gearman_worker.collection_system_transfer['smbPass']+',domain='+gearman_worker.collection_system_transfer['smbDomain']+',vers='+vers]
 
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
@@ -150,9 +173,17 @@ def test_smb_source_dir(gearman_worker):
     logging.debug('Source Dir: %s', source_dir)
     if os.path.isdir(source_dir):
         return_val.append({"partName": "Source Directory", "result": "Pass"})
+
+        if gearman_worker.collection_system_transfer['removeSourceFiles'] != 0:
+            if write_test(source_dir):
+                return_val.append({"partName": "Write Test", "result": "Pass"})
+
+            else:
+                return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to delete files from source directory: {build_source_dir(gearman_worker)}"})
+    
     else:
         logging.warning("Source Directory Test Failed")
-        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {source_dir} within the SMB Share: {gearman_worker.collection_system_transfer['smbServer']}"})
+        return_val.append({"partName": "Source Directory", "result": "Fail", "reason": f"Unable to find source directory: {build_source_dir(gearman_worker)} within the SMB Share: {gearman_worker.collection_system_transfer['smbServer']}"})
 
     # Unmount SMB Share
     if os.path.ismount(mntpoint):
