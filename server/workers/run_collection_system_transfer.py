@@ -921,7 +921,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             job_data = {
                 'cruiseID': self.cruise_id,
-                'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'],
+                'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
                 'files': results_obj['files']
             }
 
@@ -929,13 +929,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
-            elif results_obj['parts'][-1]['result'] == "Pass":
+        if self.collection_system_transfer:
+            if len(results_obj['parts']) > 0:
+                if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
+                        self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
+                elif results_obj['parts'][-1]['result'] == "Pass":
+                    self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
+            else:
                 self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
-        else:
-            self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
         logging.info("Job: %s, %s transfer completed at: %s", current_job.handle, self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
