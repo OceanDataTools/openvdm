@@ -1,6 +1,6 @@
 {
   "name": "openvdm",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "homepage": "https://github.com/oceandatatools/openvdm",
   "author": "Webb Pinner",
   "description": "Web-based components of OpenVDM. Built on NOVAFramework by David Carr and the SB Admin 2 Bootstrap theme by David Miller",

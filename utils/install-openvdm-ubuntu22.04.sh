@@ -169,17 +169,21 @@ function install_packages {
 
     apt-get update -qq
 
-    apt-get install -q -y software-properties-common
+    apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
     LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
 
-    curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh
-    bash /tmp/nodesource_setup.sh
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_16.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+
+    # curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh
+    # bash /tmp/nodesource_setup.sh
 
     apt-get update -qq
 
-    apt install -q -y openssh-server sshpass rsync curl git samba smbclient \
+    apt install -q -y openssh-server sshpass rsync git samba smbclient \
         cifs-utils gearman-job-server libgearman-dev nodejs python3 \
         python3-dev python3-pip python3-venv supervisor mysql-server \
         mysql-client ntp apache2 libapache2-mod-wsgi-py3 php7.3 \
