@@ -28,7 +28,15 @@ use Helpers\Session;
     <div class="row">
         <div class="col-md-12">
             <div class="panel panel-default">
-                <div class="panel-heading">Manage Messages</div>
+                <div class="panel-heading">
+                    Manage Messages
+                    <?php echo Form::open(array('role'=>'form', 'method'=>'post', 'class'=>'form-inline pull-right')); ?>
+                        <div class="form-group">
+                            <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'messageSearch')); ?>
+                            <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-secondary', 'value'=>'Search')); ?>
+                        </div>
+                    <?php echo Form::close(); ?>
+                </div>
                 <div class="panel-body">
 <?php
     if($data['messages']){
