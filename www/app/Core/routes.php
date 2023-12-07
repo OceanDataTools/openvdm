@@ -105,7 +105,8 @@ Router::any('config/shipToShoreTransfers/stop', '\Controllers\Config\ShipToShore
 Router::any('config/shipToShoreTransfers/enableShipToShoreTransfers', '\Controllers\Config\ShipToShoreTransfers@enableShipToShoreTransfers');
 Router::any('config/shipToShoreTransfers/disableShipToShoreTransfers', '\Controllers\Config\ShipToShoreTransfers@disableShipToShoreTransfers');
 
-Router::any('config/messages', '\Controllers\Config\Messages@index');
+Router::get('config/messages', '\Controllers\Config\Messages@index');
+Router::post('config/messages', '\Controllers\Config\Messages@index');
 Router::any('config/messages/delete/(:num)', '\Controllers\Config\Messages@delete');
 Router::any('config/messages/viewedMessage/(:num)', '\Controllers\Config\Messages@viewedMessage');
 Router::any('config/messages/viewAllMessages', 'Controllers\Config\Messages@viewAllMessages');
