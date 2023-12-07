@@ -23,7 +23,6 @@ class Messages extends Controller {
 
         $pages = new Paginator('15','page');
 
-	//if(isset($_POST['submit'])){
         $data['messageSearch'] = $_POST['messageSearch'] ?? '';
 
         $pages->setTotal($this->_messagesModel->getMessagesTotal($data['messageSearch']));

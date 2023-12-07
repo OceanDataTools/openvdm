@@ -7,29 +7,29 @@ class Messages extends Model {
 
     public function getMessages($limit, $search=''){
         if($search !== ''){
-	    return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageTitle LIKE '%".$search."%' ORDER BY messageID DESC " . $limit);
-	}
-	return $this->db->select("SELECT * FROM ".PREFIX."Messages ORDER BY messageID DESC " . $limit);
+        return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageTitle LIKE '%".$search."%' ORDER BY messageID DESC " . $limit);
+    }
+    return $this->db->select("SELECT * FROM ".PREFIX."Messages ORDER BY messageID DESC " . $limit);
     }
     
     public function getMessagesTotal($search=''){
         if($search !== ''){
             return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageTitle LIKE '%".$search."%'"));
-	}
-	return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages"));
+    }
+    return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages"));
     }
 
     public function getNewMessages($limit, $search='') {
         if($search !== ''){
             return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageTitle LIKE '%".$search."%' AND messageViewed = 0 ORDER BY messageID DESC " . $limit);
-	}
-	return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageViewed = 0 ORDER BY messageID DESC " . $limit);
+    }
+    return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageViewed = 0 ORDER BY messageID DESC " . $limit);
     }
     
     public function getNewMessagesTotal($search=''){
         if($search !== ''){
             return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageTitle LIKE '%".$search."%' AND messageViewed = 0"));    
-        }	
+        }   
         return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0"));
     }
 
