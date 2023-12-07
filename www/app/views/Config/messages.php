@@ -1,6 +1,7 @@
 <?php
 
 use Core\Error;
+use Helpers\Form;
 use Helpers\Session;
 
 ?>
@@ -28,12 +29,12 @@ use Helpers\Session;
     <div class="row">
         <div class="col-md-12">
             <div class="panel panel-default">
-                <div class="panel-heading">
+                <div class="panel-heading" style="padding-bottom:20px;">
                     Manage Messages
                     <?php echo Form::open(array('role'=>'form', 'method'=>'post', 'class'=>'form-inline pull-right')); ?>
-                        <div class="form-group">
-                            <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'messageSearch')); ?>
-                            <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-secondary', 'value'=>'Search')); ?>
+                        <div class="form-group ">
+                            <?php echo Form::input(array('class'=>'form-control input-sm', 'type'=>'text', 'name'=>'messageSearch', 'value'=>$data['messageSearch'])); ?>
+                            <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-secondary btn-sm', 'value'=>'Search')); ?>
                         </div>
                     <?php echo Form::close(); ?>
                 </div>
