@@ -801,6 +801,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever a new job arrives
         """
 
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+        logging.basicConfig(format=LOGGING_FORMAT)
+
         logging.debug("current_job: %s", current_job)
 
         payload_obj = json.loads(current_job.data)
@@ -819,6 +822,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         except Exception as err:
             logging.debug(str(err))
             return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for collection system transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - {}: %(message)s'.format(self.collection_system_transfer['name'])
+        logging.basicConfig(format=LOGGING_FORMAT)
 
         self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
