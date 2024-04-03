@@ -184,9 +184,9 @@ function install_packages {
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
         nvm install --lts
-
-        sudo ln -s $HOME/.nvm/versions/node/v20.11.0/bin/npm /usr/local/bin/
-        sudo ln -s $HOME/.nvm/versions/node/v20.11.0/bin/node /usr/local/bin/
+        NODE_VERSION= node -V
+        sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/npm /usr/local/bin/
+        sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/node /usr/local/bin/
     fi
     
     apt-get update -qq
