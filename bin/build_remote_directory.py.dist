@@ -155,15 +155,15 @@ if __name__ == "__main__":
     # Retrieve the information for the collection system defined in the command-line argument
     if parsed_args.collection_system:
 
-        for collection_system in parsed_args.collection_system:
+        for cs in parsed_args.collection_system:
 
-            collection_system = openvdm.get_collection_system_transfer_by_name(parsed_args.collection_system)
+            collection_system = openvdm.get_collection_system_transfer_by_name(cs)
             if not collection_system:
-                logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collection_system)
+                logging.error("Collection System: %s not found in OpenVDM configuration.", cs)
                 sys.exit(1)
 
             if collection_system['transferType'] not in ["1","3", "4"]:
-                logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", parsed_args.collection_system)
+                logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", cs)
                 sys.exit(1)
 
             if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
