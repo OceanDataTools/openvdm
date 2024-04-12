@@ -11,18 +11,17 @@ DESCRIPTION:  Parse the supplied geotiff file and return the json-
             [-v+] Increase verbosity (default: warning)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
+REQUIREMENTS:  Python3.10
             Python Modules:
-                gdal==
-                PyYAML==5.3.1
-                requests==2.25.1
+                PyYAML==6.0
+                requests==2.27.1
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
   VERSION:  2.9
   CREATED:  2016-08-29
- REVISION:  2022-07-24
+ REVISION:  2024-04-10
 """
 
 import os

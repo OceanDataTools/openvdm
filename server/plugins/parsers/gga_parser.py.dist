@@ -5,7 +5,7 @@ FILE:  gga_parser.py
 USAGE:  gga_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
 DESCRIPTION:  Parse the supplied NMEA-formtted GGA file and return the json-
-    formatted string used by OpenVDM as part of it's Data dashboard.
+              formatted string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -28,7 +28,7 @@ REQUIREMENTS:  Python3.8
    AUTHOR:  Webb Pinner
   VERSION:  2.9
   CREATED:  2016-08-29
- REVISION:  2022-07-24
+ REVISION:  2024-04-10
 """
 
 import csv
@@ -45,7 +45,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-
+from server.lib.condense_to_ranges import condense_to_ranges
 
 RAW_COLS = ['date_time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum'] # OpenRVDAS style
 # RAW_COLS = ['date','time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum'] # SCS style
@@ -91,7 +91,7 @@ class GGAParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader(csvfile, self.raw_cols)
+                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -263,7 +263,7 @@ class GGAParser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
 
 
 # -------------------------------------------------------------------------------------
