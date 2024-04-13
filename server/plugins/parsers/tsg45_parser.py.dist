@@ -46,8 +46,8 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','data'] # OpenRVDAS style
-# RAW_COLS = ['date','time','data'] # SCS style
+RAW_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity'] # OpenRVDAS style
+# RAW_COLS = ['date','time','water_temp_int','conductivity','salinity','sound_velocity'] # SCS style
 PROC_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity']
 
 ROUNDING = {
@@ -73,6 +73,7 @@ class SBE45TSGParser(OpenVDMCSVParser):
         self.add_sbe38 = add_sbe38
         
         if self.add_sbe38:
+            RAW_COLS.append('water_temp_ext')
             PROC_COLS.append('water_temp_ext')
 
         super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
@@ -100,14 +101,11 @@ class SBE45TSGParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
-                        # data_temp,data_cont,data_sal,data_sv =  line['data'].split()
-                        sensor_data = line['data'].split(',') if self.add_sbe38 else line['data'].split()
-
-                        water_temp_int = float(sensor_data[0])
-                        conductivity = float(sensor_data[1])
-                        salinity = float(sensor_data[2])
-                        sound_velocity = float(sensor_data[3])
-                        water_temp_ext = float(sensor_data[4]) if self.add_sbe38 else None
+                        water_temp_int = float(line['water_temp_int'].split("=")[-1])
+                        conductivity = float(line['conductivity'].split("=")[-1])
+                        salinity = float(line['salinity'].split("=")[-1])
+                        sound_velocity = float(line['sound_velocity'].split("=")[-1])
+                        water_temp_ext = float(line['water_temp_ext'].split("=")[-1]) if self.add_sbe38 else None
 
                     except Exception as err:
                         errors.append(lineno)
