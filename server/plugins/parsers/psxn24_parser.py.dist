@@ -4,8 +4,8 @@ FILE:  psxn24_parser.py
 
 USAGE:  psxn24_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA PSXN (24) data and return the json-formatted
-    string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied NMEA PSXN (24) data and return the json-
+              formatted string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -15,19 +15,19 @@ DESCRIPTION:  Parse the supplied NMEA PSXN (24) data and return the json-formatt
             [--stopTS] optional stop crop time (strptime format)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
+REQUIREMENTS:  Python3.10
             Python Modules:
-                numpy==1.19.5
-                pandas==1.2.0
-                PyYAML==5.3.1
-                requests==2.25.1
+                numpy==1.22.2
+                pandas==1.4.1
+                PyYAML==6.0
+                requests==2.27.1
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
   VERSION:  2.9
   CREATED:  2016-08-29
- REVISION:  2022-07-24
+ REVISION:  2024-04-10
 """
 
 import csv
@@ -42,7 +42,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-
+from server.lib.condense_to_ranges import condense_to_ranges
 
 # $PSXN,24,roll_rate,pitch_rate,yaw_rate,vertical-vel*csum term
 RAW_COLS = ['date_time','hdr','24','roll_rate','pitch_rate','yaw_rate','heave_velocity_checksum'] # OpenRVDAS style
@@ -79,7 +79,7 @@ class PSXN24Parser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader(csvfile, self.raw_cols)
+                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -149,10 +149,10 @@ class PSXN24Parser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['pitch_rate'].min(),3), round(df_proc['pitch_rate'].max(),3)], 'Pitch Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['roll_rate'].min(),3), round(df_proc['roll_rate'].max(),3)], 'Roll Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['yaw_rate'].min(),3), round(df_proc['yaw_rate'].max(),3)], 'Yaw Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['heave_velocity'].min(),3), round(df_proc['heave_velocity'].max(),3)], 'Heave Velocity Bounds', 'm/s')
+        self.add_bounds_stat([round(df_proc['pitch_rate'].min(),ROUNDING['pitch_rate']), round(df_proc['pitch_rate'].max(),ROUNDING['pitch_rate'])], 'Pitch Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['roll_rate'].min(),ROUNDING['roll_rate']), round(df_proc['roll_rate'].max(),ROUNDING['roll_rate'])], 'Roll Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['yaw_rate'].min(),ROUNDING['yaw_rate']), round(df_proc['yaw_rate'].max(),ROUNDING['yaw_rate'])], 'Yaw Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['heave_velocity'].min(),ROUNDING['heave_velocity']), round(df_proc['heave_velocity'].max(),ROUNDING['heave_velocity'])], 'Heave Velocity Bounds', 'm/s')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -211,7 +211,7 @@ class PSXN24Parser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
 
 
 # -------------------------------------------------------------------------------------

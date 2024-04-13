@@ -801,6 +801,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever a new job arrives
         """
 
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.debug("current_job: %s", current_job)
 
         payload_obj = json.loads(current_job.data)
@@ -813,12 +816,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
             if self.collection_system_transfer['status'] == "1": #running
-                logging.info("Transfer job for %s skipped because a transfer for that collection system is already in-progress", self.collection_system_transfer['name'])
+                logging.info("Transfer job skipped because a transfer for that collection system is already in-progress")
                 return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
         except Exception as err:
             logging.debug(str(err))
             return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for collection system transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - {}: %(message)s'.format(self.collection_system_transfer['name'])
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
@@ -852,7 +858,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         self.source_dir = build_source_dir(self)
 
-        logging.info("Job: %s, %s transfer started at: %s", current_job.handle, self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
@@ -895,7 +901,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle, self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        logging.error("Job: %s, transfer failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
         self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], 'Worker crashed')
@@ -939,7 +945,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s, %s transfer completed at: %s", current_job.handle, self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s, transfer completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -959,6 +965,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
 
         self.stop = True
+
         logging.warning("Quitting worker...")
         self.shutdown()
 
@@ -1150,6 +1157,9 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -1157,6 +1167,9 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()

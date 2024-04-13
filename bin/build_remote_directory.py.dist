@@ -13,6 +13,8 @@ OPTIONAL ARGUMENTS:
     -s, --create_source      create the source directory
     -t, --template directory the directory structure to create on the remote
                              server
+    -c, --collection_system  Create the remote directory/file just for the
+                             specified collection system'
 
 DESCRIPTION:
     This script is designed to be called from the postSetupNewCruise hook to
@@ -103,14 +105,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='build remote directory structure based on template')
     parser.add_argument('-v', '--verbosity', dest='verbosity', action='count', default=0,
                         help='Increase output verbosity')
-    parser.add_argument('-s', '--create_source',  action='store_true',
+    parser.add_argument('-s', '--create_source', action='store_true',
                         help='Create the source directory')
-    parser.add_argument('-l', '--lowering',  action='store_true',
+    parser.add_argument('-l', '--lowering', action='store_true',
                         help='Create the remote directories/files for the lowering collection system transfers.')
     parser.add_argument('-t', '--template', dest='template_directory', metavar='template_directory',
                         help='The directory containing the directories/files to create on the remote system')
-    parser.add_argument('-c', '--collection_system', dest='collection_system', metavar='collection_system',
-                        help='create the remote directory/file just for the specified collection system')
+    parser.add_argument('-c', '--collection_system', action='append', dest='collection_system', metavar='collection_system',
+                        help='Create the remote directory/file just for the specified collection system')
 
     parsed_args = parser.parse_args()
 
@@ -153,20 +155,22 @@ if __name__ == "__main__":
     # Retrieve the information for the collection system defined in the command-line argument
     if parsed_args.collection_system:
 
-        collection_system = openvdm.get_collection_system_transfer_by_name(parsed_args.collection_system)
-        if not collection_system:
-            logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collection_system)
-            sys.exit(1)
+        for cs in parsed_args.collection_system:
 
-        if collection_system['transferType'] not in ["1","3", "4"]:
-            logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", parsed_args.collection_system)
-            sys.exit(1)
+            collection_system = openvdm.get_collection_system_transfer_by_name(cs)
+            if not collection_system:
+                logging.error("Collection System: %s not found in OpenVDM configuration.", cs)
+                sys.exit(1)
 
-        if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
-            logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
-            sys.exit(1)
+            if collection_system['transferType'] not in ["1","3", "4"]:
+                logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", cs)
+                sys.exit(1)
 
-        collection_systems.append(collection_system)
+            if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
+                logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
+                sys.exit(1)
+
+            collection_systems.append(collection_system)
     else:
         collection_systems = openvdm.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openvdm.get_active_collection_system_transfers(cruise=False)
 

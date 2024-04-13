@@ -5,7 +5,7 @@ FILE:  sbe38_parser.py
 USAGE:  sbe38_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
 DESCRIPTION:  Parse the supplied SBE38 temp data and return the json-formatted
-    string used by OpenVDM as part of it's Data dashboard.
+              string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -15,12 +15,12 @@ DESCRIPTION:  Parse the supplied SBE38 temp data and return the json-formatted
             [--stopTS] optional stop crop time (strptime format)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
+REQUIREMENTS:  Python3.10
             Python Modules:
-                numpy==1.19.5
-                pandas==1.2.0
-                PyYAML==5.3.1
-                requests==2.25.1
+                numpy==1.22.2
+                pandas==1.4.1
+                PyYAML==6.0
+                requests==2.27.1
 
      BUGS:
     NOTES:
@@ -42,7 +42,7 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-
+from server.lib.condense_to_ranges import condense_to_ranges
 
 RAW_COLS = ['date_time','water_temp'] # OpenRVDAS style
 # RAW_COLS = ['date','time','water_temp'] # SCS style
@@ -77,7 +77,7 @@ class SBE38Parser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader(csvfile, self.raw_cols)
+                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -141,7 +141,7 @@ class SBE38Parser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['water_temp'].min(),4), round(df_proc['water_temp'].max(),4)], 'Water Temp 1', 'C')
+        self.add_bounds_stat([round(df_proc['water_temp'].min(),ROUNDING['water_temp']), round(df_proc['water_temp'].max(),ROUNDING['water_temp'])], 'Water Temp 1', 'C')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile
@@ -185,7 +185,7 @@ class SBE38Parser(OpenVDMCSVParser):
 
         # send message about errors encountered to OpenVDM
         if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join([str(error) for error in errors])}')
+            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
 
 
 # -------------------------------------------------------------------------------------
