@@ -141,7 +141,7 @@ class SBE38Parser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['water_temp'].min(),4), round(df_proc['water_temp'].max(),4)], 'Water Temp 1', 'C')
+        self.add_bounds_stat([round(df_proc['water_temp'].min(),ROUNDING['water_temp']), round(df_proc['water_temp'].max(),ROUNDING['water_temp'])], 'Water Temp 1', 'C')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

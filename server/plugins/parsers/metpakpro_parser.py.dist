@@ -152,9 +152,10 @@ class MetPakProParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['wind_spd'].min(),1), round(df_proc['wind_spd'].max(),1)], 'Wind Speed Bounds', 'm/s')
-        self.add_bounds_stat([round(df_proc['air_temp'].min(),2), round(df_proc['air_temp'].max(),2)], 'Air Temperature Bounds', 'C')
-        self.add_bounds_stat([round(df_proc['air_pres'].min(),1), round(df_proc['air_pres'].max(),1)], 'Air Pressure Bounds', 'hPa')
+        self.add_bounds_stat([round(df_proc['air_temp'].min(),ROUNDING['air_temp']), round(df_proc['air_temp'].max(),ROUNDING['air_temp'])], 'Air Temperature Bounds', 'C')
+        self.add_bounds_stat([round(df_proc['air_pres'].min(),ROUNDING['air_pres']), round(df_proc['air_pres'].max(),ROUNDING['air_pres'])], 'Air Pressure Bounds', 'hPa')
+        self.add_bounds_stat([round(df_proc['humidity'].min(),ROUNDING['humidity']), round(df_proc['humidity'].max(),ROUNDING['humidity'])], 'Relative Humidity', '%')
+        self.add_bounds_stat([round(df_proc['wind_spd'].min(),ROUNDING['wind_spd']), round(df_proc['wind_spd'].max(),ROUNDING['wind_spd'])], 'Wind Speed Bounds', 'm/s')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

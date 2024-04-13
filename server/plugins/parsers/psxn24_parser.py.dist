@@ -149,10 +149,10 @@ class PSXN24Parser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['pitch_rate'].min(),3), round(df_proc['pitch_rate'].max(),3)], 'Pitch Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['roll_rate'].min(),3), round(df_proc['roll_rate'].max(),3)], 'Roll Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['yaw_rate'].min(),3), round(df_proc['yaw_rate'].max(),3)], 'Yaw Rate Bounds', 'deg/s')
-        self.add_bounds_stat([round(df_proc['heave_velocity'].min(),3), round(df_proc['heave_velocity'].max(),3)], 'Heave Velocity Bounds', 'm/s')
+        self.add_bounds_stat([round(df_proc['pitch_rate'].min(),ROUNDING['pitch_rate']), round(df_proc['pitch_rate'].max(),ROUNDING['pitch_rate'])], 'Pitch Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['roll_rate'].min(),ROUNDING['roll_rate']), round(df_proc['roll_rate'].max(),ROUNDING['roll_rate'])], 'Roll Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['yaw_rate'].min(),ROUNDING['yaw_rate']), round(df_proc['yaw_rate'].max(),ROUNDING['yaw_rate'])], 'Yaw Rate Bounds', 'deg/s')
+        self.add_bounds_stat([round(df_proc['heave_velocity'].min(),ROUNDING['heave_velocity']), round(df_proc['heave_velocity'].max(),ROUNDING['heave_velocity'])], 'Heave Velocity Bounds', 'm/s')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

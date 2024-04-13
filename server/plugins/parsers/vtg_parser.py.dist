@@ -160,14 +160,14 @@ class VTGParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['cog_t'].min(),3), round(df_proc['cog_t'].max(),3)], "COG True Bounds", "deg")
+        self.add_bounds_stat([round(df_proc['cog_t'].min(),ROUNDING['cog_t']), round(df_proc['cog_t'].max(),ROUNDING['cog_t'])], "COG True Bounds", "deg")
         self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG True Validity")
         if not self.no_mag:
-            self.add_bounds_stat([round(df_proc['cog_m'].min(),3), round(df_proc['cog_m'].max(),3)], "COG Magnetic Bounds", "deg")
+            self.add_bounds_stat([round(df_proc['cog_m'].min(),ROUNDING['cog_m']), round(df_proc['cog_m'].max(),ROUNDING['cog_m'])], "COG Magnetic Bounds", "deg")
             self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
-        self.add_bounds_stat([round(df_proc['sog_kts'].min(),3), round(df_proc['sog_kts'].max(),3)], 'SOG Knots Bounds', 'deg')
+        self.add_bounds_stat([round(df_proc['sog_kts'].min(),ROUNDING['sog_kts']), round(df_proc['sog_kts'].max(),ROUNDING['sog_kts'])], 'SOG Knots Bounds', 'deg')
         self.add_value_validity_stat([len(df_proc[(df_proc['sog_kts'] <= MAX_SOG_KTS)]),len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)])], "SOG Knots Validity")
-        self.add_bounds_stat([round(df_proc['sog_kph'].min(),3), round(df_proc['sog_kph'].max(),3)], 'SOG KPH Bounds', 'deg')
+        self.add_bounds_stat([round(df_proc['sog_kph'].min(),ROUNDING['sog_kph']), round(df_proc['sog_kph'].max(),ROUNDING['sog_kph'])], 'SOG KPH Bounds', 'deg')
         self.add_value_validity_stat([len(df_proc[(df_proc['sog_kph'] <= MAX_SOG_KPH)]),len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)])], "SOG KPH Validity")
 
 
@@ -192,19 +192,19 @@ class VTGParser(OpenVDMCSVParser):
 
         error_rate = len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)]) / len(df_proc)
         if error_rate > .25:
-            self.add_quality_test_failed("SOG KTS")
+            self.add_quality_test_failed("SOG kts")
         elif error_rate > .10:
-            self.add_quality_test_warning("SOG KTS")
+            self.add_quality_test_warning("SOG kts")
         else:
-            self.add_quality_test_passed("SOG KTS")
+            self.add_quality_test_passed("SOG kts")
 
         error_rate = len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)]) / len(df_proc)
         if error_rate > .25:
-            self.add_quality_test_failed("SOG KPH")
+            self.add_quality_test_failed("SOG kph")
         elif error_rate > .10:
-            self.add_quality_test_warning("SOG KPH")
+            self.add_quality_test_warning("SOG kph")
         else:
-            self.add_quality_test_passed("SOG KPH")
+            self.add_quality_test_passed("SOG kph")
 
         error_rate = len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)]) / len(df_proc)
         if error_rate > .25:

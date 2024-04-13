@@ -158,6 +158,12 @@ class CompPresParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
+        self.add_bounds_stat([round(df_proc['comp1'].min(),ROUNDING['comp1']), round(df_proc['comp1'].max(),ROUNDING['comp1'])], 'Compensator 1', '%')
+        self.add_bounds_stat([round(df_proc['comp2'].min(),ROUNDING['comp2']), round(df_proc['comp2'].max(),ROUNDING['comp2'])], 'Compensator 1', '%')
+        self.add_bounds_stat([round(df_proc['comp3'].min(),ROUNDING['comp3']), round(df_proc['comp3'].max(),ROUNDING['comp3'])], 'Compensator 1', '%')
+        self.add_bounds_stat([round(df_proc['comp4'].min(),ROUNDING['comp4']), round(df_proc['comp4'].max(),ROUNDING['comp4'])], 'Compensator 1', '%')
+        self.add_bounds_stat([round(df_proc['comp5'].min(),ROUNDING['comp5']), round(df_proc['comp5'].max(),ROUNDING['comp5'])], 'Compensator 1', '%')
+        self.add_bounds_stat([round(df_proc['comp6'].min(),ROUNDING['comp6']), round(df_proc['comp6'].max(),ROUNDING['comp6'])], 'Compensator 1', '%')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

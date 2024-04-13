@@ -144,7 +144,7 @@ class ParoParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['depth'].min(),3), round(df_proc['depth'].max(),3)], 'Depth Bounds', 'm')
+        self.add_bounds_stat([round(df_proc['depth'].min(),ROUNDING['depth']), round(df_proc['depth'].max(),ROUNDING['depth'])], 'Depth Bounds', 'm')
         self.add_value_validity_stat([len(df_proc[(df_proc['depth'] >= MIN_DEPTH)]),len(df_proc[(df_proc['depth'] < MIN_DEPTH)])], 'Depth Validity')
 
         logging.debug("Running quality tests...")

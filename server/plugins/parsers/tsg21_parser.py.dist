@@ -158,12 +158,12 @@ class SBE21TSGParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['conductivity'].min(),5), round(df_proc['conductivity'].max(),5)], 'Conductivity', 'S/m')
-        self.add_bounds_stat([round(df_proc['water_temp_1'].min(),4), round(df_proc['water_temp_1'].max(),4)], 'Water Temp 1', 'C')
-        self.add_bounds_stat([round(df_proc['salinity'].min(),4), round(df_proc['salinity'].max(),4)], 'Salinity', 'PSU')
-        self.add_bounds_stat([round(df_proc['water_temp_2'].min(),4), round(df_proc['water_temp_2'].max(),4)], 'Water Temp 2', 'C')
-        self.add_bounds_stat([round(df_proc['fluorescence'].min(),5), round(df_proc['fluorescence'].max(),5)], 'Fluorescence', 'mg/m^3')
-        self.add_bounds_stat([round(df_proc['sound_velocity'].min(),5), round(df_proc['sound_velocity'].max(),5)], 'Sound Velocity', 'm/s')
+        self.add_bounds_stat([round(df_proc['conductivity'].min(),ROUNDING['conductivity']), round(df_proc['conductivity'].max(),ROUNDING['conductivity'])], 'Conductivity', 'S/m')
+        self.add_bounds_stat([round(df_proc['water_temp_1'].min(),ROUNDING['water_temp_1']), round(df_proc['water_temp_1'].max(),ROUNDING['water_temp_1'])], 'Water Temp 1', 'C')
+        self.add_bounds_stat([round(df_proc['salinity'].min(),ROUNDING['salinity']), round(df_proc['salinity'].max(),ROUNDING['salinity'])], 'Salinity', 'PSU')
+        self.add_bounds_stat([round(df_proc['water_temp_2'].min(),ROUNDING['water_temp_2']), round(df_proc['water_temp_2'].max(),ROUNDING['water_temp_2'])], 'Water Temp 2', 'C')
+        self.add_bounds_stat([round(df_proc['fluorescence'].min(),ROUNDING['fluorescence']), round(df_proc['fluorescence'].max(),ROUNDING['fluorescence'])], 'Fluorescence', 'mg/m^3')
+        self.add_bounds_stat([round(df_proc['sound_velocity'].min(),ROUNDING['sound_velocity']), round(df_proc['sound_velocity'].max(),ROUNDING['sound_velocity'])], 'Sound Velocity', 'm/s')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

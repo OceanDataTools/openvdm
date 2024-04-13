@@ -141,8 +141,8 @@ class PHParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['temp'].min(),2), round(df_proc['temp'].max(),2)], 'Temperature Bounds', 'C')
-        self.add_bounds_stat([round(df_proc['ph'].min(),1), round(df_proc['ph'].max(),1)], 'pH Bounds')
+        self.add_bounds_stat([round(df_proc['temp'].min(),ROUNDING['temp']), round(df_proc['temp'].max(),ROUNDING['temp'])], 'Temperature Bounds', 'C')
+        self.add_bounds_stat([round(df_proc['ph'].min(),ROUNDING['ph']), round(df_proc['ph'].max(),ROUNDING['ph'])], 'pH Bounds')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

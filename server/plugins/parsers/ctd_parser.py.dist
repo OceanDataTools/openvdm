@@ -160,12 +160,12 @@ class CTDParser(OpenVDMCSVParser):
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
 
-        self.add_bounds_stat([round(df_proc['conductivity'].min(),3), round(df_proc['conductivity'].max(),3)], "Conductivity", "S/m")
-        self.add_bounds_stat([round(df_proc['temperature'].min(),3), round(df_proc['temperature'].max(),3)], "Temperature", "C")
-        self.add_bounds_stat([round(df_proc['pressure'].min(),3), round(df_proc['pressure'].max(),3)], "Pressure", "psig")
-        self.add_bounds_stat([round(df_proc['depth'].min(),3), round(df_proc['depth'].max(),3)], "Depth", "m")
-        self.add_bounds_stat([round(df_proc['salinity'].min(),3), round(df_proc['salinity'].max(),3)], "Salinity", "ppt")
-        self.add_bounds_stat([round(df_proc['sound_velocity'].min(),3), round(df_proc['sound_velocity'].max(),3)], "Sound Velocity", "m/s")
+        self.add_bounds_stat([round(df_proc['conductivity'].min(),ROUNDING['conductivity']), round(df_proc['conductivity'].max(),ROUNDING['conductivity'])], "Conductivity", "S/m")
+        self.add_bounds_stat([round(df_proc['temperature'].min(),ROUNDING['temperature']), round(df_proc['temperature'].max(),ROUNDING['temperature'])], "Temperature", "C")
+        self.add_bounds_stat([round(df_proc['pressure'].min(),ROUNDING['pressure']), round(df_proc['pressure'].max(),ROUNDING['pressure'])], "Pressure", "psig")
+        self.add_bounds_stat([round(df_proc['depth'].min(),ROUNDING['depth']), round(df_proc['depth'].max(),ROUNDING['depth'])], "Depth", "m")
+        self.add_bounds_stat([round(df_proc['salinity'].min(),ROUNDING['salinity']), round(df_proc['salinity'].max(),ROUNDING[])], "Salinity", "ppt")
+        self.add_bounds_stat([round(df_proc['sound_velocity'].min(),ROUNDING['sound_velocity']), round(df_proc['sound_velocity'].max(),ROUNDING['sound_velocity'])], "Sound Velocity", "m/s")
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

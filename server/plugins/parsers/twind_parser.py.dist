@@ -142,7 +142,7 @@ class TWindParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['wind_speed'].min(),2), round(df_proc['wind_speed'].max(),2)], 'Wind Speed Bounds', 'm/s')
+        self.add_bounds_stat([round(df_proc['wind_speed'].min(),ROUNDING['wind_speed']), round(df_proc['wind_speed'].max(),ROUNDING['wind_speed'])], 'Wind Speed Bounds', 'm/s')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

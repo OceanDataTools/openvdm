@@ -148,9 +148,9 @@ class O2Parser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
         self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['abs_value'].min(),3), round(df_proc['abs_value'].max(),3)], 'ABS Value Bounds', '\u03BCM')
-        self.add_bounds_stat([round(df_proc['temp'].min(),3), round(df_proc['temp'].max(),3)], 'Temperature Bounds', 'C')
-        self.add_bounds_stat([round(df_proc['airsat'].min(),3), round(df_proc['airsat'].max(),3)], 'Saturation Bounds', '%')
+        self.add_bounds_stat([round(df_proc['abs_value'].min(),ROUNDING['abs_value']), round(df_proc['abs_value'].max(),ROUNDING['abs_value'])], 'ABS Value Bounds', '\u03BCM')
+        self.add_bounds_stat([round(df_proc['temp'].min(),ROUNDING['temp']), round(df_proc['temp'].max(),3)], 'Temperature Bounds', 'C')
+        self.add_bounds_stat([round(df_proc['airsat'].min(),ROUNDING['airsat']), round(df_proc['airsat'].max(),ROUNDING['airsat'])], 'Saturation Bounds', '%')
 
         logging.debug("Running quality tests...")
         # % of bad rows in datafile

@@ -53,7 +53,8 @@ PROC_COLS = ['date_time','latitude','longitude']
 
 ROUNDING = {
     'latitude': 8,
-    'longitude': 8
+    'longitude': 8,
+    'velocity': 3
 }
 
 MAX_VELOCITY = 10 #Max speed of vehicle (mph)
@@ -168,8 +169,8 @@ class SprintParser(OpenVDMCSVParser):
 
         logging.debug("Tabulating statistics...")
         self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_geobounds_stat([round(df_proc['latitude'].max(),3),round(df_proc['longitude'].max(),3),round(df_proc['latitude'].min(),3),round(df_proc['longitude'].min(),3)])
-        self.add_bounds_stat([round(df_proc['velocity'].min(),3), 999999.999 if np.isinf(df_proc['velocity'].max()) else round(df_proc['velocity'].max(),3)], 'Velocity Bounds', 'kts')
+        self.add_geobounds_stat([round(df_proc['latitude'].max(),ROUNDING['latitude']),round(df_proc['longitude'].max(),ROUNDING['longitude']),round(df_proc['latitude'].min(),ROUNDING['latitude']),round(df_proc['longitude'].min(),ROUNDING['longitude'])])
+        self.add_bounds_stat([round(df_proc['velocity'].min(),ROUNDING['velocity']), 999999.999 if np.isinf(df_proc['velocity'].max()) else round(df_proc['velocity'].max(),ROUNDING['velocity'])], 'Velocity Bounds', 'kts')
         self.add_value_validity_stat([len(df_proc[(df_proc['velocity'] <= MAX_VELOCITY)]),len(df_proc[(df_proc['velocity'] > MAX_VELOCITY)])], 'Velocity Validity')
         self.add_total_value_stat([round(df_proc['distance'].sum(axis=0),3)], 'Distance Traveled', 'nm')
         self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
