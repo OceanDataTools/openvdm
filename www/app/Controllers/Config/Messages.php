@@ -27,7 +27,7 @@ class Messages extends Controller {
 
         $pages->setTotal($this->_messagesModel->getMessagesTotal($data['messageSearch']));
         $data['messages'] = $this->_messagesModel->getMessages($pages->getLimit(), $data['messageSearch']);
-        $data['page_links'] = $pages->pageLinks();
+        $data['page_links'] = $pages->pageLinks('?search=' + $data['messageSearch']);
 
         $data['javascript'] = array();
 
