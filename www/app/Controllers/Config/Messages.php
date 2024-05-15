@@ -23,11 +23,12 @@ class Messages extends Controller {
 
         $pages = new Paginator('15','page');
 
-        $data['messageSearch'] = $_POST['messageSearch'] ?? '';
+        $data['search'] = $_GET['search'] ?? '';
+	$searchQueryStr = $_GET['search'] ? '&search=' . $data['search'] : '';
 
-        $pages->setTotal($this->_messagesModel->getMessagesTotal($data['messageSearch']));
-        $data['messages'] = $this->_messagesModel->getMessages($pages->getLimit(), $data['messageSearch']);
-        $data['page_links'] = $pages->pageLinks('?search=' + $data['messageSearch']);
+        $pages->setTotal($this->_messagesModel->getMessagesTotal($data['search']));
+        $data['messages'] = $this->_messagesModel->getMessages($pages->getLimit(), $data['search']);
+        $data['page_links'] = $pages->pageLinks('?', $searchQueryStr);
 
         $data['javascript'] = array();
 

@@ -31,10 +31,10 @@ use Helpers\Session;
             <div class="panel panel-default">
                 <div class="panel-heading" style="padding-bottom:20px;">
                     Manage Messages
-                    <?php echo Form::open(array('role'=>'form', 'method'=>'post', 'class'=>'form-inline pull-right')); ?>
+                    <?php echo Form::open(array('role'=>'form', 'method'=>'get', 'class'=>'form-inline pull-right')); ?>
                         <div class="form-group ">
-                            <?php echo Form::input(array('class'=>'form-control input-sm', 'type'=>'text', 'name'=>'messageSearch', 'value'=>$data['messageSearch'])); ?>
-                            <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-secondary btn-sm', 'value'=>'Search')); ?>
+                            <?php echo Form::input(array('class'=>'form-control input-sm', 'type'=>'text', 'name'=>'search', 'value'=>$data['search'])); ?>
+                            <?php echo Form::submit(array('class'=>'btn btn-secondary btn-sm', 'value'=>'Search')); ?>
                         </div>
                     <?php echo Form::close(); ?>
                 </div>
