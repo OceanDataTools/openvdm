@@ -69,7 +69,7 @@ use Helpers\FormCustom;
             <p>The <strong>Server Username</strong> is the SSH username on the SSDW with read/write permission to the Destination Directory (i.e. "shipTech").</p>
             <p>The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p>The <strong>Server Password</strong> is the username on the SSDW with read/write permission to the files/folders in the <?php echo CRUISE_NAME; ?> Data Directories (i.e. "shipTech").</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Data Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SSDW (i.e. "/mnt/vault/Shoreside").</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Data Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SSDW (i.e. "/mnt/data/Shoreside").</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>

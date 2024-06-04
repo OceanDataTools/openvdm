@@ -70,7 +70,7 @@ function set_default_variables {
     DEFAULT_HOSTNAME=$HOSTNAME
     DEFAULT_INSTALL_ROOT=/opt
 
-    DEFAULT_DATA_ROOT=/vault
+    DEFAULT_DATA_ROOT=/data
 
     DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
     DEFAULT_OPENVDM_BRANCH=master
@@ -925,8 +925,8 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/vault/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
-    sed -e "s|define('PUBLICDATA_DIR', '/vault/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
+    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then

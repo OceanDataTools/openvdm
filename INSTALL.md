@@ -81,8 +81,8 @@ New database password for user survey? (survey) weak_password
 
 ```
 #####################################################################
-Root data directory for OpenVDM? (/vault) 
-Root data directory /vault does not exists... create it?  (yes) 
+Root data directory for OpenVDM? (/data) 
+Root data directory /data does not exists... create it?  (yes) 
 ```
 
 ```
@@ -131,7 +131,7 @@ When the script completes successfully there will a message containing how to ac
 OpenVDM Installation: Complete
 OpenVDM WebUI available at: http://127.0.0.1
 Login with user: survey, pass: weak_password
-Cruise Data will be stored at: /vault/CruiseData
+Cruise Data will be stored at: /data/CruiseData
 ```
  
 At this point there should be a working installation of OpenVDM however the vessel operator will still need to configure data dashboard collection system transfers, cruise data transfers and the shoreside data warehouse.
