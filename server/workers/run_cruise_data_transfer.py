@@ -271,6 +271,7 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     try:
         with open(rsync_exclude_list_filepath, mode='w', encoding="utf-8") as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
+            rsync_excludelist_file.write('\0')
 
     except IOError:
         logging.error("Error Saving temporary rsync filelist file")
@@ -382,6 +383,7 @@ def transfer_smb_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     try:
         with open(rsync_exclude_list_filepath, mode='w', encoding='utf-8') as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
+            rsync_excludelist_file.write('\0')
 
         logging.debug('\n'.join(files['exclude']))
     except IOError:
@@ -487,6 +489,7 @@ def transfer_rsync_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
     try:
         with open(rsync_exclude_list_filepath, mode='w', encoding="utf-8") as rsync_excludelist_file:
             rsync_excludelist_file.write('\n'.join(files['exclude']))
+            rsync_excludelist_file.write('\0')
 
     except IOError:
         logging.error("Error Saving temporary rsync filelist file")
@@ -564,8 +567,9 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-ma
     ssh_excludelist_filepath = os.path.join(tmpdir, 'sshExcludeList.txt')
 
     try:
-        with open(ssh_excludelist_filepath, mode='w', encoding='utf-8') as ssh_exclude_filelist_file:
-            ssh_exclude_filelist_file.write('\n'.join(files['exclude']))
+        with open(ssh_excludelist_filepath, mode='w', encoding='utf-8') as ssh_excludelist_file:
+            ssh_excludelist_file.write('\n'.join(files['exclude']))
+            ssh_excludelist_file.write('\0')
 
     except IOError:
         logging.debug("Error Saving temporary ssh exclude filelist file")

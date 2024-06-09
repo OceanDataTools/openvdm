@@ -516,6 +516,7 @@ def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=to
                 except Exception as err:
                     logging.warning("File not ascii: %s", file)
                     logging.debug(str(err))
+            rsync_filelist_file.write('\0')
 
     except IOError:
         logging.error("Error Saving temporary rsync filelist file %s", rsync_filelist_filepath)
@@ -600,6 +601,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     try:
         with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
             rsync_filelist_file.write('\n'.join(files['include']))
+            rsync_filelist_file.write('\0')
 
     except IOError:
         logging.error("Error Saving temporary rsync filelist file")
@@ -681,6 +683,7 @@ def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=to
     try:
         with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
             rsync_filelist_file.write('\n'.join(files['include']))
+            rsync_filelist_file.write('\0')
 
     except IOError:
         logging.error("Error Saving temporary rsync filelist file")
@@ -737,6 +740,7 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     try:
         with open(ssh_filelist_filepath, mode='w', encoding='utf-8') as ssh_filelist_file:
             ssh_filelist_file.write('\n'.join(files['include']))
+            ssh_filelist_file.write('\0')
 
     except IOError:
         logging.debug("Error Saving temporary ssh filelist file")

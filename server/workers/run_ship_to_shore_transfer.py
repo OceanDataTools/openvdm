@@ -126,8 +126,9 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     file_count = len(files['include'])
 
     try:
-        with open(ssh_includelist_filepath, mode='w', encoding="utf-8") as ssh_include_filelist_filepath:
-            ssh_include_filelist_filepath.write('\n'.join([os.path.join(gearman_worker.cruise_id, filename) for filename in files['include']]))
+        with open(ssh_includelist_filepath, mode='w', encoding="utf-8") as ssh_includelist_file:
+            ssh_includelist_file.write('\n'.join([os.path.join(gearman_worker.cruise_id, filename) for filename in files['include']]))
+            ssh_includelist_file.write('\0')
 
     except IOError:
         logging.debug("Error Saving temporary ssh include filelist file")
