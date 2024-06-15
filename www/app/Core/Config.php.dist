@@ -37,7 +37,7 @@ class Config
         /*
          * Define path on webserver that contains cruise data
          */
-        define('CRUISEDATA_BASEDIR', '/vault/CruiseData');
+        define('CRUISEDATA_BASEDIR', '/data/CruiseData');
 
         /*
          * Define directory alias configured within the webserver that contains cruise data
@@ -47,7 +47,7 @@ class Config
         /*
          * Define path on webserver that contains public data
          */
-        define('PUBLICDATA_DIR', '/vault/PublicData');
+        define('PUBLICDATA_DIR', '/data/PublicData');
 
         /*
          * Define location/name of the data dashboard configuration file
@@ -156,7 +156,7 @@ class Config
         /*
          * Optional create a constant for the name of the site.
          */
-        define('SITETITLE', 'Open Vessel Data Management v2.9.5');
+        define('SITETITLE', 'Open Vessel Data Management v2.9.6');
 
         /*
          * Optionall set a site email address.
