@@ -65,7 +65,7 @@ class GeoTIFFParser(OpenVDMParser):
         directoryname, filename = os.path.split(filepath)
         label = os.path.splitext(filename)[0]
 
-        if self.output_dir is None and self.openvdm:
+        if self.output_dir is None and self.openvdm is not None:
             # parse the filepath to get the name of the file without the file extension
             data_warehouse_config = self.openvdm.get_shipboard_data_warehouse_config()
             logging.debug(self.openvdm.get_required_extra_directory_by_name("Dashboard_Data"))
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = GeoTIFFParser(use_openvdm_api=False, output_dir=parsed_args.outputDir)
+    ovdm_parser = GeoTIFFParser(output_dir=parsed_args.outputDir)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)
