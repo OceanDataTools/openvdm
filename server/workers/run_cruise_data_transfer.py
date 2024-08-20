@@ -324,8 +324,11 @@ def transfer_local_dest_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         files['new'], files['updated'] = run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count)
 
-        logging.info("Setting file permissions")
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(dest_dir, gearman_worker.cruise_id))
+        if gearman_worker.cruise_data_transfer['localDirIsMountPoint'] == '1':
+            output_results = { 'verdict': True }
+        else:
+            logging.info("Setting file permissions")
+            output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(dest_dir, gearman_worker.cruise_id))
 
     # Cleanup
     logging.debug("delete tmp dir: %s", tmpdir)

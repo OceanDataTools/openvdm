@@ -88,8 +88,11 @@ if __name__ == "__main__":
                         default=0, action='count',
                         help='Increase output verbosity')
     parser.add_argument('-n','--no_combine', action='store_true', help='do NOT combine the json files')
-    parser.add_argument('-k','--kml_only', action='store_true', help='only create the KML files')
-    parser.add_argument('-g','--geojson_only', action='store_true', help='only create the GeoJSON files')
+
+    group1 = parser.add_mutually_exclusive_group()
+    group1.add_argument('-k','--kml_only', action='store_true', help='only create the KML files')
+    group1.add_argument('-g','--geojson_only', action='store_true', help='only create the GeoJSON files')
+
     parser.add_argument('-c', dest='cruiseID', metavar='cruiseID', help='the cruiseID to process')
     parser.add_argument('-o', dest='outputDir', metavar='outputDir', help='the desired output directory')
     parser.add_argument('-u', '--username', metavar='username', help='set the output file(s) ownership to username')
@@ -107,10 +110,6 @@ if __name__ == "__main__":
     LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    if parsed_args.kml_only and parsed_args.geojson_only:
-        parser.error("Can not specify the '--kml_only' AND '--geojson_only' arguments.")
-        sys.exit(1)
 
     # build an OpenVDM object
     openVDM = OpenVDM()
