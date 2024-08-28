@@ -115,12 +115,11 @@ if __name__ == "__main__":
     openVDM = OpenVDM()
 
     # Define the cruiseID to use for identifying the position data
-    cruiseID = openVDM.get_cruise_id()
+    cruiseID = parsed_args.cruiseID or openVDM.get_cruise_id()
 
-    # if a cruiseID was declared in the command-line aruments, redefine the cruiseID variable
-    if not parsed_args.cruiseID is None:
-        logging.info("Setting CruiseID to: %s", parsed_args.cruiseID)
-        cruiseID = parsed_args.cruiseID
+    if cruiseID is None:
+        logging.error("Unable to find CruiseID")
+        sys.exit(1)
 
     # Retrieve the information for the collection system defined in the command-line argument
     collectionSystem = openVDM.get_collection_system_transfer_by_name(parsed_args.collectionSystem)
@@ -131,12 +130,12 @@ if __name__ == "__main__":
     # Retrieve the shipboard data warehouse configuration
     shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
 
-    # Get the user to save the output file(s) as
-    outputUser = parsed_args.username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
-
     # Construct the full path to the cruise data directory
     baseDir = shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir']
     cruiseDir = os.path.join(baseDir, cruiseID)
+
+    # Get the user to save the output file(s) as
+    outputUser = parsed_args.username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
 
     # Verify the cruise data directory exists
     if not os.path.isdir(cruiseDir):
@@ -144,9 +143,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     tracklineDir = parsed_args.outputDir or os.path.join(cruiseDir, openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)['destDir'])
-    # if not tracklineDirectory:
-    #     logging.error("Extra Directory: %s not found in OpenVDM configuration", TRACKLINE_EXTRA_DIR_NAME)
-    #     sys.exit(1)
 
     # Verify the trackline directory exists
     if not os.path.isdir(tracklineDir):

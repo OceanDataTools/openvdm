@@ -72,7 +72,7 @@ sys.path.append(dirname(dirname(realpath(__file__))))
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
-TEMPLATE_DIRECTORY = '/home/survey/template_directory'
+TEMPLATE_DIRECTORY = '/opt/openvdm/template_directory'
 
 def make_system_call(command):
     """

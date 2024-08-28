@@ -1,0 +1,160 @@
+#!/bin/bash
+# -----------------------------------------------------------------------------
+#  process_file.sh - Process recently added/update files
+# -----------------------------------------------------------------------------
+#
+#  Usage:   process_file.sh [options] <data_file> ...
+#
+#  Depends: none... yet. 
+#
+#  Options:
+#
+#   -x, --xtrace    Enable debug output to console
+#
+#   -h  --help      Print this header
+#
+#   -r  --root_dir  Root directory containing data files.  Needed for OpenVDM
+#                   integration.
+#
+#   -i --ignore_checks Script will not verify the data file(s). Needed for
+#                   OpenVDM integration
+#
+#  Example:
+#   process_file.sh data_file_1.txt data_file_2.txt data_file_3.txt
+#
+# -----------------------------------------------------------------------------
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# -----------------------------------------------------------------------------
+# Functions
+# -----------------------------------------------------------------------------
+
+# deletes the temp directory
+cleanup() {
+  rm -rf "${WORK_DIR}"
+  # echo "Deleted temp working directory ${WORK_DIR}"
+}
+
+set_environment() {
+
+  # Read in preferences
+  source ${0%/*}/preferences.sh
+
+  ## Parse command line args
+
+  while getopts "h?xr:i" opt; do
+    case "$opt" in
+      h|help)
+        print_hdr
+        exit 0
+        ;;
+      x|xtrace)  set -o xtrace
+        ;;
+      r|root_dir)  ROOT_DIR=${OPTARG}
+        ;;
+      i|ignore_checks)  IGNORE_CHECKS=1
+
+    esac
+  done
+
+  shift $((OPTIND-1))
+
+  ## Set default values for anything not specified by command line arg or env
+  SCRIPT=${SCRIPT:=${0##*/}}
+
+  DATA_FILES=($@)
+
+  if [ ! -f "${PYTHON_BIN}" ]; then
+    echo "ERROR: Python binary not found... quiting."
+    exit 1
+  fi
+
+  if [[ -z ${IGNORE_CHECKS+z} && ! -d "${OUTPUT_DIR}" ]]; then
+    echo "ERROR: Output directory does not exist... quiting."
+    exit 1
+  fi
+
+  if [ ${#DATA_FILES[@]} -eq 0 ]; then
+    echo "ERROR: No DTM files provided... quiting."
+    exit 1
+  fi
+
+  WORK_DIR=`mktemp -d`
+
+  ## Trap signals
+  trap cleanup HUP INT TERM QUIT EXIT
+
+  # check if tmp dir was created
+  if [[ ! "${WORK_DIR}" || ! -d "${WORK_DIR}" ]]; then
+    echo "ERROR: Could not create working directory... quiting."
+    exit 1
+  fi
+
+}
+
+print_hdr() {
+  ## Universal header function, script reads itself up to the first
+  ## blank line, stripping out the shabang at the top and the first
+  ## comment symbol on each line.
+  ## Entire header should be commented out.
+  echo
+  ## Want to preserve whitespace so set IFS to ""
+  while IFS='' read -r LINE; do
+    case ${LINE} in
+      \#!*) continue                    ;; ## Strip out shebang
+        "") echo "" ; break             ;; ## Stop if blank line
+         *) printf '%s\n' "${LINE/\#/}" ;; ## Print everything else
+    esac
+  done < "$0"
+  }
+
+process_file() {
+
+  INPUT_FILE=$1
+
+  echo "Current input file: ${INPUT_FILE}"
+
+  if [[ ! -z ${IGNORE_CHECKS+z} || -f "${INPUT_FILE}" ]]; then
+  	echo "Processing file: ${INPUT_FILE}"
+
+  	#################################
+  	#                               #
+  	#    PUT PROCESSING CODE HERE   #
+  	#                               #
+  	#################################
+
+  else
+    echo "WARNING: file does not exist... skipping."
+  fi
+}
+
+main() {
+
+  ## Set up environment
+  set_environment "$@"
+
+  echo "Script Name: ${SCRIPT}"
+  echo "Python Bin: ${PYTHON_BIN}"
+  echo "Working Dir: ${WORK_DIR}"
+
+  echo "Data Files:"
+  for data_file in "${DATA_FILES[@]}"; do
+    echo "  -${data_file}"
+  done
+
+  for data_file in "${DATA_FILES[@]}"; do
+    if [[ -z ${ROOT_DIR+z} ]]; then
+      process_file "${data_file}"
+    else
+      process_file "${ROOT_DIR}/${data_file}"
+    fi
+  done
+}
+
+# -----------------------------------------------------------------------------
+# Run
+# -----------------------------------------------------------------------------
+main "$@"

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Full path to python binary
+PYTHON_BIN='/opt/openvdm/venv/bin/python'
