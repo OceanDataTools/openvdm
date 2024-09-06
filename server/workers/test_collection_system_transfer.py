@@ -177,7 +177,7 @@ def test_smb_source_dir(gearman_worker):
     if os.path.isdir(source_dir):
         return_val.append({"partName": "Source Directory", "result": "Pass"})
 
-        if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1'
+        if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
             if not write_test(source_dir):
                 return_val.append({"partName": "Write Test", "result": "Fail", "reason": f"Unable to delete data from source directory: {source_dir}"})
                 return return_val
