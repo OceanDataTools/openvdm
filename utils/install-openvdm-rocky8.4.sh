@@ -674,15 +674,13 @@ EOF
 ###########################################################################
 # Install and configure database
 function configure_mapproxy {
-    
-    if [ $INSTALL_MAPPROXY == 'yes' ]; then
 
-        startingDir=${PWD}
+    startingDir=${PWD}
 
-        cd ~
-        mapproxy-util create -t base-config --force mapproxy
+    cd ~
+    mapproxy-util create -t base-config --force mapproxy
 
-        cat > ~/mapproxy/mapproxy.yaml <<EOF
+    cat > ~/mapproxy/mapproxy.yaml <<EOF
 # -------------------------------
 # MapProxy configuration.
 # -------------------------------
@@ -748,16 +746,15 @@ grids:
 globals:
 EOF
 
-        cp -r ~/mapproxy /var/www/mapproxy
-        mkdir /var/www/mapproxy/cache_data
-        chmod 777 /var/www/mapproxy/cache_data
+    cp -r ~/mapproxy /var/www/mapproxy
+    mkdir /var/www/mapproxy/cache_data
+    chmod 777 /var/www/mapproxy/cache_data
 
-        cd /var/www/mapproxy
-        mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
+    cd /var/www/mapproxy
+    mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
 
-        # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
-        cd ${startingDir}
-    fi
+    # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
+    cd ${startingDir}
 }
 
 ###########################################################################
@@ -1201,9 +1198,11 @@ echo "#####################################################################"
 echo "Installing additional python libraries"
 install_python_packages
 
-echo "#####################################################################"
-echo "Installing/Configuring MapProxy"
-configure_mapproxy
+if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    echo "#####################################################################"
+    echo "Installing/Configuring MapProxy"
+    configure_mapproxy
+fi
 
 echo "#####################################################################"
 echo "Configuring Apache2"
