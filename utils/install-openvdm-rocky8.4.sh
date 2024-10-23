@@ -827,9 +827,8 @@ function configure_directories {
         echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
-    fi
-    
-    if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+
+        if [ $INSTALL_PUBLICDATA == 'yes' ]; then
             mkdir -p ${DATA_ROOT}/PublicData
             chmod -R 777 ${DATA_ROOT}/PublicData
         fi
