@@ -43,7 +43,7 @@ from server.plugins.parsers.tsg_parser   import TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
 
 # -------------------------------------------------------------------------------------
-# This array defines the various dataTypes collected by SCS and the cooresponding file
+# This array defines the various dataTypes collected by SCS and the corresponding file
 # regex expression.
 # -------------------------------------------------------------------------------------
 fileTypeFilters = [
