@@ -62,18 +62,6 @@ def hash_file(filepath):
     """
     Build the md5 hash for the given file
     """
-    # try:
-    #     md5 = hashlib_md5()
-    #     with open(filepath, mode='rb') as file:
-    #         while True:
-    #             data = file.read(BUF_SIZE)
-    #             if not data:
-    #                 break
-    #             md5.update(data)
-    #     return md5.hexdigest()
-    # except Exception as err:
-    #     raise err
-
     try:
         with open(filepath, mode='rb') as f:
             file_hash = hashlib_md5()
