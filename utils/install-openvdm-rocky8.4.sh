@@ -897,22 +897,22 @@ function install_openvdm {
         echo "Downloading OpenVDM repository"
         cd $INSTALL_ROOT
         git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
-        chown ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
 
     else
         cd ${INSTALL_ROOT}/openvdm
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            git pull
-            git checkout $OPENVDM_BRANCH
-            git pull
+            sudo -u ${OPENVDM_USER} git pull
+            sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH
+            sudo -u ${OPENVDM_USER} git pull
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
             cd ..
             rm -rf openvdm
-            git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
+            sudo -u ${OPENVDM_USER} git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
         fi
     fi
 
