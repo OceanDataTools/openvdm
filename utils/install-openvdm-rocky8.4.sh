@@ -655,8 +655,10 @@ EOF
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}
     chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
 
-    chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
-    chcon -R -t httpd_sys_rw_content_t /var/www/mapproxy/cache_data
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
+        chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
+        chcon -R -t httpd_sys_rw_content_t /var/www/mapproxy/cache_data
+    fi
 
     setsebool httpd_tmp_exec on
     setsebool -P httpd_can_network_connect=1
