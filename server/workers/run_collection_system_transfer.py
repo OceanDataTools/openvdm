@@ -296,7 +296,17 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
 
     filters = build_filters(gearman_worker)
 
-    command = ['rsync', '-r', '--protect-args', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
+    isDarwin = False
+    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
+        isDarwin = (line.rstrip('\n') == 'Darwin' )
+        if isDarwin:
+            break
+
+    command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
+
+    if not isDarwin:
+        command.insert(2, '--protect-args')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
         command.insert(2, '--min-size=1')
@@ -757,7 +767,17 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
-    command = ['rsync', '-tri', '--protect-args', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
+    isDarwin = False
+    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
+        isDarwin = (line.rstrip('\n') == 'Darwin' )
+        if isDarwin:
+            break
+
+    command = ['rsync', '-tri', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
+
+    if not isDarwin:
+        command.insert(2, '--protect-args')
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
         command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
