@@ -117,13 +117,6 @@ postHookCommands:
         #  - /opt/openvdm/bin/build_remote_directory.py
         #  - "-s"
         #  - "-l"
-    preFinalizeCurrentCruise:
-        #commandList:
-        #- name: "Export Sealog data for current cruise"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
     postFinalizeCurrentCruise:
         commandList:
         - name: "Export Sealog Data"
