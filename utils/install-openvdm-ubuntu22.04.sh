@@ -75,19 +75,19 @@ function set_default_variables {
 
     DEFAULT_DATA_ROOT=/data
 
-    DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
-    DEFAULT_OPENVDM_BRANCH=master
-    DEFAULT_OPENVDM_SITEROOT=127.0.0.1
+    DEFAULT_OPENVDM_REPO=https://github.com/schmidtocean/openvdm
+    DEFAULT_OPENVDM_BRANCH=master-FKt
+    DEFAULT_OPENVDM_SITEROOT=10.23.9.20
 
-    DEFAULT_OPENVDM_USER=survey
+    DEFAULT_OPENVDM_USER=mt
     
     DEFAULT_INSTALL_MAPPROXY=no
 
     DEFAULT_INSTALL_PUBLICDATA=yes
     DEFAULT_INSTALL_VISITORINFORMATION=no
 
-    DEFAULT_SUPERVISORD_WEBINTERFACE=no
-    DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
+    DEFAULT_SUPERVISORD_WEBINTERFACE=yes
+    DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=yes
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e $PREFERENCES_FILE ]; then
@@ -394,7 +394,7 @@ stopsignal=INT
 command=${VENV_BIN}/python server/workers/run_collection_system_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
-numprocs=2
+numprocs=8
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/run_collection_system_transfer.log
 user=root
@@ -406,7 +406,7 @@ stopsignal=INT
 command=${VENV_BIN}/python server/workers/run_cruise_data_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
-numprocs=2
+numprocs=4
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/run_cruise_data_transfer.log
 user=root
@@ -556,9 +556,9 @@ fi
 if [ $INSTALL_PUBLICDATA == 'yes' ]; then
     cat >> /etc/samba/openvdm.conf <<EOF
 
-[PublicData]
-  comment=Public Data, read/write access to all
-  path=${DATA_ROOT}/PublicData
+[ParticipantData]
+  comment=Participant Data, read/write access to all
+  path=${DATA_ROOT}/ParticipantData
   browseable = yes
   public = yes
   guest ok = yes
@@ -844,19 +844,19 @@ function configure_directories {
     if [ ! -d $DATA_ROOT ]; then
         echo "Creating data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
+        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/Vehicle/S9999
+        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/DashboardData
+        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/TransferLogs
 
-        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
+        echo "[]" > ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/FKt990101/ovdmConfig.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/FKt990101/Vehicle/S9999/loweringConfig.json
+        touch ${DATA_ROOT}/CruiseData/FKt990101/MD5_Summary.md5
+        touch ${DATA_ROOT}/CruiseData/FKt990101/MD5_Summary.txt
 
         if [ $INSTALL_PUBLICDATA == 'yes' ]; then
-            mkdir -p ${DATA_ROOT}/PublicData
-            chmod -R 777 ${DATA_ROOT}/PublicData
+            mkdir -p ${DATA_ROOT}/ParticipantData
+            chmod -R 777 ${DATA_ROOT}/ParticipantData
         fi
 
         if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
@@ -1172,7 +1172,7 @@ echo "pictures, etc. These files will be copied to the cruise data "
 echo "directory at the end of the cruise. This behavior can be disabled in"
 echo "the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
 echo
-yes_no "Setup PublicData Share? " $DEFAULT_INSTALL_PUBLICDATA
+yes_no "Setup ParticipantData Share? " $DEFAULT_INSTALL_PUBLICDATA
 INSTALL_PUBLICDATA=$YES_NO_RESULT
 echo
 

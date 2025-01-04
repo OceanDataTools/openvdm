@@ -157,16 +157,79 @@
   - charts
   - charts-zoom
   - leaflet
-  - lowering
   placeholderArray:
   - plotType: map
     id: map
     heading: Position
     dataArray:
-    - dataType: gga
+    - dataType: dps122-gga
       visType: geoJSON
+    - dataType: posmv-gga
+      visType: geoJSON
+    - dataType: seapath-gga
+      visType: geoJSON 
     - dataType: geotiff
       visType: tms
+  # - plotType: chart
+  #   id: dps122-hdt
+  #   heading: DPS122 - Heading
+  #   dataArray:
+  #   - dataType: dps122-hdt
+  #     visType: json
+  - plotType: chart
+    id: gyro1-hdt
+    heading: Gyro 1 - Heading
+    dataArray:
+    - dataType: gyro1-hdt
+      visType: json
+  - plotType: chart
+    id: gyro2-hdt
+    heading: Gyro 2 - Heading
+    dataArray:
+    - dataType: gyro2-hdt
+      visType: json
+  - plotType: chart
+    id: gyro3-hdt
+    heading: Gyro 3 - Heading
+    dataArray:
+    - dataType: gyro3-hdt
+      visType: json
+  - plotType: chart
+    id: posmv-hdt
+    heading: POS/MV - Heading
+    dataArray:
+    - dataType: posmv-hdt
+      visType: json
+  - plotType: chart
+    id: seapath-hdt
+    heading: Seapath - Heading
+    dataArray:
+    - dataType: seapath-hdt
+      visType: json
+  - plotType: chart
+    id: posmv-pashr
+    heading: POS/MV - Heading, Pitch, Roll, Heave
+    dataArray:
+    - dataType: posmv-pashr 
+      visType: json
+  - plotType: chart
+    id: dps122-vtg
+    heading: DPS122 - COG/SOG
+    dataArray:
+    - dataType: dps122-vtg
+      visType: json
+  - plotType: chart
+    id: posmv-vtg
+    heading: POS/MV - COG/SOG
+    dataArray:
+    - dataType: posmv-vtg
+      visType: json
+  - plotType: chart
+    id: seapath-vtg
+    heading: Seapath - COG/SOG
+    dataArray:
+    - dataType: seapath-vtg
+      visType: json
 
 - title: Weather
   page: weather
@@ -177,16 +240,28 @@
   - charts-zoom
   placeholderArray:
   - plotType: chart
-    id: met
-    heading: Meterological Sensor
+    id: mpp-fm
+    heading: MetPakPro - Forward Mast
     dataArray:
-    - dataType: met
+    - dataType: mpp-fm
       visType: json
   - plotType: chart
-    id: twind
-    heading: Wind Sensor
+    id: mpp-mm-aft
+    heading: MetPakPro - Main Mast - Aft
     dataArray:
-    - dataType: twind
+    - dataType: mpp-mm-aft
+      visType: json
+  - plotType: chart
+    id: truewind-mpp-fm
+    heading: MMP True Wind - Forward Mast
+    dataArray:
+    - dataType: truewind-mpp-fm
+      visType: json
+  - plotType: chart
+    id: truewind-mpp-mm-aft
+    heading: MMP True Wind - Main Mast - Aft
+    dataArray:
+    - dataType: truewind-mpp-mm-aft
       visType: json
 
 - title: Seawater
@@ -197,15 +272,99 @@
   - charts
   - charts-zoom
   placeholderArray:
+  # - plotType: chart
+  #   id: tsg
+  #   heading: Thermosalinograph Sensor
+  #   dataArray:
+  #   - dataType: tsg
+  #     visType: json
   - plotType: chart
-    id: tsg
-    heading: Thermosalinograph Sensor
+    id: fluoro_1
+    heading: Fluorometer 1
     dataArray:
-    - dataType: tsg
+    - dataType: fluoro_1
       visType: json
   - plotType: chart
-    id: svp
-    heading: Sound Velocity Probe
+    id: fluoro_2
+    heading: Fluorometer 2
     dataArray:
-    - dataType: svp
+    - dataType: fluoro_2
       visType: json
+  - plotType: chart
+    id: ea440-dpt
+    heading: EA440 - DPT
+    dataArray:
+    - dataType: ea440-dpt
+      visType: json
+  - plotType: chart
+    id: ea440-dbs
+    heading: EA440 - DBS
+    dataArray:
+    - dataType: ea440-dbs
+      visType: json
+  - plotType: chart
+    id: ea640-dpt
+    heading: EA640 - DPT
+    dataArray:
+    - dataType: ea640-dpt
+      visType: json
+  - plotType: chart
+    id: ea640-dbs
+    heading: EA640 - DBS
+    dataArray:
+    - dataType: ea640-dbs
+      visType: json
+  - plotType: chart
+    id: em124-dpt
+    heading: EM124 - DPT
+    dataArray:
+    - dataType: em124-dpt
+      visType: json
+  - plotType: chart
+    id: em2040-dpt
+    heading: EM2040 - DPT
+    dataArray:
+    - dataType: em2040-dpt
+      visType: json
+  - plotType: chart
+    id: em712-dpt
+    heading: EM712 - DPT
+    dataArray:
+    - dataType: em712-dpt
+      visType: json
+  - plotType: chart
+    id: minisvs-aft
+    heading: MiniSVS - Aft
+    dataArray:
+    - dataType: minisvs-aft
+      visType: json
+  - plotType: chart
+    id: minisvs-fwd
+    heading: MiniSVS - Fwd
+    dataArray:
+    - dataType: minisvs-fwd
+      visType: json
+  - plotType: chart
+    id: tsg45_1 
+    heading: SBE45/SBE38 Primary
+    dataArray:
+    - dataType: tsg45_1
+      visType: json
+  - plotType: chart
+    id: tsg45_2 
+    heading: SBE45/SBE38 Secondary
+    dataArray:
+    - dataType: tsg45_2
+      visType: json
+  # - plotType: chart
+  #   id: flowrate-aft 
+  #   heading: Flowrate - Aft
+  #   dataArray:
+  #   - dataType: flowrate-aft
+  #     visType: json
+  # - plotType: chart
+  #   id: flowrate-fwd 
+  #   heading: Flowrate - Forward
+  #   dataArray:
+  #   - dataType: flowrate-fwd
+  #     visType: json

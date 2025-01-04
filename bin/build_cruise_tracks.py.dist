@@ -69,13 +69,17 @@ AllGPSSources = [
         "CollectionSystem":"OpenRVDAS",
         "GPSSources": [
             {
-                "device":"CNAV",
-                "regex":"NAV/CNAV-GGA_*.json"
+                "device":"DPS122",
+                "regex":"*_dspi1_gga-*.json"
             },
             {
                 "device":"POSMV",
-                "regex":"NAV/POSMV-GGA_*.json"
-            }
+                "regex":"*_posmv_gga-*.json"
+            },
+            {
+                "device":"Seapath",
+                "regex":"*_seapath330_gga-*.json"
+            },
         ]
     }
 ]

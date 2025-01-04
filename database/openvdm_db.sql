@@ -201,7 +201,7 @@ INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cr
 VALUES
   (1,'Transfer_Logs','Transfer Logs',0,'OpenVDM/TransferLogs',1,1),
   (2,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
-  (3,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
+  (3,'From_PublicData','Files copied from ParticipantData share',0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -246,7 +246,7 @@ LOCK TABLES `OVDM_Links` WRITE;
 INSERT INTO `OVDM_Links` (`name`, `url`, `enable`, `private`)
 VALUES
   ('Supervisord','http://{hostIP}:9001',1,1),
-  ('Public Data','http://{hostIP}/PublicData/',1,0),
+  ('Participant Data','http://{hostIP}/ParticipantData/',1,0),
   ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
   ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0);
 
@@ -330,7 +330,7 @@ VALUES
   (4,'rebuildDataDashboard','Rebuild Data Dashboard',0,2,1,0),
   (5,'rebuildCruiseDirectory','Rebuild {cruise_name} Directory',0,2,1,0),
   (6,'exportOVDMConfig','Re-export the OpenVDM Configuration',0,2,1,0),
-  (7,'rsyncPublicDataToCruiseData','Sync PublicData within {cruise_name} Directory',0,2,1,0),
+  (7,'rsyncPublicDataToCruiseData','Sync ParticipantData within {cruise_name} Directory',0,2,1,0),
   (8,'setupNewLowering','Setup New {lowering_name}',1,2,1,0),
   (9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
   (10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),
