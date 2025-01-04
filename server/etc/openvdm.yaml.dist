@@ -26,11 +26,11 @@ gearmanServer: "localhost:4730"
 
 # Whether or not to hide all directories in the CruiseData directory other than the
 # current cruise. (True|False)
-showOnlyCurrentCruiseDir: False
+showOnlyCurrentCruiseDir: True
 
 # Whether or not to move the contents of the PublicData share to the cruise data
 # directory. (True|False)
-transferPubicData: True
+transferPubicData: False
 
 # maximum age of transfer log files to retain. String must conform with the python
 # datetime.timedelta standard
@@ -87,25 +87,28 @@ postHookCommands:
         #    - /opt/openvdm/bin/r2r_nav_manager.py
         #    - OpenRVDAS
     postDataDashboard:
-        #- collectionSystemTransferName: OpenRVDAS
-        #  commandList:
-        #  - name: "Build cruise tracks"
-        #    command:
-        #    - /opt/openvdm/venv/bin/python
-        #    - /opt/openvdm/bin/build_cruise_tracks.py
-        #    - OpenRVDAS
+        - collectionSystemTransferName: OpenRVDAS
+          commandList:
+          - name: "Build cruise tracks"
+            command:
+            - /opt/openvdm/venv/bin/python
+            - /opt/openvdm/bin/build_cruise_tracks.py
+            - OpenRVDAS
     postSetupNewCruise:
-        #commandList:
+        commandList:
         #- name: "Setup Remote Cruise Directories"
         #  command:
         #  - /opt/openvdm/venv/bin/python
         #  - /opt/openvdm/bin/build_remote_directory.py
         #  - "-s"
-        #- name: "Build new OpenRVDAS config file"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.21
-        #  - "bash /opt/odt-configs/openrvdas/bin/build_openrvdas_config.sh"
+        - name: "Build new OpenRVDAS config file"
+          command:
+          - bash 
+          - /opt/openvdm/bin/build_openrvdas_logger_config.sh
+        # - name: "Add Cruise record to Sealog"
+        #   command:
+        #   - bash 
+        #   - /home/mt/shipboard-configurations/Systems/OpenVDM/bin/build_openrvdas_logger_config.sh
     postSetupNewLowering:
         #commandList:
         #- name: "Setup Remote Lowering Directories"
@@ -122,23 +125,14 @@ postHookCommands:
         #  - survey@192.168.0.22
         #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
     postFinalizeCurrentCruise:
-        #commandList:
-        #- name: "Export Sealog data for current cruise"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
-    preFinalizeCurrentLowering:
-        #commandList:
-        #- name: "Export Sealog data for current lowering"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
+        commandList:
+        - name: "Export Sealog Data"
+          command:
+          - /opt/openvdm/venv/bin/python
+          - /opt/openvdm/bin/sealog_post_cruise_export.py
     postFinalizeCurrentLowering:
-        #commandList:
-        #- name: "Export Sealog data for current lowering"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
+        commandList:
+        - name: "Export Sealog Sub Data"
+          command:
+          - /opt/openvdm/venv/bin/python
+          - /opt/openvdm/bin/sealog_post_dive_export.py
