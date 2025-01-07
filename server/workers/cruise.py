@@ -64,8 +64,8 @@ def clear_directory(directory):
 
     # Clear out PublicData
     for root, dirs, files in os.walk(directory + '/', topdown=False):
-        for dirname in dirs:
-            result = clear_directory(realpath(os.path.join(root, dirname)))
+        for dir_name in dirs:
+            result = clear_directory(realpath(os.path.join(root, dir_name)))
             if not result['verdict']:
                 reasons.extend(result['reasons'].split('\n'))
         if not dirs and not files:

@@ -28,6 +28,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+from server.lib.md5_util import hashlib_md5
 
 CUSTOM_TASKS = [
     {
@@ -62,14 +63,11 @@ def hash_file(filepath):
     Build the md5 hash for the given file
     """
     try:
-        md5 = hashlib.md5()
-        with open(filepath, mode='rb') as file:
-            while True:
-                data = file.read(BUF_SIZE)
-                if not data:
-                    break
-                md5.update(data)
-        return md5.hexdigest()
+        with open(filepath, mode='rb') as f:
+            file_hash = hashlib_md5()
+            while chunk := f.read(BUF_SIZE):
+                file_hash.update(chunk)
+        return file_hash.hexdigest()  # to get a printable str instead of bytes
     except Exception as err:
         raise err
 

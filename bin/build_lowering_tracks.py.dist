@@ -97,7 +97,14 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
+
+    group1 = parser.add_mutually_exclusive_group()
+    group1.add_argument('-k','--kml_only', action='store_true', help='only create the KML files')
+    group1.add_argument('-g','--geojson_only', action='store_true', help='only create the GeoJSON files')
+
     parser.add_argument('-l', dest='loweringID', metavar='loweringID', help='the loweringID to process')
+    parser.add_argument('-o', dest='outputDir', metavar='outputDir', help='the desired output directory')
+    parser.add_argument('-u', '--username', metavar='username', help='set the output file(s) ownership to username')
     parser.add_argument('collectionSystem', help='the collection system to search for geoJSON files')
 
     parsed_args = parser.parse_args()
@@ -120,18 +127,11 @@ if __name__ == "__main__":
     cruiseID = openVDM.get_cruise_id()
 
     # Define the loweringID to use for identifying the position data
-    loweringID = openVDM.get_lowering_id()
+    loweringID = parsed_args.loweringID or openVDM.get_lowering_id()
 
-    # if a loweringID was declared in the command-line aruments, redefine the loweringID variable
-    if parsed_args.loweringID is not None:
-
-        if parsed_args.loweringID in openVDM.get_lowerings():
-            logging.info("Setting LoweringID to: %s", parsed_args.loweringID)
-            loweringID = parsed_args.loweringID
-
-        else:
-            logging.error("Unable to find LoweringID %s for CruiseID %s", parsed_args.loweringID, cruiseID)
-            sys.exit(1)
+    if loweringID is None:
+        logging.error("Unable to find LoweringID within Cruise: %s", cruiseID)
+        sys.exit(1)
 
     # Retrieve the information for the collection system defined in the command-line argument
     collectionSystem = openVDM.get_collection_system_transfer_by_name(parsed_args.collectionSystem)
@@ -141,11 +141,6 @@ if __name__ == "__main__":
     elif collectionSystem['cruiseOrLowering'] != '1':
         logging.error("Collection System: %s is not related to a lowering.", parsed_args.collectionSystem)
 
-    tracklineDirectory = openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)
-    if not tracklineDirectory:
-        logging.error("Extra Directory: %s not found in OpenVDM configuration", TRACKLINE_EXTRA_DIR_NAME)
-        sys.exit(1)
-
     # Retrieve the shipboard data warehouse configuration
     shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
 
@@ -154,12 +149,15 @@ if __name__ == "__main__":
     cruiseDir = os.path.join(baseDir, cruiseID)
     loweringDir = os.path.join(cruiseDir, shipboardDataWarehouseConfig['loweringDataBaseDir'], loweringID)
 
+    # Get the user to save the output file(s) as
+    outputUser = parsed_args.username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
+
     # Verify the cruise data directory exists
     if not os.path.isdir(loweringDir):
         logging.error("Lowering data directory: %s not found!", cruiseDir)
         sys.exit(1)
 
-    tracklineDir = os.path.join(cruiseDir, tracklineDirectory['destDir'])
+    tracklineDir = parsed_args.outputDir or os.path.join(cruiseDir, openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)['destDir'])
 
     # Verify the trackline directory exists
     if not os.path.isdir(tracklineDir):
@@ -213,30 +211,32 @@ if __name__ == "__main__":
                 warehouseUser = shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
 
                 # Save the combined geoJSON object to file
-                output_filepath = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.json")
-                logging.info("Saving file: %s", output_filepath)
-                output_results = output_json_data_to_file(output_filepath, combineGeoJsonObj)
+                if not parsed_args.kml_only:
+                    output_filepath = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.json")
+                    logging.info("Saving file: %s", output_filepath)
+                    output_results = output_json_data_to_file(output_filepath, combineGeoJsonObj)
 
-                if not output_results['verdict']:
-                    logging.error("Problem writing output file: %s, reason: %s", output_filepath, output_results['reason'])
-                else:
-                    output_results = set_owner_group_permissions(warehouseUser, output_filepath)
                     if not output_results['verdict']:
-                        logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath, output_results['reason'])
+                        logging.error("Problem writing output file: %s, reason: %s", output_filepath, output_results['reason'])
+                    else:
+                        output_results = set_owner_group_permissions(warehouseUser, output_filepath)
+                        if not output_results['verdict']:
+                            logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath, output_results['reason'])
 
                 # Convert the combined geoJSON object to kml and save to file
-                output_filepath_kml = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.kml")
-                logging.info("Saving file: %s", output_filepath_kml)
-                try:
-                    with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
-                        kml_file.write(convert_to_kml(combineGeoJsonObj))
-                except Exception as err:
-                    logging.error("Problem writing output file: %s", output_filepath_kml)
-                    logging.debug(str(err))
+                if not parsed_args.geojson_only:
+                    output_filepath_kml = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.kml")
+                    logging.info("Saving file: %s", output_filepath_kml)
+                    try:
+                        with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
+                            kml_file.write(convert_to_kml(combineGeoJsonObj))
+                    except Exception as err:
+                        logging.error("Problem writing output file: %s", output_filepath_kml)
+                        logging.debug(str(err))
 
-                output_results = set_owner_group_permissions(warehouseUser, output_filepath_kml)
-                if not output_results['verdict']:
-                    logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath_kml, output_results['reason'])
+                    output_results = set_owner_group_permissions(warehouseUser, output_filepath_kml)
+                    if not output_results['verdict']:
+                        logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath_kml, output_results['reason'])
 
             # No need to proceed to another collectionSystem
             break

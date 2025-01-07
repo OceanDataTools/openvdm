@@ -22,6 +22,9 @@
 # produce the desired result.  Bug reports, and even better, bug
 # fixes, will be greatly appreciated.
 
+# set -o nounset
+# set -o errexit
+# set -o pipefail
 
 PREFERENCES_FILE='.install_openvdm_preferences'
 
@@ -78,9 +81,13 @@ function set_default_variables {
 
     DEFAULT_OPENVDM_USER=survey
 
+    DEFAULT_INSTALL_MAPPROXY=no
+
+    DEFAULT_INSTALL_PUBLICDATA=yes
+    DEFAULT_INSTALL_VISITORINFORMATION=no
+
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
-    DEFAULT_SUPERVISORD_WEBINTERFACE_PORT=9001
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e $PREFERENCES_FILE ]; then
@@ -101,18 +108,21 @@ function save_default_variables {
 DEFAULT_HOSTNAME=$HOSTNAME
 DEFAULT_INSTALL_ROOT=$INSTALL_ROOT
 
-DEFAULT_DATA_ROOT=$DATA_ROOT
-
 DEFAULT_OPENVDM_REPO=$OPENVDM_REPO
 DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
+
+DEFAULT_DATA_ROOT=$DATA_ROOT
 DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
 
+DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
+
+DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
+DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
+
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
-DEFAULT_SUPERVISORD_WEBINTERFACE_PORT=$SUPERVISORD_WEBINTERFACE_PORT
-
 EOF
 }
 
@@ -159,6 +169,8 @@ function create_user {
 # Install and configure required packages
 function install_packages {
 
+    startingDir=${PWD}
+
     yum install -y epel-release
     yum -y update --nobest
 
@@ -182,9 +194,15 @@ function install_packages {
 
     pip3 install Pillow MapProxy
 
-    npm install -g bower
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    
+        yum -y install gdal-bin libgeos-dev libgdal-dev proj-bin \
+            python3-pyproj
+        
+        pip3 install MapProxy --quiet
+    fi
 
-    startingDir=${PWD}
+    npm install --quiet -g bower
 
     cd ~
     curl -sS https://getcomposer.org/installer | php
@@ -206,11 +224,9 @@ function install_python_packages {
     python -m venv $VENV_PATH
     source $VENV_PATH/bin/activate  # activate virtual environment
 
-    pip install \
-      --trusted-host pypi.org --trusted-host files.pythonhosted.org \
-      --upgrade pip
-    pip install wheel  # To help with the rest of the installations
-
+    pip install --trusted-host pypi.org \
+      --trusted-host files.pythonhosted.org --upgrade pip --quiet
+    pip install wheel --quiet # To help with the rest of the installations
 
     sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
     pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
@@ -486,6 +502,10 @@ EOF
   directory mask = 0755
   veto files = /._*/.DS_Store/.Trashes*/
   delete veto files = yes
+EOF
+
+if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
+    cat >> /etc/samba/openvdm.conf <<EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
@@ -499,6 +519,11 @@ EOF
   directory mask = 0755
   veto files = /._*/.DS_Store/.Trashes*/
   delete veto files = yes
+EOF
+fi
+
+if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+    cat >> /etc/samba/openvdm.conf <<EOF
 
 [PublicData]
   comment=Public Data, read/write access to all
@@ -514,6 +539,7 @@ EOF
   force create mode = 666
   force directory mode = 777
 EOF
+fi
 
     echo "Updating firewall rules for samba"
 
@@ -561,6 +587,10 @@ function configure_apache {
     <Directory "/var/www/openvdm">
       AllowOverride all
     </Directory>
+EOF
+
+if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 
     WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
 
@@ -568,6 +598,10 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
+EOF
+fi
+
+cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 
     Alias /CruiseData/ $DATA_ROOT/CruiseData/
     <Directory "$DATA_ROOT/CruiseData">
@@ -577,7 +611,11 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
-  
+EOF
+
+if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+    cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
+
     Alias /PublicData/ $DATA_ROOT/PublicData/
     <Directory "$DATA_ROOT/PublicData">
       AllowOverride None
@@ -586,6 +624,11 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
+EOF
+fi
+
+if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
+    cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 
     Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
     <Directory "$DATA_ROOT/VisitorInformation">
@@ -595,6 +638,10 @@ function configure_apache {
       Allow from all
       Require all granted
     </Directory>
+EOF
+fi
+
+cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 
 </VirtualHost>
 EOF
@@ -608,8 +655,10 @@ EOF
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}
     chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
 
-    chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
-    chcon -R -t httpd_sys_rw_content_t /var/www/mapproxy/cache_data
+    if [ $INSTALL_MAPPROXY == 'yes' ]; then
+        chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /var/www/mapproxy
+        chcon -R -t httpd_sys_rw_content_t /var/www/mapproxy/cache_data
+    fi
 
     setsebool httpd_tmp_exec on
     setsebool -P httpd_can_network_connect=1
@@ -624,118 +673,8 @@ EOF
 ###########################################################################
 ###########################################################################
 # Install and configure database
-function configure_mysql {
-    # Expect the following shell variables to be appropriately set:
-    # OPENVDM_USER - valid userid
-    # OPENVDM_DATABASE_PASSWORD - current OpenVDM user MySQL database password
-    # NEW_ROOT_DATABASE_PASSWORD - new root password to use for MySQL
-    # CURRENT_ROOT_DATABASE_PASSWORD - current root password for MySQL
-
-    echo "Enabling MySQL Database Server"
-
-    systemctl enable mysqld    # to make it start on boot
-    systemctl start mysqld     # to manually start db server
-
-    echo "Setting up database root user and permissions"
-    # Verify current root password for mysql
-    while true; do
-        # Check whether they're right about the current password; need
-        # a special case if the password is empty.
-        PASS=TRUE
-        [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root  < /dev/null) || PASS=FALSE
-        [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /dev/null) || PASS=FALSE
-        case $PASS in
-            TRUE ) break;;
-            * ) echo "Database root password failed";read -p "Current database password for root? (if one exists - hit return if not) " CURRENT_ROOT_DATABASE_PASSWORD;;
-        esac
-    done
-
-    # Set the new root password
-    cat > /tmp/set_pwd <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$NEW_ROOT_DATABASE_PASSWORD';
-FLUSH PRIVILEGES;
-EOF
-
-    # If there's a current root password
-    [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /tmp/set_pwd
-
-    # If there's no current root password
-    [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
-    rm -f /tmp/set_pwd
-
-    echo "Setting up OpenVDM database user"
-    mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
-drop user if exists '$OPENVDM_USER'@'localhost';
-create user '$OPENVDM_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$OPENVDM_DATABASE_PASSWORD';
-flush privileges;
-\q
-EOF
-    echo "Done setting up MySQL"
-}
-
-###########################################################################
-###########################################################################
-# Create the various directories needed for the install
-function configure_directories {
-
-    if [ ! -d $DATA_ROOT ]; then
-        while true; do
-            read -p "Root data directory ${DATA_ROOT} does not exists... create it? (yes) " yn
-            case $yn in
-                [Yy]* )
-                    break;;
-                "" )
-                    break;;
-                [Nn]* )
-                    echo "Quitting"
-                    exit_gracefully;;
-                * ) echo "Please answer yes or no.";;
-            esac
-        done
-    fi
-
-    if [ ! -d $DATA_ROOT/CruiseData ]; then
-        echo "Creating initial data directory structure starting at: $DATA_ROOT"
-
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
-
-        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
-    fi
-    
-    if [ ! -d $DATA_ROOT/PublicData ]; then
-        echo "Creating PublicData at: $DATA_ROOT"
-        
-        mkdir -p ${DATA_ROOT}/PublicData
-        chmod -R 777 ${DATA_ROOT}/PublicData
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/PublicData
-    fi
-
-    if [ ! -d $DATA_ROOT/VisitorInformation ]; then
-        echo "Creating VisitorInformation at: $DATA_ROOT"
-        
-        mkdir -p ${DATA_ROOT}/VisitorInformation
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/VisitorInformation
-    fi
-
-    if [ ! -d  /var/log/openvdm ]; then
-        echo "Creating logfile directory"
-        mkdir -p /var/log/openvdm
-    fi
-
-}
-
-
-###########################################################################
-###########################################################################
-# Install and configure database
 function configure_mapproxy {
-    
+
     startingDir=${PWD}
 
     cd ~
@@ -816,8 +755,98 @@ EOF
 
     # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
     cd ${startingDir}
+}
+
+###########################################################################
+###########################################################################
+# Install and configure database
+function configure_mysql {
+    # Expect the following shell variables to be appropriately set:
+    # OPENVDM_USER - valid userid
+    # OPENVDM_DATABASE_PASSWORD - current OpenVDM user MySQL database password
+    # NEW_ROOT_DATABASE_PASSWORD - new root password to use for MySQL
+    # CURRENT_ROOT_DATABASE_PASSWORD - current root password for MySQL
+
+    echo "Enabling MySQL Database Server"
+
+    systemctl enable mysqld    # to make it start on boot
+    systemctl start mysqld     # to manually start db server
+
+    echo "Setting up database root user and permissions"
+    # Verify current root password for mysql
+    while true; do
+        # Check whether they're right about the current password; need
+        # a special case if the password is empty.
+        PASS=TRUE
+        [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root  < /dev/null) || PASS=FALSE
+        [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || (mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /dev/null) || PASS=FALSE
+        case $PASS in
+            TRUE ) break;;
+            * ) echo "Database root password failed";read -p "Current database password for root? (if one exists - hit return if not) " CURRENT_ROOT_DATABASE_PASSWORD;;
+        esac
+    done
+
+    # Set the new root password
+    cat > /tmp/set_pwd <<EOF
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$NEW_ROOT_DATABASE_PASSWORD';
+FLUSH PRIVILEGES;
+EOF
+
+    # If there's a current root password
+    [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /tmp/set_pwd
+
+    # If there's no current root password
+    [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
+    rm -f /tmp/set_pwd
+
+    echo "Setting up OpenVDM database user"
+    mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
+drop user if exists '$OPENVDM_USER'@'localhost';
+create user '$OPENVDM_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$OPENVDM_DATABASE_PASSWORD';
+flush privileges;
+\q
+EOF
+    echo "Done setting up MySQL"
+}
+
+###########################################################################
+###########################################################################
+# Create the various directories needed for the install
+function configure_directories {
+
+    if [ ! -d $DATA_ROOT ]; then
+        echo "Creating initial data directory structure starting at: $DATA_ROOT"
+
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
+        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
+
+        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
+        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
+        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
+
+        if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+            mkdir -p ${DATA_ROOT}/PublicData
+            chmod -R 777 ${DATA_ROOT}/PublicData
+        fi
+
+        if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
+            mkdir -p ${DATA_ROOT}/VisitorInformation
+        fi
+
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
+    fi
+
+    if [ ! -d  /var/log/openvdm ]; then
+        echo "Creating logfile directory"
+        mkdir -p /var/log/openvdm
+    fi
 
 }
+
+
 
 ###########################################################################
 ###########################################################################
@@ -865,22 +894,22 @@ function install_openvdm {
         echo "Downloading OpenVDM repository"
         cd $INSTALL_ROOT
         git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
-        chown ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
 
     else
         cd ${INSTALL_ROOT}/openvdm
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            git pull
-            git checkout $OPENVDM_BRANCH
-            git pull
+            sudo -u ${OPENVDM_USER} git pull
+            sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH
+            sudo -u ${OPENVDM_USER} git pull
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
             cd ..
             rm -rf openvdm
-            git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
+            sudo -u ${OPENVDM_USER} git clone -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
         fi
     fi
 
@@ -895,10 +924,25 @@ flush privileges;
 EOF
 
     else
-        echo "Setup OpenVDM database"
+        echo "Creating OpenVDM database"
         sed -e "s/survey/${OPENVDM_USER}/" ${INSTALL_ROOT}/openvdm/database/openvdm_db.sql | \
         sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+
+        if [ $INSTALL_PUBLICDATA == 'no' ]; then
+            sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql 
+        fi
+
+        if [ $INSTALL_VISITORINFORMATION == 'no' ]; then
+            sed -i -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+        fi
+
+        hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
+    cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF 
+
+INSERT INTO OVDM_Users (username, password)
+VALUES ('${OPENVDM_USER}', '${hashed_password}');
+EOF
 
         mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 create database if not exists openvdm character set utf8;
@@ -945,7 +989,13 @@ EOF
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
-        cat ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | sed -e "s/127.0.0.1/${HOSTNAME}/" > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+        sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+
+        if [ $INSTALL_PUBLICDATA == 'no' ]; then
+            sed -i -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+        fi
+
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
     fi
 
     cd ${startingDir}
@@ -968,7 +1018,6 @@ fi
 
 echo "#####################################################################"
 echo "OpenVDM configuration script"
-
 echo "#####################################################################"
 read -p "Name to assign to host ($DEFAULT_HOSTNAME)? " HOSTNAME
 HOSTNAME=${HOSTNAME:-$DEFAULT_HOSTNAME}
@@ -977,23 +1026,26 @@ echo "Hostname will be '$HOSTNAME'"
 set_hostname $HOSTNAME
 echo
 
-read -p "OpenVDM install root? ($DEFAULT_INSTALL_ROOT) " INSTALL_ROOT
+read -p "OpenVDM install root directory? ($DEFAULT_INSTALL_ROOT) " INSTALL_ROOT
 INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
-echo "Install root will be '$INSTALL_ROOT'"
-echo
 
 read -p "Repository to install from? ($DEFAULT_OPENVDM_REPO) " OPENVDM_REPO
 OPENVDM_REPO=${OPENVDM_REPO:-$DEFAULT_OPENVDM_REPO}
 
 read -p "Repository branch to install? ($DEFAULT_OPENVDM_BRANCH) " OPENVDM_BRANCH
 OPENVDM_BRANCH=${OPENVDM_BRANCH:-$DEFAULT_OPENVDM_BRANCH}
-
-read -p "IP Address or URL users will access OpenVDM from? ($DEFAULT_OPENVDM_SITEROOT) " OPENVDM_SITEROOT
-OPENVDM_SITEROOT=${OPENVDM_SITEROOT:-$DEFAULT_OPENVDM_SITEROOT}
+echo
 
 echo "Will install from github.com"
 echo "Repository: '$OPENVDM_REPO'"
 echo "Branch: '$OPENVDM_BRANCH'"
+echo "Access URL: 'http://$OPENVDM_SITEROOT'"
+echo
+
+echo "#####################################################################"
+read -p "IP Address or URL users will access OpenVDM from? ($DEFAULT_OPENVDM_SITEROOT) " OPENVDM_SITEROOT
+OPENVDM_SITEROOT=${OPENVDM_SITEROOT:-$DEFAULT_OPENVDM_SITEROOT}
+echo
 echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
@@ -1002,26 +1054,47 @@ echo "#####################################################################"
 read -p "OpenVDM user to create? ($DEFAULT_OPENVDM_USER) " OPENVDM_USER
 OPENVDM_USER=${OPENVDM_USER:-$DEFAULT_OPENVDM_USER}
 create_user $OPENVDM_USER
-
 echo
-read -p "OpenVDM Database password to use for user $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
-OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$OPENVDM_USER}
 
-echo "Will install/configure MySQL"
-# Get current and new passwords for database
+echo "#####################################################################"
+echo "Gathing information for MySQL installation/configuration"
 echo "Root database password will be empty on initial installation. If this"
 echo "is the initial installation, hit "return" when prompted for root"
 echo "database password, otherwise enter the password you used during the"
 echo "initial installation."
 echo
-echo "Current database password for root \(hit return if this is the"
+echo "Current root user password for MySQL (hit return if this is the"
 read -p "initial installation)? " CURRENT_ROOT_DATABASE_PASSWORD
-read -p "New database password for root? ($CURRENT_ROOT_DATABASE_PASSWORD) " NEW_ROOT_DATABASE_PASSWORD
+read -p "New/updated root user password for MySQL? ($CURRENT_ROOT_DATABASE_PASSWORD) " NEW_ROOT_DATABASE_PASSWORD
 NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_PASSWORD}
+echo
 
+read -p "New password for MySQL user: $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
+OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$OPENVDM_USER}
+echo
+
+echo "#####################################################################"
+echo "Gathering information on where OpenVDM should store cruise data files"
+echo "The root data directory needs to be large enough to store at least a"
+echo "single cruise worth of data but ideally should be large enougn to"
+echo "hold several cruises worth of data."
+echo
+echo "It is recommended that the root data directory be located on a"
+echo "mounted volume that is independent of the volume used for the"
+echo "operating system. This simplifies disaster recovery and system"
+echo "updates"
+echo
 read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
 DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
 
+if [ ! -d $DATA_ROOT ]; then
+    yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
+    
+    if [ $YES_NO_RESULT == "no" ]; then
+        exit
+    fi
+fi
+echo
 
 #########################################################################
 # Enable Supervisor web-interface?
@@ -1035,9 +1108,7 @@ SUPERVISORD_WEBINTERFACE=$YES_NO_RESULT
 
 if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 
-    echo Would you like to enable a password on the supervisord web-interface?
-    echo
-    yes_no "Enable Supervisor Web-interface user/pass? " $DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH
+    yes_no "Enable user/pass on Supervisor Web-interface? " $DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH
     SUPERVISORD_WEBINTERFACE_AUTH=$YES_NO_RESULT
 
     if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
@@ -1047,10 +1118,44 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
 
         read -p "Password? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_PASS
         SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_USER}
-
     fi
 fi
+echo
 
+#########################################################################
+# Install MapProxy?
+echo "#####################################################################"
+echo "Optionally install: MapProxy"
+echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
+echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
+echo
+yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
+INSTALL_MAPPROXY=$YES_NO_RESULT
+echo
+
+#########################################################################
+# Install PublicData?
+echo "#####################################################################"
+echo "Setup a PublicData SMB Share for scientists and crew to share files,"
+echo "pictures, etc. These files will be copied to the cruise data "
+echo "directory at the end of the cruise. This behavior can be disabled in"
+echo "the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
+echo
+yes_no "Setup PublicData Share? " $DEFAULT_INSTALL_PUBLICDATA
+INSTALL_PUBLICDATA=$YES_NO_RESULT
+echo
+
+#########################################################################
+# Install VisitorInformation?
+echo "#####################################################################"
+echo "Setup a VistorInformation SMB Share for sharing documentation, print"
+echo "drivers, etc with crew and scientists."
+echo
+yes_no "Setup VisitorInformation Share? " $DEFAULT_INSTALL_VISITORINFORMATION
+INSTALL_VISITORINFORMATION=$YES_NO_RESULT
+echo
+
+#########################################################################
 #########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
@@ -1093,9 +1198,11 @@ echo "#####################################################################"
 echo "Installing additional python libraries"
 install_python_packages
 
-echo "#####################################################################"
-echo "Installing/Configuring MapProxy"
-configure_mapproxy
+if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    echo "#####################################################################"
+    echo "Installing/Configuring MapProxy"
+    configure_mapproxy
+fi
 
 echo "#####################################################################"
 echo "Configuring Apache2"
@@ -1104,6 +1211,13 @@ configure_apache
 echo "#####################################################################"
 echo "Configuring Supervisor"
 configure_supervisor
+
+echo "#####################################################################"
+echo "OpenVDM Installation: Complete"
+echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
+echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
+echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+echo
 
 #########################################################################
 #########################################################################

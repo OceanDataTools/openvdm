@@ -67,7 +67,7 @@ hooks:
 
 # The postHookCommands section contains any additional commands that should be performed
 # after the successful completion of the primary OpenVDM Gearman task.  Any subsequent
-# tasks called with be called as background Gearman tasks so to not interfer with
+# tasks called with be called as background Gearman tasks so to not interfere with
 # OpenVDM's primary operation.
 postHookCommands:
     postCollectionSystemTransfer:
@@ -77,7 +77,7 @@ postHookCommands:
         #    command:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/r2r_nav_manager.py
-        #    - SCS
+        #    - OpenRVDAS
     postDataDashboard:
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
@@ -93,6 +93,11 @@ postHookCommands:
         #  - /opt/openvdm/venv/bin/python
         #  - /opt/openvdm/bin/build_remote_directory.py
         #  - "-s"
+        #- name: "Build new OpenRVDAS config file"
+        #  command:
+        #  - ssh
+        #  - survey@192.168.0.21
+        #  - "bash /opt/odt-configs/openrvdas/bin/build_openrvdas_config.sh"
     postSetupNewLowering:
         #commandList:
         #- name: "Setup Remote Lowering Directories"
@@ -103,13 +108,15 @@ postHookCommands:
         #  - "-l"
     postFinalizeCurrentCruise:
         #commandList:
-        #- name: "Export Sealog Vessel Data"
+        #- name: "Export Sealog data for current cruise"
         #  command:
-        #  - /opt/sealog-server-vessel/venv/bin/python
-        #  - /opt/sealog-server-vessel/misc/sealog_vessel_data_export.py
+        #  - ssh
+        #  - survey@192.168.0.22
+        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
     postFinalizeCurrentLowering:
         #commandList:
-        #- name: "Export Sealog Vessel Data"
+        #- name: "Export Sealog data for current lowering"
         #  command:
-        #  - /opt/sealog-server-vehicle/venv/bin/python
-        #  - /opt/sealog-server-vehicle/misc/sealog_vehicle_data_export.py
+        #  - ssh
+        #  - survey@192.168.0.22
+        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"

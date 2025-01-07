@@ -539,7 +539,9 @@ fi
     systemctl restart smbd.service
 }
 
-
+###########################################################################
+###########################################################################
+# Setup Apache
 function configure_apache {
 
     echo "Building new vhost file"
@@ -798,7 +800,9 @@ EOF
 
 }
 
-
+###########################################################################
+###########################################################################
+# Create the various directories needed for the install
 function configure_directories {
 
     if [ ! -d $DATA_ROOT ]; then
