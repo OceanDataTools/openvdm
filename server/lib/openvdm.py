@@ -25,6 +25,8 @@ from server.lib import read_config
 
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
+TIMEOUT = 5
+
 class OpenVDM():
     """
     Class is a python wrapper around the OpenVDM API
@@ -43,7 +45,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/gearman/clearAllJobsFromDB'
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to clear Gearman Jobs from OpenVDM API")
             raise err
@@ -82,7 +84,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getShowLoweringComponents'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return req.text == 'true'
         except Exception as err:
             logging.error("Unable to retrieve 'showLoweringComponents' flag from OpenVDM API")
@@ -97,7 +99,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfig'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
@@ -114,7 +116,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfig'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
@@ -156,7 +158,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getMD5FilesizeLimit'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['md5FilesizeLimit']
         except Exception as err:
@@ -172,7 +174,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getMD5FilesizeLimitStatus'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['md5FilesizeLimitStatus']
         except Exception as err:
@@ -188,7 +190,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryFn'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['md5SummaryFn']
         except Exception as err:
@@ -204,7 +206,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryMD5Fn'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['md5SummaryMd5Fn']
         except Exception as err:
@@ -221,8 +223,8 @@ class OpenVDM():
             self.config['hooks'][hook_name]
         except KeyError:
             return []
-        else:
-            return self.config['hooks'][hook_name]
+
+        return self.config['hooks'][hook_name]
 
 
     def get_transfer_interval(self):
@@ -241,7 +243,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseID'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['cruiseID']
         except Exception as err:
@@ -257,7 +259,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseSize'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -273,7 +275,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseStartDate'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['cruiseStartDate']
         except Exception as err:
@@ -289,7 +291,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseEndDate'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['cruiseEndDate']
         except Exception as err:
@@ -305,7 +307,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfigFn'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['cruiseConfigFn']
         except Exception as err:
@@ -321,7 +323,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getCruises'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -337,7 +339,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringID'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['loweringID'] if return_obj['loweringID'] != '' else None
         except Exception as err:
@@ -353,7 +355,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringSize'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -369,7 +371,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringStartDate'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['loweringStartDate']
         except Exception as err:
@@ -385,7 +387,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringEndDate'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['loweringEndDate']
         except Exception as err:
@@ -401,7 +403,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfigFn'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['loweringConfigFn']
         except Exception as err:
@@ -417,7 +419,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getLowerings'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -433,7 +435,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectory/' + extra_directory_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj[0] if len(return_obj) > 0 else None
         except Exception as err:
@@ -458,7 +460,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectories'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -474,7 +476,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/extraDirectories/getActiveExtraDirectories'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
                 return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "0", return_obj))
@@ -494,7 +496,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj[0]
         except Exception as err:
@@ -519,7 +521,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectories'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -535,7 +537,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getShipboardDataWarehouseConfig'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -551,7 +553,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getShipToShoreBWLimitStatus'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['shipToShoreBWLimitStatus'] == "On"
         except Exception as err:
@@ -567,7 +569,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfer/' + ship_to_shore_transfer_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)[0]
         except Exception as err:
             logging.error("Unable to retrieve ship-to-shore transfer: %s from OpenVDM API", ship_to_shore_transfer_id)
@@ -582,7 +584,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as err:
             logging.error("Unable to retrieve ship-to-shore transfers from OpenVDM API")
@@ -597,7 +599,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getRequiredShipToShoreTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as err:
             logging.error("Unable to retrieve required ship-to-shore transfers from OpenVDM API")
@@ -612,7 +614,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getSystemStatus'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['systemStatus']
         except Exception as err:
@@ -628,7 +630,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/getTasks'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -644,7 +646,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/getActiveTasks'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -660,7 +662,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/getTask/' + task_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             task = json.loads(req.text)
             return task[0] if len(task) > 0 else None
         except Exception as err:
@@ -676,7 +678,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/getTasks'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             tasks = json.loads(req.text)
             task = list(filter(lambda task: task['name'] == task_name, tasks))
             return task[0] if len(task) > 0 else None
@@ -693,7 +695,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -709,7 +711,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
                 return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "0", return_obj))
@@ -729,7 +731,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj[0] if len(return_obj) > 0 else False
         except Exception as err:
@@ -754,7 +756,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getCruiseDataTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -770,7 +772,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfers'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj
         except Exception as err:
@@ -786,7 +788,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getCruiseDataTransfer/' + cruise_data_transfer_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj[0]
         except Exception as err:
@@ -802,7 +804,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfer/' + cruise_data_transfer_id
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj[0]
         except Exception as err:
@@ -836,7 +838,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
 
         try:
-            req = requests.get(url)
+            req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj['dataDashboardManifestFn']
         except Exception as err:
@@ -853,7 +855,7 @@ class OpenVDM():
 
         try:
             payload = {'messageTitle': message_title, 'messageBody':message_body}
-            req = requests.post(url, data=payload)
+            req = requests.post(url, data=payload, timeout=TIMEOUT)
             return req.text
         except Exception as err:
             logging.error("Unable to send message: \"%s: %s\" with OpenVDM API", message_title, message_body)
@@ -870,7 +872,7 @@ class OpenVDM():
             url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setIdleCollectionSystemTransfer/' + collection_system_transfer_id
 
             try:
-                requests.get(url)
+                requests.get(url, timeout=TIMEOUT)
             except Exception as err:
                 logging.error("Unable to clear error status for collection system transfer: %s with OpenVDM API", collection_system_transfer_id)
                 raise err
@@ -887,7 +889,7 @@ class OpenVDM():
 
             logging.info("Clear Error")
             try:
-                requests.get(url)
+                requests.get(url, timeout=TIMEOUT)
             except Exception as err:
                 logging.error("Unable to clear error status for cruise data transfer: %s with OpenVDM API", cruise_data_transfer_id)
                 raise err
@@ -913,7 +915,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
             collection_system_transfer_name = self.get_collection_system_transfer(collection_system_transfer_id)['name']
             title = collection_system_transfer_name + ' Data Transfer failed'
             self.send_msg(title, reason)
@@ -931,7 +933,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
             collection_system_transfer_name = self.get_collection_system_transfer(collection_system_transfer_id)['name']
             title = collection_system_transfer_name + ' Connection test failed'
             self.send_msg(title, reason)
@@ -949,7 +951,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
             cruise_data_transfer_name = self.get_cruise_data_transfer(cruise_data_transfer_id)['name']
             title = cruise_data_transfer_name + ' Data Transfer failed'
             self.send_msg(title, reason)
@@ -968,7 +970,7 @@ class OpenVDM():
 
         logging.info("Set Error")
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
             cruise_data_transfer_name = self.get_cruise_data_transfer(cruise_data_transfer_id)['name']
             title = cruise_data_transfer_name + ' Connection test failed'
             self.send_msg(title, reason)
@@ -986,7 +988,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/setErrorTask/' + task_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
             task_name = self.get_task(task_id)['longName']
             title = task_name + ' failed'
             self.send_msg(title, reason)
@@ -1004,7 +1006,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setIdleCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to set collection system transfer: %s to idle with OpenVDM API", collection_system_transfer_id)
             raise err
@@ -1020,7 +1022,7 @@ class OpenVDM():
 
         logging.info("Set Idle")
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to set cruise data transfer: %s to idle with OpenVDM API", cruise_data_transfer_id)
             raise err
@@ -1035,7 +1037,7 @@ class OpenVDM():
         url = self.config['siteRoot'] + 'api/tasks/setIdleTask/' + task_id
 
         try:
-            requests.get(url)
+            requests.get(url, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to set task: %s to idle with OpenVDM API", task_id)
             raise err
@@ -1051,7 +1053,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
 
             # Add to gearman job tracker
             self.track_gearman_job('Transfer for ' + collection_system_transfer_name, job_pid, job_handle)
@@ -1082,7 +1084,7 @@ class OpenVDM():
 
         logging.info("Set Running")
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
 
             # Add to gearman job tracker
             self.track_gearman_job('Transfer for ' + cruise_data_transfer_name, job_pid, job_handle)
@@ -1114,7 +1116,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
 
             # Add to gearman job tracker
             self.track_gearman_job(task_name, job_pid, job_handle)
@@ -1133,7 +1135,7 @@ class OpenVDM():
         payload = {'jobName': job_name, 'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to add new gearman task tracking with OpenVDM API, Task: %s", job_name)
             raise err
@@ -1149,7 +1151,7 @@ class OpenVDM():
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to set cruise size with OpenVDM API")
             raise err
@@ -1165,7 +1167,7 @@ class OpenVDM():
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload)
+            requests.post(url, data=payload, timeout=TIMEOUT)
         except Exception as err:
             logging.error("Unable to set lowering size with OpenVDM API")
             raise err

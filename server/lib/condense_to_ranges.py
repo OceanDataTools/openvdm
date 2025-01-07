@@ -1,4 +1,13 @@
+#!/usr/bin/env python3
+"""Utilities for condensing file parsing error messages
+"""
+
 def condense_to_ranges(integers):
+    """
+    Function to reduce array of consecutive numbers to ranges. This helps
+    condense message bodies related to file parsing errors. 
+    """
+
     ranges = []
     start = None
     prev = None
@@ -17,7 +26,7 @@ def condense_to_ranges(integers):
             ranges.append(f"{start}-{prev}")
             start = num
             prev = num
-    
+
     # Add the last range
     if start is not None:
         ranges.append(f"{start}-{prev}")

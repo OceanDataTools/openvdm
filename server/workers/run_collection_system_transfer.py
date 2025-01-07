@@ -296,16 +296,16 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
 
     filters = build_filters(gearman_worker)
 
-    isDarwin = False
+    is_darwin = False
     proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
-        isDarwin = (line.rstrip('\n') == 'Darwin' )
-        if isDarwin:
+        is_darwin = line.rstrip('\n') == 'Darwin'
+        if is_darwin:
             break
 
     command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
 
-    if not isDarwin:
+    if not is_darwin:
         command.insert(2, '--protect-args')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
@@ -767,16 +767,16 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
-    isDarwin = False
+    is_darwin = False
     proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
-        isDarwin = (line.rstrip('\n') == 'Darwin' )
-        if isDarwin:
+        is_darwin = line.rstrip('\n') == 'Darwin'
+        if is_darwin:
             break
 
     command = ['rsync', '-tri', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
 
-    if not isDarwin:
+    if not is_darwin:
         command.insert(2, '--protect-args')
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
@@ -969,7 +969,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if self.collection_system_transfer:
             if len(results_obj['parts']) > 0:
                 if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                        self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
+                    self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
                 elif results_obj['parts'][-1]['result'] == "Pass":
                     self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
             else:
