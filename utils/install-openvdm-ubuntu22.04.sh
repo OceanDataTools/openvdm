@@ -73,7 +73,8 @@ function set_default_variables {
     DEFAULT_HOSTNAME=$HOSTNAME
     DEFAULT_INSTALL_ROOT=/opt
 
-    DEFAULT_DATA_ROOT=/data
+    DEFAULT_CRUSIEDATA_ROOT=/mnt/CruiseData
+    DEFAULT_OTHERSHARE_ROOT=/mnt/CruiseSandbox
 
     DEFAULT_OPENVDM_REPO=https://github.com/schmidtocean/openvdm
     DEFAULT_OPENVDM_BRANCH=master-FKt
@@ -111,7 +112,9 @@ DEFAULT_INSTALL_ROOT=$INSTALL_ROOT
 DEFAULT_OPENVDM_REPO=$OPENVDM_REPO
 DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
 
-DEFAULT_DATA_ROOT=$DATA_ROOT
+DEFAULT_CRUISEDATA_ROOT=$CRUISEDATA_ROOT
+DEFAULT_OTHERSHARE_ROOT=$OTHERSHARE_ROOT
+
 DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
@@ -522,7 +525,7 @@ EOF
 
 [CruiseData]
   comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/CruiseData
+  path=${CRUISEDATA_ROOT}
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -540,7 +543,7 @@ if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
-  path=${DATA_ROOT}/VisitorInformation
+  path=${OTHERSHARE_ROOT}/VisitorInformation
   browsable = yes
   public = yes
   guest ok = yes
@@ -558,7 +561,7 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
 
 [ParticipantData]
   comment=Participant Data, read/write access to all
-  path=${DATA_ROOT}/ParticipantData
+  path=${OTHERSHARE_ROOT}/ParticipantData
   browseable = yes
   public = yes
   guest ok = yes
@@ -623,8 +626,8 @@ fi
 
 cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
-    Alias /CruiseData/ $DATA_ROOT/CruiseData/
-    <Directory "$DATA_ROOT/CruiseData">
+    Alias /CruiseData/ $CRUISEDATA_ROOT/
+    <Directory "$CRUISEDATA_ROOT">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -636,8 +639,8 @@ EOF
 if [ $INSTALL_PUBLICDATA == 'yes' ]; then
     cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
-    Alias /PublicData/ $DATA_ROOT/PublicData/
-    <Directory "$DATA_ROOT/PublicData">
+    Alias /ParticipantData/ $OTHERSHARE_ROOT/ParticipantData/
+    <Directory "$OTHERSHARE_ROOT/ParticipantData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -650,8 +653,8 @@ fi
 if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
     cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
-    Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
-    <Directory "$DATA_ROOT/VisitorInformation">
+    Alias /VisitorInformation/ $OTHERSHARE_ROOT/VisitorInformation/
+    <Directory "$OTHERSHARE_ROOT/VisitorInformation">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -841,29 +844,31 @@ EOF
 # Create the various directories needed for the install
 function configure_directories {
 
-    if [ ! -d $DATA_ROOT ]; then
-        echo "Creating data directory structure starting at: $DATA_ROOT"
+    if [ ! -d $CRUISEDATA_ROOT ]; then
+        echo "Creating cruise data directory structure starting at: $CRUISEDATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/Vehicle/S9999
-        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/TransferLogs
+        mkdir -p ${CRUISEDATA_ROOT}/FKt990101/Vehicle/S9999
+        mkdir -p ${CRUISEDATA_ROOT}/FKt990101/OpenVDM/DashboardData
+        mkdir -p ${CRUISEDATA_ROOT}/FKt990101/OpenVDM/TransferLogs
 
-        echo "[]" > ${DATA_ROOT}/CruiseData/FKt990101/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/FKt990101/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/FKt990101/Vehicle/S9999/loweringConfig.json
-        touch ${DATA_ROOT}/CruiseData/FKt990101/MD5_Summary.md5
-        touch ${DATA_ROOT}/CruiseData/FKt990101/MD5_Summary.txt
+        echo "[]" > ${CRUISEDATA_ROOT}/FKt990101/OpenVDM/DashboardData/manifest.json
+        echo "{}" > ${CRUISEDATA_ROOT}/FKt990101/ovdmConfig.json
+        echo "{}" > ${CRUISEDATA_ROOT}/FKt990101/Vehicle/S9999/loweringConfig.json
+        touch ${CRUISEDATA_ROOT}/FKt990101/MD5_Summary.md5
+        touch ${CRUISEDATA_ROOT}/FKt990101/MD5_Summary.txt
 
         if [ $INSTALL_PUBLICDATA == 'yes' ]; then
-            mkdir -p ${DATA_ROOT}/ParticipantData
-            chmod -R 777 ${DATA_ROOT}/ParticipantData
+            echo "Creating ParticipantData directory at: $OTHERSHARE_ROOT"
+            mkdir -p ${OTHERSHARE_ROOT}/ParticipantData
+            chmod -R 777 ${OTHERSHARE_ROOT}/ParticipantData
         fi
 
         if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
-            mkdir -p ${DATA_ROOT}/VisitorInformation
+            echo "Creating VisitorInformation directory at: $OTHERSHARE_ROOT"
+            mkdir -p ${OTHERSHARE_ROOT}/VisitorInformation
         fi
 
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
+        chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${OTHERSHARE_ROOT}/*
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
@@ -910,7 +915,7 @@ function setup_ssh {
 # Install OpenVDM
 function install_openvdm {
     # Expect the following shell variables to be appropriately set:
-    # DATA_ROOT - path where data will be stored is
+    # CRUISEDATA_ROOT - path where cruise data directories will be stored
     # OPENVDM_USER - valid userid
     # OPENVDM_REPO - path to OpenVDM repo
     # OPENVDM_BRANCH - branch of rep to install
@@ -997,8 +1002,8 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
-    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${CRUISEDATA_ROOT}');|" | \
+    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${OTHERSHARE_ROOT}/ParticipantData');|" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
@@ -1115,11 +1120,23 @@ echo "mounted volume that is independent of the volume used for the"
 echo "operating system. This simplifies disaster recovery and system"
 echo "updates"
 echo
-read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
-DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
+read -p "Cruise data directory for OpenVDM? ($DEFAULT_CRUISEDATA_ROOT) " CRUISEDATA_ROOT
+CRUISEDATA_ROOT=${CRUISEDATA_ROOT:-$DEFAULT_CRUISEDATA_ROOT}
 
-if [ ! -d $DATA_ROOT ]; then
-    yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
+if [ ! -d $CRUISEDATA_ROOT ]; then
+    yes_no "Root data directory ${CRUISEDATA_ROOT} does not exists... create it? " "yes"
+    
+    if [ $YES_NO_RESULT == "no" ]; then
+        exit
+    fi
+fi
+echo
+
+read -p "Root directory for other shares? ($DEFAULT_OTHERSHARE_ROOT) " OTHERSHARE_ROOT
+OTHERSHARE_ROOT=${OTHERSHARE_ROOT:-$DEFAULT_OTHERSHARE_ROOT}
+
+if [ ! -d $OTHERSHARE_ROOT ]; then
+    yes_no "Root directory for other shares ${OTHERSHARE_ROOT} does not exists... create it? " "yes"
     
     if [ $YES_NO_RESULT == "no" ]; then
         exit
@@ -1257,7 +1274,7 @@ echo "#####################################################################"
 echo "OpenVDM Installation: Complete"
 echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
 echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
-echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+echo "Cruise Data will be stored at: ${CRUISEDATA_ROOT}"
 echo
 
 #########################################################################
