@@ -449,6 +449,11 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     run the rsync command and return the list of new/updated files
     """
 
+    # if there are no files to transfer, then don't
+    if file_count == 0:
+        logging.debug("Skipping Transfer Command: nothing to transfer")
+        return [], []
+
     logging.debug('Transfer Command: %s', ' '.join(command))
 
     dest_dir = command[-1]
