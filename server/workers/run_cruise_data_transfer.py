@@ -160,6 +160,11 @@ def run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command
     run the rsync command and return the list of new/updated files
     """
 
+    # if there are no files to transfer, then don't
+    if file_count == 0:
+        logging.debug("Skipping Transfer Command: nothing to transfer")
+        return [], []
+
     logging.debug('Transfer Command: %s', ' '.join(command))
 
     # cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
@@ -210,6 +215,11 @@ def run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, comman
     run the rsync command and return the list of new/updated files
     """
 
+    # if there are no files to transfer, then don't
+    if file_count == 0:
+        logging.debug("Skipping Transfer Command: nothing to transfer")
+        return [], []
+    
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     file_index = 0
