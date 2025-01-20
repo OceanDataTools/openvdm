@@ -86,8 +86,8 @@ class MiniSVSParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
                         
-                        # line_temperature, line_sound_velocity = line['data'].strip().split()
-                        line_sound_velocity = line['data'].strip()
+                        line_temperature, line_sound_velocity = line['data'].strip().split()
+                        # line_sound_velocity = line['data'].strip()
                         sound_velocity = float(line_sound_velocity)
 
                     except Exception as err:
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = SVPParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
+    ovdm_parser = MiniSVSParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)
