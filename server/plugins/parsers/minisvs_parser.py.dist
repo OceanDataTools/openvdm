@@ -60,7 +60,9 @@ class MiniSVSParser(OpenVDMCSVParser):
     Custom OpenVDM CSV file parser
     """
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False, temperature=False):
+
+        self.temperature = temperature
         super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
 
 
@@ -86,8 +88,12 @@ class MiniSVSParser(OpenVDMCSVParser):
                         date_time = line['date_time'] # OpenRVDAS style
                         # date_time = ' '.join([line['date'], line['time']]) # SCS style
                         
-                        line_temperature, line_sound_velocity = line['data'].strip().split()
-                        # line_sound_velocity = line['data'].strip()
+                        line_temperature = line_sound_velocity = None
+                        if self.temperature:
+                            line_temperature, line_sound_velocity = line['data'].strip().split()
+                        else:
+                            line_sound_velocity = line['data'].strip()
+                        
                         sound_velocity = float(line_sound_velocity)
 
                     except Exception as err:

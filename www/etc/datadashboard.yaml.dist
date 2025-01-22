@@ -162,7 +162,7 @@
     id: map
     heading: Position
     dataArray:
-    - dataType: dps122-gga
+    - dataType: dpsi1-gga
       visType: geoJSON
     - dataType: posmv-gga
       visType: geoJSON
@@ -214,9 +214,9 @@
       visType: json
   - plotType: chart
     id: dps122-vtg
-    heading: DPS122 - COG/SOG
+    heading: DPSi1 - COG/SOG
     dataArray:
-    - dataType: dps122-vtg
+    - dataType: dpsi1-vtg
       visType: json
   - plotType: chart
     id: posmv-vtg
