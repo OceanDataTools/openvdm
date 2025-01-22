@@ -48,8 +48,8 @@ from server.plugins.parsers.hdt_parser       import HDTParser
 from server.plugins.parsers.metpakpro_parser import MetPakProParser
 from server.plugins.parsers.minisvs_parser   import MiniSVSParser
 from server.plugins.parsers.mwd_parser       import MWDParser
-# from server.plugins.parsers.par2_parser      import PARParser as RADParser
-# from server.plugins.parsers.par_parser       import PARParser
+from server.plugins.parsers.par2_parser      import PARParser as RADParser
+from server.plugins.parsers.par_parser       import PARParser
 from server.plugins.parsers.pashr_parser     import PashrParser
 # from server.plugins.parsers.prdid_parser     import PRDIDParser
 # from server.plugins.parsers.rmc_parser       import RMCParser
@@ -86,10 +86,11 @@ fileTypeFilters = [
     # {"data_type":"gyro2-rot",        "regex": "*/" + cruiseID + "_gyro_2_rot-*.txt",     "parser": "ROT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     {"data_type":"gyro3-hdt",        "regex": "*/" + cruiseID + "_gyro_3_hdt-*.txt",      "parser": "HDT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"gyro3-rot",        "regex": "*/" + cruiseID + "_gyro_3_rot-*.txt",     "parser": "ROT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
-    {"data_type":"minisvs-aft",      "regex": "*/" + cruiseID + "_minisvs_aft-*.txt",     "parser": "MiniSVS",   'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    {"data_type":"minisvs-aft",      "regex": "*/" + cruiseID + "_minisvs_aft-*.txt",     "parser": "MiniSVS",   'parser_options':{'skip_header':True,'use_openvdm_api':True, 'temperature':True}},
     {"data_type":"minisvs-fwd",      "regex": "*/" + cruiseID + "_minisvs_fwd-*.txt",     "parser": "MiniSVS",   'parser_options':{'skip_header':True,'use_openvdm_api':True}},
-    {"data_type":"mpp-fm-aft",       "regex": "*/" + cruiseID + "_mpp_fm_aft-*.txt",      "parser": "MetPakPro", 'parser_options':{'skip_header':True,'use_openvdm_api':True}},
-    # {"data_type":"par",              "regex": "*/" + cruiseID + "_par-*.txt",             "parser": "PAR",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    {"data_type":"mpp-wh-stb",       "regex": "*/" + cruiseID + "_mpp_wh_stb-*.txt",      "parser": "MetPakPro", 'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    {"data_type":"par-fm-port",      "regex": "*/" + cruiseID + "_par_fm_port-*.txt",     "parser": "PAR",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    {"data_type":"par-fm-stb",       "regex": "*/" + cruiseID + "_par_fm_stb-*.txt",     "parser": "PAR",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     {"data_type":"posmv-gga",        "regex": "*/" + cruiseID + "_posmv_gga-*.txt",       "parser": "GGA",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"posmv-ggk",        "regex": "*/" + cruiseID + "_posmv_ggk-*.txt",       "parser": "GGK",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"posmv-gll",        "regex": "*/" + cruiseID + "_posmv_gll-*.txt",       "parser": "GLL",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
