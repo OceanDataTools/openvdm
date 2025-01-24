@@ -20,9 +20,11 @@ Download the install script
 ```
 OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
 BRANCH=master
-wget https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
-chmod +x install-openvdm-ubuntu22.04.sh
-sudo ./install-openvdm-ubuntu22.04.sh
+wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
+# Optional script for installing on Rocky/RHEL 8
+# wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-rocky8.10.sh
+chmod +x install-openvdm.sh
+sudo ./install-openvdm.sh
 ```
 
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.

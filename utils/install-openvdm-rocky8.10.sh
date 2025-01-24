@@ -3,7 +3,7 @@
 # OpenVDM is available as open source under the MIT License at
 #   https:/github.com/oceandatatools/openvdm
 #
-# This script installs and configures OpenVDM to run on Rocky 8.4.  It
+# This script installs and configures OpenVDM to run on Rocky 8.10.  It
 # is designed to be run as root. It should take a (relatively) clean
 # Rocky 8.4 installation and install and configure all the components
 # to run the full OpenVDM system.
@@ -171,35 +171,32 @@ function install_packages {
 
     startingDir=${PWD}
 
-    yum install -y epel-release
-    yum -y update --nobest
+    dnf install -y epel-release
+    dnf -y update --nobest
 
     # Install php7.3, Instructions at:
     # https://wiki.crowncloud.net/?How_to_Install_PHP_7_3_in_Rocky_Linux_8
     # https://techviewleo.com/install-lamp-stack-on-rocky-almalinux-8/
-    yum install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
-    yum module reset php -y
-    yum module enable php:remi-7.3 -y
-    yum install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
+    dnf install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    dnf module reset php -y
+    dnf module enable php:remi-7.3 -y
+    dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
 
-    # Install Python3.8 and set to default
-    yum install -y python38
-    alternatives --set python /usr/bin/python3.8
-    yum install -y python38-devel # python3-mod_wsgi
-
-    yum -y install openssh-server sshpass rsync curl git samba samba-common \
-    samba-client cifs-utils gearmand libgearman-devel nodejs supervisor \
-    mysql-server npm httpd setroubleshoot policycoreutils-python-utils gcc \
-    zlib-devel libjpeg-devel make python3-devel proj python3-pyproj python3-mod_wsgi
-
-    pip3 install Pillow MapProxy
+    # Install Python3.11 and set to default
+    dnf install -y python3.11
+    alternatives --set python3 /usr/bin/python3.11
+    dnf install -y python3.11-devel
+    python3 -m pip install --upgrade pip --quiet
+    
+    dnf -y install cifs-utils curl gcc gdal-bin gearmand git httpd libgdal-dev \
+    libgearman-devel libgeos-dev libjpeg-devel make mysql-server nodejs npm \
+    openssh-server policycoreutils-python-utils proj proj-bin python3-mod_wsgi \
+    python3-pyproj rsync samba samba-client samba-common setroubleshoot sshpass \
+    supervisor zlib-devel
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
-    
-        yum -y install gdal-bin libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj
-        
-        pip3 install MapProxy --quiet
+            
+        python3 -m pip install Pillow MapProxy --quiet
     fi
 
     npm install --quiet -g bower
@@ -225,7 +222,7 @@ function install_python_packages {
     source $VENV_PATH/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
-      --trusted-host files.pythonhosted.org --upgrade pip --quiet
+      --trusted-host files.pythonhosted.org --quiet
     pip install wheel --quiet # To help with the rest of the installations
 
     sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
