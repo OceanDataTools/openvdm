@@ -75,8 +75,8 @@ function set_default_variables {
 
     DEFAULT_DATA_ROOT=/data
 
-    DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
-    DEFAULT_OPENVDM_BRANCH=master
+    DEFAULT_OPENVDM_REPO="${OPENVDM_REPO:-https://github.com/oceandatatools/openvdm}"
+    DEFAULT_OPENVDM_BRANCH="${BRANCH:-master}"
     DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
