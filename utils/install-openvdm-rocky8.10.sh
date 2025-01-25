@@ -172,6 +172,7 @@ function install_packages {
     startingDir=${PWD}
 
     dnf install -y epel-release
+    dnf config-manager --set-enabled powertools
     dnf -y update --nobest
 
     # Install php7.3, Instructions at:
@@ -185,17 +186,16 @@ function install_packages {
     # Install Python3.11 and set to default
     dnf install -y python3.11
     alternatives --set python3 /usr/bin/python3.11
-    dnf install -y python3.11-devel
+    dnf install -y python3.11-devel python3.11-pip
     python3 -m pip install --upgrade pip --quiet
     
-    dnf -y install cifs-utils curl gcc gdal-bin gearmand git httpd libgdal-dev \
-    libgearman-devel libgeos-dev libjpeg-devel make mysql-server nodejs npm \
-    openssh-server policycoreutils-python-utils proj proj-bin python3-mod_wsgi \
-    python3-pyproj rsync samba samba-client samba-common setroubleshoot sshpass \
-    supervisor zlib-devel
+    dnf -y install cifs-utils curl gcc gdal gearmand git httpd gdal-devel \
+    libgearman-devel geos-devel libjpeg-devel make mysql-server nodejs npm \
+    openssh-server policycoreutils-python-utils proj proj-devel \
+    python3.11-mod_wsgi python3-pyproj rsync samba samba-client samba-common \
+    setroubleshoot sshpass supervisor zlib-devel
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
-            
         python3 -m pip install Pillow MapProxy --quiet
     fi
 
@@ -218,16 +218,16 @@ function install_python_packages {
 
     # Set up virtual environment
     VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python -m venv $VENV_PATH
+    python3 -m venv $VENV_PATH
+
+    cat > $VENV_PATH/pip.conf <<EOF
+[global]
+trusted-host = pypi.org
+               files.pythonhosted.org
+EOF
+
     source $VENV_PATH/bin/activate  # activate virtual environment
-
-    pip install --trusted-host pypi.org \
-      --trusted-host files.pythonhosted.org --quiet
-    pip install wheel --quiet # To help with the rest of the installations
-
-    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
-    pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
-    
+    pip install -r $INSTALL_ROOT/openvdm/requirements.txt
     deactivate
 
 }
@@ -437,10 +437,11 @@ programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_
 
 EOF
 
-    echo "Updating Firewall rules for Supervisor Web Server"
-    # TODO Check for firewall
-    firewall-cmd --zone=public --add-port=9001/tcp --permanent || echo "No firewall installed"
-    firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+        echo "Updating Firewall rules for Supervisor Web Server"
+        firewall-cmd --zone=public --add-port=9001/tcp --permanent
+        firewall-cmd --reload
+    fi
 
     echo "Starting new supervisor processes"
     systemctl restart supervisord
@@ -538,11 +539,12 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
 EOF
 fi
 
-    echo "Updating firewall rules for samba"
 
-    # TODO Check if firewall installed
-    sudo firewall-cmd --add-service=samba --zone=public --permanent || echo "No firewall installed"
-    sudo firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+        echo "Updating firewall rules for samba"
+        sudo firewall-cmd --add-service=samba --zone=public --permanent
+        sudo firewall-cmd --reload
+    fi
 
     echo "Restarting Samba Service"
     systemctl start smb
@@ -643,10 +645,11 @@ cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 </VirtualHost>
 EOF
 
-    echo "Updating Firewall rules for Apache Web Server"
-    # TODO Check for firewall
-    firewall-cmd --permanent --add-service={http,https} || echo "No firewall installed"
-    firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+       echo "Updating Firewall rules for Apache Web Server"
+       firewall-cmd --permanent --add-service={http,https}
+       firewall-cmd --reload
+    fi
 
     echo "Setting SELinux exception rules"
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}
@@ -871,7 +874,7 @@ function setup_ssh {
         chmod 600 /home/${OPENVDM_USER}/.ssh/authorized_keys
     fi
 
-    ssh ${OPENVDM_USER}@${HOSTNAME} ls > /dev/null
+    ssh -o StrictHostKeyChecking=no ${OPENVDM_USER}@${HOSTNAME} ls > /dev/null
 }
 
 
@@ -1121,14 +1124,15 @@ echo
 
 #########################################################################
 # Install MapProxy?
-echo "#####################################################################"
-echo "Optionally install: MapProxy"
-echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
-echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
-echo
-yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
-INSTALL_MAPPROXY=$YES_NO_RESULT
-echo
+#echo "#####################################################################"
+#echo "Optionally install: MapProxy"
+#echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
+#echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
+#echo
+#yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
+#INSTALL_MAPPROXY=$YES_NO_RESULT
+#echo
+INSTALL_MAPPROXY=$DEFAULT_INSTALL_MAPPROXY
 
 #########################################################################
 # Install PublicData?
@@ -1156,6 +1160,12 @@ echo
 #########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
+
+# Determine if there's a firewall installed.
+set +e
+which firewall-cmd > /dev/null 2>&1
+FIREWALL_ENABLED=$?
+set -e
 
 #########################################################################
 # The rest of the installtion
