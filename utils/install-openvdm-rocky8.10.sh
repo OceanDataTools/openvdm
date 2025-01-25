@@ -1039,7 +1039,6 @@ echo
 echo "Will install from github.com"
 echo "Repository: '$OPENVDM_REPO'"
 echo "Branch: '$OPENVDM_BRANCH'"
-echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
 echo "#####################################################################"
