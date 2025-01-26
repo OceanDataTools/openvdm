@@ -35,4 +35,10 @@ $(function () {
         window.location.replace(siteRoot + 'config/collectionSystemTransfers');
     });
 
+    var options = {
+        valueNames: [ 'name' ]
+    };
+
+    var userList = new List('transfers', options);
+
 });
