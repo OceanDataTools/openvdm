@@ -84,6 +84,7 @@ $(function () {
 
                     // Get the value of the input field (replace 'input-field' with your actual input's ID or selector)
                     const inputField = document.getElementById('transfer-filter'); // Example: <input id="input-field" />
+                    inputField.blur();
                     const inputValue = inputField ? inputField.value : ''; // Get input field value or empty if not found
 
                     // Add the input field value as a query parameter to the URL
