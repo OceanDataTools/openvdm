@@ -119,6 +119,10 @@ class CollectionSystemTransfers extends Controller {
     public function index(){
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
+
+        $data['search'] = $_GET['search'] ?? '';
+        $searchQueryStr = $_GET['search'] ? '&search=' . $data['search'] : '';
+
         $data['javascript'] = array('collectionSystemTransfers');
 
         $warehouseModel = new \Models\Warehouse();

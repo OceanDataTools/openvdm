@@ -24,7 +24,7 @@ class Messages extends Controller {
         $pages = new Paginator('15','page');
 
         $data['search'] = $_GET['search'] ?? '';
-	$searchQueryStr = $_GET['search'] ? '&search=' . $data['search'] : '';
+        $searchQueryStr = $_GET['search'] ? '&search=' . $data['search'] : '';
 
         $pages->setTotal($this->_messagesModel->getMessagesTotal($data['search']));
         $data['messages'] = $this->_messagesModel->getMessages($pages->getLimit(), $data['search']);
