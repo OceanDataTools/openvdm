@@ -120,8 +120,7 @@ class CollectionSystemTransfers extends Controller {
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
 
-        $data['search'] = $_GET['search'] ?? '';
-        $searchQueryStr = $_GET['search'] ? '&search=' . $data['search'] : '';
+        $data['filter'] = $_GET['filter'] ?? '';
 
         $data['javascript'] = array('collectionSystemTransfers');
 
@@ -597,6 +596,7 @@ class CollectionSystemTransfers extends Controller {
 
         $data['title'] = 'Collection System Transfers';
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
+        $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
         $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
@@ -833,10 +833,11 @@ class CollectionSystemTransfers extends Controller {
                 
                 if($data['row'][0]->destDir != $destDir){
                     $this->updateDestinationDirectory();
-                }
-                
+		}
+
+                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : ""; 
                 Session::set('message','Collection System Transfers Updated');
-                Url::redirect('config/collectionSystemTransfers');
+                Url::redirect('config/collectionSystemTransfers'.$filter);
             } else {
                 
                 $data['row'][0]->name = $name;
@@ -1119,24 +1120,26 @@ class CollectionSystemTransfers extends Controller {
     }
     
     public function delete($id){
-                
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         $where = array('collectionSystemTransferID' => $id);
         $this->_collectionSystemTransfersModel->deleteCollectionSystemTransfer($where);
         Session::set('message','Collection System Transfer Deleted');
-        Url::redirect('config/collectionSystemTransfers');
+        Url::redirect('config/collectionSystemTransfers'.$filter);
     }
     
     public function enable($id) {
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         $this->_collectionSystemTransfersModel->enableCollectionSystemTransfer($id);
 
         $this->updateDestinationDirectory();
 
-        Url::redirect('config/collectionSystemTransfers');
+        Url::redirect('config/collectionSystemTransfers'.$filter);
     }
     
     public function disable($id) {
-        $this->_collectionSystemTransfersModel->disableCollectionSystemTransfer($id);
-        Url::redirect('config/collectionSystemTransfers');
+	$filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";    
+	$this->_collectionSystemTransfersModel->disableCollectionSystemTransfer($id);
+        Url::redirect('config/collectionSystemTransfers'.$filter);
     }
     
     public function test($id) {
@@ -1160,6 +1163,7 @@ class CollectionSystemTransfers extends Controller {
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
         $data['javascript'] = array('collectionSystemTransfers');
+        $data['filter'] = $_GET['filter'] ?? '';
 
         #additional data needed for view
         $data['testCollectionSystemTransferName'] = $gmData['collectionSystemTransfer']->name;
@@ -1171,7 +1175,9 @@ class CollectionSystemTransfers extends Controller {
     
     public function run($id) {
         
-        $collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+
+	$collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
         
         $gmData = array(
             'collectionSystemTransfer' => array(
@@ -1192,12 +1198,14 @@ class CollectionSystemTransfers extends Controller {
 
         sleep(1);
 
-        Url::redirect('config/collectionSystemTransfers');
+        Url::redirect('config/collectionSystemTransfers'.$filter);
     }
     
     public function stop($id) {
         
-        $gmData = array(
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+	
+	$gmData = array(
             'pid' => $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0]->pid
         );
         
@@ -1212,6 +1220,6 @@ class CollectionSystemTransfers extends Controller {
 
         sleep(1);
 
-        Url::redirect('config/collectionSystemTransfers');
+        Url::redirect('config/collectionSystemTransfers'.$filter);
     }
 }
