@@ -31,27 +31,27 @@ $(function () {
         updateCollectionSystemTransferStatus();
     }, 5000);
 
-    $('#testResultsModal').on('hidden.bs.modal', function () {
-        // Get the current URL's path (ignoring query strings and fragments)
-        const currentPath = window.location.pathname.split('?')[0].split('#')[0];
+    // $('#testResultsModal').on('hidden.bs.modal', function () {
+    //     // Get the current URL's path (ignoring query strings and fragments)
+    //     const currentPath = window.location.pathname.split('?')[0].split('#')[0];
 
-        // Get the value of the input field (replace 'input-field' with your actual input's ID or selector)
-        const inputField = document.getElementById('transfer-filter'); // Example: <input id="input-field" />
-        const inputValue = inputField ? inputField.value : ''; // Get input field value or empty if not found
+    //     // Get the value of the input field (replace 'input-field' with your actual input's ID or selector)
+    //     const inputField = document.getElementById('transfer-filter'); // Example: <input id="input-field" />
+    //     const inputValue = inputField ? inputField.value : ''; // Get input field value or empty if not found
 
-        // Add the input field value as a query parameter to the URL
-        const url = new URL(currentPath);
-        console.log("InputValue:", inputValue);
-        if (inputValue) {
-            // Append the input value as a query parameter (e.g., ?input=value)
-            url.searchParams.set('filter', inputValue);
-        }
-        else {
-            url.searchParams.delete('filter')
-        }
-        // window.location.replace(siteRoot + 'config/collectionSystemTransfers');
-        window.location.href = url.href;
-    });
+    //     // Add the input field value as a query parameter to the URL
+    //     const url = new URL(currentPath);
+    //     console.log("InputValue:", inputValue);
+    //     if (inputValue) {
+    //         // Append the input value as a query parameter (e.g., ?input=value)
+    //         url.searchParams.set('filter', inputValue);
+    //     }
+    //     else {
+    //         url.searchParams.delete('filter')
+    //     }
+    //     // window.location.replace(siteRoot + 'config/collectionSystemTransfers');
+    //     window.location.href = url.href;
+    // });
 
     var options = {
         valueNames: [ 'name' ]
