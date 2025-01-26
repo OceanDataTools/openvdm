@@ -173,7 +173,7 @@ echo var_dump($data['filter']);
                 </ui>
             </div>
             <div class="modal-footer">
-                <a href='<?php echo DIR . "config/collectionSystemTransfers" . $data['filter'] ? '?filter='.$data['filter'] : ''; ?>' class="btn btn-primary" data-dismiss="modal">Close</a>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
             </div>
         </div> <!-- /.modal-content -->
     </div> <!-- /.modal-dialog -->
