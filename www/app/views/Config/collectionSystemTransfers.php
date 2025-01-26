@@ -2,7 +2,6 @@
 
 use Core\Error;
 use Helpers\Session;
-echo var_dump($data['filter']);
 ?>
 
     <div class="row">
