@@ -2,7 +2,7 @@
 
 use Core\Error;
 use Helpers\Session;
-
+echo var_dump($data['filter']);
 ?>
 
     <div class="row">
@@ -28,7 +28,7 @@ use Helpers\Session;
     <div class="row">
         <div  id="transfers" class="col-lg-7 col-md-12">
             <div style="padding-bottom: 10px">
-	        <input class="search" placeholder="Search" value="<?php echo $data['search']; ?>"/>
+	        <input id="transfer-filter" class="search" placeholder="Filter" value="<?php echo $data['filter']; ?>"/>
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
                     Add New Collection System Transfer
                 </a>
@@ -56,7 +56,7 @@ use Helpers\Session;
 <?php
             } else {
 ?>
-                            <a href='<?php echo DIR; ?>config/collectionSystemTransfers/test/<?php echo $row->collectionSystemTransferID; ?>'>Test</a> /
+                            <a href='<?php echo DIR; ?>config/collectionSystemTransfers/test/<?php echo $row->collectionSystemTransferID; echo $data['filter']!='' ? '?filter='.$data['filter'] : ''; ?>'>Test</a> /
 <?php
             }
 ?>
@@ -173,7 +173,7 @@ use Helpers\Session;
                 </ui>
             </div>
             <div class="modal-footer">
-                <a href='' class="btn btn-primary" data-dismiss="modal">Close</a>
+                <a href='<?php echo $data['filter'] ? '?filter='.$data['fitler'] : ''; ?>' class="btn btn-primary" data-dismiss="modal">Close</a>
             </div>
         </div> <!-- /.modal-content -->
     </div> <!-- /.modal-dialog -->
