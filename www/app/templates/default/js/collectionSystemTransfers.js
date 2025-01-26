@@ -42,28 +42,28 @@ $(function () {
     var userList = new List('transfers', options);
 
     function interceptLinksToCurrentPage() {
-        // Get the current page's base URL (excluding query strings, fragments)
-        const currentUrl = window.location.href.split('#')[0].split('?')[0];
+        // Get the current URL's path (ignoring query strings and fragments)
+        const currentPath = window.location.pathname.split('?')[0].split('#')[0];
 
         // Get all <a> tags on the page
         const links = document.querySelectorAll('a');
 
         // Loop through each link and add an event listener for 'click'
         links.forEach(function(link) {
-            // Check if the link's href is the same as the current page's URL (ignoring query params and fragments)
-            const linkUrl = link.href.split('#')[0].split('?')[0];
+            // Check if the link's href starts with the same path as the current page's path
+            const linkPath = new URL(link.href).pathname.split('?')[0].split('#')[0];
 
-            // If the link's URL is the same as the current page's URL, intercept it
-            if (linkUrl === currentUrl) {
+            // If the link's path starts with the same base path, intercept it
+            if (linkPath.startsWith(currentPath)) {
                 link.addEventListener('click', function(event) {
                     // Prevent the default action (which is following the link)
                     event.preventDefault();
 
                     // Additional action: Log something or perform any custom logic
-                    console.log('Intercepted link to the current page: ', link.href);
+                    console.log('Intercepted link to the current or related page: ', link.href);
 
                     // You can perform any custom action here
-                    // For example, let's simulate a page scroll, or open a modal, etc.
+                    // For example, let's simulate a page scroll, or show a modal, etc.
 
                     // Optionally, if you still want to navigate after your action, use:
                     window.location.href = link.href;  // to follow the link
@@ -72,7 +72,7 @@ $(function () {
         });
     }
 
-    // Call the function to intercept links to the current page
+    // Call the function to intercept links to the current or related pages
     interceptLinksToCurrentPage();
 
 });
