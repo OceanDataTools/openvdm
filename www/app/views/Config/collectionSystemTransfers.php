@@ -28,7 +28,7 @@ use Helpers\Session;
     <div class="row">
         <div  id="transfers" class="col-lg-7 col-md-12">
             <div style="padding-bottom: 10px">
-	        <input class="search" placeholder="Search" />
+	        <input class="search" placeholder="Search" value="<?php echo $data['search']; ?>"/>
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
                     Add New Collection System Transfer
                 </a>
