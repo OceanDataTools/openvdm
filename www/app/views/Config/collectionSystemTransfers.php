@@ -27,10 +27,12 @@ use Helpers\Session;
     </div>
     <div class="row">
         <div  id="transfers" class="col-lg-7 col-md-12">
-            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
-                Add New Collection System Transfer
-            </a>
-            <input class="search" placeholder="Search" />
+            <div style="padding-bottom: 10px">
+	        <input class="search" placeholder="Search" />
+                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
+                    Add New Collection System Transfer
+                </a>
+            </div>
             <table class='table table-striped table-hover table-bordered responsive'>
                 <tbody class="list">
                     <tr>
