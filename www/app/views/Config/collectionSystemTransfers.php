@@ -173,7 +173,7 @@ echo var_dump($data['filter']);
                 </ui>
             </div>
             <div class="modal-footer">
-                <a href='' class="btn btn-primary" data-dismiss="modal">Close</a>
+                <a href='<?php echo $data['filter'] ? '?filter='.$data['fitler'] : ''; ?>' class="btn btn-primary" data-dismiss="modal">Close</a>
             </div>
         </div> <!-- /.modal-content -->
     </div> <!-- /.modal-dialog -->
