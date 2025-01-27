@@ -113,7 +113,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
                         <div class="row">    
                             <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Add')); ?>
-                                <a href="<?php echo DIR; ?>config/cruiseDataTransfers" class="btn btn-danger">Cancel</a>
+                                <a href="<?php echo DIR; ?>config/cruiseDataTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
                         </div>    
