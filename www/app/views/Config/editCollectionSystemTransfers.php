@@ -77,7 +77,7 @@ $_warehouseModel = new \Models\Warehouse();
                         <div class="row">    
                             <div class="col-lg-12">
                                 <?php echo Form::submit( array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
-                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers" class="btn btn-danger">Cancel</a>
+                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
                         </div>    

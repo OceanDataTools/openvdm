@@ -19,7 +19,7 @@ $_warehouseModel = new \Models\Warehouse();
             <div class="tabbable" style="margin-bottom: 18px;">
                 <ul class="nav nav-tabs">
                     <li class=""><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
-                    <li class="active"><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
+                    <li class="active"><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
                     <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
@@ -77,7 +77,7 @@ $_warehouseModel = new \Models\Warehouse();
                         <div class="row">    
                             <div class="col-lg-12">
                                 <?php echo Form::submit( array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Add')); ?>
-                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers" class="btn btn-danger">Cancel</a>
+                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
                         </div>    
