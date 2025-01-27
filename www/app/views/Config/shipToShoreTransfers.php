@@ -41,7 +41,7 @@ use Helpers\Session;
     </div>
     <div class="row">
         <div class="col-lg-7 col-md-12">
-            <div style="padding-bottom: 35px">
+            <div style="padding-bottom: 35px padding-top: 35px">
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/enableShipToShoreTransfers/add">
                     Add New Transfer
                 </a>
