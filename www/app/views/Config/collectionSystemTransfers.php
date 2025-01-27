@@ -29,7 +29,7 @@ use Helpers\Session;
             <div style="padding-bottom: 10px">
 	        <input id="transfer-filter" class="search" placeholder="Filter" value="<?php echo $data['filter']; ?>"/>
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
-                    Add New Collection System Transfer
+                    Add New Transfer
                 </a>
             </div>
             <table class='table table-striped table-hover table-bordered responsive'>
