@@ -53,7 +53,7 @@ use Helpers\Session;
 <?php        
     }
 ?>
-                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/enableShipToShoreTransfers/add">
+                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/shipToShoreTransfers/add">
                     Add New Transfer
                 </a>
             </div>
