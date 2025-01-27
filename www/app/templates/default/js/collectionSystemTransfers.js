@@ -35,7 +35,7 @@ $(function () {
         valueNames: [ 'name' ]
     };
 
-    var userList = new List('transfers', options);
+    var transferList = new List('transfers', options);
 
     function interceptLinksToCurrentPage() {
         // Get the current URL's path (ignoring query strings and fragments)
@@ -93,5 +93,5 @@ $(function () {
     // Filter list
     const inputField = document.getElementById('transfer-filter');
     const inputValue = inputField ? inputField.value : '';
-    userList.search(inputValue);
+    transferList.search(inputValue);
 });
