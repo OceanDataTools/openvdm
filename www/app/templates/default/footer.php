@@ -56,6 +56,7 @@ $jsFileArray = array(
     DIR . 'bower_components/bootstrap/dist/js/bootstrap.min.js',
     DIR . 'bower_components/metisMenu/dist/metisMenu.min.js',
     DIR . 'bower_components/js-cookie/src/js.cookie.js',
+    DIR . 'bower_components/list.js/dist/list.min.js',    
     Url::templatePath() . 'js/sb-admin-2.js',
     Url::templatePath() . 'js/header.js',    
     Url::templatePath() . 'js/modals.js',

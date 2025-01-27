@@ -6,3 +6,7 @@
 .checkbox {
   margin-top: 0px;
 }
+
+thead {
+  background-color: #eee;
+}

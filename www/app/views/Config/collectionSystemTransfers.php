@@ -2,7 +2,6 @@
 
 use Core\Error;
 use Helpers\Session;
-
 ?>
 
     <div class="row">
@@ -25,32 +24,40 @@ use Helpers\Session;
             </div>
         </div>
     </div>
-
     <div class="row">
-        <div class="col-lg-7 col-md-12">
+        <div  id="transfers" class="col-lg-7 col-md-12">
+            <div style="padding-bottom: 10px">
+	        <input id="transfer-filter" class="search" placeholder="Filter" value="<?php echo $data['filter']; ?>"/>
+                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
+                    Add New Transfer
+                </a>
+            </div>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>Name</th>
-                    <th>Action</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Action</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody class="list">
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
 ?>
-                <tr>
-                    <td><?php echo $row->longName; ?></td>
-                    <td>
-                        <a href='<?php echo DIR; ?>config/collectionSystemTransfers/edit/<?php echo $row->collectionSystemTransferID; ?>'>Edit</a> / 
-                        <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Collection System Transfer" data-delete-url="<?php echo DIR; ?>config/collectionSystemTransfers/delete/<?php echo $row->collectionSystemTransferID; ?>">Delete</a> / 
+                    <tr>
+                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="actions">
+                            <a href='<?php echo DIR; ?>config/collectionSystemTransfers/edit/<?php echo $row->collectionSystemTransferID; ?>'>Edit</a> / 
+                            <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Collection System Transfer" data-delete-url="<?php echo DIR; ?>config/collectionSystemTransfers/delete/<?php echo $row->collectionSystemTransferID; ?>">Delete</a> / 
 <?php
             if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
 ?>
-                        <span class="text-muted">Test</span> /
+                            <span class="text-muted">Test</span> /
 <?php
             } else {
 ?>
-                        <a href='<?php echo DIR; ?>config/collectionSystemTransfers/test/<?php echo $row->collectionSystemTransferID; ?>'>Test</a> /
+                            <a href='<?php echo DIR; ?>config/collectionSystemTransfers/test/<?php echo $row->collectionSystemTransferID; echo $data['filter']!='' ? '?filter='.$data['filter'] : ''; ?>'>Test</a> /
 <?php
             }
 ?>
@@ -58,38 +65,38 @@ use Helpers\Session;
 <?php
             if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
 ?>
-                        <span class="text-muted">Run</span>
+                            <span class="text-muted">Run</span>
 <?php
             } else {
 
                 if($row->status === "1"){
 ?>
-                            <a id="runStop<?php echo $row->collectionSystemTransferID; ?>" href='<?php echo DIR; ?>config/collectionSystemTransfers/stop/<?php echo $row->collectionSystemTransferID; ?>'>Stop</a>
+                                <a id="runStop<?php echo $row->collectionSystemTransferID; ?>" href='<?php echo DIR; ?>config/collectionSystemTransfers/stop/<?php echo $row->collectionSystemTransferID; ?>'>Stop</a>
  <?php
                 } else {
 ?>
-                            <a id="runStop<?php echo $row->collectionSystemTransferID; ?>" href='<?php echo DIR; ?>config/collectionSystemTransfers/run/<?php echo $row->collectionSystemTransferID; ?>'>Run</a>
+                                <a id="runStop<?php echo $row->collectionSystemTransferID; ?>" href='<?php echo DIR; ?>config/collectionSystemTransfers/run/<?php echo $row->collectionSystemTransferID; ?>'>Run</a>
 <?php
                 }
             }
 
             if($row->status === "3") {
 ?>
-                        <span class="pull-right"><i class="fa fa-warning text-danger"></i></span>
+                            <span class="pull-right"><i class="fa fa-warning text-danger"></i></span>
 <?php
             }
 ?>
-                    </td>
-                    <td style='text-align:center'>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
                 if($row->enable === "0"){
 ?>
-                        <div class="btn btn-xs btn-danger disabled">Off</div>
+                            <div class="btn btn-xs btn-danger disabled">Off</div>
 <?php
                 } else {
 ?>
-                        <div class="btn btn-xs btn-success disabled">On</div>
+                            <div class="btn btn-xs btn-success disabled">On</div>
 <?php
                 }
                         
@@ -97,23 +104,23 @@ use Helpers\Session;
 
                 if($row->enable === "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/collectionSystemTransfers/enable/<?php echo $row->collectionSystemTransferID;?> '>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/collectionSystemTransfers/enable/<?php echo $row->collectionSystemTransferID;?> '>Off</a>
 <?php
                 } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/collectionSystemTransfers/disable/<?php echo $row->collectionSystemTransferID; ?>'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/collectionSystemTransfers/disable/<?php echo $row->collectionSystemTransferID; ?>'>On</a>
 <?php
                 }
             }
 ?>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 <?php
         }
     }
 ?>
+                </tbody>
             </table>
-            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">Add New Collection System Transfer</a>
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
@@ -167,7 +174,7 @@ use Helpers\Session;
                 </ui>
             </div>
             <div class="modal-footer">
-                <a href='' class="btn btn-primary" data-dismiss="modal">Close</a>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
             </div>
         </div> <!-- /.modal-content -->
     </div> <!-- /.modal-dialog -->
