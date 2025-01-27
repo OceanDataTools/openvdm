@@ -41,7 +41,18 @@ use Helpers\Session;
     </div>
     <div class="row">
         <div class="col-lg-7 col-md-12">
-            <div style="padding-bottom: 35px padding-top: 35px">
+            <div style="padding-bottom: 35px; padding-top: 5px">
+<?php
+    if(strcmp($data['ssdwStatus'], "1") === 0) {
+?>
+                <a id="runStop" class="btn btn-sm btn-danger" href="<?php echo DIR; ?>config/shipToShoreTransfers/stop">Stop Ship-to-Shore Transfer</a>
+<?php
+    } else {
+?>   
+                <a id="runStop" class="btn btn-sm btn-success" href="<?php echo DIR; ?>config/shipToShoreTransfers/run">Run Ship-to-Shore Transfer</a>
+<?php        
+    }
+?>
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/enableShipToShoreTransfers/add">
                     Add New Transfer
                 </a>
@@ -86,19 +97,6 @@ use Helpers\Session;
 ?>
                 </tbody>
             </table>
-            <span class="pull-right">
-<?php
-    if(strcmp($data['ssdwStatus'], "1") === 0) {
-?>
-                <a id="runStop" class="btn btn-sm btn-danger" href="<?php echo DIR; ?>config/shipToShoreTransfers/stop">Stop Ship-to-Shore Transfer</a>
-<?php
-    } else {
-?>   
-                <a id="runStop" class="btn btn-sm btn-success" href="<?php echo DIR; ?>config/shipToShoreTransfers/run">Run Ship-to-Shore Transfer</a>
-<?php        
-    }
-?>
-            </span>
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
