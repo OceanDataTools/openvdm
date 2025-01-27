@@ -33,12 +33,14 @@ use Helpers\Session;
                 </a>
             </div>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tbody class="list">
+                <thead>
                     <tr>
                         <th>Name</th>
                         <th>Action</th>
                         <th style='width:20px;'>Enabled</th>
                     </tr>
+                </thead>
+                <tbody class="list">
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
