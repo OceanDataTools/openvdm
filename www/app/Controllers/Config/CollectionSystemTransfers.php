@@ -137,6 +137,7 @@ class CollectionSystemTransfers extends Controller {
 
         $data['title'] = 'Add Collection System Transfers';
         $data['javascript'] = array('collectionSystemTransfersFormHelper');
+        $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['stalenessOptions'] = $this->_buildStalenessOptions();
         $data['removeSourceFilesOptions'] = $this->_buildRemoveSourceFilesOptions();
