@@ -112,7 +112,7 @@ use Helpers\Session;
             <p>Clicking a <strong class="text-primary">Run</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to start.  If the <?php echo CRUISE_NAME; ?> Data Transfer is currently running, this link is not present</p>
             <p>Clicking a <strong class="text-primary">Stop</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to stop immediately.  If the <?php echo CRUISE_NAME; ?> Data Transfer is not currently running, this link is not present</p>
             <p>The button in the <strong>Enabled</strong> Column shows whether the transfer is enabled.  Click the button in the enable column to toggle the enable status of the cooresponding <?php echo CRUISE_NAME; ?> Data Transfer.</p>
-            <p>Click the <strong>Add New <?php echo CRUISE_NAME; ?> Data Transfer</strong> button to add a new <?php echo CRUISE_NAME; ?> Data Transfer.</p>
+            <p>Click the <strong>Add New Transfer</strong> button to add a new <?php echo CRUISE_NAME; ?> Data Transfer.</p>
         </div>
     </div>
 

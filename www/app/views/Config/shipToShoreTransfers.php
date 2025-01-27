@@ -104,7 +104,7 @@ use Helpers\Session;
             <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit Ship-to-Shore Transfer Form" where you can modify the Ship-to-Shore Transfer.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Ship-to-Shore Transfer. There is a confirmation window so don't worry about accidental clicks.</p>
             <p>The button in the <strong>Enabled</strong> Column shows whether a Ship-to-Shore Transfer will be performed.  Click the button in the enable column to toggle the enable status of the cooresponding Ship-to-Shore Transfer.</p>
-            <p>Click the <strong>Add New Ship-to-Shore Transfer</strong> button to add a new Ship-to-Shore Transfer.</p>
+            <p>Click the <strong>Add New Transfer</strong> button to add a new Ship-to-Shore Transfer.</p>
             <p>Click the <strong>Run Ship-to-Shore Transfer</strong> button to manually trigger the Ship-to-Shore Transfer.  If a Ship-to-Shore transfer is already in-progress this button will not be present.</p>
             <p>Click the <strong>Stop Ship-to-Shore Transfer</strong> button to manually stop a Ship-to-Shore Transfer that is already in-progress.  If a Ship-to-Shore transfer is not already in-progress this button will not be present.</p>
         </div>
