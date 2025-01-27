@@ -25,7 +25,7 @@ use Helpers\Session;
     </div>
     <div class="row">
         <div class="col-lg-7 col-md-12">
-            <div style="padding-bottom: 20px">
+            <div style="padding-bottom: 35px">
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/extraDirectories/add">
                     Add New Directory
                 </a>
