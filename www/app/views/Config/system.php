@@ -96,11 +96,11 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                         <th style='width:20px;'>Enabled</th>
                     </tr>
                 </thead>
+                <tbody>
 <?php
     if($data['links']){
         foreach($data['links'] as $row){
 ?>
-                <tbody>
                     <tr>
                         <td><?php echo $row->name; ?></td>
                         <td>
