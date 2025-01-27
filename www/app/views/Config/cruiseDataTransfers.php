@@ -28,71 +28,80 @@ use Helpers\Session;
 
 
     <div class="row">
-        <div class="col-lg-7 col-md-12">
+        <div id="transfers" class="col-lg-7 col-md-12">
+            <div style="padding-bottom: 10px">
+            <input id="transfer-filter" class="search" placeholder="Filter" value="<?php echo $data['filter']; ?>"/>
+                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/cruiseDataTransfers/add">
+                    Add New Transfer
+                </a>
+            </div>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>Name</th>
-                    <th>Action</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Action</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody class="list">
 <?php
     if($data['cruiseDataTransfers']) {
         foreach($data['cruiseDataTransfers'] as $row) {
 ?>
-                <tr>
-                    <td><?php echo $row->longName; ?></td>
-                    <td>
-                        <a href='<?php echo DIR; ?>config/cruiseDataTransfers/edit/<?php echo $row->cruiseDataTransferID; ?>'>Edit</a> / 
-                        <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> / 
-                        <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> / 
+                    <tr>
+                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="action">
+                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/edit/<?php echo $row->cruiseDataTransferID; ?>'>Edit</a> / 
+                            <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> / 
+                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> / 
 <?php
             if($row->status === "1") {
 ?>
-                        <a id="runStop<?php echo $row->cruiseDataTransferID ?>" href='<?php echo DIR; ?>config/cruiseDataTransfers/stop/<?php echo $row->cruiseDataTransferID; ?>'>Stop</a>
+                            <a id="runStop<?php echo $row->cruiseDataTransferID ?>" href='<?php echo DIR; ?>config/cruiseDataTransfers/stop/<?php echo $row->cruiseDataTransferID; ?>'>Stop</a>
 <?php
             } else if($row->status === "5") {
 ?>
-                        <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Stopping</a>
+                            <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Stopping</a>
 <?php
             } else if($row->status === "6") {
 ?>
-                        <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Starting</a>
+                            <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Starting</a>
  <?php
             } else {
 ?>
-                        <a id="runStop<?php echo $row->cruiseDataTransferID ?>" href='<?php echo DIR; ?>config/cruiseDataTransfers/run/<?php echo $row->cruiseDataTransferID; ?>'>Run</a>
-                        <span id="testFail<?php echo $row->cruiseDataTransferID ?>" class="pull-right">
+                            <a id="runStop<?php echo $row->cruiseDataTransferID ?>" href='<?php echo DIR; ?>config/cruiseDataTransfers/run/<?php echo $row->cruiseDataTransferID; ?>'>Run</a>
+                            <span id="testFail<?php echo $row->cruiseDataTransferID ?>" class="pull-right">
 <?php
             }
             if($row->status === "3") {
 ?>
-                            <i class="fa fa-warning text-danger"></i>
+                                <i class="fa fa-warning text-danger"></i>
 <?php
             }
 ?>
-                        </span>
-                    </td>
-                    <td style='text-align:center'>
+                            </span>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if($row->enable == "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/cruiseDataTransfers/enable/<?php echo $row->cruiseDataTransferID; ?>'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/cruiseDataTransfers/enable/<?php echo $row->cruiseDataTransferID; ?>'>Off</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/cruiseDataTransfers/disable/<?php echo $row->cruiseDataTransferID; ?>'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/cruiseDataTransfers/disable/<?php echo $row->cruiseDataTransferID; ?>'>On</a>
 <?php
             }
 ?>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 <?php
 
         }
     }
 ?>
+                </tbody>
             </table>
-            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/cruiseDataTransfers/add">Add New <?php echo CRUISE_NAME; ?> Data Transfer</a>
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
@@ -103,7 +112,7 @@ use Helpers\Session;
             <p>Clicking a <strong class="text-primary">Run</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to start.  If the <?php echo CRUISE_NAME; ?> Data Transfer is currently running, this link is not present</p>
             <p>Clicking a <strong class="text-primary">Stop</strong> link will manually trigger the corresponding <?php echo CRUISE_NAME; ?> Data Transfer to stop immediately.  If the <?php echo CRUISE_NAME; ?> Data Transfer is not currently running, this link is not present</p>
             <p>The button in the <strong>Enabled</strong> Column shows whether the transfer is enabled.  Click the button in the enable column to toggle the enable status of the cooresponding <?php echo CRUISE_NAME; ?> Data Transfer.</p>
-            <p>Click the <strong>Add New <?php echo CRUISE_NAME; ?> Data Transfer</strong> button to add a new <?php echo CRUISE_NAME; ?> Data Transfer.</p>
+            <p>Click the <strong>Add New Transfer</strong> button to add a new <?php echo CRUISE_NAME; ?> Data Transfer.</p>
         </div>
     </div>
 
@@ -145,7 +154,7 @@ use Helpers\Session;
                 </ui>
             </div>
             <div class="modal-footer">
-                <a href='' class="btn btn-primary" data-dismiss="modal">Close</a>
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
             </div>
         </div> <!-- /.modal-content -->
     </div> <!-- /.modal-dialog -->

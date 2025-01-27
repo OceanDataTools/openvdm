@@ -131,7 +131,7 @@ use Helpers\Session;
             <p>Clicking a <strong class="text-primary">Run</strong> link will manually trigger the corresponding Collection System Transfer to start.  If the Collection System Transfer is currently running, this link is not present</p>
             <p>Clicking a <strong class="text-primary">Stop</strong> link will manually trigger the corresponding Collection System Transfer to stop immediately.  If the Collection System Transfer is not currently running, this link is not present</p>
             <p>The button in the <strong>Enabled</strong> column shows whether an automated collection system transfer is enabled.  Click the button to enable/disable automated data transfer for the cooresponding Collection System Transfer.</p>
-            <p>Click the <strong>Add New Collection System Transfer</strong> button to add a new Collection System Transfer.</p>
+            <p>Click the <strong>Add New Transfer</strong> button to add a new Collection System Transfer.</p>
         </div>
     </div>
 

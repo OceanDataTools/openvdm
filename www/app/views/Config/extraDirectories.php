@@ -25,43 +25,51 @@ use Helpers\Session;
     </div>
     <div class="row">
         <div class="col-lg-7 col-md-12">
+            <div style="padding-bottom: 35px">
+                <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/extraDirectories/add">
+                    Add New Directory
+                </a>
+            </div>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>Name</th>
-                    <th>Action</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Action</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                </tbody>
 <?php
     if($data['extraDirectories']){
         foreach($data['extraDirectories'] as $row){
 ?>
-                <tr>
-                    <td><?php echo $row->longName; ?></td>
-                    <td>
-                        <a href='<?php echo DIR; ?>config/extraDirectories/edit/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
-                        /
-                        <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Extra Directory" data-delete-url="<?php echo DIR; ?>config/extraDirectories/delete/<?php echo $row->extraDirectoryID; ?>">Delete</a>
-                    </td>
-                    <td style='text-align:center'>
+                    <tr>
+                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="action">
+                            <a href='<?php echo DIR; ?>config/extraDirectories/edit/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
+                            /
+                            <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Extra Directory" data-delete-url="<?php echo DIR; ?>config/extraDirectories/delete/<?php echo $row->extraDirectoryID; ?>">Delete</a>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if($row->enable == "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/extraDirectories/enable/<?php echo $row->extraDirectoryID; ?>'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/extraDirectories/enable/<?php echo $row->extraDirectoryID; ?>'>Off</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/extraDirectories/disable/<?php echo $row->extraDirectoryID; ?>'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/extraDirectories/disable/<?php echo $row->extraDirectoryID; ?>'>On</a>
 <?php
             }
 ?>                               
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 <?php
         }
     }
 ?>
+                </tbody>
             </table>
-            <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/extraDirectories/add">Add New Extra Directory</a>
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
@@ -70,7 +78,7 @@ use Helpers\Session;
             <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit Extra Directory Form" where you can modify the Extra Directory name and location.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Extra Directory. There is a confirmation window so don't worry about accidental clicks.</p>
             <p>The button in the <strong>Enabled</strong> column shows whether the directory will be created within the cruise data directory for the current cruise.  Click the button to toggle the enable/disable the cooresponding Extra Directory.  In accordance with OpenVDM data integrity policies, disabling an extra directory will not delete an existing directory.  The directly will simply not be created with in the cruise data directoy when a new cruise is initialized.</p>
-            <p>Click the <strong>Add New Extra Directory</strong> button to add a new Extra Directory.</p>
+            <p>Click the <strong>Add New Directory</strong> button to add a new Extra Directory.</p>
         </div>
     </div>
 

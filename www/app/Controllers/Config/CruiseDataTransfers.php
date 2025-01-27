@@ -78,6 +78,8 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Configuration';
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers("longName");
         $data['javascript'] = array('cruiseDataTransfers');
+        $data['filter'] = $_GET['filter'] ?? '';
+
         View::rendertemplate('header',$data);
         View::render('Config/cruiseDataTransfers',$data);
         View::rendertemplate('footer',$data);
@@ -86,6 +88,7 @@ class CruiseDataTransfers extends Controller {
     public function add(){
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
+        $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
@@ -493,6 +496,7 @@ class CruiseDataTransfers extends Controller {
     public function edit($id){
         $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
+        $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
@@ -687,8 +691,9 @@ class CruiseDataTransfers extends Controller {
                 $where = array('cruiseDataTransferID' => $id);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
                 
+                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
                 Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
-                Url::redirect('config/cruiseDataTransfers');
+                Url::redirect('config/cruiseDataTransfers'.$filter);
             } else {
                 
                 $data['row'][0]->name = $name;
@@ -943,20 +948,23 @@ class CruiseDataTransfers extends Controller {
                 
         $where = array('cruiseDataTransferID' => $id);
         $this->_cruiseDataTransfersModel->deleteCruiseDataTransfer($where);
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Session::set('message','Collection System Transfer Deleted');
-        Url::redirect('config/cruiseDataTransfers');
+        Url::redirect('config/cruiseDataTransfers'.$filter);
     }
     
     public function enable($id) {
 
         $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
-        Url::redirect('config/cruiseDataTransfers');
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        Url::redirect('config/cruiseDataTransfers'.$filter);
     }
     
     public function disable($id) {
 
         $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($id);
-        Url::redirect('config/cruiseDataTransfers');
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        Url::redirect('config/cruiseDataTransfers'.$filter);
     }
     
     public function test($id) {
@@ -980,6 +988,7 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Configuration';
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers("longName");
         $data['javascript'] = array('cruiseDataTransfers');
+        $data['filter'] = $_GET['filter'] ?? '';
 
         #additional data needed for view
         $data['testCruiseDataTransferName'] = $gmData['cruiseDataTransfer']->longName;
@@ -1013,7 +1022,8 @@ class CruiseDataTransfers extends Controller {
     
         sleep(1);
         
-        Url::redirect('config/cruiseDataTransfers');
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        Url::redirect('config/cruiseDataTransfers'.$filter);
     }
         
     public function stop($id) {
@@ -1036,7 +1046,8 @@ class CruiseDataTransfers extends Controller {
         $job_handle = $gmc->doBackground("stopJob", json_encode($gmData));
     
         sleep(1);
-    
-        Url::redirect('config/cruiseDataTransfers');
+
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";    
+        Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 }
