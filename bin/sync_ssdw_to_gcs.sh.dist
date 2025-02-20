@@ -1,0 +1,183 @@
+#!/usr/bin/bash
+# -----------------------------------------------------------------------------
+#  sync_s2sd_to_gcs.sh - Sync Ship-to-Shore data to Google Cloud Storage
+# -----------------------------------------------------------------------------
+#
+#  Usage:   sync_s2sd_to_gcs.sh [options]
+#
+#  Depends: 
+#
+#  Options:
+#
+#   -x, --xtrace    Enable debug output to console
+#
+#   -h  --help      Print this header
+#
+#   -n  --dry-run   Run transfer in dry-run mode.
+#
+#  Prerequisites:
+#    1. Install gcloud CLI tool:
+#        sudo apt-get install apt-transport-https ca-certificates gnupg curl
+#        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+#        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+#        sudo apt-get update && sudo apt-get install google-cloud-cli
+#    2. Setup authentication to GCS:
+#        gcloud init --no-launch-browser
+#    3. Test connection:
+#        gcloud storage ls gs://<BUCKET_NAME>
+#        If you need to change projects to access the desired bucket run:
+#          gcloud config set project PROJECT_ID
+#
+#    Setup the OpenVDM Shore-side Data Warehouse (SSDW) to use a storage
+#    volume that the Data Warehouse can access via SSH. This can be a local
+#    directory on the Data Warehouse (ssh user@127.0.01). The destination
+#    volume will need enough space to hold the expected data volume.
+#
+#    Update the OPENVDM_SERVER_URL, SSDW_PATH, BUCKET_NAME and BUCKET_PATH
+#    variables.
+#
+#    This script assumes it is installed on a machine that has network access to
+#    the OpenVDM Data Warehouse and direct access to the SSDW_PATH.
+#
+#  Example:
+#   sync_s2sd_to_gcs.sh
+#
+# -----------------------------------------------------------------------------
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# -----------------------------------------------------------------------------
+# Functions
+# -----------------------------------------------------------------------------
+
+main() {
+  ## Set up environment
+  set_environment "$@"
+
+  do_stuff
+}
+
+set_environment() {
+
+  OPENVDM_SERVER_URL=http://127.0.0.1
+  SSDW_PATH=/data/ssdw
+  BUCKET_NAME="<BUCKET_NAME>"
+  BUCKET_PATH="/"
+
+  ## Parse command line args
+  while getopts "h?xn" opt; do
+    case "$opt" in
+      h|help)
+        print_hdr
+        exit 0
+        ;;
+      x|xtrace)  set -o xtrace
+        ;;
+      n|dry-run)  DRY_RUN='--dry-run'
+
+    esac
+  done
+
+  DRY_RUN=${DRY_RUN:-''}
+
+  shift $((OPTIND-1))
+
+}
+
+print_hdr() {
+  ## Universal header function, script reads itself up to the first
+  ## blank line, stripping out the shabang at the top and the first
+  ## comment symbol on each line.
+  ## Entire header should be commented out.
+  echo
+  ## Want to preserve whitespace so set IFS to ""
+  while IFS='' read -r LINE; do
+    case ${LINE} in
+      \#!*) continue                    ;; ## Strip out shebang
+        "") echo "" ; break             ;; ## Stop if blank line
+         *) printf '%s\n' "${LINE/\#/}" ;; ## Print everything else
+    esac
+  done < "$0"
+}
+
+do_stuff() {
+
+  set +e
+  response=$(curl -s -f --connect-timeout 2 "${OPENVDM_SERVER_URL}/api/warehouse/getSystemStatus")
+  if [ $? -eq 0 ]; then
+    CRUISE_STATUS=`echo $response | python3 -c "import sys, json; print(json.load(sys.stdin)['systemStatus'])"`
+
+    if [ ${CRUISE_STATUS} == "Off" ]; then
+      echo "Cruise Status set to Off... exiting"
+      exit 0
+    fi
+
+  else
+    echo "API call failed"
+    exit 1
+  fi
+
+  response=$(curl -s -f --connect-timeout 2 "${OPENVDM_SERVER_URL}/api/cruiseDataTransfers/getRequiredCruiseDataTransfers")
+  if [ $? -eq 0 ]; then
+    S2S_ENABLE=`echo $response | python3 -c "import sys, json; print(json.load(sys.stdin)[0]['enable'])"`
+
+    if [[ ${S2S_ENABLE} == "0" ]]; then
+      echo "Ship-to-Shore Transfers disabled... exiting"
+      exit 0
+    fi
+
+  else
+    echo "API call failed"
+    exit 1
+  fi
+
+  response=$(curl -s -f --connect-timeout 2 "${OPENVDM_SERVER_URL}/api/warehouse/getCruiseID")
+  if [ $? -eq 0 ]; then
+    CRUISE_ID=`echo $response | python3 -c "import sys, json; print(json.load(sys.stdin)['cruiseID'])"`
+
+    if [ ${CRUISE_ID} == "" ]; then
+      echo "No Cruise ID defined... exiting"
+      exit 0
+    fi
+
+  else
+    echo "API call failed"
+    exit 1
+  fi
+  set -e
+
+  if [ ! -d "${SSDW_PATH}/${CRUISE_ID}" ]; then
+    echo "Source directory: ${SSDW_PATH}/${CRUISE_ID} does not exist."
+    exit 1
+  fi
+
+  bucket_list=$(gcloud storage buckets list --filter=${BUCKET_NAME} --format="value(name)")
+  if [ -z "$bucket_list" ]; then
+    echo "Unable to find GCS bucket: ${BUCKET_NAME}"
+    exit 1
+  fi
+
+  set +e
+  gsutil -q ls "gs://${BUCKET_NAME}${BUCKET_PATH}/*" >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    echo "Destination path: ${BUCKET_PATH} does not exist"
+    exit 1
+  fi
+  set -e
+
+  echo "Syncing to cloud..."
+  SYNC_CMD="gcloud storage rsync -r ${DRY_RUN} ${SSDW_PATH}/${CRUISE_ID} gs://${BUCKET_NAME}${BUCKET_PATH}/${CRUISE_ID}"
+  echo ${SYNC_CMD}
+  eval "${SYNC_CMD}"
+
+  echo "Done"
+}
+
+# -----------------------------------------------------------------------------
+# Run
+# -----------------------------------------------------------------------------
+
+main "$@"
+
