@@ -516,7 +516,7 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
 
             logging.info("Processing file: %s", filename)
             # json_filename = os.path.splitext(filename)[0] + '.json'
-            json_filename = os.path.splitext(os.path.basename(filepath))[0] + '.json'
+            json_filename = os.path.splitext(os.path.basename(filename))[0] + '.json'
             logging.debug("jsonFileName: %s", json_filename)
             raw_filepath = os.path.join(gearman_worker.cruise_dir, filename)
             logging.debug("rawFilePath: %s", raw_filepath)
