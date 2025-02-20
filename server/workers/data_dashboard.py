@@ -45,6 +45,8 @@ def build_filelist(source_dir):
     return the list of files in the source directory
     """
 
+    source_dir = source_dir.rstrip('/') or '/'
+
     logging.debug("sourceDir: %s", source_dir)
 
     return_files = []
@@ -520,7 +522,7 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
             logging.debug("jsonFileName: %s", json_filename)
             raw_filepath = os.path.join(gearman_worker.cruise_dir, filename)
             logging.debug("rawFilePath: %s", raw_filepath)
-            json_filepath = os.path.join(gearman_worker.data_dashboard_dir, json_filename)
+            json_filepath = os.path.join(gearman_worker.data_dashboard_dir, collection_system_transfer['destDir'], json_filename)
             logging.debug("jsonFilePath: %s", json_filepath)
 
             if os.stat(raw_filepath).st_size == 0:
