@@ -150,10 +150,12 @@ def build_exclude_filterlist(gearman_worker):
         exclude_filterlist.append(f"*{extra_directory['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)}*")
 
     # Ignore png files created by tile cutter
-    data_dashboard_extra_directory = gearman_worker.ovdm.get_required_extra_directory_by_name('DashboardData')
+    data_dashboard_extra_directory = gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')
 
-    if data_dashboard_extra_directory.id not in excluded_extra_directory_ids:
-        exclude_filterlist.append(f"*{data_dashboard_extra_directory['destDir']}*.png")
+    logging.warning(json.dumps(data_dashboard_extra_directory, indent=2))
+
+    if data_dashboard_extra_directory['extraDirectoryID'] not in excluded_extra_directory_ids:
+        exclude_filterlist.append(f"*{data_dashboard_extra_directory['destDir']}/*.png")
 
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
 
