@@ -301,7 +301,13 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
     filters = build_filters(gearman_worker)
 
     is_darwin = False
-    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+
+    logging.debug("Command: %s", ' '.join(command))
+
+    proc = subprocess.run(command, capture_output=True, text=True, check=False)
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
         is_darwin = line.rstrip('\n') == 'Darwin'
         if is_darwin:
@@ -777,7 +783,14 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
     is_darwin = False
-    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+        
+    logging.debug("Command: %s", ' '.join(command))
+
+    proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
         is_darwin = line.rstrip('\n') == 'Darwin'
         if is_darwin:
