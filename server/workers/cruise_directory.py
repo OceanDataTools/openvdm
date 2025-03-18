@@ -69,6 +69,11 @@ def build_directorylist(gearman_worker):
 
     # Add required extra directories
     extra_directories = gearman_worker.ovdm.get_required_extra_directories()
+
+    # Filter out From_PublicData directory if the auto transfer has been disabled.
+    if gearman_worker.get_transfer_public_data() is True:
+        extra_directories = [ extra_directory for extra_directory in extra_directories if extra_directory['name'] != 'From_PublicData']
+
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
     # Add lowering base directory
