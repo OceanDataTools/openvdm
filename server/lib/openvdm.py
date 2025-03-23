@@ -314,6 +314,36 @@ class OpenVDM():
             logging.error("Unable to retrieve cruise config filename from OpenVDM API")
             raise err
 
+    def get_cruisedata_url(self):
+        """
+        Return the cruise config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getCruiseDataURLPath'
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return f'{self.config['siteRoot'].rstrip('/')}{return_obj['cruiseDataURLPath']}'
+        except Exception as err:
+            logging.error("Unable to retrieve cruise data URL from OpenVDM API")
+            raise err
+
+
+    def get_cruisedata_path(self):
+        """
+        Return the cruise config filename
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getDataWarehouseBaseDir'
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return return_obj['dataWarehouseBaseDir']
+        except Exception as err:
+            logging.error("Unable to retrieve data warehouse base directory from OpenVDM API")
+            raise err
 
     def get_cruises(self):
         """
