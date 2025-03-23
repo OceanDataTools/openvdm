@@ -324,7 +324,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return f'{self.config['siteRoot'].rstrip('/')}{return_obj['cruiseDataURLPath']}'
+            return self.config['siteRoot'].rstrip('/')+return_obj['cruiseDataURLPath']
         except Exception as err:
             logging.error("Unable to retrieve cruise data URL from OpenVDM API")
             raise err
