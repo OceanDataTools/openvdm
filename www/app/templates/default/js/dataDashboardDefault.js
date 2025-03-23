@@ -2,7 +2,6 @@ $(function () {
     'use strict';
     
     var MAPPROXY_DIR = '/mapproxy';
-
     var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
 
     var greenIcon = null;
@@ -330,8 +329,8 @@ $(function () {
                             zIndex: 10
                         });
                     } else if ('tileURL' in data[0]) {
-                        mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + data[0]['tileURL'], {
-                            tms:true,
+                        const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
+			mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(url, {
                             bounds:L.latLngBounds(southwest, northeast),
                             zIndex: 10
                         });    
@@ -349,7 +348,6 @@ $(function () {
                     }
                     
                     mapObject['mapBounds'][tmsObjectJsonName] = L.latLngBounds(southwest, northeast);
-                    //console.log(mapObject['mapBounds'][tmsObjectJsonName]);
                         
                     // Add the layer to the map
                     mapObject['tmsLayers'][tmsObjectJsonName].addTo(mapObject['map']);
