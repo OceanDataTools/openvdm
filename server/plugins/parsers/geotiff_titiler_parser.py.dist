@@ -25,6 +25,7 @@ REQUIREMENTS:  Python3.10
 """
 
 import os
+import json
 import logging
 import shutil
 import subprocess
@@ -41,7 +42,8 @@ from server.lib.openvdm_plugin import OpenVDMParser
 # DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
-DEFAULT_TITILER_URL = 'http://localhost:8000'
+TIMEOUT = 2
+DEFAULT_TITILER_URL = 'http://openvdm.oceandatatools.org:8000'
 
 class GeoTIFFParser(OpenVDMParser):
     """
@@ -62,7 +64,6 @@ class GeoTIFFParser(OpenVDMParser):
         else:
             self.cruisedata_url = self.openvdm.get_cruisedata_url()
 
-
         self.cruisedata_path = self.openvdm.get_cruisedata_path()
         # self.time_format = time_format
 
@@ -80,11 +81,11 @@ class GeoTIFFParser(OpenVDMParser):
         logging.debug("Parsing data file...")
 
         directoryname, filename = os.path.split(filepath)
-        logging.warning('directoryname:', directoryname)
-        logging.warning('filename:', filename)
+        logging.warning('directoryname: %s', directoryname)
+        logging.warning('filename: %s', filename)
 
         label = os.path.splitext(filename)[0]
-        logging.warning('label', label)
+        logging.warning('label: %s', label)
 
         # if self.output_dir is None and self.openvdm is not None:
         #     # parse the filepath to get the name of the file without the file extension
@@ -142,37 +143,42 @@ class GeoTIFFParser(OpenVDMParser):
         # subprocess.run(command, capture_output=True, check=False)
 
         # shutil.rmtree(tmpdir)
+        logging.warning('self.cruisedata_url: %s', self.cruisedata_url)
+
         params = {
-            url: self.cruisedata_url + filepath
+            'url': self.cruisedata_url + filepath.replace(self.cruisedata_path, '')
         }
+        logging.warning('params: %s', json.dumps(params))
 
         url = f'{self.titiler_url}/cog/bounds'
-        loggign.warning('url:', url)
+        logging.warning('url: %s', url)
 
-        # try:
-        #     req = requests.get(url, params=params, timeout=TIMEOUT)
-        #     bounds = req.json.bounds
-        #     logging.warning("bounds:", bounds)
-        # except Exception as err:
-        #     logging.error("Unable to retrieve metadata on file from TiTiler API")
-        #     raise err
+        try:
+            req = requests.get(url, params=params, timeout=TIMEOUT)
+            logging.warning('req.json: %s', req.json())
+            bounds = req.json()['bounds']
+            bounds = [round(bound, 6) for bound in bounds]
+            logging.warning("bounds: %s", bounds)
+        except Exception as err:
+            logging.error("Unable to retrieve metadata on file from TiTiler API")
+            raise err
 
-        # logging.debug("Finished parsing data file")
+        logging.debug("Finished parsing data file")
 
-        # logging.debug("Tabulating statistics...")
+        logging.debug("Tabulating statistics...")
         # self.add_geobounds_stat([minx,miny,maxx,maxy])
 
-        # logging.debug("Building visualization data...")
+        logging.debug("Building visualization data...")
 
-        # visualizer_data_obj = {
-        #     "label": label,
-        #     "tileDirectory": self.tile_dir,
-        #     "mapBounds": bounds.join(',')
-        # }
+        visualizer_data_obj = {
+            "label": label,
+            "tileURL": params['url'],
+            "mapBounds": ','.join([str(bound) for bound in bounds])
+        }
 
-        # logging.warning("visualizer_data_obj", visualizer_data_obj)
+        logging.warning("visualizer_data_obj: %s", visualizer_data_obj)
         
-        # self.add_visualization_data(visualizer_data_obj)
+        self.add_visualization_data(visualizer_data_obj)
 
 
 # -------------------------------------------------------------------------------------
