@@ -77,11 +77,9 @@ def build_directorylist(gearman_worker):
     # add required extra directories to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
-
     # Add lowering base directory
     if gearman_worker.ovdm.get_show_lowering_components():
         return_directories.append(os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']))
-
 
     # Retrieve active collection system transfers
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
@@ -97,9 +95,9 @@ def build_directorylist(gearman_worker):
     # add collection system transfers to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
-
     # Retrieve active extra directories
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
+    extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == '0']
 
     # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
     if not gearman_worker.lowering_id:
@@ -108,7 +106,7 @@ def build_directorylist(gearman_worker):
     # add required extra directories to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
-    return return_directories
+    return list(set(return_directories))
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
