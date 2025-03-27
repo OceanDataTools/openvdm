@@ -43,7 +43,7 @@ from server.lib.openvdm_plugin import OpenVDMParser
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 TIMEOUT = 2
-DEFAULT_TITILER_URL = 'http://openvdm.oceandatatools.org:8000'
+DEFAULT_TITILER_URL = 'http://localhost:8000'
 
 class GeoTIFFParser(OpenVDMParser):
     """
