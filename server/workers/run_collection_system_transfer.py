@@ -132,7 +132,7 @@ def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-loca
     return_files['exclude'].sort()
 
     if prefix:
-        return_files['include'] = [filename.replace(prefix, '') for filename in return_files['include']]
+        # return_files['include'] = [filename.replace(prefix, '') for filename in return_files['include']]
         return_files['exclude'] = [filename.replace(prefix, '') for filename in return_files['exclude']]
 
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
@@ -614,10 +614,11 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['smbUser'] == 'guest':
         rw_type += ',guest'
     else:
-        rw_type += ',username=' + gearman_worker.collection_system_transfer['smbUser']
-        rw_type += ',password=' + gearman_worker.collection_system_transfer['smbPass']
+        rw_type += f",username={gearman_worker.collection_system_transfer['smbUser']}"
+        rw_type += f",password={gearman_worker.collection_system_transfer['smbPass']}"
 
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', rw_type + ',domain=\'' + gearman_worker.collection_system_transfer['smbDomain'] + '\',vers=' + vers]
+    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', f"{rw_type},domain={gearman_worker.collection_system_transfer['smbDomain']},vers={vers}"]
+
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
     proc = subprocess.call(mount_command)
