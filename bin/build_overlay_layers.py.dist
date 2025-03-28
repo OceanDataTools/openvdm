@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""
+FILE:  build_map_overlay_layers.py
+
+USAGE:  build_map_overlay_layers.py [-h] [-v+] [-c cruiseID] collectionSystem
+
+REQUIRED ARGUMENTS:
+    collectionSystem  name of OpenVDM-defined collection system to process
+
+OPTIONAL ARGUMENTS:
+    -h, --help        show this help message and exit
+    -v[+]             increase verbosity of script (DEFAULT: Warning)
+    -c cruiseID       the cruiseID to process
+
+DESCRIPTION:
+    Creates a leaflet-compatible json object for defining overlay tile layers fhat
+    can be imported into leaflet based on the geotiff files that were processed as
+    part of the data-dashboard task.
+
+    BUGS:
+   NOTES:
+  AUTHOR:  Webb Pinner
+ VERSION:  2.9
+ CREATED:  2025-03-24
+REVISION:  
+"""
+
+import argparse
+import glob
+import json
+import logging
+import os
+import sys
+import urllib.parse
+
+from os.path import dirname, realpath
+sys.path.append(dirname(dirname(realpath(__file__))))
+
+from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.output_json_data_to_file import output_json_data_to_file
+from server.lib.openvdm import OpenVDM
+
+DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
+OUTPUT_DIR = '/var/www/openvdm'
+OUTPUT_FN = 'overlay_layers.json'
+
+TITILER_URL = 'http://openvdm.oceandatatools.org:8000'
+
+AllGeoTiffSources = [
+    {
+        "CollectionSystem":"EM302",
+        "GeoTiffSources": [
+            {
+                "device":"EM302",
+                "regex":"proc/*.json"
+            }
+        ]
+    },
+    {
+        "CollectionSystem":"EM712",
+        "GeoTiffSources": [
+            {
+                "device":"EM712",
+                "regex":"proc/*.json"
+            }
+        ]
+    }
+
+]
+
+def build_json_file(cruiseID, outputDir, username, collectionSystem):
+
+    # Retrieve the shipboard data warehouse configuration
+    shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
+
+    # Get the user to save the output file(s) as
+    username = username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
+
+    # Construct the full path to the cruise data directory
+    baseDir = shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir']
+    cruiseDir = os.path.join(baseDir, cruiseID)
+
+    # Verify the cruise data directory exists
+    if not os.path.isdir(cruiseDir):
+        logging.error("Cruise data directory: %s not found!", cruiseDir)
+        sys.exit(1)
+
+
+    dashboardDataDirectory = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
+    dashboardDataDir = os.path.join(cruiseDir, dashboardDataDirectory)
+
+    # Verify the data dashboard directory exists
+    if not os.path.isdir(dashboardDataDir):
+        logging.error("Dashboard Data Directory: %s not found", dashboardDataDir)
+        sys.exit(1)
+
+    collectionSystemDashboardDataDir = os.path.join(dashboardDataDir, collectionSystem['destDir'])
+    logging.debug("collectionSystemDashboardDataDir: %s", collectionSystemDashboardDataDir)
+
+    # Verify the dashboard data directory for the specified collecion system exists
+    if not os.path.isdir(collectionSystemDashboardDataDir):
+        logging.error('Dashboard Data Directory for %s: %s not found', collectionSystem['name'], collectionSystemDashboardDataDir)
+        sys.exit(1)
+
+    results = []
+
+    # Loop through the AllGeoTiffs object
+    for GeoTiffCS in AllGeoTiffSources:
+
+        logging.debug(json.dumps(GeoTiffCS))
+
+        # No need to proceed to another collectionSystem
+        if GeoTiffCS['CollectionSystem'] != parsed_args.collectionSystem:
+            continue
+
+        #Build a geoJSON and kml cruisetrack for each GGA Device
+        for GeoTiffSource in GeoTiffCS['GeoTiffSources']:
+
+            logging.debug(json.dumps(GeoTiffSource))
+            logging.info("Processing %s", GeoTiffSource['device'])
+
+            # Build the list of files coorsponding to the current device based on the regex provided
+            files = glob.glob(collectionSystemDashboardDataDir.rstrip('/') + '/' + GeoTiffSource['regex'])
+
+            if len(files) == 0:
+                logging.warning('No files found for GeoTiff Source: %s', GeoTiffSource['device'])
+                continue
+
+            files.sort()
+
+            logging.debug("Files: %s", json.dumps(files, indent=2))
+            
+            for file in files:
+                with open(file, 'r') as fp:
+                    data = json.load(fp)
+                    params = {
+                        'url': data['visualizerData'][0]['tileURL']
+                    }
+                    results.append(
+                        {
+                            'name': data['visualizerData'][0]['label'],
+                            'url': TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?' + urllib.parse.urlencode(params)
+
+                        }
+                    )
+
+            try:
+                with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'r') as fp:
+                    data = json.load(fp)
+                    results.extend(data)
+            except:
+                pass
+
+            unique_names = set()
+
+            filtered_list = []
+            for obj in results:
+                name = obj["name"]
+                if name not in unique_names:
+                    unique_names.add(name)
+                    filtered_list.append(obj)
+
+            with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'w') as fp:
+                json.dump(filtered_list, fp, indent=2)
+        break
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='build leaflet overlay json file')
+    parser.add_argument('-v', '--verbosity', dest='verbosity',
+                        default=0, action='count',
+                        help='Increase output verbosity')
+    parser.add_argument('-c', dest='cruiseID', metavar='cruiseID', help='the cruiseID to process')
+    parser.add_argument('-o', dest='outputDir', metavar='outputDir', default=None, help='the desired output directory')
+    parser.add_argument('-u', '--username', metavar='username', help='set the output file(s) ownership to username')
+    parser.add_argument('collectionSystem', help='the collection system to search for geotiff files')
+
+    parsed_args = parser.parse_args()
+
+    ############################
+    # Set up logging before we do any other argument parsing (so that we
+    # can log problems with argument parsing).
+
+    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+    logging.basicConfig(format=LOGGING_FORMAT)
+
+    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
+    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+
+    # build an OpenVDM object
+    openVDM = OpenVDM()
+
+    # Define the cruiseID to use for identifying the position data
+    cruiseID = parsed_args.cruiseID or openVDM.get_cruise_id()
+
+    if cruiseID is None:
+        logging.error("Unable to find CruiseID")
+        sys.exit(1)
+
+    # Retrieve the information for the collection system defined in the command-line argument
+    collectionSystem = openVDM.get_collection_system_transfer_by_name(parsed_args.collectionSystem)
+    if not collectionSystem:
+        logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collectionSystem)
+        sys.exit(1)
+
+    outputDir = parsed_args.outputDir or OUTPUT_DIR
+
+    # Verify the trackline directory exists
+    if not os.path.isdir(outputDir):
+        logging.error("Output Directory: %s not found", outputDir)
+        sys.exit(1)
+
+    build_json_file(cruiseID, outputDir, parsed_args.username, collectionSystem)
+
+
