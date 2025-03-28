@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FILE:  build_map_overlay_layers.py
+FILE:  build_overlay_layers.py
 
 USAGE:  build_map_overlay_layers.py [-h] [-v+] [-c cruiseID] collectionSystem
 
@@ -36,15 +36,13 @@ import urllib.parse
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.openvdm import OpenVDM
 
 DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
 OUTPUT_DIR = '/var/www/openvdm'
 OUTPUT_FN = 'overlay_layers.json'
 
-TITILER_URL = 'http://openvdm.oceandatatools.org:8000'
+TITILER_URL = 'http://localhost:8000'
 
 AllGeoTiffSources = [
     {
@@ -68,13 +66,33 @@ AllGeoTiffSources = [
 
 ]
 
-def build_json_file(cruiseID, outputDir, username, collectionSystem):
+def build_json_file(cruiseID, outputDir, collectionSystemName):
+
+    # build an OpenVDM object
+    openVDM = OpenVDM()
+
+    # Define the cruiseID to use for identifying the position data
+    cruiseID = cruiseID or openVDM.get_cruise_id()
+
+    if cruiseID is None:
+        logging.error("Unable to find CruiseID")
+        sys.exit(1)
+
+    # Retrieve the information for the collection system defined in the command-line argument
+    collectionSystem = openVDM.get_collection_system_transfer_by_name(collectionSystemName)
+    if not collectionSystem:
+        logging.error("Collection System: %s not found in OpenVDM configuration.", collectionSystemName)
+        sys.exit(1)
+
+    outputDir = outputDir or OUTPUT_DIR
+
+    # Verify the trackline directory exists
+    if not os.path.isdir(outputDir):
+        logging.error("Output Directory: %s not found", outputDir)
+        sys.exit(1)
 
     # Retrieve the shipboard data warehouse configuration
     shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
-
-    # Get the user to save the output file(s) as
-    username = username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
 
     # Construct the full path to the cruise data directory
     baseDir = shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir']
@@ -110,7 +128,7 @@ def build_json_file(cruiseID, outputDir, username, collectionSystem):
         logging.debug(json.dumps(GeoTiffCS))
 
         # No need to proceed to another collectionSystem
-        if GeoTiffCS['CollectionSystem'] != parsed_args.collectionSystem:
+        if GeoTiffCS['CollectionSystem'] != collectionSystemName:
             continue
 
         #Build a geoJSON and kml cruisetrack for each GGA Device
@@ -164,14 +182,14 @@ def build_json_file(cruiseID, outputDir, username, collectionSystem):
                 json.dump(filtered_list, fp, indent=2)
         break
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='build leaflet overlay json file')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('-c', dest='cruiseID', metavar='cruiseID', help='the cruiseID to process')
+    parser.add_argument('-c', dest='cruiseID', metavar='cruiseID', default=None, help='the cruiseID to process')
     parser.add_argument('-o', dest='outputDir', metavar='outputDir', default=None, help='the desired output directory')
-    parser.add_argument('-u', '--username', metavar='username', help='set the output file(s) ownership to username')
     parser.add_argument('collectionSystem', help='the collection system to search for geotiff files')
 
     parsed_args = parser.parse_args()
@@ -187,29 +205,4 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    # build an OpenVDM object
-    openVDM = OpenVDM()
-
-    # Define the cruiseID to use for identifying the position data
-    cruiseID = parsed_args.cruiseID or openVDM.get_cruise_id()
-
-    if cruiseID is None:
-        logging.error("Unable to find CruiseID")
-        sys.exit(1)
-
-    # Retrieve the information for the collection system defined in the command-line argument
-    collectionSystem = openVDM.get_collection_system_transfer_by_name(parsed_args.collectionSystem)
-    if not collectionSystem:
-        logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collectionSystem)
-        sys.exit(1)
-
-    outputDir = parsed_args.outputDir or OUTPUT_DIR
-
-    # Verify the trackline directory exists
-    if not os.path.isdir(outputDir):
-        logging.error("Output Directory: %s not found", outputDir)
-        sys.exit(1)
-
-    build_json_file(cruiseID, outputDir, parsed_args.username, collectionSystem)
-
-
+    build_json_file(parsed_arg.cruiseID, parsed_arg.outputDir, parsed_arg.collectionSystem)
