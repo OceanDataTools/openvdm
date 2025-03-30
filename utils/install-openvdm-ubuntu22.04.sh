@@ -206,8 +206,6 @@ function install_packages {
         pip3 install MapProxy --quiet
     fi
     
-    npm install --quiet -g bower
-
     cd ~
     curl -sS https://getcomposer.org/installer | php
     mv composer.phar /usr/local/bin/composer

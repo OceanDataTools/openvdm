@@ -199,8 +199,6 @@ function install_packages {
         python3 -m pip install Pillow MapProxy --quiet
     fi
 
-    npm install --quiet -g bower
-
     cd ~
     curl -sS https://getcomposer.org/installer | php
     mv composer.phar /usr/local/bin/composer

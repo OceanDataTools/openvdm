@@ -52,11 +52,11 @@ $hooks = Hooks::get();
 <?php 
 
 $jsFileArray = array(
-    DIR . 'bower_components/jquery/dist/jquery.min.js',
-    DIR . 'bower_components/bootstrap/dist/js/bootstrap.min.js',
-    DIR . 'bower_components/metisMenu/dist/metisMenu.min.js',
-    DIR . 'bower_components/js-cookie/src/js.cookie.js',
-    DIR . 'bower_components/list.js/dist/list.min.js',    
+    DIR . 'node_modules/jquery/dist/jquery.min.js',
+    DIR . 'node_modules/bootstrap/dist/js/bootstrap.min.js',
+    DIR . 'node_modules/metismenu/dist/metisMenu.min.js',
+    DIR . 'node_modules/js-cookie/src/js.cookie.js',
+    DIR . 'node_modules/list.js/dist/list.min.js',    
     Url::templatePath() . 'js/sb-admin-2.js',
     Url::templatePath() . 'js/header.js',    
     Url::templatePath() . 'js/modals.js',
@@ -79,8 +79,8 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'node_modules/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');
         } else if ($jsFile === 'datetimepicker') {
-            array_push($jsFileArray, DIR . 'bower_components/moment/moment.js');
-            array_push($jsFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js');   
+            array_push($jsFileArray, DIR . 'node_modules/moment/moment.js');
+            array_push($jsFileArray, DIR . 'node_modules/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js');   
             array_push($jsFileArray, Url::templatePath() . 'js/datetimepicker.js');
         } else {
             array_push($jsFileArray, Url::templatePath() . 'js/' . $jsFile . '.js');
