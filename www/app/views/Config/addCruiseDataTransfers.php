@@ -68,7 +68,10 @@ if(!isset($_POST['excludedExtraDirectories'])) {
 ?>
                                 <div class="form-group">
                                     <label for='excludedCollectionSystems[]'>Select any Collection Systems to EXCLUDE:</label>
-                                    <div class="checkbox">
+                                    <div>
+                                      <input type="checkbox" id="selectAllCS" /> Select All
+                                    </div>
+                                    <div id='excludedCollectionSystems' class="checkbox">
 <?php
         foreach ($data['collectionSystemTransfers'] as $key => $value) {
 ?>
@@ -91,7 +94,10 @@ if(!isset($_POST['excludedExtraDirectories'])) {
 ?>
                                 <div class="form-group">
                                     <label for='excludedExtraDirectories[]'>Select any Extra Directories to EXCLUDE:</label>
-                                    <div class="checkbox">
+                                    <div>
+                                      <input type="checkbox" id="selectAllED" /> Select All
+                                    </div>
+                                    <div id='excludedExtraDirectories' class="checkbox">
 <?php
         foreach ($data['extraDirectories'] as $key => $value) {
 ?>
