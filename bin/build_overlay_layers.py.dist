@@ -2,7 +2,7 @@
 """
 FILE:  build_overlay_layers.py
 
-USAGE:  build_map_overlay_layers.py [-h] [-v+] [-c cruiseID] collectionSystem
+USAGE:  build_map_overlay_layers.py [-h] [-v+] [-o output_dir] collectionSystem
 
 REQUIRED ARGUMENTS:
     collectionSystem  name of OpenVDM-defined collection system to process
@@ -10,7 +10,7 @@ REQUIRED ARGUMENTS:
 OPTIONAL ARGUMENTS:
     -h, --help        show this help message and exit
     -v[+]             increase verbosity of script (DEFAULT: Warning)
-    -c cruiseID       the cruiseID to process
+    -o output_dir     output directory for json file
 
 DESCRIPTION:
     Creates a leaflet-compatible json object for defining overlay tile layers fhat
@@ -66,58 +66,62 @@ AllGeoTiffSources = [
 
 ]
 
-def build_json_file(cruiseID, outputDir, collectionSystemName):
+def build_json_file(output_dir, collection_system_name):
+    '''
+    Takes the output directory and collection system name and creates a json 
+    file that contains all overlay layers available for the given cruise.
+    '''
 
     # build an OpenVDM object
-    openVDM = OpenVDM()
+    openvdm = OpenVDM()
 
-    # Define the cruiseID to use for identifying the position data
-    cruiseID = cruiseID or openVDM.get_cruise_id()
+    # Define the cruise_id to use for identifying the position data
+    cruise_id = openvdm.get_cruise_id()
 
-    if cruiseID is None:
+    if cruise_id is None:
         logging.error("Unable to find CruiseID")
         sys.exit(1)
 
     # Retrieve the information for the collection system defined in the command-line argument
-    collectionSystem = openVDM.get_collection_system_transfer_by_name(collectionSystemName)
-    if not collectionSystem:
-        logging.error("Collection System: %s not found in OpenVDM configuration.", collectionSystemName)
+    collection_system = openvdm.get_collection_system_transfer_by_name(collection_system_name)
+    if not collection_system:
+        logging.error("Collection System: %s not found in OpenVDM configuration.", collection_system_name)
         sys.exit(1)
 
-    outputDir = outputDir or OUTPUT_DIR
+    output_dir = output_dir or OUTPUT_DIR
 
     # Verify the trackline directory exists
-    if not os.path.isdir(outputDir):
-        logging.error("Output Directory: %s not found", outputDir)
+    if not os.path.isdir(output_dir):
+        logging.error("Output Directory: %s not found", output_dir)
         sys.exit(1)
 
     # Retrieve the shipboard data warehouse configuration
-    shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
+    shipboard_data_warehouse_config = openvdm.get_shipboard_data_warehouse_config()
 
     # Construct the full path to the cruise data directory
-    baseDir = shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir']
-    cruiseDir = os.path.join(baseDir, cruiseID)
+    base_dir = shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
+    cruise_dir = os.path.join(base_dir, cruise_id)
 
     # Verify the cruise data directory exists
-    if not os.path.isdir(cruiseDir):
-        logging.error("Cruise data directory: %s not found!", cruiseDir)
+    if not os.path.isdir(cruise_dir):
+        logging.error("Cruise data directory: %s not found!", cruise_dir)
         sys.exit(1)
 
 
-    dashboardDataDirectory = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
-    dashboardDataDir = os.path.join(cruiseDir, dashboardDataDirectory)
+    dashboard_data_directory = openvdm.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
+    dashboard_data_dir = os.path.join(cruise_dir, dashboard_data_directory)
 
     # Verify the data dashboard directory exists
-    if not os.path.isdir(dashboardDataDir):
-        logging.error("Dashboard Data Directory: %s not found", dashboardDataDir)
+    if not os.path.isdir(dashboard_data_dir):
+        logging.error("Dashboard Data Directory: %s not found", dashboard_data_dir)
         sys.exit(1)
 
-    collectionSystemDashboardDataDir = os.path.join(dashboardDataDir, collectionSystem['destDir'])
-    logging.debug("collectionSystemDashboardDataDir: %s", collectionSystemDashboardDataDir)
+    collection_system_dashboard_data_dir = os.path.join(dashboard_data_dir, collection_system['destDir'])
+    logging.debug("collection_system_dashboard_data_dir: %s", collection_system_dashboard_data_dir)
 
     # Verify the dashboard data directory for the specified collecion system exists
-    if not os.path.isdir(collectionSystemDashboardDataDir):
-        logging.error('Dashboard Data Directory for %s: %s not found', collectionSystem['name'], collectionSystemDashboardDataDir)
+    if not os.path.isdir(collection_system_dashboard_data_dir):
+        logging.error('Dashboard Data Directory for %s: %s not found', collection_system['name'], collection_system_dashboard_data_dir)
         sys.exit(1)
 
     results = []
@@ -128,7 +132,7 @@ def build_json_file(cruiseID, outputDir, collectionSystemName):
         logging.debug(json.dumps(GeoTiffCS))
 
         # No need to proceed to another collectionSystem
-        if GeoTiffCS['CollectionSystem'] != collectionSystemName:
+        if GeoTiffCS['CollectionSystem'] != collection_system_name:
             continue
 
         #Build a geoJSON and kml cruisetrack for each GGA Device
@@ -138,7 +142,7 @@ def build_json_file(cruiseID, outputDir, collectionSystemName):
             logging.info("Processing %s", GeoTiffSource['device'])
 
             # Build the list of files coorsponding to the current device based on the regex provided
-            files = glob.glob(collectionSystemDashboardDataDir.rstrip('/') + '/' + GeoTiffSource['regex'])
+            files = glob.glob(collection_system_dashboard_data_dir.rstrip('/') + '/' + GeoTiffSource['regex'])
 
             if len(files) == 0:
                 logging.warning('No files found for GeoTiff Source: %s', GeoTiffSource['device'])
@@ -147,9 +151,9 @@ def build_json_file(cruiseID, outputDir, collectionSystemName):
             files.sort()
 
             logging.debug("Files: %s", json.dumps(files, indent=2))
-            
+
             for file in files:
-                with open(file, 'r') as fp:
+                with open(file, 'r', encoding='utf-8') as fp:
                     data = json.load(fp)
                     params = {
                         'url': data['visualizerData'][0]['tileURL']
@@ -163,10 +167,10 @@ def build_json_file(cruiseID, outputDir, collectionSystemName):
                     )
 
             try:
-                with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'r') as fp:
+                with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'r', encoding='utf-8') as fp:
                     data = json.load(fp)
                     results.extend(data)
-            except:
+            except BaseException:
                 pass
 
             unique_names = set()
@@ -178,7 +182,7 @@ def build_json_file(cruiseID, outputDir, collectionSystemName):
                     unique_names.add(name)
                     filtered_list.append(obj)
 
-            with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'w') as fp:
+            with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'w', encoding='utf-8') as fp:
                 json.dump(filtered_list, fp, indent=2)
         break
 
@@ -188,9 +192,8 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('-c', dest='cruiseID', metavar='cruiseID', default=None, help='the cruiseID to process')
-    parser.add_argument('-o', dest='outputDir', metavar='outputDir', default=None, help='the desired output directory')
-    parser.add_argument('collectionSystem', help='the collection system to search for geotiff files')
+    parser.add_argument('-o', dest='output_dir', metavar='output_dir', default=None, help='the desired output directory')
+    parser.add_argument('collection_system', help='the collection system to search for geotiff files')
 
     parsed_args = parser.parse_args()
 
@@ -205,4 +208,4 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    build_json_file(parsed_arg.cruiseID, parsed_arg.outputDir, parsed_arg.collectionSystem)
+    build_json_file(parsed_args.output_dir, parsed_args.collection_system)
