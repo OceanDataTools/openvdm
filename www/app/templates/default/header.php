@@ -129,9 +129,9 @@ use Helpers\Hooks;
 <?php
 
     $cssFileArray = array(
-        DIR . 'bower_components/bootstrap/dist/css/bootstrap.min.css',
-        DIR . 'bower_components/metisMenu/dist/metisMenu.min.css',
-        DIR . 'bower_components/font-awesome/css/font-awesome.min.css',
+        DIR . 'node_modules/bootstrap/dist/css/bootstrap.min.css',
+        DIR . 'node_modules/metismenu/dist/metisMenu.min.css',
+        DIR . 'node_modules/font-awesome/css/font-awesome.min.css',
         Url::templatePath() . 'css/sb-admin-2.css',
         Url::templatePath() . 'css/timeline.css',
         Url::templatePath() . 'css/style.css',
@@ -145,7 +145,7 @@ use Helpers\Hooks;
             } else if ($cssFile === 'leaflet-timedimension') {
                 array_push($cssFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.control.min.css');
             } else if ($cssFile === 'datetimepicker') {
-                array_push($cssFileArray, DIR . 'bower_components/eonasdan-bootstrap-datetimepicker/build/css/bootstrap-datetimepicker.min.css');
+                array_push($cssFileArray, DIR . 'node_modules/eonasdan-bootstrap-datetimepicker/build/css/bootstrap-datetimepicker.min.css');
             } else {
                 array_push($cssFileArray, Url::templatePath() . "css/" . $cssFile . ".css");
             }
