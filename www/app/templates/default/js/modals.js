@@ -8,7 +8,7 @@ $(function () {
         $(this).find('#modalDeleteLink').attr("href", deleteURL);
     });
     
-    $(window).load(function(){
+    $(window).on('load', function(){
         if($('#testResultsModal').length > 0) {
             $('#testResultsModal').modal({show:true});
         } else if($('#jobResultsModal').length > 0) {

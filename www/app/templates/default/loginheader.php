@@ -21,9 +21,9 @@
     <!-- CSS -->
 	<?php
 		Assets::css(array(
-			DIR . 'bower_components/bootstrap/dist/css/bootstrap.min.css',
-			DIR . 'bower_components/metisMenu/dist/metisMenu.min.css',
-            DIR . 'bower_components/font-awesome/css/font-awesome.min.css',
+			DIR . 'node_modules/bootstrap/dist/css/bootstrap.min.css',
+			DIR . 'node_modules/metismenu/dist/metisMenu.min.css',
+            DIR . 'node_modules/font-awesome/css/font-awesome.min.css',
 			Url::templatePath() . 'css/sb-admin-2.css',
 			Url::templatePath() . 'css/timeline.css',
             Url::templatePath() . 'css/style.css',
