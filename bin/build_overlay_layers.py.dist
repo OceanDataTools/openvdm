@@ -50,7 +50,7 @@ AllGeoTiffSources = [
         "GeoTiffSources": [
             {
                 "device":"EM302",
-                "regex":"proc/*.json"
+                "regex":"**/*.json"
             }
         ]
     },
@@ -59,14 +59,14 @@ AllGeoTiffSources = [
         "GeoTiffSources": [
             {
                 "device":"EM712",
-                "regex":"proc/*.json"
+                "regex":"**/*.json"
             }
         ]
     }
 
 ]
 
-def build_json_file(output_dir, collection_system_name):
+def build_json_file(output_dir):
     '''
     Takes the output directory and collection system name and creates a json 
     file that contains all overlay layers available for the given cruise.
@@ -80,19 +80,6 @@ def build_json_file(output_dir, collection_system_name):
 
     if cruise_id is None:
         logging.error("Unable to find CruiseID")
-        sys.exit(1)
-
-    # Retrieve the information for the collection system defined in the command-line argument
-    collection_system = openvdm.get_collection_system_transfer_by_name(collection_system_name)
-    if not collection_system:
-        logging.error("Collection System: %s not found in OpenVDM configuration.", collection_system_name)
-        sys.exit(1)
-
-    output_dir = output_dir or OUTPUT_DIR
-
-    # Verify the trackline directory exists
-    if not os.path.isdir(output_dir):
-        logging.error("Output Directory: %s not found", output_dir)
         sys.exit(1)
 
     # Retrieve the shipboard data warehouse configuration
@@ -116,45 +103,45 @@ def build_json_file(output_dir, collection_system_name):
         logging.error("Dashboard Data Directory: %s not found", dashboard_data_dir)
         sys.exit(1)
 
-    collection_system_dashboard_data_dir = os.path.join(dashboard_data_dir, collection_system['destDir'])
-    logging.debug("collection_system_dashboard_data_dir: %s", collection_system_dashboard_data_dir)
-
-    # Verify the dashboard data directory for the specified collecion system exists
-    if not os.path.isdir(collection_system_dashboard_data_dir):
-        logging.error('Dashboard Data Directory for %s: %s not found', collection_system['name'], collection_system_dashboard_data_dir)
-        sys.exit(1)
-
     results = []
 
     # Loop through the AllGeoTiffs object
-    for GeoTiffCS in AllGeoTiffSources:
+    for geotif_cs in AllGeoTiffSources:
 
-        logging.debug(json.dumps(GeoTiffCS))
+        # Retrieve the information for the collection system defined in the command-line argument
+        collection_system = openvdm.get_collection_system_transfer_by_name(geotif_cs['CollectionSystem'])
+        if not collection_system:
+            logging.error("Collection System: %s not found in OpenVDM configuration.", geotif_cs['CollectionSystem'])
+            continue
 
-        # No need to proceed to another collectionSystem
-        if GeoTiffCS['CollectionSystem'] != collection_system_name:
+        collection_system_dashboard_data_dir = os.path.join(dashboard_data_dir, collection_system['destDir'])
+        logging.debug("collection_system_dashboard_data_dir: %s", collection_system_dashboard_data_dir)
+
+        # Verify the dashboard data directory for the specified collecion system exists
+        if not os.path.isdir(collection_system_dashboard_data_dir):
+            logging.error('Dashboard Data Directory for %s: %s not found', collection_system['name'], collection_system_dashboard_data_dir)
             continue
 
         #Build a geoJSON and kml cruisetrack for each GGA Device
-        for GeoTiffSource in GeoTiffCS['GeoTiffSources']:
+        for geotif_source in geotif_cs['GeoTiffSources']:
 
-            logging.debug(json.dumps(GeoTiffSource))
-            logging.info("Processing %s", GeoTiffSource['device'])
+            logging.debug(json.dumps(geotif_source))
+            logging.info("Processing %s", geotif_source['device'])
 
             # Build the list of files coorsponding to the current device based on the regex provided
-            files = glob.glob(collection_system_dashboard_data_dir.rstrip('/') + '/' + GeoTiffSource['regex'])
+            files = glob.glob(collection_system_dashboard_data_dir.rstrip('/') + '/' + geotif_source['regex'])
 
             if len(files) == 0:
-                logging.warning('No files found for GeoTiff Source: %s', GeoTiffSource['device'])
+                logging.warning('No files found for GeoTiff Source: %s', geotif_source['device'])
                 continue
 
             files.sort()
 
             logging.debug("Files: %s", json.dumps(files, indent=2))
 
-            for file in files:
-                with open(file, 'r', encoding='utf-8') as fp:
-                    data = json.load(fp)
+            for filename in files:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    data = json.load(file)
                     params = {
                         'url': data['visualizerData'][0]['tileURL']
                     }
@@ -166,25 +153,17 @@ def build_json_file(output_dir, collection_system_name):
                         }
                     )
 
+    try:
+        with open(os.path.join(output_dir, OUTPUT_FN), 'w', encoding='utf-8') as file:
             try:
-                with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'r', encoding='utf-8') as fp:
-                    data = json.load(fp)
-                    results.extend(data)
-            except BaseException:
-                pass
+                json.dump(results, file, indent=2)
+            except (IOError, OSError) as exc:
+                logging.error("Error writing to file")
+                logging.debug(str(exc))
 
-            unique_names = set()
-
-            filtered_list = []
-            for obj in results:
-                name = obj["name"]
-                if name not in unique_names:
-                    unique_names.add(name)
-                    filtered_list.append(obj)
-
-            with open(os.path.join(OUTPUT_DIR, OUTPUT_FN), 'w', encoding='utf-8') as fp:
-                json.dump(filtered_list, fp, indent=2)
-        break
+    except (FileNotFoundError, PermissionError, OSError) as exc:
+        logging.error("Error opening file")
+        logging.debug(str(exc))
 
 
 if __name__ == "__main__":
@@ -192,8 +171,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('-o', dest='output_dir', metavar='output_dir', default=None, help='the desired output directory')
-    parser.add_argument('collection_system', help='the collection system to search for geotiff files')
+    parser.add_argument('-o', dest='output', metavar='output', default=None, help='the desired output directory')
 
     parsed_args = parser.parse_args()
 
@@ -208,4 +186,11 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    build_json_file(parsed_args.output_dir, parsed_args.collection_system)
+    output = parsed_args.output or OUTPUT_DIR
+
+    # Verify the output directory exists
+    if not os.path.isdir(output):
+        logging.error("Output Directory: %s not found", output)
+        sys.exit(1)
+
+    build_json_file(output)
