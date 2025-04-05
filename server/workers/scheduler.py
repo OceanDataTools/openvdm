@@ -121,9 +121,11 @@ if __name__ == "__main__":
             time.sleep(2)
 
         # purge old transfer logs:
+        logging.info("Purging old transfer logs")
         cruiseID = ovdm.get_cruise_id()
+        timedelta_str = ovdm.get_logfile_purge_timedelta_str()
         transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
-        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str="12 hours")
+        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=timedelta_str)
 
         delay = parsed_args.interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)
