@@ -86,6 +86,9 @@ def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive
                 time_args['seconds'] = value
 
             i += 2
+        
+        if not time_args:
+            raise ValueError('Invalid timedelta string specified: %s', timedelta_str)
 
         return timedelta(**time_args)
 
@@ -132,7 +135,7 @@ def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive
         time_delta = _parse_timedelta(timedelta_str)
     except ValueError as exc:
         logging.error("Error parsing time delta string: %s", exc)
-        return
+        raise exc
 
     # Get the current time
     current_time = time.time()

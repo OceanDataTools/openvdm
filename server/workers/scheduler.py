@@ -67,12 +67,19 @@ if __name__ == "__main__":
 
     cruise_basedir = ovdm.get_cruisedata_path()
     openvdm_config = read_config(DEFAULT_CONFIG_FILE)
-    logfile_purge_timedelta = openvdm_config['logfilePurgeTimedelta'] or None
+    logfile_purge_timedelta = openvdm_config.get('logfilePurgeTimedelta', None)
 
     if logfile_purge_timedelta:
         logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
 
     while True:
+ 
+        # purge old transfer logs:
+        logging.info("Purging old transfer logs")
+        cruiseID = ovdm.get_cruise_id()
+        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
+
 
         CURRENT_SEC = 0
         while True:
@@ -125,12 +132,6 @@ if __name__ == "__main__":
                 completed_job_request = gm_client.submit_job("runShipToShoreTransfer", json.dumps(gmData), background=True)
 
             time.sleep(2)
-
-        # purge old transfer logs:
-        logging.info("Purging old transfer logs")
-        cruiseID = ovdm.get_cruise_id()
-        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
-        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
 
         delay = parsed_args.interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)

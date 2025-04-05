@@ -361,7 +361,7 @@ class OpenVDM():
             raise err
 
 
-    def get_logfile_purge_timedelta_str(self)
+    def get_logfile_purge_timedelta_str(self):
         """
         Return the logfile purge interval
         """
