@@ -33,8 +33,9 @@ from python3_gearman import GearmanClient
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.openvdm import OpenVDM
 from server.lib.file_utils import purge_old_files
+from server.lib.openvdm import OpenVDM, DEFAULT_CONFIG_FILE
+from server.lib.read_config import read_config
 
 if __name__ == "__main__":
 
@@ -65,6 +66,11 @@ if __name__ == "__main__":
     time.sleep(10)
 
     cruise_basedir = ovdm.get_cruisedata_path()
+    openvdm_config = read_config(DEFAULT_CONFIG_FILE)
+    logfile_purge_timedelta = openvdm_config['logfilePurgeTimedelta'] or None
+
+    if logfile_purge_timedelta:
+        logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
 
     while True:
 
@@ -123,9 +129,8 @@ if __name__ == "__main__":
         # purge old transfer logs:
         logging.info("Purging old transfer logs")
         cruiseID = ovdm.get_cruise_id()
-        timedelta_str = ovdm.get_logfile_purge_timedelta_str()
         transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
-        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=timedelta_str)
+        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
 
         delay = parsed_args.interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)
