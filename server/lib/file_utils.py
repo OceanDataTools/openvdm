@@ -5,6 +5,7 @@
 import os
 import re
 import time
+import fnmatch
 import logging
 from datetime import timedelta
 
@@ -61,7 +62,7 @@ def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive
     purge files older than the given deltatime-formatted threshold
     '''
 
-    timedelta_str = timedelta_str or "1 day"
+    timedelta_str = timedelta_str or "12 hours"
 
     def _parse_timedelta(timedelta_str):
         '''
