@@ -22,11 +22,12 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
  REVISION:  2022-07-24
 """
 
-import argparse
-import json
-import logging
+import os
 import sys
 import time
+import json
+import logging
+import argparse
 from os.path import dirname, realpath
 from python3_gearman import GearmanClient
 
@@ -62,6 +63,8 @@ if __name__ == "__main__":
     gm_client = GearmanClient([ovdm.get_gearman_server()])
 
     time.sleep(10)
+
+    cruise_basedir = ovdm.get_cruisedata_path()
 
     while True:
 
@@ -104,6 +107,7 @@ if __name__ == "__main__":
 
             time.sleep(2)
 
+        # schedule ship-to-shore transfer
         required_cruise_data_transfers = ovdm.get_required_cruise_data_transfers()
         for required_cruise_data_transfer in required_cruise_data_transfers:
             if required_cruise_data_transfer['name'] == 'SSDW':
@@ -115,6 +119,11 @@ if __name__ == "__main__":
                 completed_job_request = gm_client.submit_job("runShipToShoreTransfer", json.dumps(gmData), background=True)
 
             time.sleep(2)
+
+        # purge old transfer logs:
+        cruiseID = ovdm.get_cruise_id()
+        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str="12 hours")
 
         delay = parsed_args.interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)

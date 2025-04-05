@@ -56,10 +56,12 @@ def is_rsync_patial_file(filename):
     return file_match
 
 
-def purge_old_files(directory_path, timedelta_str="1 day", recursive=False):
+def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive=False):
     '''
     purge files older than the given deltatime-formatted threshold
     '''
+
+    timedelta_str = timedelta_str or "1 day"
 
     def _parse_timedelta(timedelta_str):
         '''
@@ -86,30 +88,42 @@ def purge_old_files(directory_path, timedelta_str="1 day", recursive=False):
 
         return timedelta(**time_args)
 
-    def _purge_files(directory_path, total_seconds, recursive):
+    def _purge_files(directory_path, excludes, total_seconds, recursive):
         # Iterate over all files in the directory
         for filename in os.listdir(directory_path):
-            file_path = os.path.join(directory_path, filename)
+            filepath = os.path.join(directory_path, filename)
+
+            # handle excludes
+            skip = False
+            if excludes is not None:
+                for exclude in excludes.split(','):
+                    if fnmatch.fnmatch(filepath, exclude):
+                        logging.debug("%s excluded by exclude filter", filepath)
+                        skip = True
+                        break
+
+            if skip:
+                continue
 
             # Process files
-            if os.path.isfile(file_path):
+            if os.path.isfile(filepath):
                 # Check the file's last modification time
-                file_mod_time = os.path.getmtime(file_path)
+                file_mod_time = os.path.getmtime(filepath)
 
                 # If the file is older than the specified time delta, delete it
                 if current_time - file_mod_time > total_seconds:
                     try:
-                        os.remove(file_path)
-                        logging.info("Deleted: %s", file_path)
+                        os.remove(filepath)
+                        logging.info("Deleted: %s", filepath)
                     except Exception as exc:
-                        logging.error("Error deleting %s: %s", file_path, exc)
+                        logging.error("Error deleting %s: %s", filepath, exc)
 
             # Process directories
-            if os.path.isdir(file_path):
+            if os.path.isdir(filepath):
                 if not recursive:
                     continue
 
-                _purge_files(file_path, total_seconds, recursive)
+                _purge_files(filepath, excludes, total_seconds, recursive)
 
     # Parse the time delta string into a timedelta object
     try:
@@ -122,4 +136,4 @@ def purge_old_files(directory_path, timedelta_str="1 day", recursive=False):
     # Get the current time
     current_time = time.time()
 
-    _purge_files(directory_path, time_delta.total_seconds(), recursive)
+    _purge_files(directory_path, excludes, time_delta.total_seconds(), recursive)
