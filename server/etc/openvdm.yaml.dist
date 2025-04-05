@@ -32,6 +32,10 @@ showOnlyCurrentCruiseDir: False
 # directory. (True|False))
 transferPubicData: True
 
+# maximum age of transfer log files to retain. String must conform with the pythong
+# datetime.timedelta standard
+# logfilePurgeTimedelta: "12 hours"
+
 # The plugins section defines where the plugins processing scripts reside
 # and the expected suffix for each processing file.  It should include 2 directives:
 # processingScriptDir --> the full path containing the plugins processing scripts
