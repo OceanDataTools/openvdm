@@ -12,9 +12,9 @@ $(function () {
     
     $(window).on('load', function(){
         if($('#testResultsModal').length > 0) {
-            $('#testResultsModal').modal({'show'});
+            $('#testResultsModal').modal('show');
         } else if($('#jobResultsModal').length > 0) {
-            $('#jobResultsModal').modal({'show'});
+            $('#jobResultsModal').modal('show');
         }
     });
 });
