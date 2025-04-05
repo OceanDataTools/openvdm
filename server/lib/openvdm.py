@@ -361,6 +361,22 @@ class OpenVDM():
             raise err
 
 
+    def get_logfile_purge_timedelta_str(self):
+        """
+        Return the logfile purge interval
+        """
+
+        url = self.config['siteRoot'] + 'api/warehouse/getLogfilePurgeInterval'
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return return_obj['logfilePurgeInterval'] if return_obj['logfilePurgeInterval'] != '' else None
+        except Exception as err:
+            logging.error("Unable to retrieve LogfilePurgeInterval from OpenVDM API")
+            raise err
+
+
     def get_lowering_id(self):
         """
         Return the current lowering id

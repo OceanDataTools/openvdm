@@ -69,7 +69,7 @@ def build_directorylist(gearman_worker):
 
     # Retrieve required extra directories
     extra_directories = gearman_worker.ovdm.get_required_extra_directories()
-    
+
     # Filter out From_PublicData directory if the auto transfer has been disabled.
     if gearman_worker.ovdm.get_transfer_public_data() is not True:
         extra_directories = [ extra_directory for extra_directory in extra_directories if extra_directory['name'] != 'From_PublicData']
