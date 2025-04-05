@@ -30,7 +30,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii, is_rsync_patial_file
+from server.lib.file_utils import is_ascii, is_rsync_patial_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
@@ -218,7 +218,7 @@ def run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, comman
     if file_count == 0:
         logging.debug("Skipping Transfer Command: nothing to transfer")
         return [], []
-    
+
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     file_index = 0

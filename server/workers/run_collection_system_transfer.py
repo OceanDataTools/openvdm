@@ -33,7 +33,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii
+from server.lib.file_utils import is_ascii
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
@@ -302,14 +302,14 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
 
     is_darwin = False
     command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
-    
+
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
-    
+
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
         is_darwin = line.rstrip('\n') == 'Darwin'
         if is_darwin:
@@ -787,10 +787,10 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     is_darwin = False
     command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
-    
+
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
-        
+
     logging.debug("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -1115,6 +1115,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.info("Setting file permissions")
+        logging.debug("%s %s", gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
 
         output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
 

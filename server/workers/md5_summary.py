@@ -14,7 +14,6 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
 """
 
 import argparse
-import hashlib
 import json
 import logging
 import os
