@@ -1,6 +1,8 @@
 $(function () {
     'use strict';
 
+    console.log("modal")
+
     $('#confirmDeleteModal').on('show.bs.modal', function (e) {
         var itemName = $(e.relatedTarget).data('item-name');
         var deleteURL = $(e.relatedTarget).data('delete-url');
@@ -10,9 +12,9 @@ $(function () {
     
     $(window).on('load', function(){
         if($('#testResultsModal').length > 0) {
-            $('#testResultsModal').modal({show:true});
+            $('#testResultsModal').modal({'show'});
         } else if($('#jobResultsModal').length > 0) {
-            $('#jobResultsModal').modal({show:true});
+            $('#jobResultsModal').modal({'show'});
         }
     });
 });
