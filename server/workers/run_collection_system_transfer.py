@@ -1115,9 +1115,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.info("Setting file permissions")
-        logging.debug("%s %s", gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
-
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
+        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.dest_dir)
 
         if not output_results['verdict']:
             logging.error("Error setting destination directory file/directory ownership/permissions: %s", gearman_worker.dest_dir)

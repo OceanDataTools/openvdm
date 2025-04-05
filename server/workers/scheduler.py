@@ -33,7 +33,7 @@ from python3_gearman import GearmanClient
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-
+from server.lib.file_utils import purge_old_files
 
 if __name__ == "__main__":
 
@@ -74,6 +74,7 @@ if __name__ == "__main__":
             else:
                 break
 
+        # schedule collection_system_transfers
         collection_system_transfers = ovdm.get_active_collection_system_transfers()
         for collection_system_transfer in collection_system_transfers:
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -88,7 +89,7 @@ if __name__ == "__main__":
 
             time.sleep(2)
 
-
+        # schedule cruise_data_transfers
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
