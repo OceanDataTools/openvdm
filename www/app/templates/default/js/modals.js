@@ -8,13 +8,11 @@ $(function () {
         $(this).find('#modalDeleteLink').attr("href", deleteURL);
     });
     
-    $(window).on('load', function(){
-        setTimeout(function() {        
-            if($('#testResultsModal').length > 0) {
-                $('#testResultsModal').modal('show');
-            } else if($('#jobResultsModal').length > 0) {
-                $('#jobResultsModal').modal('show');
-            }
-        }, 1000)
+    $(document).ready(function(){
+        if($('#testResultsModal').length > 0) {
+            $('#testResultsModal').modal('show');
+        } else if($('#jobResultsModal').length > 0) {
+            $('#jobResultsModal').modal('show');
+        }
     });
 });
