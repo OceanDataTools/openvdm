@@ -1,7 +1,7 @@
 $(function () {
     'use strict';
    
-    $(window).load(function(){
+    $(document).ready(function(){  
         if($('#statsModal')) {
             $('#statsModal').modal('show');
         }
