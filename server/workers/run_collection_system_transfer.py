@@ -425,11 +425,38 @@ def build_filters(gearman_worker):
     Replace wildcard string in filters
     """
 
-    return {
-        'includeFilter': gearman_worker.collection_system_transfer['includeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
-        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
-        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id)
+    filters = {
+        'includeFilter': gearman_worker.collection_system_transfer['includeFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]'),
+        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]'),
+        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]')
     }
+    logging.debug(json.dumps(filters, indent=2))
+
+    return filters
 
 
 def build_dest_dir(gearman_worker):
@@ -880,7 +907,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.debug(str(err))
             return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for collection system transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - {}: %(message)s'.format(self.collection_system_transfer['name'])
+        LOGGING_FORMAT = f'%(asctime)-15s %(levelname)s - {self.collection_system_transfer["name"]}: %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
