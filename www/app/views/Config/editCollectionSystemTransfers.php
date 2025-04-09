@@ -120,7 +120,13 @@ $_warehouseModel = new \Models\Warehouse();
             <p><strong>Shorthand notation</strong> for file filters, source and destination directories:<br/>
                 <ul>
                     <li><strong>{cruiseID}</strong> is the shorthand for the current <?php echo CRUISE_NAME; ?> ID</li>
+<?php
+  if ( $data['showLoweringComponents']) {
+?>
                     <li><strong>{loweringID}</strong> is the shorthand for the current <?php echo LOWERING_NAME; ?> ID</li>
+<?php
+  }
+?>
                 </ul>
             </p>
             <p><strong>Additional shorthand notation</strong> for file filters:<br/>
