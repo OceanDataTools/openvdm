@@ -425,14 +425,14 @@ def build_filters(gearman_worker):
     Replace wildcard string in filters
     """
 
-    return {
+    filters = {
         'includeFilter': gearman_worker.collection_system_transfer['includeFilter']
             .replace('{cruiseID}', gearman_worker.cruise_id)
             .replace('{loweringID}', gearman_worker.lowering_id)
             .replace('{YYYY}', '20[0-9][0-9]')
             .replace('{YY}', '[0-9][0-9]')
             .replace('{mm}', '[0-1][0-9]')
-            .replace('{dd}', '[0-3][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
             .replace('{HH}', '[0-2][0-9]')
             .replace('{MM}', '[0-5][0-9]'),
         'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter']
@@ -441,7 +441,7 @@ def build_filters(gearman_worker):
             .replace('{YYYY}', '20[0-9][0-9]')
             .replace('{YY}', '[0-9][0-9]')
             .replace('{mm}', '[0-1][0-9]')
-            .replace('{dd}', '[0-3][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
             .replace('{HH}', '[0-2][0-9]')
             .replace('{MM}', '[0-5][0-9]'),
         'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter']
@@ -450,10 +450,13 @@ def build_filters(gearman_worker):
             .replace('{YYYY}', '20[0-9][0-9]')
             .replace('{YY}', '[0-9][0-9]')
             .replace('{mm}', '[0-1][0-9]')
-            .replace('{dd}', '[0-3][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
             .replace('{HH}', '[0-2][0-9]')
             .replace('{MM}', '[0-5][0-9]')
     }
+    logging.debug(json.dumps(filters, indent=2))
+
+    return filters
 
 
 def build_dest_dir(gearman_worker):
