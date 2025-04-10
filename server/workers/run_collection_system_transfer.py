@@ -131,8 +131,12 @@ def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-loca
     return_files['include'].sort()
     return_files['exclude'].sort()
 
-    return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
-    return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
+    if prefix:
+        return_files['include'] = [filename.replace(prefix, '').lstrip('/') for filename in return_files['include']]
+        return_files['exclude'] = [filename.replace(prefix, '').lstrip('/') for filename in return_files['exclude']]
+
+    # return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
+    # return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
 
     logging.debug("return_files: %s", json.dumps(return_files, indent=2))
     return {'verdict': True, 'files': return_files}
