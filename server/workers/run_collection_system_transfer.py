@@ -613,7 +613,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer from SMB Source")
 
-    gearman_worker.source_dir = gearman_worker.source_dir.rstrip('').lstrip('')
+    gearman_worker.source_dir = gearman_worker.source_dir.strip().rstrip('/').lstrip('/')
 
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
