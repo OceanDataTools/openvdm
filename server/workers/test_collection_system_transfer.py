@@ -171,7 +171,8 @@ def test_smb_source_dir(gearman_worker):
 
     return_val.append({"partName": "SMB Share", "result": "Pass"})
 
-    source_dir = os.path.join(mntpoint, build_source_dir(gearman_worker))
+    gearman_worker.source_dir = gearman_worker.source_dir.rstrip('/').lstrip('/')
+    source_dir = mntpoint if gearman_worker.source_dir == '' else os.path.join(mntpoint, build_source_dir(gearman_worker))
 
     logging.debug('Source Dir: %s', source_dir)
     if os.path.isdir(source_dir):
