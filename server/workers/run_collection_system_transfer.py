@@ -1015,7 +1015,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             job_data = {
                 'cruiseID': self.cruise_id,
                 'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
-                'files': results_obj['files']
+                'files': {
+                    'new': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['new']],
+                    'updated': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['updated']]
+                }
             }
 
             for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
