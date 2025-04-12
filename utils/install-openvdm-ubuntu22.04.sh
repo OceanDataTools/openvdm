@@ -221,21 +221,30 @@ function install_python_packages {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT - path where openvdm is
 
+    startingDir=${PWD}
+
+    cd $INSTALL_ROOT/openvdm
     # Set up virtual environment
-    VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python3 -m venv $VENV_PATH
-    source $VENV_PATH/bin/activate  # activate virtual environment
+    python3 -m venv ./venv
+    source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
         --trusted-host files.pythonhosted.org --upgrade pip --quiet
     pip install wheel --quiet # To help with the rest of the installations
 
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt --quiet
+    pip install -r requirements.txt --quiet
+
+    # setup pre-commit hooks
+    pre-commit install
+    pre-commit run --all-files
+
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
        pip install geographiclib==1.52 geopy==2.2.0 --quiet
        pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version` --quiet
     fi
+
+    cd $startingDir
 }
 
 

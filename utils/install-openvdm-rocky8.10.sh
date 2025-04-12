@@ -214,19 +214,28 @@ function install_python_packages {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT - path where openvdm is
 
-    # Set up virtual environment
-    VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python3 -m venv $VENV_PATH
+    startingDir=${PWD}
+    cd $INSTALL_ROOT/openvdm
 
-    cat > $VENV_PATH/pip.conf <<EOF
+    # Set up virtual environment
+    python3 -m venv ./venv
+
+    cat > ./venv/pip.conf <<EOF
 [global]
 trusted-host = pypi.org
                files.pythonhosted.org
 EOF
 
-    source $VENV_PATH/bin/activate  # activate virtual environment
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt
+    source ./venv/bin/activate  # activate virtual environment
+    pip install -r requirements.txt
+
+    # setup pre-commit hooks
+    pre-commit install
+    pre-commit run --all-files
+
     deactivate
+
+    cd $startingDir
 
 }
 

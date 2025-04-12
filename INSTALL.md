@@ -206,3 +206,12 @@ rm -r bower_components
 rm -r node_modules
 bash composer install
 ```
+
+If you plan to contribute back to the project (thanks!) please install the pre-commit hook to lint your changes prior to committing:
+```
+cd <openvdm_root>
+source ./venv/bin/activate
+pre-commit install
+pre-commit run --all-files
+deactivate
+```
