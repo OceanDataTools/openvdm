@@ -1,46 +1,38 @@
 #!/usr/bin/env python3
 """
-FILE:  geotiff_parser.py
+FILE:  geotiff_titiler_parser.py
 
-USAGE:  geotiff_parser.py [-h] [-v+] <dataFile>
+USAGE:  geotiff_titiler_parser.py [-h] [-v+] <dataFile>
 
-DESCRIPTION:  Parse the supplied geotiff file and return the json-
-    formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Process the supplied geotiff file using TiTiler and return the
+              json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.10
-            Python Modules:
-                PyYAML==6.0
-                requests==2.27.1
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   requests==2.32.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import os
-import json
 import logging
-import shutil
-import subprocess
 import sys
-import tempfile
 from os.path import dirname, realpath
-from osgeo import gdal
 import requests
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMParser
-
-# DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 TIMEOUT = 2
 DEFAULT_TITILER_URL = 'http://localhost:8000'
@@ -55,7 +47,7 @@ class GeoTIFFParser(OpenVDMParser):
 
         self.titiler_url = titiler_url or DEFAULT_TITILER_URL
 
-        if cruisedata_url is None and use_openvdm_api == False:
+        if cruisedata_url is None and not use_openvdm_api:
             raise ValueError('Unable to determine base URL of datafile')
 
         if cruisedata_url:
@@ -65,13 +57,7 @@ class GeoTIFFParser(OpenVDMParser):
             self.cruisedata_url = self.openvdm.get_cruisedata_url()
 
         self.cruisedata_path = self.openvdm.get_cruisedata_path()
-        # self.time_format = time_format
 
-        # if output_dir is not None and not os.path.isdir(output_dir):
-        #     raise FileNotFoundError("Output directory does not exist")
-
-        # self.output_dir = output_dir
-        # self.tile_dir = None
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """
@@ -79,94 +65,24 @@ class GeoTIFFParser(OpenVDMParser):
         """
 
         logging.debug("Parsing data file...")
-
         directoryname, filename = os.path.split(filepath)
-        logging.warning('directoryname: %s', directoryname)
-        logging.warning('filename: %s', filename)
-
         label = os.path.splitext(filename)[0]
-        logging.warning('label: %s', label)
-
-        # if self.output_dir is None and self.openvdm is not None:
-        #     # parse the filepath to get the name of the file without the file extension
-        #     data_warehouse_config = self.openvdm.get_shipboard_data_warehouse_config()
-        #     logging.debug(self.openvdm.get_required_extra_directory_by_name("Dashboard_Data"))
-        #     dashboard_data_dir = self.openvdm.get_required_extra_directory_by_name("Dashboard_Data")['destDir']
-        #     cruise_id = self.openvdm.get_cruise_id()
-
-        #     collection_system_dir = directoryname.replace(os.path.join(data_warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id), '').lstrip('/')
-        #     self.output_dir = os.path.join(data_warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id, dashboard_data_dir, collection_system_dir)
-        #     self.tile_dir = cruise_id + '/' + dashboard_data_dir + '/' + collection_system_dir + '/' + label
-
-        # elif self.output_dir is None:
-        #     self.output_dir = directoryname
-        #     self.tile_dir = os.path.join(directoryname, label)
-
-        # else:
-        #     self.tile_dir = os.path.join(self.output_dir, label)
-
-        # Directory where the tiles will go.
-        # tilepath = os.path.join(self.output_dir, label)
-
-        # Create temp directory
-        # tmpdir = tempfile.mkdtemp()
-
-        # ll_filepath = os.path.join(tmpdir, label + "_LL.tif")
-        # vrt_filepath = os.path.join(tmpdir, 'temp.vrt')
-
-        # t_srs_options = "+proj=latlong +datum=WGS84"
-
-        # command = ['gdalwarp', '-t_srs', t_srs_options, filepath, ll_filepath]
-        # logging.debug("Command: %s", ' '.join(command))
-        # subprocess.run(command, capture_output=True, check=False)
-
-        # # open the ll geoTiff
-        # ll_tiff = gdal.Open(ll_filepath)
-
-        # # process the geoTiff
-        # width = ll_tiff.RasterXSize
-        # height = ll_tiff.RasterYSize
-        # gt_tiff = ll_tiff.GetGeoTransform()
-
-        # # calculate the bounds of the geoTiff
-        # minx = gt_tiff[0]
-        # miny = gt_tiff[3] + width*gt_tiff[4] + height*gt_tiff[5]
-        # maxx = gt_tiff[0] + width*gt_tiff[1] + height*gt_tiff[2]
-        # maxy = gt_tiff[3]
-
-        # command = ['gdal_translate', '-of', 'vrt', ll_filepath, vrt_filepath]
-        # logging.debug("Command: %s", ' '.join(command))
-        # subprocess.run(command, capture_output=True, check=False)
-
-        # command = ['gdal2tiles.py', '-v', '--profile=mercator', '--zoom=5-12', '--webviewer=none', vrt_filepath, tilepath]
-        # logging.debug("Command: %s", ' '.join(command))
-        # subprocess.run(command, capture_output=True, check=False)
-
-        # shutil.rmtree(tmpdir)
-        logging.warning('self.cruisedata_url: %s', self.cruisedata_url)
 
         params = {
             'url': self.cruisedata_url + filepath.replace(self.cruisedata_path, '')
         }
-        logging.warning('params: %s', json.dumps(params))
 
         url = f'{self.titiler_url}/cog/bounds'
-        logging.warning('url: %s', url)
 
         try:
             req = requests.get(url, params=params, timeout=TIMEOUT)
-            logging.warning('req.json: %s', req.json())
             bounds = req.json()['bounds']
             bounds = [round(bound, 6) for bound in bounds]
-            logging.warning("bounds: %s", bounds)
         except Exception as err:
             logging.error("Unable to retrieve metadata on file from TiTiler API")
             raise err
 
         logging.debug("Finished parsing data file")
-
-        logging.debug("Tabulating statistics...")
-        # self.add_geobounds_stat([minx,miny,maxx,maxy])
 
         logging.debug("Building visualization data...")
 
@@ -176,8 +92,6 @@ class GeoTIFFParser(OpenVDMParser):
             "mapBounds": ','.join([str(bound) for bound in bounds])
         }
 
-        logging.warning("visualizer_data_obj: %s", visualizer_data_obj)
-        
         self.add_visualization_data(visualizer_data_obj)
 
 

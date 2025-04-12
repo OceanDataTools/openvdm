@@ -2,7 +2,7 @@
 """
 FILE:  tsg45_parser.py
 
-USAGE:  tsg45_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  tsg45_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--sbe38] <dataFile>
 
 DESCRIPTION:  Parse the supplied SBE45 TSG data and return the json-formatted
               string used by OpenVDM as part of it's Data dashboard.
@@ -13,23 +13,20 @@ DESCRIPTION:  Parse the supplied SBE45 TSG data and return the json-formatted
                            yyyy-mm-ddTHH:MM:SS.sssZ
             [--startTS] optional start crop time (strptime format)
             [--stopTS] optional stop crop time (strptime format)
-            [--add_sbe38] use if datafile includes temperature data from a
-                          SBE38 external temperature sensor.
+            [--sbe38] use if datafile includes temperature data from a SBE38
+                      external temperature sensor.
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.10
-            Python Modules:
-                numpy==1.22.2
-                pandas==1.4.1
-                PyYAML==6.0
-                requests==2.27.1
+               Python Modules:
+                   pandas==2.0.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import csv
@@ -46,8 +43,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity'] # OpenRVDAS style
-# RAW_COLS = ['date','time','water_temp_int','conductivity','salinity','sound_velocity'] # SCS style
+RAW_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity']
 PROC_COLS = ['date_time','water_temp_int','conductivity','salinity','sound_velocity']
 
 ROUNDING = {
@@ -71,7 +67,7 @@ class SBE45TSGParser(OpenVDMCSVParser):
     def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False, add_sbe38=False):
 
         self.add_sbe38 = add_sbe38
-        
+
         if self.add_sbe38:
             RAW_COLS.append('water_temp_ext')
             PROC_COLS.append('water_temp_ext')
@@ -90,7 +86,7 @@ class SBE45TSGParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -98,8 +94,7 @@ class SBE45TSGParser(OpenVDMCSVParser):
                 for lineno, line in enumerate(reader):
 
                     try:
-                        date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                        date_time = line['date_time']
 
                         water_temp_int = float(line['water_temp_int'].split("=")[-1])
                         conductivity = float(line['conductivity'].split("=")[-1])
@@ -247,7 +242,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Parse SBE45 TSG sensor data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity', default=0, 
+    parser.add_argument('-v', '--verbosity', dest='verbosity', default=0,
                         action='count', help='Increase output verbosity')
     parser.add_argument('--timeFormat', help='timestamp format', default=None)
     parser.add_argument('--startDT', default=None,

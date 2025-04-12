@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utilities for creating/ directories and managing their permissions.
+"""Utilities for processing files and filenames.
 """
 
 import os
@@ -86,7 +86,7 @@ def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive
                 time_args['seconds'] = value
 
             i += 2
-        
+
         if not time_args:
             raise ValueError('Invalid timedelta string specified: %s', timedelta_str)
 

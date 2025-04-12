@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -88,7 +88,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
                     return_files['include'].append(filepath)
 
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop().replace("[", "\[").replace("]", "\]") for filename in return_files['exclude']]
+    return_files['exclude'] = [filename.split(source_dir + '/',1).pop().replace("[", r"\[").replace("]", r"\]") for filename in return_files['exclude']]
 
     logging.debug("file list: %s", json.dumps(return_files, indent=2))
 

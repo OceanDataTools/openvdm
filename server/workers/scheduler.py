@@ -17,9 +17,9 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import os
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
 
     while True:
- 
+
         # purge old transfer logs:
         logging.info("Purging old transfer logs")
         cruiseID = ovdm.get_cruise_id()

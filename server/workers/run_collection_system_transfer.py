@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -492,8 +492,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    dest_dir = command[-1]
-
     file_index = 0
     new_files = []
     updated_files = []
@@ -526,9 +524,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
                 gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
                 file_index += 1
 
-    #new_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
-    #updated_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
-    
     return new_files, updated_files
 
 

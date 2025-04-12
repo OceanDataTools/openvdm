@@ -16,14 +16,14 @@ DESCRIPTION:  This python script interprets geotiff files created by the EM302
                 fileTypeFilter array.
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
+REQUIREMENTS:  Python3.11
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-10-23
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import sys

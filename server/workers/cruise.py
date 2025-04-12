@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse

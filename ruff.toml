@@ -1,0 +1,6 @@
+line-length = 100
+include = ["*.py", "*.py.dist"]
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]

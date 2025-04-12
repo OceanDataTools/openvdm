@@ -187,3 +187,22 @@ rm -r bower_components
 bower install
 composer install
 ```
+
+## Upgrading from 2.9.
+
+OpenVDM v2.10 added some new server-side functionality updated how javascript and CSS libraries are installed.  These changes will require existing user to perform some additional steps.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Make a backup the webUI config file: `./www/app/Core/Config.php`
+3. Make a new webUI config file using the default template: `cp ./www/app/Core/Config.php.dist ./www/app/Core/Config.php`
+4. Transfer any customizations from the the backup configuration file to the new configuration file.
+5. Make a backup the server config file: `./server/etc/openvdm.yaml`
+6. Make a new server config file using the default template: `cp ./server/etc/openvdm.yaml.dist ./server/etc/openvdm.yaml`
+7. Transfer any customizations from the the backup configuration file to the new configuration file.
+8. Re-install the javascript and css libraries:
+```
+cd <openvdm_root>/www
+rm -r bower_components
+rm -r node_modules
+bash composer install
+```

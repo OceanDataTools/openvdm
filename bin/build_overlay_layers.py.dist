@@ -20,9 +20,9 @@ DESCRIPTION:
     BUGS:
    NOTES:
   AUTHOR:  Webb Pinner
- VERSION:  2.9
+ VERSION:  2.10
  CREATED:  2025-03-24
-REVISION:  
+REVISION:  2025-04-12
 """
 
 import argparse
@@ -68,7 +68,7 @@ AllGeoTiffSources = [
 
 def build_json_file(output_dir):
     '''
-    Takes the output directory and collection system name and creates a json 
+    Takes the output directory and collection system name and creates a json
     file that contains all overlay layers available for the given cruise.
     '''
 

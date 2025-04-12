@@ -10,9 +10,9 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-02-09
- REVISION:  2020-02-24
+ REVISION:  2025-04-12
 """
 
 import argparse
