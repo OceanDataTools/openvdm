@@ -263,11 +263,6 @@ function install_python_packages {
 
     pip install -r requirements.txt --quiet
 
-    # setup pre-commit hooks
-    # pre-commit install
-    # pre-commit run --all-files
-
-
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
        pip install geographiclib==1.52 geopy==2.2.0 --quiet
        pip install --config-settings="--global-option=build_ext" \

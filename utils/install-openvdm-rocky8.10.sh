@@ -229,10 +229,6 @@ EOF
     source ./venv/bin/activate  # activate virtual environment
     pip install -r requirements.txt
 
-    # setup pre-commit hooks
-    pre-commit install
-    pre-commit run --all-files
-
     deactivate
 
     cd $startingDir
