@@ -173,28 +173,37 @@ function install_packages {
 
     sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
-    # Set codename manually to jammy to avoid Oracular (24.10) issues
+    # Constants
     CODENAME="jammy"
+    KEYRING_DIR="/etc/apt/keyrings"
+    KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
+    APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
+    APACHE_PPA_URL="http://ppa.launchpad.net/ondrej/apache2/ubuntu"
+    PHP_PPA_LIST="/etc/apt/sources.list.d/ondrej-php.list"
+    PHP_PPA_URL="http://ppa.launchpad.net/ondrej/php/ubuntu"
 
-    # Define repo and key
-    REPO_NAME="ondrej_php"
-    KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC08317516413FEC74E5267A6C"
+    # Make sure keyrings dir exists
+    sudo mkdir -p "$KEYRING_DIR"
 
-    # Add the GPG key securely
-    echo "Fetching and adding GPG key for Ondrej PHP..."
-    curl -fsSL "$KEY_URL" | gpg --dearmor | sudo tee "/usr/share/keyrings/${REPO_NAME}.gpg" > /dev/null
+    echo "Downloading and importing public keys..."
 
-    # Add the APT source manually
-    echo "Adding APT repository for PHP (codename: $CODENAME)..."
-    echo "deb [signed-by=/usr/share/keyrings/${REPO_NAME}.gpg] http://ppa.launchpad.net/ondrej/php/ubuntu $CODENAME main" | sudo tee "/etc/apt/sources.list.d/${REPO_NAME}.list"
-    echo "deb [signed-by=/usr/share/keyrings/${REPO_NAME}.gpg] http://ppa.launchpad.net/ondrej/apache2/ubuntu $CODENAME main" | sudo tee "/etc/apt/sources.list.d/${REPO_NAME}.list"
+    # Download individual keys (in ASCII format) and dearmor them
+    # First: Ondřej’s PHP packaging key (E5267A6C)
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x4F4EA0AAE5267A6C" \
+      | gpg --dearmor | sudo tee "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
 
-    # Update package list
-    echo "Updating package list..."
-    sudo apt update -qq
+    # Second: DPA key (71DAEAAB4AD4CAB6) — still used by Launchpad for some builds
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x71DAEAAB4AD4CAB6" \
+      | gpg --dearmor | sudo tee -a "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
 
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
+    echo "➕ Adding PHP PPA with correct keyring..."
+    echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
+      sudo tee "$PHP_PPA_LIST"
+
+    # Add Apache2 PPA
+    echo "➕ Adding Apache2 PPA..."
+    echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
+      sudo tee "$APACHE_PPA_LIST"
 
     # Install nodejs v20.11.0 LTS
     if [ ! -e "/usr/local/bin/npm" ]; then
