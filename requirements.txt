@@ -1,4 +1,4 @@
-ertifi==2025.1.31
+certifi==2025.1.31
 chardet==5.2.0
 charset-normalizer==3.4.1
 GDAL==3.10.3

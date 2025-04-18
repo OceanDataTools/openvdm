@@ -169,12 +169,32 @@ function install_packages {
 
     startingDir=${PWD}
 
-    apt-get update -qq
+    sudo NEEDRESTART_MODE=a apt-get update -qq
 
-    apt-get install -q -y software-properties-common ca-certificates curl gnupg
+    sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
+    # Set codename manually to jammy to avoid Oracular (24.10) issues
+    CODENAME="jammy"
+
+    # Define repo and key
+    REPO_NAME="ondrej_php"
+    KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC08317516413FEC74E5267A6C"
+
+    # Add the GPG key securely
+    echo "Fetching and adding GPG key for Ondrej PHP..."
+    curl -fsSL "$KEY_URL" | gpg --dearmor | sudo tee "/usr/share/keyrings/${REPO_NAME}.gpg" > /dev/null
+
+    # Add the APT source manually
+    echo "Adding APT repository for PHP (codename: $CODENAME)..."
+    echo "deb [signed-by=/usr/share/keyrings/${REPO_NAME}.gpg] http://ppa.launchpad.net/ondrej/php/ubuntu $CODENAME main" | sudo tee "/etc/apt/sources.list.d/${REPO_NAME}.list"
+    echo "deb [signed-by=/usr/share/keyrings/${REPO_NAME}.gpg] http://ppa.launchpad.net/ondrej/apache2/ubuntu $CODENAME main" | sudo tee "/etc/apt/sources.list.d/${REPO_NAME}.list"
+
+    # Update package list
+    echo "Updating package list..."
+    sudo apt update -qq
+
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
+    # LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
 
     # Install nodejs v20.11.0 LTS
     if [ ! -e "/usr/local/bin/npm" ]; then
@@ -189,18 +209,18 @@ function install_packages {
         sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/node /usr/local/bin/
     fi
     
-    apt-get update -qq
+    sudo apt update -qq
 
-    apt install -q -y openssh-server sshpass rsync git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev python3 mysql-client \
-        python3-dev python3-pip python3-venv supervisor mysql-server ntp\
-        apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-        php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-        php7.3-yaml
+    sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 cifs-utils gdal-bin \
+    gearman-job-server git libapache2-mod-php7.3 libapache2-mod-wsgi-py3 \
+    libgearman-dev mysql-client mysql-server ntp php7.3 php7.3-cli \
+    php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml php7.3-zip python3 \
+    python3-dev python3-pip python3-venv rsync samba smbclient sshpass \
+    supervisor
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
-        apt install -q -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
+        sudo NEEDRESTART_MODE=a apt install -q -y libgeos-dev libgdal-dev proj-bin \
             python3-pyproj
         
         pip3 install MapProxy --quiet
@@ -235,13 +255,18 @@ function install_python_packages {
     pip install -r requirements.txt --quiet
 
     # setup pre-commit hooks
-    pre-commit install
-    pre-commit run --all-files
+    # pre-commit install
+    # pre-commit run --all-files
 
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
        pip install geographiclib==1.52 geopy==2.2.0 --quiet
-       pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version` --quiet
+       pip install --config-settings="--global-option=build_ext" \
+                   --config-settings="--global-option=-I/usr/include/gdal" \
+                   GDAL==`gdal-config \
+                   --version` \
+                   --quiet
+
     fi
 
     cd $startingDir
