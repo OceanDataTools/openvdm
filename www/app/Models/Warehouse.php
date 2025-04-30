@@ -84,6 +84,10 @@ class Warehouse extends Model {
         return CRUISE_CONFIG_FN;
     }
 
+    public function getCruiseDataURLPath(){
+        return CRUISEDATA_APACHEDIR;
+    }
+
     public function getCruiseID(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseID'");
         return $row[0]->value;
@@ -177,6 +181,7 @@ class Warehouse extends Model {
         $shipboardDataWarehousePublicDataDir = PUBLICDATA_DIR;
         $loweringDataBaseDir = $this->getLoweringDataBaseDir();
         $cruiseConfigFn = $this->getCruiseConfigFn();
+        $cruiseDataURLPath = $this->getCruiseDataURLPath();
         $loweringConfigFn = $this->getLoweringConfigFn();
         $dataDashboardManifestFn = $this->getDataDashboardManifestFn();
         $md5SummaryFn = $this->getMd5SummaryFn();
@@ -190,6 +195,7 @@ class Warehouse extends Model {
             'shipboardDataWarehousePublicDataDir' => $shipboardDataWarehousePublicDataDir,
             'loweringDataBaseDir' => $loweringDataBaseDir,
             'cruiseConfigFn' => $cruiseConfigFn,
+            'cruiseDataURLPath' => $cruiseDataURLPath,
             'loweringConfigFn' => $loweringConfigFn,
             'dataDashboardManifestFn' => $dataDashboardManifestFn,
             'md5SummaryFn' => $md5SummaryFn,

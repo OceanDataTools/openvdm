@@ -3,8 +3,9 @@
 ## Installation Guide
 At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
 
-### Operating System
-Goto <https://releases.ubuntu.com/22.04/>
+### Operating Systems
+ - Ubuntu 22.04: <https://releases.ubuntu.com/22.04/>
+ - Rocky 8.10 <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
 
 ### If you are installing OpenVDM remotely
 
@@ -18,11 +19,20 @@ Log into the Server as root
 
 Download the install script
 ```
-OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
-BRANCH=master
-wget https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
-chmod +x install-openvdm-ubuntu22.04.sh
-sudo ./install-openvdm-ubuntu22.04.sh
+export OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
+export BRANCH=master
+wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
+
+# Alternate script for installing on Rocky/RHEL 8
+# wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-rocky8.10.sh
+
+chmod +x install-openvdm.sh
+sudo ./install-openvdm.sh
+```
+
+If wget is not available you can install it or use the following `curl` command:
+```
+curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
 ```
 
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
@@ -176,4 +186,32 @@ cd <openvdm_root>/www
 rm -r bower_components
 bower install
 composer install
+```
+
+## Upgrading from 2.9.
+
+OpenVDM v2.10 added some new server-side functionality updated how javascript and CSS libraries are installed.  These changes will require existing user to perform some additional steps.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Make a backup the webUI config file: `./www/app/Core/Config.php`
+3. Make a new webUI config file using the default template: `cp ./www/app/Core/Config.php.dist ./www/app/Core/Config.php`
+4. Transfer any customizations from the the backup configuration file to the new configuration file.
+5. Make a backup the server config file: `./server/etc/openvdm.yaml`
+6. Make a new server config file using the default template: `cp ./server/etc/openvdm.yaml.dist ./server/etc/openvdm.yaml`
+7. Transfer any customizations from the the backup configuration file to the new configuration file.
+8. Re-install the javascript and css libraries:
+```
+cd <openvdm_root>/www
+rm -r bower_components
+rm -r node_modules
+bash composer install
+```
+
+If you plan to contribute back to the project (thanks!) please install the pre-commit hook to lint your changes prior to committing:
+```
+cd <openvdm_root>
+source ./venv/bin/activate
+pre-commit install
+pre-commit run --all-files
+deactivate
 ```

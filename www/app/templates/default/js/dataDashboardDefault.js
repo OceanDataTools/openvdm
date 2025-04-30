@@ -2,6 +2,7 @@ $(function () {
     'use strict';
     
     var MAPPROXY_DIR = '/mapproxy';
+    var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
 
     var greenIcon = null;
     var redIcon = null;    
@@ -321,12 +322,19 @@ $(function () {
                         northeast = L.latLng(parseFloat(coords[3]), parseFloat(coords[2]));
 
                     // Build the layer
-                    mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                        tms:true,
-                        bounds:L.latLngBounds(southwest, northeast),
-                        zIndex: 10
-                    });
-                    
+                    if ('tileDirectory' in data[0]) {
+                        mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
+                            tms:true,
+                            bounds:L.latLngBounds(southwest, northeast),
+                            zIndex: 10
+                        });
+                    } else if ('tileURL' in data[0]) {
+                        const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
+			mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(url, {
+                            bounds:L.latLngBounds(southwest, northeast),
+                            zIndex: 10
+                        });    
+		    }
                     if (parseFloat(coords[0]) < 0) {
                         southwest = southwest.wrap(360, 0);
                     } else {
@@ -340,7 +348,6 @@ $(function () {
                     }
                     
                     mapObject['mapBounds'][tmsObjectJsonName] = L.latLngBounds(southwest, northeast);
-                    //console.log(mapObject['mapBounds'][tmsObjectJsonName]);
                         
                     // Add the layer to the map
                     mapObject['tmsLayers'][tmsObjectJsonName].addTo(mapObject['map']);

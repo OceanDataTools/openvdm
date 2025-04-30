@@ -15,14 +15,15 @@ DESCRIPTION:  This python script interprets raw files created by the OpenRVDAS
                 fileTypeFilter array.
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
-
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   requests==2.32.3
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-10-23
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import sys
@@ -47,7 +48,7 @@ from server.plugins.parsers.paro_parser import ParoParser
 from server.plugins.parsers.sprint_parser import SprintParser
 
 SEALOG_SERVER_URL = 'http://localhost:8000/sealog-server'
-SEALOG_JWT = ''
+SEALOG_JWT = '<TOKEN>'
 
 # -------------------------------------------------------------------------------------
 # This array defines the various dataTypes collected by SCS and the cooresponding file

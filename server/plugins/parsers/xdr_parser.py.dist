@@ -16,18 +16,15 @@ DESCRIPTION:  Parse the supplied NMEA XDR weather data and return the json-
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.10
-            Python Modules:
-                numpy==1.22.2
-                pandas==1.4.1
-                PyYAML==6.0
-                requests==2.27.1
+               Python Modules:
+                   pandas==2.0.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import csv
@@ -44,12 +41,11 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','C','air_temp','C2','TEMP','H','humidity','P','RH','P2','air_press','mB','BARO_checksum'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','C','air_temp','C2','TEMP','H','humidity','P','RH','P2','air_press','mB','BARO_checksum'] # SCS style
-PROC_COLS = ['date_time','air_press','air_temp','humidity']
+RAW_COLS = ['date_time','hdr','C','air_temp','C2','TEMP','H','humidity','P','RH','P2','air_pres','mB','BARO_checksum']
+PROC_COLS = ['date_time','air_pres','air_temp','humidity']
 
 ROUNDING = {
-    'air_press': 1,
+    'air_pres': 1,
     'air_temp': 2,
     'humidity': 1
 }
@@ -65,7 +61,7 @@ class XDRParser(OpenVDMCSVParser):
     """
 
     def __init__(self, start_dt=None, stop_dt=None, skip_header=False, time_format=None, use_openvdm_api=False):
-        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
 
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -79,7 +75,7 @@ class XDRParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -87,8 +83,7 @@ class XDRParser(OpenVDMCSVParser):
                 for lineno, line in enumerate(reader):
 
                     try:
-                        date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                        date_time = line['date_time']
 
                         air_temp = float(line['air_temp'])
                         air_pres = float(line['air_pres'])

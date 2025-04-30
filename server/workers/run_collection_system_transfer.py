@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -33,7 +33,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii
+from server.lib.file_utils import is_ascii
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
@@ -131,9 +131,10 @@ def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-loca
     return_files['include'].sort()
     return_files['exclude'].sort()
 
-    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
+    return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
+    return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
 
+    logging.debug("return_files: %s", json.dumps(return_files, indent=2))
     return {'verdict': True, 'files': return_files}
 
 
@@ -297,7 +298,15 @@ def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-
     filters = build_filters(gearman_worker)
 
     is_darwin = False
-    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+
+    logging.debug("Command: %s", ' '.join(command))
+
+    proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
         is_darwin = line.rstrip('\n') == 'Darwin'
         if is_darwin:
@@ -413,11 +422,38 @@ def build_filters(gearman_worker):
     Replace wildcard string in filters
     """
 
-    return {
-        'includeFilter': gearman_worker.collection_system_transfer['includeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
-        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id),
-        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id)
+    filters = {
+        'includeFilter': gearman_worker.collection_system_transfer['includeFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]'),
+        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]'),
+        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter']
+            .replace('{cruiseID}', gearman_worker.cruise_id)
+            .replace('{loweringID}', gearman_worker.lowering_id)
+            .replace('{YYYY}', '20[0-9][0-9]')
+            .replace('{YY}', '[0-9][0-9]')
+            .replace('{mm}', '[0-1][0-9]')
+            .replace('{DD}', '[0-3][0-9]')
+            .replace('{HH}', '[0-2][0-9]')
+            .replace('{MM}', '[0-5][0-9]')
     }
+    logging.debug(json.dumps(filters, indent=2))
+
+    return filters
 
 
 def build_dest_dir(gearman_worker):
@@ -456,8 +492,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    dest_dir = command[-1]
-
     file_index = 0
     new_files = []
     updated_files = []
@@ -489,9 +523,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
                 logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
                 gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
                 file_index += 1
-
-    new_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in new_files]
-    updated_files = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/').rstrip('/'), filename) for filename in updated_files]
 
     return new_files, updated_files
 
@@ -574,6 +605,8 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Transfer from SMB Source")
 
+    gearman_worker.source_dir = gearman_worker.source_dir.strip().rstrip('/').lstrip('/')
+
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
 
@@ -602,10 +635,11 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
     if gearman_worker.collection_system_transfer['smbUser'] == 'guest':
         rw_type += ',guest'
     else:
-        rw_type += ',username=' + gearman_worker.collection_system_transfer['smbUser']
-        rw_type += ',password=' + gearman_worker.collection_system_transfer['smbPass']
+        rw_type += f",username={gearman_worker.collection_system_transfer['smbUser']}"
+        rw_type += f",password={gearman_worker.collection_system_transfer['smbPass']}"
 
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', rw_type + ',domain=' + gearman_worker.collection_system_transfer['smbDomain'] + ',vers=' + vers]
+    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', f"{rw_type},domain={gearman_worker.collection_system_transfer['smbDomain']},vers={vers}"]
+
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
     proc = subprocess.call(mount_command)
@@ -773,7 +807,15 @@ def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
     is_darwin = False
-    proc = subprocess.run(['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass'], 'ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"], capture_output=True, text=True, check=False)
+    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+
+    logging.debug("Command: %s", ' '.join(command))
+
+    proc = subprocess.run(command, capture_output=True, text=True, check=False)
+
     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
         is_darwin = line.rstrip('\n') == 'Darwin'
         if is_darwin:
@@ -859,7 +901,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.debug(str(err))
             return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for collection system transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - {}: %(message)s'.format(self.collection_system_transfer['name'])
+        LOGGING_FORMAT = f'%(asctime)-15s %(levelname)s - {self.collection_system_transfer["name"]}: %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
@@ -964,7 +1006,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             job_data = {
                 'cruiseID': self.cruise_id,
                 'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
-                'files': results_obj['files']
+                'files': {
+                    'new': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['new']],
+                    'updated': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['updated']]
+                }
             }
 
             for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
@@ -973,7 +1018,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         if self.collection_system_transfer:
             if len(results_obj['parts']) > 0:
-                if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
+                if results_obj['parts'][-1]['result'] == "Fail" and results_obj['parts'][-1]['partName'] != "Located Collection System Tranfer Data": # Final Verdict
                     self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
                 elif results_obj['parts'][-1]['result'] == "Pass":
                     self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
@@ -1094,8 +1139,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.info("Setting file permissions")
-
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), gearman_worker.dest_dir))
+        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.dest_dir)
 
         if not output_results['verdict']:
             logging.error("Error setting destination directory file/directory ownership/permissions: %s", gearman_worker.dest_dir)

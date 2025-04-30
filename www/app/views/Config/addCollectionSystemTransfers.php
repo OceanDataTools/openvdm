@@ -19,7 +19,7 @@ $_warehouseModel = new \Models\Warehouse();
             <div class="tabbable" style="margin-bottom: 18px;">
                 <ul class="nav nav-tabs">
                     <li class=""><a id="main" href="<?php echo DIR; ?>config">Main</a></li>
-                    <li class="active"><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers">Collection System Transfers</a></li>
+                    <li class="active"><a id="collectionSystemTransfers" href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>">Collection System Transfers</a></li>
                     <li class=""><a id="extraDirectories" href="<?php echo DIR; ?>config/extraDirectories">Extra Directories</a></li>
                     <li class=""><a id="cruiseDataTransfers" href="<?php echo DIR; ?>config/cruiseDataTransfers"><?php echo CRUISE_NAME; ?> Data Transfers</a></li>
                     <li class=""><a id="shipToShoreTransfers" href="<?php echo DIR; ?>config/shipToShoreTransfers">Ship-to-Shore Transfers</a></li>
@@ -77,7 +77,7 @@ $_warehouseModel = new \Models\Warehouse();
                         <div class="row">    
                             <div class="col-lg-12">
                                 <?php echo Form::submit( array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Add')); ?>
-                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers" class="btn btn-danger">Cancel</a>
+                                <a href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
                         </div>    
@@ -117,6 +117,28 @@ $_warehouseModel = new \Models\Warehouse();
             <p class="sshServer">The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p class="sshServer">The <strong>SSH Password</strong> is the SSH password for the Rsync Username.</p>
             <p>Click the <strong>Add</strong> button to add the new collection system transfer to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
+            <p><strong>Shorthand notation</strong> for file filters, source and destination directories:<br/>
+                <ul>
+                    <li><strong>{cruiseID}</strong> is the shorthand for the current <?php echo CRUISE_NAME; ?> ID</li>
+<?php
+  if ( $data['showLoweringComponents']) {
+?>
+                    <li><strong>{loweringID}</strong> is the shorthand for the current <?php echo LOWERING_NAME; ?> ID</li>
+<?php
+  }
+?>
+                </ul>
+            </p>
+            <p><strong>Additional shorthand notation</strong> for file filters:<br/>
+                <ul>
+                    <li><strong>{YYYY}</strong> is the shorthand for a 4-number year</li>
+                    <li><strong>{YY}</strong> is the shorthand for a 2-number year</li>
+                    <li><strong>{mm}</strong> is the shorthand for a 2-number month</li>
+                    <li><strong>{DD}</strong> is the shorthand for a 2-number day</li>
+                    <li><strong>{HH}</strong> is the shorthand for a 2-number hour</li>
+                    <li><strong>{MM}</strong> is the shorthand for a 2-number minute</li>                    
+                </ul>
+            </p>
         </div>
     </div>
 

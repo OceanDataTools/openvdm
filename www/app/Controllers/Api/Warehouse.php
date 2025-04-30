@@ -160,6 +160,18 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    public function getDataWarehouseBaseDir() {
+
+        $response['dataWarehouseBaseDir'] = $this->_warehouseModel->getShipboardDataWarehouseBaseDir();
+        echo json_encode($response);
+    }
+
+    public function getCruiseDataURLPath() {
+
+        $response['cruiseDataURLPath'] = $this->_warehouseModel->getCruiseDataURLPath();
+        echo json_encode($response);
+    }
+
     public function getCruises() {
 
         $response = $this->_warehouseModel->getCruises();

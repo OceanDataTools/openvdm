@@ -3,7 +3,7 @@
 # OpenVDM is available as open source under the MIT License at
 #   https:/github.com/oceandatatools/openvdm
 #
-# This script installs and configures OpenVDM to run on Rocky 8.4.  It
+# This script installs and configures OpenVDM to run on Rocky 8.10.  It
 # is designed to be run as root. It should take a (relatively) clean
 # Rocky 8.4 installation and install and configure all the components
 # to run the full OpenVDM system.
@@ -75,8 +75,8 @@ function set_default_variables {
 
     DEFAULT_DATA_ROOT=/data
 
-    DEFAULT_OPENVDM_REPO=https://github.com/oceandatatools/openvdm
-    DEFAULT_OPENVDM_BRANCH=master
+    DEFAULT_OPENVDM_REPO="${OPENVDM_REPO:-https://github.com/oceandatatools/openvdm}"
+    DEFAULT_OPENVDM_BRANCH="${BRANCH:-master}"
     DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
@@ -171,38 +171,33 @@ function install_packages {
 
     startingDir=${PWD}
 
-    yum install -y epel-release
-    yum -y update --nobest
+    dnf install -y epel-release
+    dnf config-manager --set-enabled powertools
+    dnf -y update --nobest
 
     # Install php7.3, Instructions at:
     # https://wiki.crowncloud.net/?How_to_Install_PHP_7_3_in_Rocky_Linux_8
     # https://techviewleo.com/install-lamp-stack-on-rocky-almalinux-8/
-    yum install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
-    yum module reset php -y
-    yum module enable php:remi-7.3 -y
-    yum install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
+    dnf install -y https://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    dnf module reset php -y
+    dnf module enable php:remi-7.3 -y
+    dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip 
 
-    # Install Python3.8 and set to default
-    yum install -y python38
-    alternatives --set python /usr/bin/python3.8
-    yum install -y python38-devel # python3-mod_wsgi
-
-    yum -y install openssh-server sshpass rsync curl git samba samba-common \
-    samba-client cifs-utils gearmand libgearman-devel nodejs supervisor \
-    mysql-server npm httpd setroubleshoot policycoreutils-python-utils gcc \
-    zlib-devel libjpeg-devel make python3-devel proj python3-pyproj python3-mod_wsgi
-
-    pip3 install Pillow MapProxy
+    # Install Python3.11 and set to default
+    dnf install -y python3.11
+    alternatives --set python3 /usr/bin/python3.11
+    dnf install -y python3.11-devel python3.11-pip
+    python3 -m pip install --upgrade pip --quiet
+    
+    dnf -y install cifs-utils curl gcc gdal gearmand git httpd gdal-devel \
+    libgearman-devel geos-devel libjpeg-devel make mysql-server nodejs npm \
+    openssh-server policycoreutils-python-utils proj proj-devel \
+    python3.11-mod_wsgi python3-pyproj rsync samba samba-client samba-common \
+    setroubleshoot sshpass supervisor zlib-devel
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
-    
-        yum -y install gdal-bin libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj
-        
-        pip3 install MapProxy --quiet
+        python3 -m pip install Pillow MapProxy --quiet
     fi
-
-    npm install --quiet -g bower
 
     cd ~
     curl -sS https://getcomposer.org/installer | php
@@ -219,19 +214,24 @@ function install_python_packages {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT - path where openvdm is
 
+    startingDir=${PWD}
+    cd $INSTALL_ROOT/openvdm
+
     # Set up virtual environment
-    VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python -m venv $VENV_PATH
-    source $VENV_PATH/bin/activate  # activate virtual environment
+    python3 -m venv ./venv
 
-    pip install --trusted-host pypi.org \
-      --trusted-host files.pythonhosted.org --upgrade pip --quiet
-    pip install wheel --quiet # To help with the rest of the installations
+    cat > ./venv/pip.conf <<EOF
+[global]
+trusted-host = pypi.org
+               files.pythonhosted.org
+EOF
 
-    sed 's/GDAL/# GDAL/' $INSTALL_ROOT/openvdm/requirements.txt | sed 's/pkg_resources/# pkg_resources/' > $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
-    pip install -r $INSTALL_ROOT/openvdm/requirements_no_gdal.txt
-    
+    source ./venv/bin/activate  # activate virtual environment
+    pip install -r requirements.txt
+
     deactivate
+
+    cd $startingDir
 
 }
 
@@ -440,10 +440,11 @@ programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_
 
 EOF
 
-    echo "Updating Firewall rules for Supervisor Web Server"
-    # TODO Check for firewall
-    firewall-cmd --zone=public --add-port=9001/tcp --permanent || echo "No firewall installed"
-    firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+        echo "Updating Firewall rules for Supervisor Web Server"
+        firewall-cmd --zone=public --add-port=9001/tcp --permanent
+        firewall-cmd --reload
+    fi
 
     echo "Starting new supervisor processes"
     systemctl restart supervisord
@@ -541,11 +542,12 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
 EOF
 fi
 
-    echo "Updating firewall rules for samba"
 
-    # TODO Check if firewall installed
-    sudo firewall-cmd --add-service=samba --zone=public --permanent || echo "No firewall installed"
-    sudo firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+        echo "Updating firewall rules for samba"
+        sudo firewall-cmd --add-service=samba --zone=public --permanent
+        sudo firewall-cmd --reload
+    fi
 
     echo "Restarting Samba Service"
     systemctl start smb
@@ -646,10 +648,11 @@ cat >> /etc/httpd/conf.d/openvdm.conf <<EOF
 </VirtualHost>
 EOF
 
-    echo "Updating Firewall rules for Apache Web Server"
-    # TODO Check for firewall
-    firewall-cmd --permanent --add-service={http,https} || echo "No firewall installed"
-    firewall-cmd --reload || echo "No firewall installed"
+    if [ -z $FIREWALL_ENABLED ]; then
+       echo "Updating Firewall rules for Apache Web Server"
+       firewall-cmd --permanent --add-service={http,https}
+       firewall-cmd --reload
+    fi
 
     echo "Setting SELinux exception rules"
     chcon -R -t httpd_sys_content_t ${DATA_ROOT}
@@ -874,7 +877,7 @@ function setup_ssh {
         chmod 600 /home/${OPENVDM_USER}/.ssh/authorized_keys
     fi
 
-    ssh ${OPENVDM_USER}@${HOSTNAME} ls > /dev/null
+    ssh -o StrictHostKeyChecking=no ${OPENVDM_USER}@${HOSTNAME} ls > /dev/null
 }
 
 
@@ -1039,7 +1042,6 @@ echo
 echo "Will install from github.com"
 echo "Repository: '$OPENVDM_REPO'"
 echo "Branch: '$OPENVDM_BRANCH'"
-echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
 echo "#####################################################################"
@@ -1124,14 +1126,15 @@ echo
 
 #########################################################################
 # Install MapProxy?
-echo "#####################################################################"
-echo "Optionally install: MapProxy"
-echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
-echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
-echo
-yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
-INSTALL_MAPPROXY=$YES_NO_RESULT
-echo
+#echo "#####################################################################"
+#echo "Optionally install: MapProxy"
+#echo "MapProxy is used for caching map tiles from ESRI and Google. This can"
+#echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
+#echo
+#yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
+#INSTALL_MAPPROXY=$YES_NO_RESULT
+#echo
+INSTALL_MAPPROXY=$DEFAULT_INSTALL_MAPPROXY
 
 #########################################################################
 # Install PublicData?
@@ -1159,6 +1162,12 @@ echo
 #########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
+
+# Determine if there's a firewall installed.
+set +e
+which firewall-cmd > /dev/null 2>&1
+FIREWALL_ENABLED=$?
+set -e
 
 #########################################################################
 # The rest of the installtion

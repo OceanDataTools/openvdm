@@ -12,16 +12,15 @@ DESCRIPTION:  Parse the supplied geotiff file and return the json-
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.10
-            Python Modules:
-                PyYAML==6.0
-                requests==2.27.1
+               Python Modules:
+                   GDAL==3.10.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import os
@@ -37,9 +36,6 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMParser
 
-# DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
-
 class GeoTIFFParser(OpenVDMParser):
     """
     Custom OpenVDM file parser
@@ -47,7 +43,6 @@ class GeoTIFFParser(OpenVDMParser):
 
     def __init__(self, use_openvdm_api=False, output_dir=None):
         super().__init__(use_openvdm_api=use_openvdm_api)
-        # self.time_format = time_format
 
         if output_dir is not None and not os.path.isdir(output_dir):
             raise FileNotFoundError("Output directory does not exist")

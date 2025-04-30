@@ -15,20 +15,18 @@ DESCRIPTION:  Parse the supplied NMEA-formtted GGA file and return the json-
             [--stopTS] optional stop crop time (strptime format)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
-            Python Modules:
-                geopy==2.1.0
-                numpy==1.19.5
-                pandas==1.2.0
-                PyYAML==5.3.1
-                requests==2.25.1
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   geopy==2.4.0
+                   numpy==2.2.4
+                   pandas==2.2.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import csv
@@ -47,8 +45,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum'] # SCS style
+RAW_COLS = ['date_time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum']
 PROC_COLS = ['date_time','latitude','longitude','num_satellites','hdop','altitude','height_wgs84']
 
 ROUNDING = {
@@ -64,7 +61,6 @@ MAX_VELOCITY = 18 #Max speed of vessel (mph)
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
 
 
 class GGAParser(OpenVDMCSVParser):
@@ -95,7 +91,7 @@ class GGAParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -103,8 +99,7 @@ class GGAParser(OpenVDMCSVParser):
                 for lineno, line in enumerate(reader):
 
                     try:
-                        date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                        date_time = line['date_time']
 
                         longitude = (self._hemisphere_correction(float(line['longitude'][:3]) + float(line['longitude'][3:])/60, line['EW']))
                         latitude = (self._hemisphere_correction(float(line['latitude'][:2]) + float(line['latitude'][2:])/60, line['NS']))

@@ -13,9 +13,9 @@ ARGUMENTS: --interval <interval> The minimum interval in second between director
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2017-09-30
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse

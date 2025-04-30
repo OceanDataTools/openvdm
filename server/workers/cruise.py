@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -30,7 +30,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.check_filenames import bad_filename
+from server.lib.file_utils import bad_filename
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.openvdm import OpenVDM
 

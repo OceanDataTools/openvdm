@@ -169,12 +169,41 @@ function install_packages {
 
     startingDir=${PWD}
 
-    apt-get update -qq
+    sudo NEEDRESTART_MODE=a apt-get update -qq
 
-    apt-get install -q -y software-properties-common ca-certificates curl gnupg
+    sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-    LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/apache2
+    # Constants
+    CODENAME="jammy"
+    KEYRING_DIR="/etc/apt/keyrings"
+    KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
+    APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
+    APACHE_PPA_URL="http://ppa.launchpad.net/ondrej/apache2/ubuntu"
+    PHP_PPA_LIST="/etc/apt/sources.list.d/ondrej-php.list"
+    PHP_PPA_URL="http://ppa.launchpad.net/ondrej/php/ubuntu"
+
+    # Make sure keyrings dir exists
+    sudo mkdir -p "$KEYRING_DIR"
+
+    echo "Downloading and importing public keys..."
+
+    # Download individual keys (in ASCII format) and dearmor them
+    # First: Ondřej’s PHP packaging key (E5267A6C)
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x4F4EA0AAE5267A6C" \
+      | gpg --dearmor | sudo tee "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
+
+    # Second: DPA key (71DAEAAB4AD4CAB6) — still used by Launchpad for some builds
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x71DAEAAB4AD4CAB6" \
+      | gpg --dearmor | sudo tee -a "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
+
+    echo "➕ Adding PHP PPA with correct keyring..."
+    echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
+      sudo tee "$PHP_PPA_LIST"
+
+    # Add Apache2 PPA
+    echo "➕ Adding Apache2 PPA..."
+    echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
+      sudo tee "$APACHE_PPA_LIST"
 
     # Install nodejs v20.11.0 LTS
     if [ ! -e "/usr/local/bin/npm" ]; then
@@ -189,25 +218,23 @@ function install_packages {
         sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/node /usr/local/bin/
     fi
     
-    apt-get update -qq
+    sudo apt update -qq
 
-    apt install -q -y openssh-server sshpass rsync git samba smbclient \
-        cifs-utils gearman-job-server libgearman-dev python3 mysql-client \
-        python3-dev python3-pip python3-venv supervisor mysql-server ntp\
-        apache2 libapache2-mod-wsgi-py3 php7.3 libapache2-mod-php7.3 \
-        php7.3-cli php7.3-mysql php7.3-zip php7.3-curl php7.3-gearman \
-        php7.3-yaml
+    sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 cifs-utils gdal-bin \
+    gearman-job-server git libapache2-mod-php7.3 libapache2-mod-wsgi-py3 \
+    libgearman-dev mysql-client mysql-server ntp php7.3 php7.3-cli \
+    php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml php7.3-zip python3 \
+    python3-dev python3-pip python3-venv rsync samba smbclient sshpass \
+    supervisor
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
-        apt install -q -y libgdal-dev gdal-bin libgeos-dev libgdal-dev proj-bin \
+        sudo NEEDRESTART_MODE=a apt install -q -y libgeos-dev libgdal-dev proj-bin \
             python3-pyproj
         
         pip3 install MapProxy --quiet
     fi
     
-    npm install --quiet -g bower
-
     cd ~
     curl -sS https://getcomposer.org/installer | php
     mv composer.phar /usr/local/bin/composer
@@ -223,21 +250,30 @@ function install_python_packages {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT - path where openvdm is
 
+    startingDir=${PWD}
+
+    cd $INSTALL_ROOT/openvdm
     # Set up virtual environment
-    VENV_PATH=$INSTALL_ROOT/openvdm/venv
-    python3 -m venv $VENV_PATH
-    source $VENV_PATH/bin/activate  # activate virtual environment
+    python3 -m venv ./venv
+    source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
         --trusted-host files.pythonhosted.org --upgrade pip --quiet
     pip install wheel --quiet # To help with the rest of the installations
 
-    pip install -r $INSTALL_ROOT/openvdm/requirements.txt --quiet
+    pip install -r requirements.txt --quiet
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
        pip install geographiclib==1.52 geopy==2.2.0 --quiet
-       pip install --global-option=build_ext --global-option="-I/usr/include/gdal" GDAL==`gdal-config --version` --quiet
+       pip install --config-settings="--global-option=build_ext" \
+                   --config-settings="--global-option=-I/usr/include/gdal" \
+                   GDAL==`gdal-config \
+                   --version` \
+                   --quiet
+
     fi
+
+    cd $startingDir
 }
 
 

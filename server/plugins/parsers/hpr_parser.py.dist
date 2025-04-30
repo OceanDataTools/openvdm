@@ -16,18 +16,15 @@ DESCRIPTION:  Parse the supplied NMEA-formtted HPR file and return the json-
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.10
-            Python Modules:
-                numpy==1.22.2
-                pandas==1.4.1
-                PyYAML==6.0
-                requests==2.27.1
+               Python Modules:
+                   pandas==2.2.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import csv
@@ -44,8 +41,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','heading','pitch','roll','checksum'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','heading','pitch','roll','checksum'] # SCS style
+RAW_COLS = ['date_time','hdr','heading','pitch','roll','checksum']
 PROC_COLS = ['date_time','heading','pitch','roll']
 
 ROUNDING = {
@@ -56,8 +52,7 @@ ROUNDING = {
 
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
+DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 class HPRParser(OpenVDMCSVParser):
@@ -80,7 +75,7 @@ class HPRParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -89,7 +84,6 @@ class HPRParser(OpenVDMCSVParser):
 
                     try:
                         date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
 
                         heading = float(line['heading'])
                         pitch = float(line['pitch'])

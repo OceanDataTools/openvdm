@@ -5,7 +5,7 @@
 def condense_to_ranges(integers):
     """
     Function to reduce array of consecutive numbers to ranges. This helps
-    condense message bodies related to file parsing errors. 
+    condense message bodies related to file parsing errors.
     """
 
     ranges = []

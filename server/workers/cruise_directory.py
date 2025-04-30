@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -67,33 +67,46 @@ def build_directorylist(gearman_worker):
 
     return_directories = []
 
-    # Add required extra directories
+    # Retrieve required extra directories
     extra_directories = gearman_worker.ovdm.get_required_extra_directories()
+
+    # Filter out From_PublicData directory if the auto transfer has been disabled.
+    if gearman_worker.ovdm.get_transfer_public_data() is not True:
+        extra_directories = [ extra_directory for extra_directory in extra_directories if extra_directory['name'] != 'From_PublicData']
+
+    # add required extra directories to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
     # Add lowering base directory
     if gearman_worker.ovdm.get_show_lowering_components():
         return_directories.append(os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']))
 
-    # Add active collection system transfers
+    # Retrieve active collection system transfers
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
     # Filter out collection system transfers that contain {loweringID} in the dest_dir if there is no lowering ID
     if not gearman_worker.lowering_id:
         collection_system_transfers = [ collection_system_transfer for collection_system_transfer in collection_system_transfers if '{loweringID}' not in collection_system_transfer['destDir']]
 
+    # Filter out From_PublicData directory if the auto transfer has been disabled.
+    if gearman_worker.ovdm.get_transfer_public_data() is not True:
+        collection_system_transfers = [ collection_system_transfer for collection_system_transfer in collection_system_transfers if collection_system_transfer['name'] != 'From_PublicData']
+
+    # add collection system transfers to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
-    # Add active extra directories
+    # Retrieve active extra directories
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
+    extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == '0']
 
     # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
     if not gearman_worker.lowering_id:
         extra_directories = [ extra_directory for extra_directory in extra_directories if '{loweringID}' not in extra_directory['destDir']]
 
+    # add required extra directories to output
     return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
-    return return_directories
+    return list(set(return_directories))
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
@@ -252,7 +265,6 @@ def task_create_cruise_directory(gearman_worker, gearman_job):
     if len(directorylist) > 0:
         job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
     else:
-        logging.warning("Directory list is empty")
         job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
         return json.dumps(job_results)
 

@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""
+FILE:  geotiff_titiler_parser.py
+
+USAGE:  geotiff_titiler_parser.py [-h] [-v+] <dataFile>
+
+DESCRIPTION:  Process the supplied geotiff file using TiTiler and return the
+              json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
+
+  OPTIONS:  [-h] Return the help message.
+            [-v+] Increase verbosity (default: warning)
+            <dataFile> Full or relative path of the data file to process.
+
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   requests==2.32.3
+
+     BUGS:
+    NOTES:
+   AUTHOR:  Webb Pinner
+  VERSION:  2.10
+  CREATED:  2016-08-29
+ REVISION:  2025-04-12
+"""
+
+import os
+import logging
+import sys
+from os.path import dirname, realpath
+import requests
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.lib.openvdm_plugin import OpenVDMParser
+
+TIMEOUT = 2
+DEFAULT_TITILER_URL = 'http://localhost:8000'
+
+class GeoTIFFParser(OpenVDMParser):
+    """
+    Custom OpenVDM file parser
+    """
+
+    def __init__(self, use_openvdm_api=False, cruisedata_url=None, titiler_url=None):
+        super().__init__(use_openvdm_api=use_openvdm_api)
+
+        self.titiler_url = titiler_url or DEFAULT_TITILER_URL
+
+        if cruisedata_url is None and not use_openvdm_api:
+            raise ValueError('Unable to determine base URL of datafile')
+
+        if cruisedata_url:
+            self.cruisedata_url = cruisedata_url
+
+        else:
+            self.cruisedata_url = self.openvdm.get_cruisedata_url()
+
+        self.cruisedata_path = self.openvdm.get_cruisedata_path()
+
+
+    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        """
+        Process the provided file
+        """
+
+        logging.debug("Parsing data file...")
+        directoryname, filename = os.path.split(filepath)
+        label = os.path.splitext(filename)[0]
+
+        params = {
+            'url': self.cruisedata_url + filepath.replace(self.cruisedata_path, '')
+        }
+
+        url = f'{self.titiler_url}/cog/bounds'
+
+        try:
+            req = requests.get(url, params=params, timeout=TIMEOUT)
+            bounds = req.json()['bounds']
+            bounds = [round(bound, 6) for bound in bounds]
+        except Exception as err:
+            logging.error("Unable to retrieve metadata on file from TiTiler API")
+            raise err
+
+        logging.debug("Finished parsing data file")
+
+        logging.debug("Building visualization data...")
+
+        visualizer_data_obj = {
+            "label": label,
+            "tileURL": params['url'],
+            "mapBounds": ','.join([str(bound) for bound in bounds])
+        }
+
+        self.add_visualization_data(visualizer_data_obj)
+
+
+# -------------------------------------------------------------------------------------
+# Required python code for running the script as a stand-alone utility
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Parse GeoTiff image data')
+    parser.add_argument('-v', '--verbosity', dest='verbosity',
+                        default=0, action='count',
+                        help='Increase output verbosity')
+    parser.add_argument('--outputDir', metavar='outputDir', default=None,
+                        help='where to save the output tiles')
+    parser.add_argument('dataFile', metavar='dataFile',
+                        help='the raw data file to process')
+
+    parsed_args = parser.parse_args()
+
+    ############################
+    # Set up logging before we do any other argument parsing (so that we
+    # can log problems with argument parsing).
+
+    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+    logging.basicConfig(format=LOGGING_FORMAT)
+
+    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
+    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+
+    ovdm_parser = GeoTIFFParser(output_dir=parsed_args.outputDir)
+
+    try:
+        logging.info("Processing file: %s", parsed_args.dataFile)
+        ovdm_parser.process_file(parsed_args.dataFile)
+        print(ovdm_parser.to_json())
+        logging.info("Done!")
+    except Exception as err:
+        logging.error(str(err))
+        raise err

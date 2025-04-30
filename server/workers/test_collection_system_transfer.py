@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing collection system transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -171,7 +171,9 @@ def test_smb_source_dir(gearman_worker):
 
     return_val.append({"partName": "SMB Share", "result": "Pass"})
 
-    source_dir = os.path.join(mntpoint, build_source_dir(gearman_worker))
+    logging.debug(gearman_worker.collection_system_transfer)
+    gearman_worker.collection_system_transfer['sourceDir'] = gearman_worker.collection_system_transfer['sourceDir'].rstrip('/').lstrip('/')
+    source_dir = mntpoint if gearman_worker.collection_system_transfer['sourceDir'] == '' else os.path.join(mntpoint, build_source_dir(gearman_worker))
 
     logging.debug('Source Dir: %s', source_dir)
     if os.path.isdir(source_dir):

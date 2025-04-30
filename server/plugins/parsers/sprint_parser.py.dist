@@ -15,20 +15,18 @@ DESCRIPTION:  Parse the supplied Sprint navigation data file and return the
             [--stopTS] optional stop crop time (strptime format)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
-            Python Modules:
-                geopy==2.1.0
-                numpy==1.19.5
-                pandas==1.2.0
-                PyYAML==5.3.1
-                requests==2.25.1
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   geopy==2.4.1
+                   numpy==2.2.4
+                   pandas==2.2.3
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2016-08-29
- REVISION:  2024-04-10
+ REVISION:  2025-04-12
 """
 
 import csv
@@ -47,8 +45,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','roll','pitch','heading','orientation_status','latitude','longitude','position_status','velocity_fwd','velocity_Stbd','velocity_down','altitude','altitude_status','depth','depth_used'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','roll','pitch','heading','orientation_status','latitude','longitude','position_status','velocity_fwd','velocity_Stbd','velocity_down','altitude','altitude_status','depth','depth_used'] # SCS style
+RAW_COLS = ['date_time','hdr','roll','pitch','heading','orientation_status','latitude','longitude','position_status','velocity_fwd','velocity_Stbd','velocity_down','altitude','altitude_status','depth','depth_used']
 PROC_COLS = ['date_time','latitude','longitude']
 
 ROUNDING = {
@@ -60,9 +57,7 @@ ROUNDING = {
 MAX_VELOCITY = 10 #Max speed of vehicle (mph)
 MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-# DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
-
+DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 class SprintParser(OpenVDMCSVParser):
     """
@@ -84,7 +79,7 @@ class SprintParser(OpenVDMCSVParser):
         errors = []
         try:
             with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
 
                 if self.skip_header:
                     next(reader)
@@ -92,8 +87,7 @@ class SprintParser(OpenVDMCSVParser):
                 for lineno, line in enumerate(reader):
 
                     try:
-                        date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                        date_time = line['date_time']
 
                         longitude = float(line['longitude']) if line['longitude'] != '' else None
                         latitude = float(line['latitude']) if line['latitude'] != '' else None
@@ -233,7 +227,6 @@ class SprintParser(OpenVDMCSVParser):
         }
 
         for event in events:
-            # logging.debug("EV: %s".format(event))
             feature = {
                 'type':'Feature',
                 'geometry':{

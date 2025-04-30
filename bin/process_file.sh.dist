@@ -78,7 +78,7 @@ set_environment() {
   fi
 
   if [ ${#DATA_FILES[@]} -eq 0 ]; then
-    echo "ERROR: No DTM files provided... quiting."
+    echo "ERROR: No files provided... quiting."
     exit 1
   fi
 
@@ -116,6 +116,16 @@ process_file() {
   INPUT_FILE=$1
 
   echo "Current input file: ${INPUT_FILE}"
+
+  # Define the regex pattern for filenames that should be processed
+  # Example: matches filenames with alphanumeric characters, underscores, or
+  # hyphens, followed by a .txt extension
+  VALID_FILE_PATTERN="^[a-zA-Z0-9_-]+\.txt$"
+
+  if [[ ! "${INPUT_FILE}" =~ ${VALID_FILE_PATTERN} ]]; then
+    echo "Filename does not match expected pattern."
+    return
+  fi
 
   if [[ ! -z ${IGNORE_CHECKS+z} || -f "${INPUT_FILE}" ]]; then
   	echo "Processing file: ${INPUT_FILE}"

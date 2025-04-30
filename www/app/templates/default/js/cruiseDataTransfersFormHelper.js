@@ -73,5 +73,42 @@ $(function () {
     $('input[name=sshUseKey]').change(function () {
         setSSHUseKeyField($(this).val());
     });
+
+    $('#selectAllCS').change(function() {
+      // Check if 'Select All' is checked
+      var isChecked = $(this).prop('checked');
+      
+      // Set all child checkboxes' checked state based on 'Select All'
+      $('#excludedCollectionSystems input[type="checkbox"]').prop('checked', isChecked);
+    });
     
+    // Optional: If any child checkbox is unchecked, uncheck 'Select All'
+    $('#excludedCollectionSystems input[type="checkbox"]').change(function() {
+      // If any child checkbox is unchecked, uncheck the 'Select All' checkbox
+      if ($('#excludedCollectionSystems input[type="checkbox"]:not(:checked)').length > 0) {
+        $('#selectAllCS').prop('checked', false);
+      } else {
+        // If all child checkboxes are checked, check 'Select All'
+        $('#selectAllCS').prop('checked', true);
+      }
+    });
+    
+    $('#selectAllED').change(function() {
+      // Check if 'Select All' is checked
+      var isChecked = $(this).prop('checked');
+      
+      // Set all child checkboxes' checked state based on 'Select All'
+      $('#excludedExtraDirectories input[type="checkbox"]').prop('checked', isChecked);
+    });
+    
+    // Optional: If any child checkbox is unchecked, uncheck 'Select All'
+    $('#excludedExtraDirectories input[type="checkbox"]').change(function() {
+      // If any child checkbox is unchecked, uncheck the 'Select All' checkbox
+      if ($('#excludedExtraDirectories input[type="checkbox"]:not(:checked)').length > 0) {
+        $('#selectAllED').prop('checked', false);
+      } else {
+        // If all child checkboxes are checked, check 'Select All'
+        $('#selectAllED').prop('checked', true);
+      }
+    });
 });

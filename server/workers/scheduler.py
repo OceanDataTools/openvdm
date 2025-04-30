@@ -17,23 +17,25 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
-import argparse
-import json
-import logging
+import os
 import sys
 import time
+import json
+import logging
+import argparse
 from os.path import dirname, realpath
 from python3_gearman import GearmanClient
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.openvdm import OpenVDM
-
+from server.lib.file_utils import purge_old_files
+from server.lib.openvdm import OpenVDM, DEFAULT_CONFIG_FILE
+from server.lib.read_config import read_config
 
 if __name__ == "__main__":
 
@@ -63,7 +65,21 @@ if __name__ == "__main__":
 
     time.sleep(10)
 
+    cruise_basedir = ovdm.get_cruisedata_path()
+    openvdm_config = read_config(DEFAULT_CONFIG_FILE)
+    logfile_purge_timedelta = openvdm_config.get('logfilePurgeTimedelta', None)
+
+    if logfile_purge_timedelta:
+        logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
+
     while True:
+
+        # purge old transfer logs:
+        logging.info("Purging old transfer logs")
+        cruiseID = ovdm.get_cruise_id()
+        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
+
 
         CURRENT_SEC = 0
         while True:
@@ -74,6 +90,7 @@ if __name__ == "__main__":
             else:
                 break
 
+        # schedule collection_system_transfers
         collection_system_transfers = ovdm.get_active_collection_system_transfers()
         for collection_system_transfer in collection_system_transfers:
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -88,7 +105,7 @@ if __name__ == "__main__":
 
             time.sleep(2)
 
-
+        # schedule cruise_data_transfers
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
@@ -103,6 +120,7 @@ if __name__ == "__main__":
 
             time.sleep(2)
 
+        # schedule ship-to-shore transfer
         required_cruise_data_transfers = ovdm.get_required_cruise_data_transfers()
         for required_cruise_data_transfer in required_cruise_data_transfers:
             if required_cruise_data_transfer['name'] == 'SSDW':

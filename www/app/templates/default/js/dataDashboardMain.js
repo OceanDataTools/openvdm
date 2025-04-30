@@ -2,6 +2,7 @@ $(function () {
     'use strict';
     
     var MAPPROXY_DIR = '/mapproxy';
+    var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
 
     var max_values = 5;
     
@@ -131,7 +132,7 @@ $(function () {
                             }
                         }
                     }),
-                        mapBounds = ggaData.getBounds();
+                    mapBounds = ggaData.getBounds();
                     
                     mapBounds.extend(latLng);
 
@@ -200,15 +201,22 @@ $(function () {
 
                     //Add basemap layer
                     L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-                        // attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
                         maxZoom: 20
                     }).addTo(mapdb);
                     
-                    // Add latest trackline (GeoJSON)
-                    L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                        tms: true,
-                        bounds:mapBounds
-                    }).addTo(mapdb);
+                    // Add latest geotiff
+                    if ('tileDirectory' in data[0]) {
+                        L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
+                            tms:true,
+                            bounds:mapBounds
+                        }).addTo(mapdb);
+                    } else if ('tileURL' in data[0]) {
+                        const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
+                        console.debug(url)
+                        L.tileLayer(url, {
+                            bounds:mapBounds
+                        }).addTo(mapdb);
+                    }
                     mapdb.fitBounds(mapBounds);
                 }
             }

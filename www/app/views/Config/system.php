@@ -43,175 +43,191 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
     <div class="row">
         <div class="col-lg-7 col-md-12">
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>System Behaviors</th>
-                    <th>Action</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>
-                
-                <tr>
-                    <td>Ship-to-Shore Transfer Bandwidth Limit: <strong><?php echo (strcmp($data['shipToShoreBWLimit'], '0') === 0 ? 'Unlimited' : $data['shipToShoreBWLimit'] . ' Kbps'); ?></strong></td>
-                    <td><a href='<?php echo DIR; ?>config/system/editShipToShoreBWLimit'>Edit</a></td>
-                    <td style='text-align:center'>
+                <thead>
+                    <tr>
+                        <th>System Behaviors</th>
+                        <th>Action</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Ship-to-Shore Transfer Bandwidth Limit: <strong><?php echo (strcmp($data['shipToShoreBWLimit'], '0') === 0 ? 'Unlimited' : $data['shipToShoreBWLimit'] . ' Kbps'); ?></strong></td>
+                        <td><a href='<?php echo DIR; ?>config/system/editShipToShoreBWLimit'>Edit</a></td>
+                        <td style='text-align:center'>
 <?php
             if(strcmp($data['shipToShoreBWLimitStatus'], 'On') === 0){
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableShipToShoreBWLimit'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableShipToShoreBWLimit'>On</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableShipToShoreBWLimit'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableShipToShoreBWLimit'>Off</a>
 <?php
             }
 ?>
-                    </td>
-                </tr>
-
-                <tr>
-                    <td>Data Filesize Limit for MD5 Checksum: <strong><?php echo (strcmp($data['md5FilesizeLimit'], '0') === 0 ? 'Unlimited' : $data['md5FilesizeLimit'] . ' MB'); ?></strong></td>
-                    <td><a href='<?php echo DIR; ?>config/system/editMD5FilesizeLimit'>Edit</a></td>
-                    <td style='text-align:center'>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Data Filesize Limit for MD5 Checksum: <strong><?php echo (strcmp($data['md5FilesizeLimit'], '0') === 0 ? 'Unlimited' : $data['md5FilesizeLimit'] . ' MB'); ?></strong></td>
+                        <td><a href='<?php echo DIR; ?>config/system/editMD5FilesizeLimit'>Edit</a></td>
+                        <td style='text-align:center'>
 <?php
             if(strcmp($data['md5FilesizeLimitStatus'], 'On') === 0){
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableMD5FilesizeLimit'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableMD5FilesizeLimit'>On</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableMD5FilesizeLimit'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableMD5FilesizeLimit'>Off</a>
 <?php
             }
 ?>
-                    </td>
-                </tr>
-
+                        </td>
+                    </tr>
+                </tbody>
             </table>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>Sidebar Links<a class="pull-right btn btn-xs btn-primary" href="<?php echo DIR; ?>config/system/addLink">Add New Link</a></th>
-                    <th style='width:200px;'>Action</th>
-                    <th style='width:20px;'>Private</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>                
-
+                <thead>
+                    <tr>
+                        <th>Sidebar Links<a class="pull-right btn btn-xs btn-primary" href="<?php echo DIR; ?>config/system/addLink">Add New Link</a></th>
+                        <th style='width:200px;'>Action</th>
+                        <th style='width:20px;'>Private</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody>
 <?php
     if($data['links']){
         foreach($data['links'] as $row){
 ?>
-                <tr>
-                    <td><?php echo $row->name; ?></td>
-                    <td>
-                        <a href='<?php echo $row->url; ?>' target='_blank'>Open</a> /
-                        <a href='<?php echo DIR; ?>config/system/editLink/<?php echo $row->linkID; ?>'>Edit</a> /
-                        <a href='#confirmDeleteModal' data-toggle='modal' data-item-name='Link' data-delete-url='<?php echo DIR; ?>config/system/deleteLink/<?php echo $row->linkID; ?>'>Delete</a>
-                    </td>
-                    <td style='text-align:center'>
+                    <tr>
+                        <td><?php echo $row->name; ?></td>
+                        <td>
+                            <a href='<?php echo $row->url; ?>' target='_blank'>Open</a> /
+                            <a href='<?php echo DIR; ?>config/system/editLink/<?php echo $row->linkID; ?>'>Edit</a> /
+                            <a href='#confirmDeleteModal' data-toggle='modal' data-item-name='Link' data-delete-url='<?php echo DIR; ?>config/system/deleteLink/<?php echo $row->linkID; ?>'>Delete</a>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if($row->private == "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/privateLink/<?php echo $row->linkID; ?>'>No</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/privateLink/<?php echo $row->linkID; ?>'>No</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/publicLink/<?php echo $row->linkID; ?>'>Yes</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/publicLink/<?php echo $row->linkID; ?>'>Yes</a>
 <?php
             }
 ?>
-                    </td>
-                    <td style='text-align:center'>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if($row->enable == "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableLink/<?php echo $row->linkID; ?>'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableLink/<?php echo $row->linkID; ?>'>Off</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableLink/<?php echo $row->linkID; ?>'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableLink/<?php echo $row->linkID; ?>'>On</a>
 <?php
             }
 ?>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 <?php
         }
     }
 ?>
+                </tbody>
             </table>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>OpenVDM Specific Ship-to-Shore Transfers</th>
-                    <th>Action</th>
-                    <th style='width:20px;'>Enabled</th>
-                </tr>           
-
+                <thead>
+                    <tr>
+                        <th>OpenVDM Specific Ship-to-Shore Transfers</th>
+                        <th>Action</th>
+                        <th style='width:20px;'>Enabled</th>
+                    </tr>
+                </thead>
+                <tbody>
 <?php
     if($data['requiredShipToShoreTransfers']){
         foreach($data['requiredShipToShoreTransfers'] as $row){
 ?>
-                <tr>
-                    <td><?php echo $row->longName; ?></td>
-                    <td>
-                        <a href='<?php echo DIR; ?>config/system/editShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>Edit</a>
-                    </td>
-                    <td style='text-align:center'>
+                    <tr>
+                        <td><?php echo $row->longName; ?></td>
+                        <td>
+                            <a href='<?php echo DIR; ?>config/system/editShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>Edit</a>
+                        </td>
+                        <td style='text-align:center'>
 <?php
             if($row->enable == "0"){
 ?>
-                        <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>Off</a>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>Off</a>
 <?php
             } else {
 ?>
-                        <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>On</a>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/disableShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>On</a>
 <?php
             }
 ?>
-                    </td>
-                </tr>
+                        </td>
+                    </tr>
 <?php
         }
     }
 ?>
+                </tbody>
             </table>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>OpenVDM Required Directories</th>
-                    <th>Action</th>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>OpenVDM Required Directories</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
 <?php
     if($data['requiredExtraDirectories']){
         foreach($data['requiredExtraDirectories'] as $row){
 ?>
-                <tr>
-                    <td><?php echo $row->longName; ?></td>
-                    <td>
-                        <a href='<?php echo DIR; ?>config/system/editExtraDirectories/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
-                    </td>
-                </tr>
+                    <tr>
+                        <td><?php echo $row->longName; ?></td>
+                        <td>
+                            <a href='<?php echo DIR; ?>config/system/editExtraDirectories/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
+                        </td>
+                    </tr>
 <?php
         }
     }
 ?>
+                </tbody>
+            </table>
             <table class='table table-striped table-hover table-bordered responsive'>
-                <tr>
-                    <th>Data Warehouses</th>
-                    <th>Action</th>
-                </tr>
-                <tr>
-                    <td>Shipboard Data Warehouse (SBDW)</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editShipboardDataWarehouse">Edit</a> / 
-                        <a href="<?php echo DIR ?>config/system/testShipboardDataWarehouse">Test</a>
-                        <span class="pull-right" id="testFailSBDW"><?php echo $testFailSBDW; ?></span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Shoreside Data Warehouse (SSDW)</td>
-                    <td>
-                        <a href="<?php echo DIR ?>config/system/editShoresideDataWarehouse">Edit</a> / 
-                        <a href="<?php echo DIR ?>config/system/testShoresideDataWarehouse">Test</a>
-                        <span class="pull-right" id="testFailSSDW"><?php echo $testFailSSDW; ?></span>
-                    </td>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>Data Warehouses</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Shipboard Data Warehouse (SBDW)</td>
+                        <td>
+                            <a href="<?php echo DIR ?>config/system/editShipboardDataWarehouse">Edit</a> / 
+                            <a href="<?php echo DIR ?>config/system/testShipboardDataWarehouse">Test</a>
+                            <span class="pull-right" id="testFailSBDW"><?php echo $testFailSBDW; ?></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Shoreside Data Warehouse (SSDW)</td>
+                        <td>
+                            <a href="<?php echo DIR ?>config/system/editShoresideDataWarehouse">Edit</a> / 
+                            <a href="<?php echo DIR ?>config/system/testShoresideDataWarehouse">Test</a>
+                            <span class="pull-right" id="testFailSSDW"><?php echo $testFailSSDW; ?></span>
+                        </td>
+                    </tr>
+                </tbody>
             </table>
         </div>
         <div class="col-lg-5 col-md-12">

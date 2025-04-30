@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.9
+  VERSION:  2.10
   CREATED:  2015-01-01
- REVISION:  2022-07-24
+ REVISION:  2025-04-12
 """
 
 import argparse
@@ -30,7 +30,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.check_filenames import is_ascii, is_rsync_patial_file
+from server.lib.file_utils import is_ascii, is_rsync_patial_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
@@ -88,7 +88,7 @@ def build_filelist(gearman_worker, source_dir): # pylint: disable=too-many-branc
                     return_files['include'].append(filepath)
 
     return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop().replace("[", "\[").replace("]", "\]") for filename in return_files['exclude']]
+    return_files['exclude'] = [filename.split(source_dir + '/',1).pop().replace("[", r"\[").replace("]", r"\]") for filename in return_files['exclude']]
 
     logging.debug("file list: %s", json.dumps(return_files, indent=2))
 
@@ -152,7 +152,6 @@ def build_exclude_filterlist(gearman_worker):
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
 
     return exclude_filterlist
-
 
 
 def run_localfs_transfer_command_to_localfs(gearman_worker, gearman_job, command, file_count):
@@ -219,7 +218,7 @@ def run_localfs_transfer_command_to_remotefs(gearman_worker, gearman_job, comman
     if file_count == 0:
         logging.debug("Skipping Transfer Command: nothing to transfer")
         return [], []
-    
+
     logging.debug("Transfer Command: %s", ' '.join(command))
 
     file_index = 0
@@ -730,7 +729,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results_obj = json.loads(job_result)
 
         if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
+            if results_obj['parts'][-1]['result'] == "Fail" and results_obj['parts'][-1]['partName'] != "Located Cruise Data Tranfer Data": # Final Verdict
                 self.ovdm.set_error_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'], results_obj['parts'][-1]['reason'])
             elif results_obj['parts'][-1]['result'] == "Pass":
                 self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
