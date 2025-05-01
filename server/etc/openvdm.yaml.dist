@@ -25,14 +25,14 @@ transferInterval: 5
 gearmanServer: "localhost:4730"
 
 # Whether or not to hide all directories in the CruiseData directory other than the
-# current cruise. (True|False))
+# current cruise. (True|False)
 showOnlyCurrentCruiseDir: False
 
 # Whether or not to move the contents of the PublicData share to the cruise data
-# directory. (True|False))
+# directory. (True|False)
 transferPubicData: True
 
-# maximum age of transfer log files to retain. String must conform with the pythong
+# maximum age of transfer log files to retain. String must conform with the python
 # datetime.timedelta standard
 # logfilePurgeTimedelta: "12 hours"
 
@@ -47,7 +47,7 @@ plugins:
 
 # The hooks section contains any additional Gearman tasks that should be performed
 # after the successful completion of the primary OpenVDM Gearman task.  Any subsequent
-# tasks called with be called as background Gearman tasks so to not interfer with
+# tasks called with be called as background Gearman tasks so to not interfere with
 # OpenVDM's primary operation.
 hooks:
     runCollectionSystemTransfer:
