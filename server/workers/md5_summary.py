@@ -257,11 +257,15 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
+    if 'deleted' not in payload_obj['files']:
+        payload_obj['files']['deleted'] = []
+
+    if len(payload_obj['files']['new']) + len(payload_obj['files']['updated']) + len(payload_obj['files']['deleted']) == 0:
+        return json.dumps(job_results)
+
     if payload_obj['files']['new'] or payload_obj['files']['updated']:
         filelist.extend(payload_obj['files']['new'])
         filelist.extend(payload_obj['files']['updated'])
-    else:
-        return json.dumps(job_results)
 
     #filelist = [os.path.join(gearman_worker.cruiseID, filename) for filename in filelist]
     logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
