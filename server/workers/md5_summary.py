@@ -300,6 +300,7 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     row_added = 0
     row_updated = 0
+    row_deleted = 0
 
     for new_hash in new_hashes:
         updated = False
@@ -314,10 +315,17 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
             existing_hashes.append({'hash': new_hash['hash'], 'filename': new_hash['filename']})
             row_added += 1
 
+    if 'deleted' in payload_obj['files']:
+        hashes = len(existing_hashes)
+        existing_hashes = [existing_hash for existing_hash in existing_hashes if existing_hash.get(filename) not in payload_obj['files']['deleted']]
+        row_deleted = hashes - len(existing_hashes)
+
     if row_added > 0:
         logging.debug("%s row(s) added", row_added)
     if row_updated > 0:
         logging.debug("%s row(s) updated", row_updated)
+    if row_deleted > 0:
+        logging.debug("%s row(s) deleted", row_deleted)
 
     gearman_worker.send_job_status(gearman_job, 85, 100)
 

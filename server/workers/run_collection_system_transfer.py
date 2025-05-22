@@ -1022,6 +1022,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 }
             }
 
+            if 'deleted' in results_obj['files']:
+                # job_data['files']['deleted'] = [
+                #     os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/')
+                #     for filepath in results_obj['files']['deleted']
+                # ]
+
+                job_data['files']['deleted'] = [
+                    os.path.normpath(os.path.join(self.collection_system_transfer['destDir'], filepath))
+                    for filepath in results_obj['files']['deleted']
+                ]
+
             for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
@@ -1143,6 +1154,9 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         logging.debug("%s file(s) updated", len(job_results['files']['updated']))
     if len(job_results['files']['exclude']) > 0:
         logging.warning("%s misnamed file(s) encountered", len(job_results['files']['exclude']))
+
+    if 'delete' in job_results['files'] and len(job_results['files']['deleted']) > 0:
+        logging.warning("%s file(s) deleted", len(job_results['files']['deleted']))
 
     gearman_worker.send_job_status(current_job, 9, 10)
 
