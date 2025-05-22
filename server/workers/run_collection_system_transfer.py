@@ -1008,7 +1008,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         results_obj = json.loads(job_result)
 
-        if results_obj['files']['new'] or results_obj['files']['updated'] or results_obj['files']['deleted']:
+        if results_obj['files']['new'] or results_obj['files']['updated'] or ('deleted' in results_obj and results_obj['files']['deleted']):
 
             logging.debug("Preparing subsequent Gearman jobs")
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
