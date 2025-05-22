@@ -500,8 +500,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     while proc.poll() is None:
 
         for line in proc.stdout:
-
-            print(line)
             if gearman_worker.stop:
                 logging.debug("Stopping")
                 proc.terminate()
@@ -681,7 +679,7 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files': []}
 
-    command = ['rsync', '-triv', '--files-from=' + rsync_filelist_filepath,  os.path.join(mntpoint, gearman_worker.source_dir, ''), os.path.join(gearman_worker.dest_dir, '')]
+    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath,  os.path.join(mntpoint, gearman_worker.source_dir, ''), os.path.join(gearman_worker.dest_dir, '')]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
         command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
