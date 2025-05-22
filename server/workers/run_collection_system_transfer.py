@@ -501,6 +501,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
         for line in proc.stdout:
 
+            print(line)
             if gearman_worker.stop:
                 logging.debug("Stopping")
                 proc.terminate()
@@ -526,6 +527,18 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     return new_files, updated_files
 
+
+def delete_from_dest(gearman_worker, gearman_job, include_files):
+    deleted_files = []
+
+    for filename in os.listdir(gearman_worker.dest_dir):
+        full_path = os.path.join(gearman_worker.dest_dir, filename)
+        if os.path.isfile(full_path) and filename not in include_files:
+            print(f"🗑 Deleting: {filename}")
+            os.remove(full_path)
+            deleted_files.append(filename)
+
+    return deleted_files
 
 def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
     """
@@ -639,7 +652,6 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         rw_type += f",password={gearman_worker.collection_system_transfer['smbPass']}"
 
     mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', f"{rw_type},domain={gearman_worker.collection_system_transfer['smbDomain']},vers={vers}"]
-
     logging.debug("Mount command: %s", ' '.join(mount_command))
 
     proc = subprocess.call(mount_command)
@@ -669,13 +681,10 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
 
         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files': []}
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, os.path.join(mntpoint, gearman_worker.source_dir), gearman_worker.dest_dir]
+    command = ['rsync', '-triv', '--files-from=' + rsync_filelist_filepath,  os.path.join(mntpoint, gearman_worker.source_dir, ''), os.path.join(gearman_worker.dest_dir, '')]
 
     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
         command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
-
-    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
-        command.insert(2, '--delete')
 
     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
         command.insert(2, '--min-size=1')
@@ -687,6 +696,9 @@ def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-
         command.insert(2, '--remove-source-files')
 
     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
+
+    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+        files['deleted'] = delete_from_dest(gearman_worker, gearman_job, files['include'])
 
     # Cleanup
     time.sleep(2)
