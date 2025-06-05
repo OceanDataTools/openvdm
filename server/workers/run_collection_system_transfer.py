@@ -361,6 +361,7 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
         result = process_rsync_line(line, filters, data_start_time, data_end_time, epoch)
         if result:
             results.append(result)
+
     return results
 
 
@@ -448,17 +449,6 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
     del return_files['filesize']
 
     shutil.rmtree(tmpdir)
-
-
-    base_len = len(gearman_worker.source_dir.rstrip(os.sep)) + 1
-    return_files['include'] = [f[base_len:] for f in return_files['include']]
-    return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
-
-    # if gearman_worker.source_dir != '':
-    #     return_files['include'] = [filename.split(gearman_worker.source_dir + '/', 1).pop() for filename in
-    #                                return_files['include']]
-    #     return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/', 1).pop() for filename in
-    #                                return_files['exclude']]
 
     logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
