@@ -30,6 +30,7 @@ from os.path import dirname, realpath
 from random import randint
 import pytz
 import python3_gearman
+from memory_profiler import profile
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
@@ -38,7 +39,7 @@ from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
-
+@profile
 def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Build the list of files to include, exclude or ignore
@@ -57,6 +58,9 @@ def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-loca
     logging.debug("End: %s", data_end_time)
 
     filters = build_filters(gearman_worker)
+    ignore_filters = filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
+    include_filters = filters['includeFilter'].split(',') if filters['includeFilter'] else []
+    exclude_filters = filters['excludeFilter'].split(',') if filters['excludeFilter'] else []
 
     for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
         for filename in filenames:
@@ -66,78 +70,117 @@ def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-loca
                 logging.debug("%s is a symlink, skipping", filepath)
                 continue
 
-            exclude = False
-            ignore = False
-            include = False
+            try:
+                file_stat = os.stat(filepath)
+            except FileNotFoundError:
+                continue  # Skip files that disappeared mid-walk
 
-            file_mod_time = os.stat(filepath).st_mtime
+            file_mod_time = file_stat.st_mtime
+            
+            #exclude = False
+            #ignore = False
+            #include = False
+
+            #file_mod_time = os.stat(filepath).st_mtime
             logging.debug("file_mod_time: %s", file_mod_time)
 
             if file_mod_time < data_start_time or file_mod_time > data_end_time:
                 logging.debug("%s ignored for time reasons", filepath)
-                ignore = True
+            #    ignore = True
                 continue
 
-            for ignore_filter in filters['ignoreFilter'].split(','):
-                if fnmatch.fnmatch(filepath, ignore_filter):
-                    logging.debug("%s ignored by ignore filter", filepath)
-                    ignore = True
-                    break
+            #for ignore_filter in filters['ignoreFilter'].split(','):
+            #    if fnmatch.fnmatch(filepath, ignore_filter):
+            #        logging.debug("%s ignored by ignore filter", filepath)
+            #        ignore = True
+            #        break
 
-            if ignore:
+            #if ignore:
+            #    continue
+
+            #if not is_ascii(filepath):
+            #    logging.debug("%s is not an ascii-encoded unicode string", filepath)
+            #    return_files['exclude'].append(filepath)
+            #    exclude = True
+            #    continue
+            # Skip ignored patterns
+            if any(fnmatch.fnmatch(filepath, pattern) for pattern in ignore_filters):
                 continue
 
             if not is_ascii(filepath):
-                logging.debug("%s is not an ascii-encoded unicode string", filepath)
                 return_files['exclude'].append(filepath)
-                exclude = True
                 continue
 
-            for include_filter in filters['includeFilter'].split(','):
-                if fnmatch.fnmatch(filepath, include_filter):
-                    for exclude_filter in filters['excludeFilter'].split(','):
-                        if fnmatch.fnmatch(filepath, exclude_filter):
-                            logging.debug("%s excluded by exclude filter", filepath)
-                            return_files['exclude'].append(filepath)
-                            exclude = True
-                            break
+            #for include_filter in filters['includeFilter'].split(','):
+            #    if fnmatch.fnmatch(filepath, include_filter):
+            #        for exclude_filter in filters['excludeFilter'].split(','):
+            #            if fnmatch.fnmatch(filepath, exclude_filter):
+            #                logging.debug("%s excluded by exclude filter", filepath)
+            #                return_files['exclude'].append(filepath)
+            #                exclude = True
+            #                break
 
-                    if exclude:
-                        break
+            #        if exclude:
+            #            break
 
-                    logging.debug("%s is a valid file for transfer", filepath)
-                    include = True
-                    break
+            #        logging.debug("%s is a valid file for transfer", filepath)
+            #        include = True
+            #        break
 
-            if include:
+            #if include:
+            #    return_files['include'].append(filepath)
+            #    return_files['filesize'].append(os.stat(filepath).st_size)
+
+            #elif not ignore and not exclude:
+            #    logging.debug("%s excluded because file does not match any of the filters", filepath)
+            #    return_files['exclude'].append(filepath)
+
+            # Inclusion logic
+            matched_include = any(fnmatch.fnmatch(filepath, pattern) for pattern in include_filters)
+            matched_exclude = any(fnmatch.fnmatch(filepath, pattern) for pattern in exclude_filters)
+
+            if matched_include and not matched_exclude:
                 return_files['include'].append(filepath)
-                return_files['filesize'].append(os.stat(filepath).st_size)
-
-            elif not ignore and not exclude:
-                logging.debug("%s excluded because file does not match any of the filters", filepath)
+                return_files['filesize'].append(file_stat.st_size)
+            else:
                 return_files['exclude'].append(filepath)
 
-    if not gearman_worker.collection_system_transfer['staleness'] == '0':
+    #if not gearman_worker.collection_system_transfer['staleness'] == '0':
+    staleness_wait = gearman_worker.collection_system_transfer.get('staleness')
+    if staleness_wait and staleness_wait != '0':
         logging.debug("Checking for changing filesizes")
         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-        for idx, filepath in enumerate(return_files['include']):
-            if not os.stat(filepath).st_size == return_files['filesize'][idx]:
-                logging.debug("file %s has changed size, removing from include list", filepath)
-                del return_files['include'][idx]
-                del return_files['filesize'][idx]
+        #for idx, filepath in enumerate(return_files['include']):
+        #    if not os.stat(filepath).st_size == return_files['filesize'][idx]:
+        #        logging.debug("file %s has changed size, removing from include list", filepath)
+        #        del return_files['include'][idx]
+        #        del return_files['filesize'][idx]
+        stable_include = []
+        stable_filesize = []
+        for filepath, size_before in zip(return_files['include'], return_files['filesize']):
+            try:
+                if os.stat(filepath).st_size == size_before:
+                    stable_include.append(filepath)
+                    stable_filesize.append(size_before)
+            except FileNotFoundError:
+                continue  # File was removed
+        return_files['include'] = stable_include
+        return_files['filesize'] = stable_filesize
 
     del return_files['filesize']
-
     return_files['include'].sort()
     return_files['exclude'].sort()
+    source_prefix_len = len(source_dir.rstrip(os.sep)) + 1
+    return_files['include'] = [f[source_prefix_len:] for f in return_files['include']]
+    return_files['exclude'] = [f[source_prefix_len:] for f in return_files['exclude']]
 
-    return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
-    return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
+    #return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
+    #return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
 
     logging.debug("return_files: %s", json.dumps(return_files, indent=2))
     return {'verdict': True, 'files': return_files}
 
-
+@profile
 def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Build the list of files to include, exclude or ignore, for an rsync server
@@ -280,6 +323,7 @@ def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-
     return {'verdict': True, 'files': return_files}
 
 
+@profile
 def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
     """
     Build the list of files to include, exclude or ignore for a ssh server
@@ -478,7 +522,6 @@ def build_logfile_dirpath(gearman_worker):
     """
 
     return os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
-
 
 def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     """
