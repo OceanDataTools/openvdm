@@ -164,147 +164,6 @@ def build_filelist(gearman_worker, prefix=None, batch_size=500, max_workers=16):
     return {'verdict': True, 'files': return_files}
 
 
-# def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-#     """
-#     Build the list of files to include, exclude or ignore
-#     """
-
-#     source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
-
-#     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
-
-#     logging.debug("data_start_date: %s", gearman_worker.data_start_date)
-#     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-#     logging.debug("Start: %s", data_start_time)
-
-#     logging.debug("data_end_date: %s", gearman_worker.data_end_date)
-#     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-#     logging.debug("End: %s", data_end_time)
-
-#     filters = build_filters(gearman_worker)
-#     ignore_filters = filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
-#     include_filters = filters['includeFilter'].split(',') if filters['includeFilter'] else []
-#     exclude_filters = filters['excludeFilter'].split(',') if filters['excludeFilter'] else []
-
-#     for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
-#         for filename in filenames:
-#             filepath = os.path.join(root, filename)
-
-#             if os.path.islink(filepath):
-#                 logging.debug("%s is a symlink, skipping", filepath)
-#                 continue
-
-#             try:
-#                 file_stat = os.stat(filepath)
-#             except FileNotFoundError:
-#                 continue  # Skip files that disappeared mid-walk
-
-#             file_mod_time = file_stat.st_mtime
-
-#             #exclude = False
-#             #ignore = False
-#             #include = False
-
-#             #file_mod_time = os.stat(filepath).st_mtime
-#             logging.debug("file_mod_time: %s", file_mod_time)
-
-#             if file_mod_time < data_start_time or file_mod_time > data_end_time:
-#                 logging.debug("%s ignored for time reasons", filepath)
-#             #    ignore = True
-#                 continue
-
-#             #for ignore_filter in filters['ignoreFilter'].split(','):
-#             #    if fnmatch.fnmatch(filepath, ignore_filter):
-#             #        logging.debug("%s ignored by ignore filter", filepath)
-#             #        ignore = True
-#             #        break
-
-#             #if ignore:
-#             #    continue
-
-#             #if not is_ascii(filepath):
-#             #    logging.debug("%s is not an ascii-encoded unicode string", filepath)
-#             #    return_files['exclude'].append(filepath)
-#             #    exclude = True
-#             #    continue
-#             # Skip ignored patterns
-#             if any(fnmatch.fnmatch(filepath, pattern) for pattern in ignore_filters):
-#                 continue
-
-#             if not is_ascii(filepath):
-#                 return_files['exclude'].append(filepath)
-#                 continue
-
-#             #for include_filter in filters['includeFilter'].split(','):
-#             #    if fnmatch.fnmatch(filepath, include_filter):
-#             #        for exclude_filter in filters['excludeFilter'].split(','):
-#             #            if fnmatch.fnmatch(filepath, exclude_filter):
-#             #                logging.debug("%s excluded by exclude filter", filepath)
-#             #                return_files['exclude'].append(filepath)
-#             #                exclude = True
-#             #                break
-
-#             #        if exclude:
-#             #            break
-
-#             #        logging.debug("%s is a valid file for transfer", filepath)
-#             #        include = True
-#             #        break
-
-#             #if include:
-#             #    return_files['include'].append(filepath)
-#             #    return_files['filesize'].append(os.stat(filepath).st_size)
-
-#             #elif not ignore and not exclude:
-#             #    logging.debug("%s excluded because file does not match any of the filters", filepath)
-#             #    return_files['exclude'].append(filepath)
-
-#             # Inclusion logic
-#             matched_include = any(fnmatch.fnmatch(filepath, pattern) for pattern in include_filters)
-#             matched_exclude = any(fnmatch.fnmatch(filepath, pattern) for pattern in exclude_filters)
-
-#             if matched_include and not matched_exclude:
-#                 return_files['include'].append(filepath)
-#                 return_files['filesize'].append(file_stat.st_size)
-#             else:
-#                 return_files['exclude'].append(filepath)
-
-#     #if not gearman_worker.collection_system_transfer['staleness'] == '0':
-#     staleness_wait = gearman_worker.collection_system_transfer.get('staleness')
-#     if staleness_wait and staleness_wait != '0':
-#         logging.debug("Checking for changing filesizes")
-#         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-#         #for idx, filepath in enumerate(return_files['include']):
-#         #    if not os.stat(filepath).st_size == return_files['filesize'][idx]:
-#         #        logging.debug("file %s has changed size, removing from include list", filepath)
-#         #        del return_files['include'][idx]
-#         #        del return_files['filesize'][idx]
-#         stable_include = []
-#         stable_filesize = []
-#         for filepath, size_before in zip(return_files['include'], return_files['filesize']):
-#             try:
-#                 if os.stat(filepath).st_size == size_before:
-#                     stable_include.append(filepath)
-#                     stable_filesize.append(size_before)
-#             except FileNotFoundError:
-#                 continue  # File was removed
-#         return_files['include'] = stable_include
-#         return_files['filesize'] = stable_filesize
-
-#     del return_files['filesize']
-#     return_files['include'].sort()
-#     return_files['exclude'].sort()
-#     source_prefix_len = len(source_dir.rstrip(os.sep)) + 1
-#     return_files['include'] = [f[source_prefix_len:] for f in return_files['include']]
-#     return_files['exclude'] = [f[source_prefix_len:] for f in return_files['exclude']]
-
-#     #return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
-#     #return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
-
-#     logging.debug("return_files: %s", json.dumps(return_files, indent=2))
-#     return {'verdict': True, 'files': return_files}
-
-
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
     file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
@@ -332,26 +191,6 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
             return ('exclude', filepath, None)
 
     return ('exclude', filepath, None)
-
-    # for ignore_filter in filters['ignoreFilters']:
-    #     if fnmatch.fnmatch(filepath, ignore_filter):
-    #         ignore = True
-    #         break
-
-    # if ignore:
-    #     return None
-
-    # if not is_ascii(filepath):
-    #     return ('exclude', filepath)
-
-    # for include_filter in filters['includeFilters']:
-    #     if fnmatch.fnmatch(filepath, include_filter):
-    #         for exclude_filter in filters['excludeFilters']:
-    #             if fnmatch.fnmatch(filepath, exclude_filter):
-    #                 return ('exclude', filepath)
-    #         return ('include', filepath, size)
-
-    # return ('exclude', filepath)
 
 
 def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
@@ -455,44 +294,158 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
     return {'verdict': True, 'files': return_files}
 
 
-# def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+# def process_ssh_line(line, filters, data_start_time, data_end_time, epoch):
+#     """Process a single rsync line from SSH source."""
+#     file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
+#     include = False
+#     exclude = False
+#     ignore = False
+
+#     file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
+#     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+
+#     if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:
+#         return None
+
+#     for ignore_filter in filters['ignoreFilters']:
+#         if fnmatch.fnmatch(filepath, ignore_filter):
+#             return None
+
+#     if not is_ascii(filepath):
+#         return ('exclude', filepath)
+
+#     for include_filter in filters['includeFilters']:
+#         if fnmatch.fnmatch(filepath, include_filter):
+#             for exclude_filter in filters['excludeFilters']:
+#                 if fnmatch.fnmatch(filepath, exclude_filter):
+#                     return ('exclude', filepath)
+#             return ('include', filepath, size)
+
+#     return ('exclude', filepath)
+
+
+# def process_ssh_batch(batch, filters, data_start_time, data_end_time, epoch):
+#     results = []
+#     for line in batch:
+#         result = process_rsync_line(line, filters, data_start_time, data_end_time, epoch)
+#         if result:
+#             results.append(result)
+#     return results
+
+
+@profile
+def build_ssh_filelist(gearman_worker, batch_size=500, max_workers=16):
+    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
+
+    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
+    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
+    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
+    filters = build_filters(gearman_worker)
+
+    # Detect if Darwin (macOS)
+    is_darwin_cmd = ['ssh', f"{gearman_worker.collection_system_transfer['sshUser']}@{gearman_worker.collection_system_transfer['sshServer']}", "uname -s"]
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        is_darwin_cmd = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + is_darwin_cmd
+
+    proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
+    is_darwin = any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
+
+    # Build rsync command
+    command = ['rsync', '-r', '-e', 'ssh',
+               f"{gearman_worker.collection_system_transfer['sshUser']}@{gearman_worker.collection_system_transfer['sshServer']}:{gearman_worker.source_dir}/"]
+
+    if not is_darwin:
+        command.insert(2, '--protect-args')
+    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+        command.insert(2, '--min-size=1')
+    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+        command.insert(2, '-m')
+    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+        command.insert(2, '--remove-source-files')
+
+    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+
+    logging.debug("Command: %s", ' '.join(command))
+
+    proc = subprocess.run(command, capture_output=True, text=True, check=False)
+    lines = proc.stdout.splitlines()
+
+    batches = [lines[i:i + batch_size] for i in range(0, len(lines), batch_size)]
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_rsync_batch, batch, filters, data_start_time, data_end_time, epoch)
+                   for batch in batches]
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                for item in result:
+                    if item[0] == 'include':
+                        return_files['include'].append(item[1])
+                        return_files['filesize'].append(item[2])
+                    elif item[0] == 'exclude':
+                        return_files['exclude'].append(item[1])
+
+    # Optional staleness check
+    if gearman_worker.collection_system_transfer['staleness'] != '0':
+        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
+        proc = subprocess.run(command, capture_output=True, text=True, check=False)
+        for line in proc.stdout.splitlines():
+            try:
+                file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
+                idx = return_files['include'].index(filepath)
+                if return_files['filesize'][idx] != size:
+                    del return_files['filesize'][idx]
+                    del return_files['include'][idx]
+            except (ValueError, Exception) as err:
+                logging.warning("Error verifying staleness: %s", err)
+
+    del return_files['filesize']
+
+    # return_files['include'] = [f.split(gearman_worker.source_dir + '/', 1).pop()
+    #                            for f in return_files['include']]
+    # return_files['exclude'] = [f.split(gearman_worker.source_dir + '/', 1).pop()
+    #                            for f in return_files['exclude']]
+
+    logging.debug('return_files: %s', json.dumps(return_files, indent=2))
+    return {'verdict': True, 'files': return_files}
+
+# def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
 #     """
-#     Build the list of files to include, exclude or ignore, for an rsync server
+#     Build the list of files to include, exclude or ignore for a ssh server
 #     transfer
 #     """
 
 #     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
 
-#     # staleness = int(gearman_worker.collection_system_transfer['staleness']) * 60
-#     # threshold_time = time.time() - staleness # 5 minutes
 #     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
 #     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
 #     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
-#     # logging.debug("Threshold: %s", threshold_time)
 #     logging.debug("    Start: %s", data_start_time)
 #     logging.debug("      End: %s", data_end_time)
 
 #     filters = build_filters(gearman_worker)
 
-#     # Create temp directory
-#     tmpdir = tempfile.mkdtemp()
-#     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
+#     is_darwin = False
+#     command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
 
-#     try:
-#         with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
-#             rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
-#         os.chmod(rsync_password_filepath, 0o600)
+#     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+#         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
-#     except IOError:
-#         logging.error("Error Saving temporary rsync password file")
+#     logging.debug("Command: %s", ' '.join(command))
 
-#         # Cleanup
-#         shutil.rmtree(tmpdir)
+#     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-#         return {'verdict': False, 'reason': 'Error Saving temporary rsync password file: ' + rsync_password_filepath}
+#     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
+#         is_darwin = line.rstrip('\n') == 'Darwin'
+#         if is_darwin:
+#             break
 
-#     command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd', 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + gearman_worker.source_dir + '/']
+#     command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
+
+#     if not is_darwin:
+#         command.insert(2, '--protect-args')
 
 #     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
 #         command.insert(2, '--min-size=1')
@@ -503,11 +456,12 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 #     if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
 #         command.insert(2, '--remove-source-files')
 
+#     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+#         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+
 #     logging.debug("Command: %s", ' '.join(command))
 
 #     proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-#     logging.debug("proc.stdout: %s", proc.stdout)
 
 #     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
 #         logging.debug('line: %s', line.rstrip('\n'))
@@ -520,12 +474,12 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 #             file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
 #             file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
 #             logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-#             if file_mod_time_seconds < data_start_time or file_mod_time_seconds > data_end_time:  # pylint: disable=chained-comparison
+#             if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
 #                 logging.debug("%s ignored for time reasons", filepath)
 #                 ignore = True
 #                 continue
 
-#             for ignore_filter in filters['ignoreFilter'].split(','):
+#             for ignore_filter in filters['ignoreFilters']:
 #                 if fnmatch.fnmatch(filepath, ignore_filter):
 #                     logging.debug("%s ignored because file matched ignore filter", filepath)
 #                     ignore = True
@@ -540,9 +494,9 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 #                 exclude = True
 #                 continue
 
-#             for include_filter in filters['includeFilter'].split(','):
+#             for include_filter in filters['includeFilters']:
 #                 if fnmatch.fnmatch(filepath, include_filter):
-#                     for exclude_filter in filters['excludeFilter'].split(','):
+#                     for exclude_filter in filters['excludeFilters']:
 #                         if fnmatch.fnmatch(filepath, exclude_filter):
 #                             logging.debug("%s excluded because file matches exclude filter", filepath)
 #                             return_files['exclude'].append(filepath)
@@ -585,154 +539,12 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 
 #     del return_files['filesize']
 
-#     # Cleanup
-#     shutil.rmtree(tmpdir)
-
-#     if gearman_worker.source_dir != '':
-#         return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
-#         return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
+#     return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
+#     return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
 
 #     logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
 #     return {'verdict': True, 'files': return_files}
-
-
-@profile
-def build_ssh_filelist(gearman_worker): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-    """
-    Build the list of files to include, exclude or ignore for a ssh server
-    transfer
-    """
-
-    return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
-
-    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
-    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-
-    logging.debug("    Start: %s", data_start_time)
-    logging.debug("      End: %s", data_end_time)
-
-    filters = build_filters(gearman_worker)
-
-    is_darwin = False
-    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
-
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
-
-    logging.debug("Command: %s", ' '.join(command))
-
-    proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-    for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
-        is_darwin = line.rstrip('\n') == 'Darwin'
-        if is_darwin:
-            break
-
-    command = ['rsync', '-r', '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir + '/']
-
-    if not is_darwin:
-        command.insert(2, '--protect-args')
-
-    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=1')
-
-    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-        command.insert(2, '-m')
-
-    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
-        command.insert(2, '--remove-source-files')
-
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
-
-    logging.debug("Command: %s", ' '.join(command))
-
-    proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-    for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
-        logging.debug('line: %s', line.rstrip('\n'))
-        file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
-        if file_or_dir.startswith('-'):
-            exclude = False
-            ignore = False
-            include = False
-
-            file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-            file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-            logging.debug("file_mod_time_seconds: %s", file_mod_time_seconds)
-            if file_mod_time_seconds < data_start_time or file_mod_time_seconds >data_end_time: # pylint: disable=chained-comparison
-                logging.debug("%s ignored for time reasons", filepath)
-                ignore = True
-                continue
-
-            for ignore_filter in filters['ignoreFilter'].split(','):
-                if fnmatch.fnmatch(filepath, ignore_filter):
-                    logging.debug("%s ignored because file matched ignore filter", filepath)
-                    ignore = True
-                    break
-
-            if ignore:
-                continue
-
-            if not is_ascii(filepath):
-                logging.debug("%s is not an ascii-encoded unicode string", filepath)
-                return_files['exclude'].append(filepath)
-                exclude = True
-                continue
-
-            for include_filter in filters['includeFilter'].split(','):
-                if fnmatch.fnmatch(filepath, include_filter):
-                    for exclude_filter in filters['excludeFilter'].split(','):
-                        if fnmatch.fnmatch(filepath, exclude_filter):
-                            logging.debug("%s excluded because file matches exclude filter", filepath)
-                            return_files['exclude'].append(filepath)
-                            exclude = True
-                            break
-
-                    if exclude:
-                        break
-
-                    logging.debug("%s is a valid file for transfer", filepath)
-                    include = True
-                    break
-
-            if include:
-                return_files['include'].append(filepath)
-                return_files['filesize'].append(size)
-
-            elif not ignore and not exclude:
-                logging.debug("%s excluded because file does not match any include or ignore filters", filepath)
-                return_files['exclude'].append(filepath)
-
-    if not gearman_worker.collection_system_transfer['staleness'] == '0':
-        logging.debug("Checking for changing filesizes")
-        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-        proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-        for line in proc.stdout.splitlines():
-            file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
-
-            try:
-                younger_file_idx = return_files['include'].index(filepath)
-                if return_files['filesize'][younger_file_idx] != size:
-                    logging.debug("file %s has changed size, removing from include list", filepath)
-                    del return_files['filesize'][younger_file_idx]
-                    del return_files['include'][younger_file_idx]
-            except ValueError:
-                pass
-            except Exception as err:
-                logging.error(str(err))
-
-    del return_files['filesize']
-
-    return_files['include'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['include']]
-    return_files['exclude'] = [filename.split(gearman_worker.source_dir + '/',1).pop() for filename in return_files['exclude']]
-
-    logging.debug('return_files: %s', json.dumps(return_files, indent=2))
-
-    return {'verdict': True, 'files': return_files}
 
 
 def build_filters(gearman_worker):
