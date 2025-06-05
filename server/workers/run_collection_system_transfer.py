@@ -320,17 +320,15 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
         return None
 
     if not is_ascii(filepath):
-        return ('exclude', filepath)
+        return ('exclude', filepath, None)
 
     if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
         if not any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
             return ('include', filepath, size)
         else:
-            return ('exclude', filepath)
+            return ('exclude', filepath, None)
 
-    return ('exclude', filepath)
-
-
+    return ('exclude', filepath, None)
 
     # for ignore_filter in filters['ignoreFilters']:
     #     if fnmatch.fnmatch(filepath, ignore_filter):
@@ -417,8 +415,10 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
         for future in as_completed(futures):
             result = future.result()
             if result:
-                for category, filepath in result:
+                for category, filepath, filesize in result:
                     return_files[category].append(filepath)
+                    if category == 'include':
+                        return_files['filesize'].append(filesize)
 
     if gearman_worker.collection_system_transfer['staleness'] != '0':
         logging.debug("Checking for changing filesizes")
