@@ -309,6 +309,9 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
     file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
 
+    if not file_or_dir.startswith('-'):
+        return None
+
     file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
     file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
 
@@ -427,6 +430,10 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 
         for line in proc.stdout.splitlines():
             file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
+
+            if not file_or_dir.startswith('-'):
+                continue
+
             try:
                 younger_file_idx = return_files['include'].index(filepath)
                 if return_files['filesize'][younger_file_idx] != size:
