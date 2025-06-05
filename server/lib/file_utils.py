@@ -11,10 +11,14 @@ from datetime import timedelta
 
 rsync_partial_file_re = re.compile(r'(^\..+\.[\w]{6}$)')
 
-def is_ascii(test_str):
+def is_ascii(s):
     """Check if the characters in string s are in ASCII, U+0-U+7F."""
 
-    return len(test_str) == len(test_str.encode())
+    try:
+        s.encode('ascii')
+        return True
+    except UnicodeEncodeError:
+        return False
 
 
 def bad_filename(filename):

@@ -31,6 +31,7 @@ from random import randint
 import pytz
 import python3_gearman
 from memory_profiler import profile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
@@ -39,146 +40,273 @@ from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
-@profile
-def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    """
-    Build the list of files to include, exclude or ignore
-    """
+def process_batch(file_batch, filters, data_start_time, data_end_time):
+    include = []
+    exclude = []
 
-    source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
+    include_filters = filters['includeFilter'].split(',')
+    exclude_filters = filters['excludeFilter'].split(',')
+    ignore_filters = filters['ignoreFilter'].split(',')
 
-    return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
-
-    logging.debug("data_start_date: %s", gearman_worker.data_start_date)
-    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-    logging.debug("Start: %s", data_start_time)
-
-    logging.debug("data_end_date: %s", gearman_worker.data_end_date)
-    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-    logging.debug("End: %s", data_end_time)
-
-    filters = build_filters(gearman_worker)
-    ignore_filters = filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
-    include_filters = filters['includeFilter'].split(',') if filters['includeFilter'] else []
-    exclude_filters = filters['excludeFilter'].split(',') if filters['excludeFilter'] else []
-
-    for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
-        for filename in filenames:
-            filepath = os.path.join(root, filename)
-
+    for filepath in file_batch:
+        try:
             if os.path.islink(filepath):
-                logging.debug("%s is a symlink, skipping", filepath)
                 continue
 
-            try:
-                file_stat = os.stat(filepath)
-            except FileNotFoundError:
-                continue  # Skip files that disappeared mid-walk
+            stat = os.stat(filepath)
+            mod_time = stat.st_mtime
+            size = stat.st_size
 
-            file_mod_time = file_stat.st_mtime
-            
-            #exclude = False
-            #ignore = False
-            #include = False
-
-            #file_mod_time = os.stat(filepath).st_mtime
-            logging.debug("file_mod_time: %s", file_mod_time)
-
-            if file_mod_time < data_start_time or file_mod_time > data_end_time:
-                logging.debug("%s ignored for time reasons", filepath)
-            #    ignore = True
+            if not (data_start_time <= mod_time <= data_end_time):
                 continue
 
-            #for ignore_filter in filters['ignoreFilter'].split(','):
-            #    if fnmatch.fnmatch(filepath, ignore_filter):
-            #        logging.debug("%s ignored by ignore filter", filepath)
-            #        ignore = True
-            #        break
-
-            #if ignore:
-            #    continue
-
-            #if not is_ascii(filepath):
-            #    logging.debug("%s is not an ascii-encoded unicode string", filepath)
-            #    return_files['exclude'].append(filepath)
-            #    exclude = True
-            #    continue
-            # Skip ignored patterns
-            if any(fnmatch.fnmatch(filepath, pattern) for pattern in ignore_filters):
+            if any(fnmatch.fnmatch(filepath, p) for p in ignore_filters):
                 continue
 
             if not is_ascii(filepath):
-                return_files['exclude'].append(filepath)
+                exclude.append(filepath)
                 continue
 
-            #for include_filter in filters['includeFilter'].split(','):
-            #    if fnmatch.fnmatch(filepath, include_filter):
-            #        for exclude_filter in filters['excludeFilter'].split(','):
-            #            if fnmatch.fnmatch(filepath, exclude_filter):
-            #                logging.debug("%s excluded by exclude filter", filepath)
-            #                return_files['exclude'].append(filepath)
-            #                exclude = True
-            #                break
-
-            #        if exclude:
-            #            break
-
-            #        logging.debug("%s is a valid file for transfer", filepath)
-            #        include = True
-            #        break
-
-            #if include:
-            #    return_files['include'].append(filepath)
-            #    return_files['filesize'].append(os.stat(filepath).st_size)
-
-            #elif not ignore and not exclude:
-            #    logging.debug("%s excluded because file does not match any of the filters", filepath)
-            #    return_files['exclude'].append(filepath)
-
-            # Inclusion logic
-            matched_include = any(fnmatch.fnmatch(filepath, pattern) for pattern in include_filters)
-            matched_exclude = any(fnmatch.fnmatch(filepath, pattern) for pattern in exclude_filters)
-
-            if matched_include and not matched_exclude:
-                return_files['include'].append(filepath)
-                return_files['filesize'].append(file_stat.st_size)
+            if any(fnmatch.fnmatch(filepath, p) for p in include_filters):
+                if not any(fnmatch.fnmatch(filepath, p) for p in exclude_filters):
+                    include.append((filepath, size))
+                else:
+                    exclude.append(filepath)
             else:
-                return_files['exclude'].append(filepath)
+                exclude.append(filepath)
 
-    #if not gearman_worker.collection_system_transfer['staleness'] == '0':
-    staleness_wait = gearman_worker.collection_system_transfer.get('staleness')
-    if staleness_wait and staleness_wait != '0':
-        logging.debug("Checking for changing filesizes")
-        time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-        #for idx, filepath in enumerate(return_files['include']):
-        #    if not os.stat(filepath).st_size == return_files['filesize'][idx]:
-        #        logging.debug("file %s has changed size, removing from include list", filepath)
-        #        del return_files['include'][idx]
-        #        del return_files['filesize'][idx]
-        stable_include = []
-        stable_filesize = []
-        for filepath, size_before in zip(return_files['include'], return_files['filesize']):
-            try:
-                if os.stat(filepath).st_size == size_before:
-                    stable_include.append(filepath)
-                    stable_filesize.append(size_before)
-            except FileNotFoundError:
-                continue  # File was removed
-        return_files['include'] = stable_include
-        return_files['filesize'] = stable_filesize
+        except FileNotFoundError:
+            continue
 
+    return include, exclude
+
+
+def verify_staleness_batch(paths_sizes):
+    verified = []
+    for filepath, old_size in paths_sizes:
+        try:
+            if os.stat(filepath).st_size == old_size:
+                verified.append((filepath, old_size))
+        except FileNotFoundError:
+            continue
+    return verified
+
+@profile
+def build_filelist(gearman_worker, prefix=None, batch_size=500, max_workers=16):
+    source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
+    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
+
+    logging.info("Starting filelist build in %s", source_dir)
+
+    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
+    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
+    filters = build_filters(gearman_worker)
+
+    # Step 1: Gather all file paths
+    filepaths = []
+    for root, _, filenames in os.walk(source_dir):
+        for filename in filenames:
+            filepaths.append(os.path.join(root, filename))
+
+    total_files = len(filepaths)
+    logging.info("Discovered %d files", total_files)
+
+    # Step 2: Batch file paths
+    batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
+
+    # Step 3: Process in thread pool
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
+                   for batch in batches]
+
+        for future in as_completed(futures):
+            include, exclude = future.result()
+            return_files['include'].extend(f for f, _ in include)
+            return_files['filesize'].extend(s for _, s in include)
+            return_files['exclude'].extend(exclude)
+
+    logging.info("Initial filtering complete: %d included, %d excluded",
+                 len(return_files['include']), len(return_files['exclude']))
+
+    # Step 4: Optional staleness check
+    staleness = gearman_worker.collection_system_transfer.get('staleness')
+    if staleness and staleness != '0':
+        wait_secs = int(staleness)
+        logging.info("Waiting %ds to verify staleness...", wait_secs)
+        time.sleep(wait_secs)
+
+        paths_sizes = list(zip(return_files['include'], return_files['filesize']))
+        stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
+
+        verified_paths = []
+        verified_sizes = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(verify_staleness_batch, batch) for batch in stale_batches]
+
+            for future in as_completed(futures):
+                verified = future.result()
+                for filepath, size in verified:
+                    verified_paths.append(filepath)
+                    verified_sizes.append(size)
+
+        return_files['include'] = verified_paths
+        return_files['filesize'] = verified_sizes
+
+        logging.info("Staleness check complete: %d files remain", len(verified_paths))
+
+    # Step 5: Format output
     del return_files['filesize']
     return_files['include'].sort()
     return_files['exclude'].sort()
-    source_prefix_len = len(source_dir.rstrip(os.sep)) + 1
-    return_files['include'] = [f[source_prefix_len:] for f in return_files['include']]
-    return_files['exclude'] = [f[source_prefix_len:] for f in return_files['exclude']]
 
-    #return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
-    #return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
+    base_len = len(source_dir.rstrip(os.sep)) + 1
+    return_files['include'] = [f[base_len:] for f in return_files['include']]
+    return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
 
-    logging.debug("return_files: %s", json.dumps(return_files, indent=2))
+    logging.debug("Final return_files object: %s", json.dumps(return_files, indent=2))
     return {'verdict': True, 'files': return_files}
+
+
+# def build_filelist(gearman_worker, prefix=None): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+#     """
+#     Build the list of files to include, exclude or ignore
+#     """
+
+#     source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
+
+#     return_files = {'include':[], 'exclude':[], 'new':[], 'updated':[], 'filesize':[]}
+
+#     logging.debug("data_start_date: %s", gearman_worker.data_start_date)
+#     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
+#     logging.debug("Start: %s", data_start_time)
+
+#     logging.debug("data_end_date: %s", gearman_worker.data_end_date)
+#     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
+#     logging.debug("End: %s", data_end_time)
+
+#     filters = build_filters(gearman_worker)
+#     ignore_filters = filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
+#     include_filters = filters['includeFilter'].split(',') if filters['includeFilter'] else []
+#     exclude_filters = filters['excludeFilter'].split(',') if filters['excludeFilter'] else []
+
+#     for root, _, filenames in os.walk(source_dir): # pylint: disable=too-many-nested-blocks
+#         for filename in filenames:
+#             filepath = os.path.join(root, filename)
+
+#             if os.path.islink(filepath):
+#                 logging.debug("%s is a symlink, skipping", filepath)
+#                 continue
+
+#             try:
+#                 file_stat = os.stat(filepath)
+#             except FileNotFoundError:
+#                 continue  # Skip files that disappeared mid-walk
+
+#             file_mod_time = file_stat.st_mtime
+
+#             #exclude = False
+#             #ignore = False
+#             #include = False
+
+#             #file_mod_time = os.stat(filepath).st_mtime
+#             logging.debug("file_mod_time: %s", file_mod_time)
+
+#             if file_mod_time < data_start_time or file_mod_time > data_end_time:
+#                 logging.debug("%s ignored for time reasons", filepath)
+#             #    ignore = True
+#                 continue
+
+#             #for ignore_filter in filters['ignoreFilter'].split(','):
+#             #    if fnmatch.fnmatch(filepath, ignore_filter):
+#             #        logging.debug("%s ignored by ignore filter", filepath)
+#             #        ignore = True
+#             #        break
+
+#             #if ignore:
+#             #    continue
+
+#             #if not is_ascii(filepath):
+#             #    logging.debug("%s is not an ascii-encoded unicode string", filepath)
+#             #    return_files['exclude'].append(filepath)
+#             #    exclude = True
+#             #    continue
+#             # Skip ignored patterns
+#             if any(fnmatch.fnmatch(filepath, pattern) for pattern in ignore_filters):
+#                 continue
+
+#             if not is_ascii(filepath):
+#                 return_files['exclude'].append(filepath)
+#                 continue
+
+#             #for include_filter in filters['includeFilter'].split(','):
+#             #    if fnmatch.fnmatch(filepath, include_filter):
+#             #        for exclude_filter in filters['excludeFilter'].split(','):
+#             #            if fnmatch.fnmatch(filepath, exclude_filter):
+#             #                logging.debug("%s excluded by exclude filter", filepath)
+#             #                return_files['exclude'].append(filepath)
+#             #                exclude = True
+#             #                break
+
+#             #        if exclude:
+#             #            break
+
+#             #        logging.debug("%s is a valid file for transfer", filepath)
+#             #        include = True
+#             #        break
+
+#             #if include:
+#             #    return_files['include'].append(filepath)
+#             #    return_files['filesize'].append(os.stat(filepath).st_size)
+
+#             #elif not ignore and not exclude:
+#             #    logging.debug("%s excluded because file does not match any of the filters", filepath)
+#             #    return_files['exclude'].append(filepath)
+
+#             # Inclusion logic
+#             matched_include = any(fnmatch.fnmatch(filepath, pattern) for pattern in include_filters)
+#             matched_exclude = any(fnmatch.fnmatch(filepath, pattern) for pattern in exclude_filters)
+
+#             if matched_include and not matched_exclude:
+#                 return_files['include'].append(filepath)
+#                 return_files['filesize'].append(file_stat.st_size)
+#             else:
+#                 return_files['exclude'].append(filepath)
+
+#     #if not gearman_worker.collection_system_transfer['staleness'] == '0':
+#     staleness_wait = gearman_worker.collection_system_transfer.get('staleness')
+#     if staleness_wait and staleness_wait != '0':
+#         logging.debug("Checking for changing filesizes")
+#         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
+#         #for idx, filepath in enumerate(return_files['include']):
+#         #    if not os.stat(filepath).st_size == return_files['filesize'][idx]:
+#         #        logging.debug("file %s has changed size, removing from include list", filepath)
+#         #        del return_files['include'][idx]
+#         #        del return_files['filesize'][idx]
+#         stable_include = []
+#         stable_filesize = []
+#         for filepath, size_before in zip(return_files['include'], return_files['filesize']):
+#             try:
+#                 if os.stat(filepath).st_size == size_before:
+#                     stable_include.append(filepath)
+#                     stable_filesize.append(size_before)
+#             except FileNotFoundError:
+#                 continue  # File was removed
+#         return_files['include'] = stable_include
+#         return_files['filesize'] = stable_filesize
+
+#     del return_files['filesize']
+#     return_files['include'].sort()
+#     return_files['exclude'].sort()
+#     source_prefix_len = len(source_dir.rstrip(os.sep)) + 1
+#     return_files['include'] = [f[source_prefix_len:] for f in return_files['include']]
+#     return_files['exclude'] = [f[source_prefix_len:] for f in return_files['exclude']]
+
+#     #return_files['include'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['include']]
+#     #return_files['exclude'] = [filename.replace(source_dir, '').lstrip('/') for filename in return_files['exclude']]
+
+#     logging.debug("return_files: %s", json.dumps(return_files, indent=2))
+#     return {'verdict': True, 'files': return_files}
 
 @profile
 def build_rsync_filelist(gearman_worker): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
