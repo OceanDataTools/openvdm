@@ -772,9 +772,9 @@ def build_filters(gearman_worker):
     logging.debug(json.dumps(filters, indent=2))
 
     return {
-        'include_filters': filters['includeFilter'].split(','),
-        'exclude_filters': filters['excludeFilter'].split(','),
-        'ignore_filters': filters['ignoreFilter'].split(',')
+        'include_filters': filters['includeFilter'].split(',') if filters['includeFilter'] else [],
+        'exclude_filters': filters['excludeFilter'].split(',') if filters['excludeFilter'] else [],
+        'ignore_filters': filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
     }
 
 
