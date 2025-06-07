@@ -97,7 +97,7 @@ def build_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=8):
         futures = [executor.submit(process_batch, batch, filters) for batch in batches]
         for future in as_completed(futures):
             include, exclude = future.result()
-            return_files['include'].extend(f for f, _ in include)
+            return_files['include'].extend(include)
             return_files['exclude'].extend(exclude)
 
     logging.info("Initial filtering complete: %d included, %d excluded",
