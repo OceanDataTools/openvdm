@@ -315,7 +315,7 @@ def build_rsync_options(cfg, mode='dry-run', transfer_type=None):
     :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
     :return: list of rsync flags
     """
-    flags = ['-trinv'] if mode == 'dry-run' else ['-triv']
+    flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
 
     if cfg.get('skipEmptyFiles') == '1':
         flags.insert(1, '--min-size=1')
