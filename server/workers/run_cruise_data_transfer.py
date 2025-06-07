@@ -260,7 +260,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
             if not line:
                 continue
 
-            # logging.debug("%s", line)
+            logging.debug("%s", line)
 
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
