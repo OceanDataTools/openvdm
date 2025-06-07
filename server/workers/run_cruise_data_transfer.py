@@ -18,6 +18,7 @@ import fnmatch
 import json
 import logging
 import os
+import re
 import sys
 import shutil
 import signal
@@ -35,6 +36,8 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+
+TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
 @contextmanager
 def temporary_directory():
@@ -243,9 +246,10 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    file_index = 0
+    # file_index = 0
     new_files = []
     updated_files = []
+    last_percent_reported = -1
 
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     while proc.poll() is None:
@@ -257,6 +261,8 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
                 proc.terminate()
                 break
 
+            line = line.strip()
+
             if not line:
                 continue
 
@@ -265,15 +271,28 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
                 new_files.append(filename.rstrip('\n'))
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
+                # logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                # gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                # file_index += 1
             elif line.startswith( '>f.' ):
                 filename = line.split(' ',1)[1]
                 updated_files.append(filename.rstrip('\n'))
-                logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                file_index += 1
+                # logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
+                # gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+                # file_index += 1
+
+            # Extract progress from `to-chk=` lines
+            match = TO_CHK_RE.search(line)
+            if match:
+                remaining = int(match.group(1))
+                total = int(match.group(2))
+                if total > 0:
+                    percent = int(100 * (total - remaining) / total)
+
+                    if percent != last_percent_reported:
+                        logging.info("Progress Update: %d%%", percent)
+                        gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                        last_percent_reported = percent
 
     return new_files, updated_files
 
