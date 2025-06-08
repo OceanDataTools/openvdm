@@ -890,8 +890,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s, %s transfer completed at: %s", current_job.handle,
-                     self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s transfer completed at: %s", current_job.handle,
+                     time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
