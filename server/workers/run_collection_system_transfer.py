@@ -906,10 +906,9 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
 
     cfg = gearman_worker.collection_system_transfer
     cruise_cfg = gearman_worker.shipboard_data_warehouse_config
-    cruise_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
 
-    source_dir = cfg['source_dir']
-    dest_dir = os.path.join(cruise_dir, cfg['dest_dir'].lstrip(os.sep))
+    source_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    dest_dir = cfg['dest_dir'].lstrip('/')
 
     prefix = None
     mntpoint = None
