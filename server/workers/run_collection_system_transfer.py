@@ -19,7 +19,6 @@ import fnmatch
 import json
 import logging
 import os
-import re
 import sys
 import shutil
 import signal
@@ -475,49 +474,49 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
-    TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+    # TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
     # file_index = 0
     new_files = []
     updated_files = []
-    last_percent_reported = -1
+    # last_percent_reported = -1
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is None:
+    # proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    # while proc.poll() is None:
 
-        for line in proc.stdout:
+    #     for line in proc.stdout:
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
+    #         if gearman_worker.stop:
+    #             logging.debug("Stopping")
+    #             proc.terminate()
+    #             break
 
-            line = line.strip()
+    #         line = line.strip()
 
-            if not line:
-                continue
+    #         if not line:
+    #             continue
 
-            logging.debug("%s", line)
+    #         logging.debug("%s", line)
 
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                new_files.append(filename.rstrip('\n'))
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                updated_files.append(filename.rstrip('\n'))
+    #         if line.startswith( '>f+++++++++' ):
+    #             filename = line.split(' ',1)[1]
+    #             new_files.append(filename.rstrip('\n'))
+    #         elif line.startswith( '>f.' ):
+    #             filename = line.split(' ',1)[1]
+    #             updated_files.append(filename.rstrip('\n'))
 
-            # Extract progress from `to-chk=` lines
-            match = TO_CHK_RE.search(line)
-            if match:
-                remaining = int(match.group(1))
-                total = int(match.group(2))
-                if total > 0:
-                    percent = int(100 * (total - remaining) / total)
+    #         # Extract progress from `to-chk=` lines
+    #         match = TO_CHK_RE.search(line)
+    #         if match:
+    #             remaining = int(match.group(1))
+    #             total = int(match.group(2))
+    #             if total > 0:
+    #                 percent = int(100 * (total - remaining) / total)
 
-                    if percent != last_percent_reported:
-                        logging.info("Progress Update: %d%%", percent)
-                        gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
-                        last_percent_reported = percent
+    #                 if percent != last_percent_reported:
+    #                     logging.info("Progress Update: %d%%", percent)
+    #                     gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+    #                     last_percent_reported = percent
 
     return new_files, updated_files
 
@@ -981,9 +980,9 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             rsync_cmd = ['sshpass', '-p', cfg['sshPass']] + rsync_cmd
 
         # Transfer files
-        # files['new'], files['updated'] = run_transfer_command(
-        #     gearman_worker, gearman_job, rsync_cmd, len(files['include'])
-        # )
+        files['new'], files['updated'] = run_transfer_command(
+            gearman_worker, gearman_job, rsync_cmd, len(files['include'])
+        )
 
         # Cleanup
         if mntpoint:
