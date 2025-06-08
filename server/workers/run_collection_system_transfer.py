@@ -847,6 +847,7 @@ def write_include_file(include_list, filepath):
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_path=None):
+    logging.warning(include_file_path)
     cmd = ['rsync'] + flags
     cmd += extra_args
     if include_file_path:
