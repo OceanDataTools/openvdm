@@ -850,7 +850,7 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_pa
     logging.warning(include_file_path)
     cmd = ['rsync'] + flags
     cmd += extra_args
-    if include_file_path:
+    if include_file_path is not None:
         cmd.append(f"--file-from={include_file_path}")
     cmd += [source_dir, dest_dir]
     return cmd
