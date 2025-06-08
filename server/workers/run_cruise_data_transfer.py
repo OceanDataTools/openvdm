@@ -439,7 +439,7 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
             files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
-            if transfer_type == 'local' and cfg.get('localDirIsMountPoint') != '1':
+            if transfer_type == 'local' and cfg.get('localDirIsMountPoint') == '0':
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
                     cruise_cfg['shipboardDataWarehouseUsername'],
@@ -457,7 +457,7 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
-    Class for the current Gearman worker
+    Gearman worker for OpenVDM-based cruise data transfers.
     """
 
     def __init__(self):
@@ -470,103 +470,113 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
-
     def on_job_execute(self, current_job):
-        """
-        Function run whenever a new job arrives
-        """
-
-        logging.debug("current_job: %s", current_job)
-
+        logging.debug("Received job: %s", current_job)
         self.stop = False
-        payload_obj = json.loads(current_job.data)
 
         try:
-            self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(payload_obj['cruiseDataTransfer']['cruiseDataTransferID'])
+            payload_obj = json.loads(current_job.data)
+            logging.debug("Payload: %s", current_job.data)
 
-            logging.info("cruiseDataTransfer configuration: \n%s", json.dumps(self.cruise_data_transfer, indent=2))
+            cdt_id = payload_obj['cruiseDataTransfer']['cruiseDataTransferID']
+            self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)
 
-            if not self.cruise_data_transfer: # doesn't exist
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Cruise Data Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for cruise data transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            if not self.cruise_data_transfer:
+                self.cruise_data_transfer = {
+                    'name': "Unknown Transfer"
+                }
 
-            if self.cruise_data_transfer['status'] == "1": # running
-                logging.info("Transfer job for %s skipped because a transfer for that cruise data destination is already in-progress", self.cruise_data_transfer['name'])
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+                return self._fail_job(current_job, "Located Cruise Data Transfer Data",
+                                      "Could not find configuration data for cruise data transfer")
 
-        except Exception as err:
-            logging.debug(str(err))
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Cruise Data Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for cruise data transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            if self.cruise_data_transfer['status'] == "1":
+                logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
+                return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
-        self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
+        except Exception:
+            logging.exception("Failed to retrieve cruise data transfer config")
+            return self._fail_job(current_job, "Located Cruise Data Transfer Data",
+                                  "Could not retrieve data for cruise data transfer from OpenVDM API")
+
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
+        ))
+
+        logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+
+        self.system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.cruise_data_transfer.update(payload_obj['cruiseDataTransfer'])
 
         if self.system_status == "Off" or self.cruise_data_transfer['enable'] == '0':
-            logging.info("Transfer job for %s skipped because that cruise data transfer is currently disabled", self.cruise_data_transfer['name'])
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer Enabled", "result": "Ignore", "reason": "Transfer is disabled"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            logging.info("Transfer disabled for %s", self.cruise_data_transfer['name'])
+            return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-
-        logging.info("Job: %s, %s transfer started at: %s", current_job.handle, self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
-
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         return super().on_job_execute(current_job)
 
-
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run whenever the current job has an exception
-        """
+        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle,
+                      self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
 
-        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle, self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
-
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
-        self.ovdm.set_error_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'], 'Worker crashed')
+        self.send_job_data(current_job, json.dumps([{
+            "partName": "Worker crashed", "result": "Fail", "reason": "Unknown"
+        }]))
+        self.ovdm.set_error_cruise_data_transfer(
+            self.cruise_data_transfer['cruiseDataTransferID'], 'Worker crashed'
+        )
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("Exception: %s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
+
         return super().on_job_exception(current_job, exc_info)
 
-
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run whenever the current job completes
-        """
-
         results_obj = json.loads(job_result)
 
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail" and results_obj['parts'][-1]['partName'] != "Located Cruise Data Tranfer Data": # Final Verdict
-                self.ovdm.set_error_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'], results_obj['parts'][-1]['reason'])
-            elif results_obj['parts'][-1]['result'] == "Pass":
+        final_part = results_obj['parts'][-1] if results_obj['parts'] else None
+
+        if final_part:
+            if final_part['result'] == "Fail" and final_part['partName'] != "Located Cruise Data Transfer Data":
+                self.ovdm.set_error_cruise_data_transfer(
+                    self.cruise_data_transfer['cruiseDataTransferID'], final_part['reason']
+                )
+            elif final_part['result'] == "Pass":
                 self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
         else:
             self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s, %s transfer completed at: %s", current_job.handle, self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s, %s transfer completed at: %s", current_job.handle,
+                     self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
-
     def stop_task(self):
-        """
-        Function to stop the current job
-        """
-
         self.stop = True
         logging.warning("Stopping current task...")
 
-
     def quit_worker(self):
-        """
-        Function to quit the worker
-        """
-
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
+
+    # --- Helper Methods ---
+
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
+            'files': {'new': [], 'updated': [], 'exclude': []}
+        }))
+
+    def _ignore_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}],
+            'files': {'new': [], 'updated': [], 'exclude': []}
+        }))
 
 
 def task_run_cruise_data_transfer(gearman_worker, current_job):

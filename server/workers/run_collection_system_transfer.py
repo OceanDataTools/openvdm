@@ -480,7 +480,7 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None
     """
     Builds a list of rsync options based on config, transfer mode, and destination type.
 
-    :param cfg: dict-like config object (e.g., gearman_worker.cruise_data_transfer)
+    :param cfg: dict-like config object (e.g., gearman_worker.collection_system_transfer)
     :param mode: 'dry-run' or 'real'
     :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
     :return: list of rsync flags
@@ -501,9 +501,6 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None
         flags.append('--stats')
 
     else:
-        if cfg.get('syncToDest') == '1':
-            flags.insert(1, '--delete')
-
         if transfer_type == 'rsync':
             flags.append('--no-motd')
 
@@ -682,32 +679,41 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-many-instance-attributes
     """
-    Class for the current Gearman worker
+    Gearman worker for OpenVDM-based collection system transfers.
     """
 
     def __init__(self):
         self.stop = False
         self.ovdm = OpenVDM()
-        self.transfer_start_date = None
         self.cruise_id = None
+        self.system_status = None
+        self.collection_system_transfer = None
+        self.shipboard_data_warehouse_config = None
+
         self.cruise_dir = None
         self.source_dir = None
         self.dest_dir = None
         self.lowering_id = None
         self.data_start_date = None
         self.data_end_date = None
-        self.system_status = None
-        self.collection_system_transfer = None
-        self.shipboard_data_warehouse_config = None
+        self.transfer_start_date = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
+
+    def keyword_replace(self, s):
+        return (
+            s.replace('{cruiseID}', self.cruise_id)
+             .replace('{loweringID}', self.lowering_id)
+             .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+             .rstrip('/')
+        )
 
     def build_dest_dir(self):
         """
         Replace wildcard string in destDir
         """
 
-        return self.collection_system_transfer['destDir'].replace('{cruiseID}', self.cruise_id).replace('{loweringID}', self.lowering_id).replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+        return self.keyword_replace(self.collection_system_transfer['destDir']) if self.collection_system_transfer else ""
 
 
     def build_source_dir(self):
@@ -715,7 +721,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Replace wildcard string in sourceDir
         """
 
-        return self.collection_system_transfer['sourceDir'].replace('{cruiseID}', self.cruise_id).replace('{loweringID}', self.lowering_id).replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+        return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else ""
 
 
     def build_logfile_dirpath(self):
@@ -727,34 +733,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run whenever a new job arrives
-        """
-
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
-
-        logging.debug("current_job: %s", current_job)
-
-        payload_obj = json.loads(current_job.data)
-        logging.debug("payload: %s", current_job.data)
+        logging.debug("Received job: %s", current_job)
+        self.stop = False
 
         try:
-            self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj['collectionSystemTransfer']['collectionSystemTransferID'])
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
 
-            if not self.collection_system_transfer: # doesn't exists
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for collection system transfer"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            cst_id = payload_obj['collectionSystemTransfer']['collectionSystemTransferID']
+            self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
-            if self.collection_system_transfer['status'] == "1": #running
-                logging.info("Transfer job skipped because a transfer for that collection system is already in-progress")
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            if self.collection_system_transfer is None:
+                self.collection_system_transfer = {
+                    'name': "Unknown Transfer"
+                }
 
-        except Exception as err:
-            logging.error(str(err))
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": "Could not find retrieve data for collection system transfer from OpenVDM API"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+                return self._fail_job(current_job, "Located Collection System Transfer Data",
+                                      "Could not find configuration data for collection system transfer")
 
-        LOGGING_FORMAT = f'%(asctime)-15s %(levelname)s - {self.collection_system_transfer["name"]}: %(message)s'
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+            if self.collection_system_transfer['status'] == "1":
+                logging.info("Transfer already in-progress for %s", self.collection_system_transfer['name'])
+                return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
+
+        except Exception:
+            logging.exception("Failed to retrieve collection system transfer config")
+            return self._fail_job(current_job, "Located Collection System Transfer Data",
+                                  "Could not retrieve data for collection system transfer from OpenVDM API")
+
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
+        ))
 
         logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -762,26 +771,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
 
         if self.system_status == "Off" or self.collection_system_transfer['enable'] == '0':
-            logging.info("Transfer job for %s skipped because that collection system transfer is currently disabled", self.collection_system_transfer['name'])
-            return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Transfer Enabled", "result": "Ignore", "reason": "Transfer is disabled"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
+            logging.info("Transfer disabled for %s", self.collection_system_transfer['name'])
+            return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
-
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id()) or ""
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
-        if not self.lowering_id:
+        if len(self.lowering_id) == 0:
             # exit with error if trying to run a lowering collection system transfer
-            if self.collection_system_transfer['cruiseOrLowering'] == "1":
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
-
-            # exit with error if trying to run a cruise collection system transfer that has a loweringID in the destination path
-            if '{loweringID}' in self.collection_system_transfer['destDir']:
-                return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Validate Lowering ID", "result": "Fail", "reason": "Lowering ID is not defined"}], 'files':{'new':[],'updated':[], 'exclude':[]}}))
-
-            self.lowering_id = ""
+            if self.collection_system_transfer['cruiseOrLowering'] == "1" or '{loweringID}' in self.collection_system_transfer['destDir']:
+                return self._fail_job(current_job, "Validate Lowering ID",
+                                      "Lowering ID is not defined")
 
         if self.collection_system_transfer['cruiseOrLowering'] == "1":
             self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, self.build_dest_dir())
@@ -803,13 +806,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.collection_system_transfer['cruiseOrLowering'] == "0":
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_cruise_end_date() + ":59" if self.ovdm.get_cruise_end_date() else "9999/12/31 23:59:59"
+                cruise_end = self.ovdm.get_cruise_end_date()
+                self.data_end_date = cruise_end + ":59" if cruise_end else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
             else:
                 logging.debug("Using lowering Time bounds")
                 self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
-                self.data_end_date = self.ovdm.get_lowering_end_date() + ":59" if self.ovdm.get_lowering_end_date() else "9999/12/31 23:59:59"
+                lowering_end = self.ovdm.get_lowering_end_date()
+                self.data_end_date = lowering_end + ":59" if lowering_end else "9999/12/31 23:59:59"
                 # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
                 # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
@@ -831,10 +836,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s, transfer failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle,
+                      self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
 
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
-        self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], 'Worker crashed')
+        self.send_job_data(current_job, json.dumps([{
+            "partName": "Worker crashed", "result": "Fail", "reason": "Unknown"
+        }]))
+        self.ovdm.set_error_collection_system_transfer(
+            self.collection_system_transfer['collectionSystemTransferID'], 'Worker crashed'
+        )
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -850,57 +860,64 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         results_obj = json.loads(job_result)
 
-        if results_obj['files']['new'] or results_obj['files']['updated']:
+        final_part = results_obj['parts'][-1] if results_obj['parts'] else None
 
-            logging.debug("Preparing subsequent Gearman jobs")
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+        if final_part:
+            if final_part['result'] == "Fail" and final_part['partName'] != "Located Collection System Transfer Data":
+                self.ovdm.set_error_collection_system_transfer(
+                    self.collection_system_transfer['collectionSystemTransferID'], final_part['reason']
+                )
+            elif final_part['result'] == "Pass":
+                if results_obj['files']['new'] or results_obj['files']['updated']:
 
-            job_data = {
-                'cruiseID': self.cruise_id,
-                'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
-                'files': {
-                    'new': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['new']],
-                    'updated': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['updated']]
-                }
-            }
+                    logging.info("Preparing subsequent Gearman jobs")
+                    gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
+                    job_data = {
+                        'cruiseID': self.cruise_id,
+                        'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
+                        'files': {
+                            'new': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['new']],
+                            'updated': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['updated']]
+                        }
+                    }
 
-        if self.collection_system_transfer:
-            if len(results_obj['parts']) > 0:
-                if results_obj['parts'][-1]['result'] == "Fail" and results_obj['parts'][-1]['partName'] != "Located Collection System Tranfer Data": # Final Verdict
-                    self.ovdm.set_error_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'], results_obj['parts'][-1]['reason'])
-                elif results_obj['parts'][-1]['result'] == "Pass":
-                    self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
-            else:
+                    for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
+                        logging.info("Adding post task: %s", task)
+                        gm_client.submit_job(task, json.dumps(job_data), background=True)
                 self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
+        else:
+            self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s, transfer completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s, %s transfer completed at: %s", current_job.handle,
+                     self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
-
     def stop_task(self):
-        """
-        Function to stop the current job
-        """
-
         self.stop = True
         logging.warning("Stopping current task...")
 
 
     def quit_worker(self):
-        """
-        Function to quit the worker
-        """
-
         self.stop = True
-
         logging.warning("Quitting worker...")
         self.shutdown()
+
+    # --- Helper Methods ---
+
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
+            'files': {'new': [], 'updated': [], 'exclude': []}
+        }))
+
+    def _ignore_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}],
+            'files': {'new': [], 'updated': [], 'exclude': []}
+        }))
 
 
 def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
