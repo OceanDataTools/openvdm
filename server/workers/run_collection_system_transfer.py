@@ -118,7 +118,7 @@ def add_rsync_arguments(gearman_worker, command, is_darwin=False):
 
 
 def build_filelist(gearman_worker, prefix=None, batch_size=500, max_workers=16):
-    source_dir = os.path.join(prefix, gearman_worker.source_dir) if prefix else gearman_worker.source_dir
+    source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
     logging.info("Starting filelist build in %s", source_dir)
