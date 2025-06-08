@@ -806,6 +806,9 @@ def detect_smb_version(cst_cfg):
 
 def mount_smb_share(cst_cfg, mntpoint, smb_version):
 
+    logging.debug(cst_cfg)
+    logging.debug(cst_cfg['removeSourceFiles'])
+
     read_write = 'rw' if cst_cfg['removeSourceFiles'] == '1' else 'ro'
 
     opts = f"{read_write},domain={cst_cfg['smbDomain']},vers={smb_version}"
