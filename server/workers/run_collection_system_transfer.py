@@ -19,6 +19,7 @@ import fnmatch
 import json
 import logging
 import os
+import re
 import sys
 import shutil
 import signal
@@ -97,24 +98,24 @@ def verify_staleness_batch(paths_sizes):
     return verified
 
 
-def add_rsync_arguments(gearman_worker, command, is_darwin=False):
+# def add_rsync_arguments(gearman_worker, command, is_darwin=False):
 
-    if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
-        command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
+#     if gearman_worker.collection_system_transfer['bandwidthLimit'] != '0':
+#         command.insert(2, f'--bwlimit={gearman_worker.collection_system_transfer["bandwidthLimit"]}')
 
-    if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
-        command.insert(2, '--delete')
+#     if gearman_worker.collection_system_transfer['syncFromSource'] == '1':
+#         command.insert(2, '--delete')
 
-    if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-        command.insert(2, '--min-size=1')
+#     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
+#         command.insert(2, '--min-size=1')
 
-    if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-        command.insert(2, '-m')
+#     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
+#         command.insert(2, '-m')
 
-    if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
-        command.insert(2, '--remove-source-files')
+#     if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1':
+#         command.insert(2, '--remove-source-files')
 
-    return command
+#     return command
 
 
 def build_filelist(gearman_worker, prefix=None, batch_size=500, max_workers=16):
@@ -233,7 +234,7 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
-def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
+def build_rsync_filelist(gearman_worker, rsync_password_filepath, batch_size=500, max_workers=16):
     """Build the list of files to include, exclude or ignore, for an rsync server transfer."""
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
@@ -242,17 +243,14 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 
     filters = build_filters(gearman_worker)
 
-    tmpdir = tempfile.mkdtemp()
-    rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
-
-    try:
-        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
-            rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
-        os.chmod(rsync_password_filepath, 0o600)
-    except IOError:
-        logging.error("Error Saving temporary rsync password file")
-        shutil.rmtree(tmpdir)
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync password file'}
+    # try:
+    #     with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
+    #         rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
+    #     os.chmod(rsync_password_filepath, 0o600)
+    # except IOError:
+    #     logging.error("Error Saving temporary rsync password file")
+    #     shutil.rmtree(tmpdir)
+    #     return {'verdict': False, 'reason': 'Error Saving temporary rsync password file'}
 
     command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd',
                f"rsync://{gearman_worker.collection_system_transfer['rsyncUser']}@"
@@ -265,7 +263,7 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
         command.insert(2, '-m')
 
-    logging.debug("Command: %s", ' '.join(command))
+    logging.info("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
     # logging.debug("proc.stdout: %s", proc.stdout)
@@ -289,7 +287,7 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
                         return_files['filesize'].append(filesize)
 
     if gearman_worker.collection_system_transfer['staleness'] != '0':
-        logging.debug("Checking for changing filesizes")
+        logging.info("Checking for changing filesizes")
         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
         proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -312,28 +310,30 @@ def build_rsync_filelist(gearman_worker, batch_size=500, max_workers=16):
 
     del return_files['filesize']
 
-    shutil.rmtree(tmpdir)
+    # shutil.rmtree(tmpdir)
 
     # logging.debug('return_files: %s', json.dumps(return_files, indent=2))
 
     return {'verdict': True, 'files': return_files}
 
 
-def build_ssh_filelist(gearman_worker, batch_size=500, max_workers=16):
-    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
-
-    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
-    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-    filters = build_filters(gearman_worker)
-
+def is_darwin(gearman_worker):
     # Detect if Darwin (macOS)
     is_darwin_cmd = ['ssh', f"{gearman_worker.collection_system_transfer['sshUser']}@{gearman_worker.collection_system_transfer['sshServer']}", "uname -s"]
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         is_darwin_cmd = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + is_darwin_cmd
 
     proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
-    is_darwin = any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
+    return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
+
+
+def build_ssh_filelist(gearman_worker, is_darwin=False, batch_size=500, max_workers=16):
+    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
+
+    epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
+    data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
+    data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
+    filters = build_filters(gearman_worker)
 
     # Build rsync command
     command = ['rsync', '-r', '-e', 'ssh',
@@ -351,7 +351,7 @@ def build_ssh_filelist(gearman_worker, batch_size=500, max_workers=16):
     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
-    logging.debug("Command: %s", ' '.join(command))
+    logging.info("Command: %s", ' '.join(command))
 
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
     lines = proc.stdout.splitlines()
@@ -469,318 +469,317 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     # if there are no files to transfer, then don't
     if file_count == 0:
-        logging.debug("Skipping Transfer Command: nothing to transfer")
+        logging.info("Skipping Transfer Command: nothing to transfer")
         return [], []
 
-    logging.debug('Transfer Command: %s', ' '.join(command))
+    logging.info('Transfer Command: %s', ' '.join(command))
 
-    # TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+    TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
-    # file_index = 0
     new_files = []
     updated_files = []
-    # last_percent_reported = -1
+    last_percent_reported = -1
 
-    # proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    # while proc.poll() is None:
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is None:
 
-    #     for line in proc.stdout:
+        for line in proc.stdout:
 
-    #         if gearman_worker.stop:
-    #             logging.debug("Stopping")
-    #             proc.terminate()
-    #             break
+            if gearman_worker.stop:
+                logging.debug("Stopping")
+                proc.terminate()
+                break
 
-    #         line = line.strip()
+            line = line.strip()
 
-    #         if not line:
-    #             continue
+            if not line:
+                continue
 
-    #         logging.debug("%s", line)
+            # logging.debug("%s", line)
 
-    #         if line.startswith( '>f+++++++++' ):
-    #             filename = line.split(' ',1)[1]
-    #             new_files.append(filename.rstrip('\n'))
-    #         elif line.startswith( '>f.' ):
-    #             filename = line.split(' ',1)[1]
-    #             updated_files.append(filename.rstrip('\n'))
+            if line.startswith( '>f+++++++++' ):
+                filename = line.split(' ',1)[1]
+                new_files.append(filename.rstrip('\n'))
+            elif line.startswith( '>f.' ):
+                filename = line.split(' ',1)[1]
+                updated_files.append(filename.rstrip('\n'))
 
-    #         # Extract progress from `to-chk=` lines
-    #         match = TO_CHK_RE.search(line)
-    #         if match:
-    #             remaining = int(match.group(1))
-    #             total = int(match.group(2))
-    #             if total > 0:
-    #                 percent = int(100 * (total - remaining) / total)
+            # Extract progress from `to-chk=` lines
+            match = TO_CHK_RE.search(line)
+            if match:
+                remaining = int(match.group(1))
+                total = int(match.group(2))
+                if total > 0:
+                    percent = int(100 * (total - remaining) / total)
 
-    #                 if percent != last_percent_reported:
-    #                     logging.info("Progress Update: %d%%", percent)
-    #                     gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
-    #                     last_percent_reported = percent
+                    if percent != last_percent_reported:
+                        logging.info("Progress Update: %d%%", percent)
+                        gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                        last_percent_reported = percent
 
     return new_files, updated_files
 
 
-def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
-    """
-    Preform a collection system transfer from a local directory
-    """
+# def transfer_local_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
+#     """
+#     Preform a collection system transfer from a local directory
+#     """
 
-    logging.debug("Transfer from Local Directory")
-    logging.debug("Source Dir: %s", gearman_worker.source_dir)
-    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
+#     logging.debug("Transfer from Local Directory")
+#     logging.debug("Source Dir: %s", gearman_worker.source_dir)
+#     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
+#     # Create temp directory
+#     tmpdir = tempfile.mkdtemp()
 
-    logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker)
-    if not output_results['verdict']:
-        return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
-    files = output_results['files']
-    # logging.debug("Files: %s", json.dumps(files['include'], indent=2))
+#     logging.debug("Build file list")
+#     output_results = build_filelist(gearman_worker)
+#     if not output_results['verdict']:
+#         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
+#     files = output_results['files']
+#     # logging.debug("Files: %s", json.dumps(files['include'], indent=2))
 
-    rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
+#     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
-    logging.debug("Mod file list")
-    local_transfer_filelist = files['include']
-    local_transfer_filelist = [filename.replace(gearman_worker.source_dir, '', 1) for filename in local_transfer_filelist]
+#     logging.debug("Mod file list")
+#     local_transfer_filelist = files['include']
+#     local_transfer_filelist = [filename.replace(gearman_worker.source_dir, '', 1) for filename in local_transfer_filelist]
 
-    try:
-        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
-            rsync_filelist_file.write('\n'.join(local_transfer_filelist))
-            rsync_filelist_file.write('\0')
+#     try:
+#         with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
+#             rsync_filelist_file.write('\n'.join(local_transfer_filelist))
+#             rsync_filelist_file.write('\0')
 
-    except IOError:
-        logging.error("Error Saving temporary rsync filelist file %s", rsync_filelist_filepath)
+#     except IOError:
+#         logging.error("Error Saving temporary rsync filelist file %s", rsync_filelist_filepath)
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
-        return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files': []}
+#         # Cleanup
+#         shutil.rmtree(tmpdir)
+#         return {'verdict': False, 'reason': 'Error Saving temporary rsync filelist file: ' + rsync_filelist_filepath, 'files': []}
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, gearman_worker.source_dir + '/', gearman_worker.dest_dir]
+#     command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, gearman_worker.source_dir + '/', gearman_worker.dest_dir]
 
-    command = add_rsync_arguments(gearman_worker, command)
+#     command = add_rsync_arguments(gearman_worker, command)
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
+#     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
-    # Cleanup
-    shutil.rmtree(tmpdir)
+#     # Cleanup
+#     shutil.rmtree(tmpdir)
 
-    return {'verdict': True, 'files': files}
+#     return {'verdict': True, 'files': files}
 
 
-def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
-    """
-    Preform a collection system transfer from a samba server
-    """
+# def transfer_smb_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
+#     """
+#     Preform a collection system transfer from a samba server
+#     """
 
-    logging.debug("Transfer from SMB Source")
+#     logging.debug("Transfer from SMB Source")
 
-    gearman_worker.source_dir = gearman_worker.source_dir.strip().rstrip('/').lstrip('/')
+#     gearman_worker.source_dir = gearman_worker.source_dir.strip().rstrip('/').lstrip('/')
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
+#     # Create temp directory
+#     tmpdir = tempfile.mkdtemp()
 
-    # Create mountpoint
-    mntpoint = os.path.join(tmpdir, 'mntpoint')
-    os.mkdir(mntpoint, 0o755)
+#     # Create mountpoint
+#     mntpoint = os.path.join(tmpdir, 'mntpoint')
+#     os.mkdir(mntpoint, 0o755)
 
-    logging.debug("Source Dir: %s", gearman_worker.source_dir)
-    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
+#     logging.debug("Source Dir: %s", gearman_worker.source_dir)
+#     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
-    # Mount SMB Share
-    logging.debug("Mounting SMB Share")
+#     # Mount SMB Share
+#     logging.debug("Mounting SMB Share")
 
-    ver_test_command = ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-N'] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-U', gearman_worker.collection_system_transfer['smbUser'] + '%' + gearman_worker.collection_system_transfer['smbPass']]
-    logging.debug("SMB version test command: %s", ' '.join(ver_test_command))
+#     ver_test_command = ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-N'] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-U', gearman_worker.collection_system_transfer['smbUser'] + '%' + gearman_worker.collection_system_transfer['smbPass']]
+#     logging.debug("SMB version test command: %s", ' '.join(ver_test_command))
 
-    vers="2.1"
-    proc = subprocess.run(ver_test_command, capture_output=True, text=True, check=False)
+#     vers="2.1"
+#     proc = subprocess.run(ver_test_command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout.splitlines():
-        if line.startswith('OS=[Windows 5.1]'):
-            vers="1.0"
-            break
+#     for line in proc.stdout.splitlines():
+#         if line.startswith('OS=[Windows 5.1]'):
+#             vers="1.0"
+#             break
 
-    rw_type = 'rw' if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1' else 'ro'
-    if gearman_worker.collection_system_transfer['smbUser'] == 'guest':
-        rw_type += ',guest'
-    else:
-        rw_type += f",username={gearman_worker.collection_system_transfer['smbUser']}"
-        rw_type += f",password={gearman_worker.collection_system_transfer['smbPass']}"
+#     rw_type = 'rw' if gearman_worker.collection_system_transfer['removeSourceFiles'] == '1' else 'ro'
+#     if gearman_worker.collection_system_transfer['smbUser'] == 'guest':
+#         rw_type += ',guest'
+#     else:
+#         rw_type += f",username={gearman_worker.collection_system_transfer['smbUser']}"
+#         rw_type += f",password={gearman_worker.collection_system_transfer['smbPass']}"
 
-    mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', f"{rw_type},domain={gearman_worker.collection_system_transfer['smbDomain']},vers={vers}"]
+#     mount_command = ['sudo', 'mount', '-t', 'cifs', gearman_worker.collection_system_transfer['smbServer'], mntpoint, '-o', f"{rw_type},domain={gearman_worker.collection_system_transfer['smbDomain']},vers={vers}"]
 
-    logging.debug("Mount command: %s", ' '.join(mount_command))
+#     logging.debug("Mount command: %s", ' '.join(mount_command))
 
-    proc = subprocess.call(mount_command)
+#     proc = subprocess.call(mount_command)
 
-    logging.debug("Build file list")
-    output_results = build_filelist(gearman_worker, prefix=mntpoint)
-    if not output_results['verdict']:
-        return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
-    files = output_results['files']
+#     logging.debug("Build file list")
+#     output_results = build_filelist(gearman_worker, prefix=mntpoint)
+#     if not output_results['verdict']:
+#         return { 'verdict': False, 'reason': "Error building filelist", 'files':[] }
+#     files = output_results['files']
 
-    # logging.debug("File List: %s", json.dumps(files['include'], indent=2))
+#     # logging.debug("File List: %s", json.dumps(files['include'], indent=2))
 
-    rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
+#     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
-    try:
-        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
-            rsync_filelist_file.write('\n'.join(files['include']))
-            rsync_filelist_file.write('\0')
+#     try:
+#         with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
+#             rsync_filelist_file.write('\n'.join(files['include']))
+#             rsync_filelist_file.write('\0')
 
-    except IOError:
-        logging.error("Error Saving temporary rsync filelist file")
+#     except IOError:
+#         logging.error("Error Saving temporary rsync filelist file")
 
-        # Cleanup
-        time.sleep(2)
-        subprocess.call(['umount', mntpoint])
-        shutil.rmtree(tmpdir)
+#         # Cleanup
+#         time.sleep(2)
+#         subprocess.call(['umount', mntpoint])
+#         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files': []}
+#         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files': []}
 
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, os.path.join(mntpoint, gearman_worker.source_dir), gearman_worker.dest_dir]
+#     command = ['rsync', '-tri', '--files-from=' + rsync_filelist_filepath, os.path.join(mntpoint, gearman_worker.source_dir), gearman_worker.dest_dir]
 
-    command = add_rsync_arguments(gearman_worker, command)
+#     command = add_rsync_arguments(gearman_worker, command)
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
+#     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
-    # Cleanup
-    time.sleep(2)
-    logging.debug('Unmounting SMB Share')
-    subprocess.call(['umount', mntpoint])
-    shutil.rmtree(tmpdir)
+#     # Cleanup
+#     time.sleep(2)
+#     logging.debug('Unmounting SMB Share')
+#     subprocess.call(['umount', mntpoint])
+#     shutil.rmtree(tmpdir)
 
-    return {'verdict': True, 'files': files}
+#     return {'verdict': True, 'files': files}
 
-def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
-    """
-    Preform a collection system transfer from a rsync server
-    """
+# def transfer_rsync_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-statements
+#     """
+#     Preform a collection system transfer from a rsync server
+#     """
 
-    logging.debug("Transfer from RSYNC Server")
-    logging.debug("Source Dir: %s", gearman_worker.source_dir)
-    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
+#     logging.debug("Transfer from RSYNC Server")
+#     logging.debug("Source Dir: %s", gearman_worker.source_dir)
+#     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
+#     # Create temp directory
+#     tmpdir = tempfile.mkdtemp()
 
-    logging.debug("Build file list")
-    output_results = build_rsync_filelist(gearman_worker)
-    if not output_results['verdict']:
-        return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
-    files = output_results['files']
+#     logging.debug("Build file list")
+#     output_results = build_rsync_filelist(gearman_worker)
+#     if not output_results['verdict']:
+#         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
+#     files = output_results['files']
 
-    rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
+#     rsync_password_filepath = os.path.join(tmpdir, 'passwordFile')
 
-    try:
-        with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
-            rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
+#     try:
+#         with open(rsync_password_filepath, mode='w', encoding='utf-8') as rsync_password_file:
+#             rsync_password_file.write(gearman_worker.collection_system_transfer['rsyncPass'])
 
-        os.chmod(rsync_password_filepath, 0o600)
+#         os.chmod(rsync_password_filepath, 0o600)
 
-    except IOError:
-        logging.error("Error Saving temporary rsync password file")
-        rsync_password_file.close()
+#     except IOError:
+#         logging.error("Error Saving temporary rsync password file")
+#         rsync_password_file.close()
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
+#         # Cleanup
+#         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': f'Error Saving temporary rsync password file: {rsync_password_filepath}'}
+#         return {'verdict': False, 'reason': f'Error Saving temporary rsync password file: {rsync_password_filepath}'}
 
-    rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
+#     rsync_filelist_filepath = os.path.join(tmpdir, 'rsyncFileList.txt')
 
-    try:
-        with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
-            rsync_filelist_file.write('\n'.join(files['include']))
-            rsync_filelist_file.write('\0')
+#     try:
+#         with open(rsync_filelist_filepath, mode='w', encoding='utf-8') as rsync_filelist_file:
+#             rsync_filelist_file.write('\n'.join(files['include']))
+#             rsync_filelist_file.write('\0')
 
-    except IOError:
-        logging.error("Error Saving temporary rsync filelist file")
+#     except IOError:
+#         logging.error("Error Saving temporary rsync filelist file")
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
+#         # Cleanup
+#         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files':[]}
+#         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {rsync_filelist_filepath}', 'files':[]}
 
-    command = ['rsync', '-tri', '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + gearman_worker.source_dir, gearman_worker.dest_dir]
+#     command = ['rsync', '-tri', '--no-motd', '--files-from=' + rsync_filelist_filepath, '--password-file=' + rsync_password_filepath, 'rsync://' + gearman_worker.collection_system_transfer['rsyncUser'] + '@' + gearman_worker.collection_system_transfer['rsyncServer'] + gearman_worker.source_dir, gearman_worker.dest_dir]
 
-    command = add_rsync_arguments(gearman_worker, command)
+#     command = add_rsync_arguments(gearman_worker, command)
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
+#     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
-    # Cleanup
-    shutil.rmtree(tmpdir)
+#     # Cleanup
+#     shutil.rmtree(tmpdir)
 
-    return {'verdict': True, 'files': files}
+#     return {'verdict': True, 'files': files}
 
 
-def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals
-    """
-    Preform a collection system transfer from a ssh server
-    """
+# def transfer_ssh_source_dir(gearman_worker, gearman_job): # pylint: disable=too-many-locals
+#     """
+#     Preform a collection system transfer from a ssh server
+#     """
 
-    logging.debug("Transfer from SSH Server")
-    logging.debug("Source Dir: %s", gearman_worker.source_dir)
-    logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
+#     logging.debug("Transfer from SSH Server")
+#     logging.debug("Source Dir: %s", gearman_worker.source_dir)
+#     logging.debug("Destination Dir: %s", gearman_worker.dest_dir)
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
+#     # Create temp directory
+#     tmpdir = tempfile.mkdtemp()
 
-    logging.debug("Build file list")
-    output_results = build_ssh_filelist(gearman_worker)
-    if not output_results['verdict']:
-        return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
-    files = output_results['files']
+#     logging.debug("Build file list")
+#     output_results = build_ssh_filelist(gearman_worker)
+#     if not output_results['verdict']:
+#         return {'verdict': False, 'reason': output_results['reason'], 'files':[]}
+#     files = output_results['files']
 
-    ssh_filelist_filepath = os.path.join(tmpdir, 'sshFileList.txt')
+#     ssh_filelist_filepath = os.path.join(tmpdir, 'sshFileList.txt')
 
-    try:
-        with open(ssh_filelist_filepath, mode='w', encoding='utf-8') as ssh_filelist_file:
-            ssh_filelist_file.write('\n'.join(files['include']))
-            ssh_filelist_file.write('\0')
+#     try:
+#         with open(ssh_filelist_filepath, mode='w', encoding='utf-8') as ssh_filelist_file:
+#             ssh_filelist_file.write('\n'.join(files['include']))
+#             ssh_filelist_file.write('\0')
 
-    except IOError:
-        logging.debug("Error Saving temporary ssh filelist file")
+#     except IOError:
+#         logging.debug("Error Saving temporary ssh filelist file")
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
+#         # Cleanup
+#         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
+#         return {'verdict': False, 'reason': f'Error Saving temporary rsync filelist file: {ssh_filelist_filepath}', 'files':[]}
 
-    is_darwin = False
-    command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
+#     is_darwin = False
+#     command = ['ssh',  gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'], "uname -s"]
 
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+#     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+#         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
-    logging.debug("Command: %s", ' '.join(command))
+#     logging.debug("Command: %s", ' '.join(command))
 
-    proc = subprocess.run(command, capture_output=True, text=True, check=False)
+#     proc = subprocess.run(command, capture_output=True, text=True, check=False)
 
-    for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
-        is_darwin = line.rstrip('\n') == 'Darwin'
-        if is_darwin:
-            break
+#     for line in proc.stdout.splitlines(): # pylint: disable=too-many-nested-blocks
+#         is_darwin = line.rstrip('\n') == 'Darwin'
+#         if is_darwin:
+#             break
 
-    command = ['rsync', '-tri', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
+#     command = ['rsync', '-tri', '--files-from=' + ssh_filelist_filepath, '-e', 'ssh', gearman_worker.collection_system_transfer['sshUser'] + '@' + gearman_worker.collection_system_transfer['sshServer'] + ':' + gearman_worker.source_dir, gearman_worker.dest_dir]
 
-    if not is_darwin:
-        command.insert(2, '--protect-args')
+#     if not is_darwin:
+#         command.insert(2, '--protect-args')
 
-    command = add_rsync_arguments(gearman_worker, command)
+#     command = add_rsync_arguments(gearman_worker, command)
 
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-        command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+#     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
+#         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
 
-    files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
+#     files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, command, len(files['include']))
 
-    # Cleanup
-    shutil.rmtree(tmpdir)
+#     # Cleanup
+#     shutil.rmtree(tmpdir)
 
-    return {'verdict': True, 'files': files}
+#     return {'verdict': True, 'files': files}
 
 def detect_smb_version(cst_cfg):
     if cst_cfg['smbUser'] == 'guest':
@@ -795,7 +794,7 @@ def detect_smb_version(cst_cfg):
             '-U', f"{cst_cfg['smbUser']}%{cst_cfg['smbPass']}"
         ]
 
-    logging.debug("SMB version test command: %s", ' '.join(cmd))
+    logging.info("SMB version test command: %s", ' '.join(cmd))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
     for line in proc.stdout.splitlines():
@@ -816,7 +815,7 @@ def mount_smb_share(cst_cfg, mntpoint, smb_version):
         opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
 
     mount_cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.debug("Mount command: %s", ' '.join(mount_cmd))
+    logging.info("Mount command: %s", ' '.join(mount_cmd))
 
     result = subprocess.run(mount_cmd, capture_output=True, text=True)
 
@@ -910,6 +909,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
 
     prefix = None
     mntpoint = None
+    is_darwin = False
 
     with temporary_directory() as tmpdir:
         include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -926,10 +926,24 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
                 return {'verdict': False, 'reason': 'Failed to mount SMB share'}
             prefix = mntpoint
 
+        # Adjustments for RSYNC
+        if transfer_type == 'rsync':
+            # Build password file
+            try:
+                with open(password_file, 'w', encoding='utf-8') as f:
+                    f.write(gearman_worker.collection_system_transfer['rsyncPass'])
+                os.chmod(password_file, 0o600)
+            except IOError:
+                return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
+
+        if transfer_type == 'ssh':
+            is_darwin = is_darwin(gearman_worker)
+
         # Build filelist (from local, SMB mount, etc.)
         filelist_result = build_filelist(gearman_worker, prefix=prefix) if transfer_type in ['local', 'smb'] else (
-            build_rsync_filelist(gearman_worker) if transfer_type == 'rsync' else build_ssh_filelist(gearman_worker)
+            build_rsync_filelist(gearman_worker) if transfer_type == 'rsync' else build_ssh_filelist(gearman_worker, is_darwin)
         )
+
         if not filelist_result['verdict']:
             if mntpoint:
                 subprocess.call(['umount', mntpoint])
@@ -947,13 +961,6 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         if transfer_type == 'local':
             source_path = source_dir if source_dir == '/' else source_dir.rstrip('/')
         elif transfer_type == 'rsync':
-            try:
-                with open(password_file, 'w', encoding='utf-8') as f:
-                    f.write(gearman_worker.collection_system_transfer['rsyncPass'])
-                os.chmod(password_file, 0o600)
-            except IOError:
-                return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
-
             source_path = f"rsync://{gearman_worker.collection_system_transfer['rsyncUser']}@" \
                           f"{gearman_worker.collection_system_transfer['rsyncServer']}" \
                           f"{source_dir}"
@@ -973,7 +980,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             extra_args = [f"--password-file={password_file}"]
 
         # Base command
-        rsync_flags = build_rsync_options(cfg, mode='real', is_darwin=False, transfer_type=transfer_type)
+        rsync_flags = build_rsync_options(cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
 
         rsync_cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
         if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
