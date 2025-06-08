@@ -404,28 +404,120 @@ def build_filters(gearman_worker):
     }
 
 
-def build_dest_dir(gearman_worker):
+def build_include_file(include_list, filepath):
+    try:
+        with open(filepath, mode='w', encoding="utf-8") as f:
+            f.write('\n'.join(include_list))
+            f.write('\0')
+    except IOError as e:
+        logging.error("Error writing include file: %s", e)
+        return False
+
+    return True
+
+
+def detect_smb_version(cst_cfg):
+    if cst_cfg['smbUser'] == 'guest':
+        cmd = [
+            'smbclient', '-L', cst_cfg['smbServer'],
+            '-W', cst_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
+        ]
+    else:
+        cmd = [
+            'smbclient', '-L', cst_cfg['smbServer'],
+            '-W', cst_cfg['smbDomain'], '-m', 'SMB2', '-g',
+            '-U', f"{cst_cfg['smbUser']}%{cst_cfg['smbPass']}"
+        ]
+
+    logging.info("SMB version test command: %s", ' '.join(cmd))
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+    for line in proc.stdout.splitlines():
+        if line.startswith('OS=[Windows 5.1]'):
+            return '1.0'
+    return '2.1'
+
+
+def mount_smb_share(cst_cfg, mntpoint, smb_version):
+
+    read_write = 'rw' if cst_cfg['removeSourceFiles'] == '1' else 'ro'
+
+    opts = f"{read_write},domain={cst_cfg['smbDomain']},vers={smb_version}"
+
+    if cst_cfg['smbUser'] == 'guest':
+        opts += ",guest"
+    else:
+        opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
+
+    mount_cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
+    logging.info("Mount command: %s", ' '.join(mount_cmd))
+
+    result = subprocess.run(mount_cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        logging.error("Failed to mount SMB share.")
+        logging.error("STDOUT: %s", result.stdout.strip())
+        logging.error("STDERR: %s", result.stderr.strip())
+
+        # Try to unmount in case of partial mount
+        subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return False
+
+    logging.info("Mounted SMB share successfully.")
+    return True
+
+
+def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_path=None):
+    cmd = ['rsync'] + flags
+    cmd += extra_args
+    if include_file_path is not None:
+        cmd.append(f"--files-from={include_file_path}")
+    cmd += [source_dir, dest_dir]
+    return cmd
+
+
+def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
     """
-    Replace wildcard string in destDir
+    Builds a list of rsync options based on config, transfer mode, and destination type.
+
+    :param cfg: dict-like config object (e.g., gearman_worker.cruise_data_transfer)
+    :param mode: 'dry-run' or 'real'
+    :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
+    :return: list of rsync flags
     """
+    flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
 
-    return gearman_worker.collection_system_transfer['destDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+    if not is_darwin:
+        flags.insert(1, '--protect-args')
 
+    if cfg.get('skipEmptyFiles') == '1':
+        flags.insert(1, '--min-size=1')
 
-def build_source_dir(gearman_worker):
-    """
-    Replace wildcard string in sourceDir
-    """
+    if cfg.get('skipEmptyDirs') == '1':
+        flags.insert(1, '-m')
 
-    return gearman_worker.collection_system_transfer['sourceDir'].replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', gearman_worker.lowering_id).replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+    if mode == 'dry-run':
+        flags.append('--dry-run')
+        flags.append('--stats')
 
+    else:
+        if cfg.get('syncToDest') == '1':
+            flags.insert(1, '--delete')
 
-def build_logfile_dirpath(gearman_worker):
-    """
-    build the path to save transfer logfiles
-    """
+        if transfer_type == 'rsync':
+            flags.append('--no-motd')
 
-    return os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        if cfg.get('bandwidthLimit') not in (None, '0'):
+            flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
+
+        if cfg['removeSourceFiles'] == '1':
+            flags.insert(2, '--remove-source-files')
+
+        if cfg['syncFromSource'] == '1':
+            flags.insert(2, '--delete')
+
+    return flags
+
 
 def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     """
@@ -485,121 +577,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
     return new_files, updated_files
 
 
-def detect_smb_version(cst_cfg):
-    if cst_cfg['smbUser'] == 'guest':
-        cmd = [
-            'smbclient', '-L', cst_cfg['smbServer'],
-            '-W', cst_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
-        ]
-    else:
-        cmd = [
-            'smbclient', '-L', cst_cfg['smbServer'],
-            '-W', cst_cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{cst_cfg['smbUser']}%{cst_cfg['smbPass']}"
-        ]
-
-    logging.info("SMB version test command: %s", ' '.join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-
-    for line in proc.stdout.splitlines():
-        if line.startswith('OS=[Windows 5.1]'):
-            return '1.0'
-    return '2.1'
-
-
-def mount_smb_share(cst_cfg, mntpoint, smb_version):
-
-    read_write = 'rw' if cst_cfg['removeSourceFiles'] == '1' else 'ro'
-
-    opts = f"{read_write},domain={cst_cfg['smbDomain']},vers={smb_version}"
-
-    if cst_cfg['smbUser'] == 'guest':
-        opts += ",guest"
-    else:
-        opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
-
-    mount_cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.info("Mount command: %s", ' '.join(mount_cmd))
-
-    result = subprocess.run(mount_cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        logging.error("Failed to mount SMB share.")
-        logging.error("STDOUT: %s", result.stdout.strip())
-        logging.error("STDERR: %s", result.stderr.strip())
-
-        # Try to unmount in case of partial mount
-        subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return False
-
-    logging.info("Mounted SMB share successfully.")
-    return True
-
-
-def write_include_file(include_list, filepath):
-    try:
-        with open(filepath, mode='w', encoding="utf-8") as f:
-            f.write('\n'.join(include_list))
-            f.write('\0')
-    except IOError as e:
-        logging.error("Error writing include file: %s", e)
-        return False
-
-    return True
-
-
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_path=None):
-    cmd = ['rsync'] + flags
-    cmd += extra_args
-    if include_file_path is not None:
-        cmd.append(f"--files-from={include_file_path}")
-    cmd += [source_dir, dest_dir]
-    return cmd
-
-
-def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
-    """
-    Builds a list of rsync options based on config, transfer mode, and destination type.
-
-    :param cfg: dict-like config object (e.g., gearman_worker.cruise_data_transfer)
-    :param mode: 'dry-run' or 'real'
-    :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
-    :return: list of rsync flags
-    """
-    flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
-
-    if not is_darwin:
-        flags.insert(1, '--protect-args')
-
-    if cfg.get('skipEmptyFiles') == '1':
-        flags.insert(1, '--min-size=1')
-
-    if cfg.get('skipEmptyDirs') == '1':
-        flags.insert(1, '-m')
-
-    if mode == 'dry-run':
-        flags.append('--dry-run')
-        flags.append('--stats')
-
-    else:
-        if cfg.get('syncToDest') == '1':
-            flags.insert(1, '--delete')
-
-        if transfer_type == 'rsync':
-            flags.append('--no-motd')
-
-        if cfg.get('bandwidthLimit') not in (None, '0'):
-            flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
-
-        if cfg['removeSourceFiles'] == '1':
-            flags.insert(2, '--remove-source-files')
-
-        if cfg['syncFromSource'] == '1':
-            flags.insert(2, '--delete')
-
-    return flags
-
-
 def transfer_from_source(gearman_worker, gearman_job, transfer_type):
     """
     Perform a collection system transfer from the configured source type.
@@ -655,7 +632,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         files = filelist_result['files']
 
         # Write file list
-        if not write_include_file(files['include'], include_file):
+        if not build_include_file(files['include'], include_file):
             if mntpoint:
                 subprocess.call(['umount', mntpoint])
             return {'verdict': False, 'reason': 'Error writing file list', 'files': []}
@@ -725,6 +702,30 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
+    def build_dest_dir(self):
+        """
+        Replace wildcard string in destDir
+        """
+
+        return self.collection_system_transfer['destDir'].replace('{cruiseID}', self.cruise_id).replace('{loweringID}', self.lowering_id).replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+
+
+    def build_source_dir(self):
+        """
+        Replace wildcard string in sourceDir
+        """
+
+        return self.collection_system_transfer['sourceDir'].replace('{cruiseID}', self.cruise_id).replace('{loweringID}', self.lowering_id).replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir']).rstrip('/')
+
+
+    def build_logfile_dirpath(self):
+        """
+        build the path to save transfer logfiles
+        """
+
+        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
@@ -783,11 +784,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             self.lowering_id = ""
 
         if self.collection_system_transfer['cruiseOrLowering'] == "1":
-            self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, build_dest_dir(self))
+            self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, self.build_dest_dir())
         else:
-            self.dest_dir = os.path.join(self.cruise_dir, build_dest_dir(self))
+            self.dest_dir = os.path.join(self.cruise_dir, self.build_dest_dir())
 
-        self.source_dir = build_source_dir(self)
+        self.source_dir = self.build_source_dir()
 
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
 
@@ -1009,7 +1010,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             }
         }
 
-        output_results = output_json_data_to_file(os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename), logfile_contents['files'])
+        output_results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
         if output_results['verdict']:
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
@@ -1018,7 +1019,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename))
+        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
 
         if not output_results['verdict']:
             job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
@@ -1032,7 +1033,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     }
     logfile_contents['files']['exclude'] = job_results['files']['exclude']
 
-    output_results = output_json_data_to_file(os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename), logfile_contents['files'])
+    output_results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
@@ -1041,7 +1042,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": output_results['reason']})
         return job_results
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename))
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
 
     if not output_results['verdict']:
         logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
