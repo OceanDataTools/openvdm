@@ -941,7 +941,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
 
         # Build filelist (from local, SMB mount, etc.)
         filelist_result = build_filelist(gearman_worker, prefix=prefix) if transfer_type in ['local', 'smb'] else (
-            build_rsync_filelist(gearman_worker) if transfer_type == 'rsync' else build_ssh_filelist(gearman_worker, is_darwin)
+            build_rsync_filelist(gearman_worker, password_file) if transfer_type == 'rsync' else build_ssh_filelist(gearman_worker, is_darwin)
         )
 
         if not filelist_result['verdict']:
