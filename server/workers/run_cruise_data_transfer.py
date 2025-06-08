@@ -271,15 +271,9 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
                 new_files.append(filename.rstrip('\n'))
-                # logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                # gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                # file_index += 1
             elif line.startswith( '>f.' ):
                 filename = line.split(' ',1)[1]
                 updated_files.append(filename.rstrip('\n'))
-                # logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-                # gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-                # file_index += 1
 
             # Extract progress from `to-chk=` lines
             match = TO_CHK_RE.search(line)
