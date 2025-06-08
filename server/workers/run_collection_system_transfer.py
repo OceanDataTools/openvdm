@@ -945,7 +945,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
 
         # Build rsync command
         if transfer_type == 'local':
-            source_path = os.path.join(prefix if prefix else '', source_dir.lstrip('/')).rstrip('/')
+            source_path = source_dir if source_dir == '/' else source_dir.rstrip('/')
         elif transfer_type == 'rsync':
             try:
                 with open(password_file, 'w', encoding='utf-8') as f:
