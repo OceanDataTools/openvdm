@@ -975,7 +975,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         # Base command
         rsync_flags = build_rsync_options(cfg, mode='real', is_darwin=False, transfer_type=transfer_type)
 
-        rsync_cmd = build_rsync_command(rsync_flags, extra_args, source_dir, dest_dir, include_file)
+        rsync_cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
         if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
             rsync_cmd = ['sshpass', '-p', cfg['sshPass']] + rsync_cmd
 
