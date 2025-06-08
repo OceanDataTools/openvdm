@@ -47,7 +47,10 @@ def temporary_directory():
     try:
         yield tmpdir
     finally:
-        shutil.rmtree(tmpdir)
+        try:
+            shutil.rmtree(tmpdir)
+        except Exception as e:
+            logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
 
 
 def process_batch(file_batch, filters, data_start_time, data_end_time):
