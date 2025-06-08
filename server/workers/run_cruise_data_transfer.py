@@ -37,8 +37,6 @@ from server.lib.file_utils import is_ascii
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-
 @contextmanager
 def temporary_directory():
     tmpdir = tempfile.mkdtemp()
@@ -118,18 +116,17 @@ def build_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=8):
     return return_files
 
 
-def detect_smb_version(gearman_worker):
-    smb_cfg = gearman_worker.cruise_data_transfer
-    if smb_cfg['smbUser'] == 'guest':
+def detect_smb_version(cdt_cfg):
+    if cdt_cfg['smbUser'] == 'guest':
         cmd = [
-            'smbclient', '-L', smb_cfg['smbServer'],
-            '-W', smb_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
+            'smbclient', '-L', cdt_cfg['smbServer'],
+            '-W', cdt_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
         ]
     else:
         cmd = [
-            'smbclient', '-L', smb_cfg['smbServer'],
-            '-W', smb_cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{smb_cfg['smbUser']}%{smb_cfg['smbPass']}"
+            'smbclient', '-L', cdt_cfg['smbServer'],
+            '-W', cdt_cfg['smbDomain'], '-m', 'SMB2', '-g',
+            '-U', f"{cdt_cfg['smbUser']}%{cdt_cfg['smbPass']}"
         ]
 
     logging.debug("SMB version test command: %s", ' '.join(cmd))
@@ -141,16 +138,15 @@ def detect_smb_version(gearman_worker):
     return '2.1'
 
 
-def mount_smb_share(gearman_worker, mntpoint, smb_version):
-    smb_cfg = gearman_worker.cruise_data_transfer
-    opts = f"rw,domain={smb_cfg['smbDomain']},vers={smb_version}"
+def mount_smb_share(cdt_cfg, mntpoint, smb_version):
+    opts = f"rw,domain={cdt_cfg['smbDomain']},vers={smb_version}"
 
-    if smb_cfg['smbUser'] == 'guest':
+    if cdt_cfg['smbUser'] == 'guest':
         opts += ",guest"
     else:
-        opts += f",username={smb_cfg['smbUser']},password={smb_cfg['smbPass']}"
+        opts += f",username={cdt_cfg['smbUser']},password={cdt_cfg['smbPass']}"
 
-    mount_cmd = ['sudo', 'mount', '-t', 'cifs', smb_cfg['smbServer'], mntpoint, '-o', opts]
+    mount_cmd = ['sudo', 'mount', '-t', 'cifs', cdt_cfg['smbServer'], mntpoint, '-o', opts]
     logging.debug("Mount command: %s", ' '.join(mount_cmd))
 
     result = subprocess.run(mount_cmd, capture_output=True, text=True)
@@ -166,6 +162,16 @@ def mount_smb_share(gearman_worker, mntpoint, smb_version):
 
     logging.info("Mounted SMB share successfully.")
     return True
+
+
+def check_darwin(cdt_cfg):
+    # Detect if Darwin (macOS)
+    is_darwin_cmd = ['ssh', f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}", "uname -s"]
+    if cdt_cfg['sshUseKey'] == '0':
+        is_darwin_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + is_darwin_cmd
+
+    proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
+    return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
 
 
 def build_filters(gearman_worker):
@@ -246,6 +252,8 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
     logging.debug('Transfer Command: %s', ' '.join(command))
 
+    TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+
     # file_index = 0
     new_files = []
     updated_files = []
@@ -266,7 +274,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
             if not line:
                 continue
 
-            logging.debug("%s", line)
+            # logging.debug("%s", line)
 
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
@@ -300,7 +308,7 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_pa
     return cmd
 
 
-def build_rsync_options(cfg, mode='dry-run', transfer_type=None):
+def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
     """
     Builds a list of rsync options based on config, transfer mode, and destination type.
 
@@ -310,6 +318,9 @@ def build_rsync_options(cfg, mode='dry-run', transfer_type=None):
     :return: list of rsync flags
     """
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
+
+    if not is_darwin:
+        flags.insert(1, '--protect-args')
 
     if cfg.get('skipEmptyFiles') == '1':
         flags.insert(1, '--min-size=1')
@@ -321,17 +332,19 @@ def build_rsync_options(cfg, mode='dry-run', transfer_type=None):
         flags.append('--dry-run')
         flags.append('--stats')
     else:
-        if cfg.get('syncToDest') == '1':
-            flags.insert(1, '--delete')
         if transfer_type == 'rsync':
             flags.append('--no-motd')
+
         if cfg.get('bandwidthLimit') not in (None, '0'):
             flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
+
+        if cfg.get('syncToDest') == '1':
+            flags.insert(1, '--delete')
 
     return flags
 
 
-def write_exclude_file(exclude_list, filepath):
+def build_exclude_file(exclude_list, filepath):
     try:
         with open(filepath, mode='w', encoding="utf-8") as f:
             f.write('\n'.join(exclude_list))
@@ -352,24 +365,26 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
     cfg = gearman_worker.cruise_data_transfer
     cruise_cfg = gearman_worker.shipboard_data_warehouse_config
     cruise_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    dest_dir = None
 
     logging.debug("Building file list")
     files = build_filelist(gearman_worker, cruise_dir)
+    is_darwin = False
 
     with temporary_directory() as tmpdir:
         exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
-        if not write_exclude_file(files['exclude'], exclude_file):
+        if not build_exclude_file(files['exclude'], exclude_file):
             return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
         if transfer_type == 'smb':
             # Mount SMB Share
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(gearman_worker)
-            success = mount_smb_share(gearman_worker, mntpoint, smb_version)
+            smb_version = detect_smb_version(cfg)
+            success = mount_smb_share(cfg, mntpoint, smb_version)
             if not success:
                 return {'verdict': False, 'reason': 'Failed to mount SMB share'}
-            dest = os.path.join(mntpoint, cfg['destDir'].lstrip('/')).rstrip('/')
+            dest_dir = os.path.join(mntpoint, cfg['destDir'].lstrip('/')).rstrip('/')
 
         elif transfer_type == 'rsync':
             # Write rsync password file
@@ -377,17 +392,18 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
             with open(password_file, 'w', encoding='utf-8') as f:
                 f.write(cfg['rsyncPass'])
             os.chmod(password_file, 0o600)
-            dest = f"rsync://{cfg['rsyncUser']}@{cfg['rsyncServer']}{cfg['destDir'].rstrip('/')}/"
+            dest_dir = f"rsync://{cfg['rsyncUser']}@{cfg['rsyncServer']}{cfg['destDir'].rstrip('/')}/"
 
         elif transfer_type == 'ssh':
-            ssh_target = f"{cfg['sshUser']}@{cfg['sshServer']}:{cfg['destDir'].rstrip('/')}"
-            dest = ssh_target
+
+            is_darwin = check_darwin(cfg)
+            dest_dir = f"{cfg['sshUser']}@{cfg['sshServer']}:{cfg['destDir'].rstrip('/')}"
 
         else:  # local
-            dest = cfg['destDir'].rstrip('/')
+            dest_dir = cfg['destDir'].rstrip('/')
 
         # === DRY RUN ===
-        dry_flags = build_rsync_options(cfg, mode='dry-run', transfer_type=transfer_type)
+        dry_flags = build_rsync_options(cfg, mode='dry-run', is_darwin=is_darwin, transfer_type=transfer_type)
 
         extra_args = []
         if transfer_type == 'ssh':
@@ -395,7 +411,7 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
         elif transfer_type == 'rsync':
             extra_args = [f"--password-file={password_file}"]
 
-        dry_cmd = build_rsync_command(dry_flags, extra_args, cruise_dir, dest, exclude_file)
+        dry_cmd = build_rsync_command(dry_flags, extra_args, cruise_dir, dest_dir, exclude_file)
         if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
             dry_cmd = ['sshpass', '-p', cfg['sshPass']] + dry_cmd
 
@@ -413,9 +429,9 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
             logging.debug("Nothing to transfer")
         else:
             # === REAL TRANSFER ===
-            real_flags = build_rsync_options(cfg, mode='real', transfer_type=transfer_type)
+            real_flags = build_rsync_options(cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
 
-            real_cmd = build_rsync_command(real_flags, extra_args, cruise_dir, dest, exclude_file)
+            real_cmd = build_rsync_command(real_flags, extra_args, cruise_dir, dest_dir, exclude_file)
             if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
                 real_cmd = ['sshpass', '-p', cfg['sshPass']] + real_cmd
 
@@ -427,7 +443,7 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
                     cruise_cfg['shipboardDataWarehouseUsername'],
-                    os.path.join(dest, gearman_worker.cruise_id)
+                    os.path.join(dest_dir, gearman_worker.cruise_id)
                 )
                 if not output['verdict']:
                     return output
