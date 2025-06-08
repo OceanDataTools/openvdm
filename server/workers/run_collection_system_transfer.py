@@ -317,11 +317,11 @@ def build_rsync_filelist(gearman_worker, rsync_password_filepath, batch_size=500
     return {'verdict': True, 'files': return_files}
 
 
-def is_darwin(gearman_worker):
+def check_darwin(cst_cfg):
     # Detect if Darwin (macOS)
-    is_darwin_cmd = ['ssh', f"{gearman_worker.collection_system_transfer['sshUser']}@{gearman_worker.collection_system_transfer['sshServer']}", "uname -s"]
-    if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-        is_darwin_cmd = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + is_darwin_cmd
+    is_darwin_cmd = ['ssh', f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}", "uname -s"]
+    if cst_cfg['sshUseKey'] == '0':
+        is_darwin_cmd = ['sshpass', '-p', cst_cfg['sshPass']] + is_darwin_cmd
 
     proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
     return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
@@ -937,7 +937,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
                 return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
 
         if transfer_type == 'ssh':
-            is_darwin = is_darwin(gearman_worker)
+            is_darwin = check_darwin(cfg)
 
         # Build filelist (from local, SMB mount, etc.)
         filelist_result = build_filelist(gearman_worker, prefix=prefix) if transfer_type in ['local', 'smb'] else (
