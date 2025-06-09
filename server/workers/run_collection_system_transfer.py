@@ -41,6 +41,8 @@ from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+
 @contextmanager
 def temporary_directory():
     tmpdir = tempfile.mkdtemp()
@@ -530,8 +532,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
         return [], []
 
     logging.info('Transfer Command: %s', ' '.join(command))
-
-    TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
     new_files = []
     updated_files = []

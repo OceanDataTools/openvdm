@@ -37,6 +37,8 @@ from server.lib.file_utils import is_ascii
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+
 @contextmanager
 def temporary_directory():
     tmpdir = tempfile.mkdtemp()
@@ -254,8 +256,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
         return [], []
 
     logging.debug('Transfer Command: %s', ' '.join(command))
-
-    TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
     # file_index = 0
     new_files = []
