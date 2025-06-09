@@ -481,15 +481,22 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_pa
     return cmd
 
 
-def delete_from_dest(gearman_worker, gearman_job, include_files):
+def delete_from_dest(dest_dir, include_files):
     deleted_files = []
 
-    for filename in os.listdir(gearman_worker.dest_dir):
-        full_path = os.path.join(gearman_worker.dest_dir, filename)
+    for filename in os.listdir(dest_dir):
+        full_path = os.path.join(dest_dir, filename)
         if os.path.isfile(full_path) and filename not in include_files:
-            print(f"🗑 Deleting: {filename}")
-            os.remove(full_path)
-            deleted_files.append(filename)
+            logging.debug("Deleting: {filename}")
+            try:
+                os.remove(full_path)
+                deleted_files.append(filename)
+            except FileNotFoundError:
+                logging.error("File to delete not found: %s", filename)
+            except PermissionError:
+                logging.error("Insufficent permission to delete file: %s", filename)
+            except OSError as e:
+                logging.error("OS error occurred while deleting file: %s --> %s", filename, str(e))
 
     return deleted_files
 
@@ -527,9 +534,6 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None
 
         if cfg['removeSourceFiles'] == '1':
             flags.insert(2, '--remove-source-files')
-
-        if cfg['syncFromSource'] == '1':
-            flags.insert(2, '--delete')
 
     return flags
 
@@ -683,6 +687,10 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         files['new'], files['updated'] = run_transfer_command(
             gearman_worker, gearman_job, rsync_cmd, len(files['include'])
         )
+
+        # Delete files if sync'ing with source
+        if cfg['syncFromSource'] == '1':
+            files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
         # Cleanup
         if mntpoint:
@@ -885,7 +893,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 )
             elif final_part['result'] == "Pass":
 
-                if results_obj['files']['new'] or results_obj['files']['updated']:
+                if results_obj['files']['new'] or results_obj['files']['updated'] or ('deleted' in results_obj['files'] and results_obj['files']['deleted']):
 
                     logging.info("Preparing subsequent Gearman jobs")
                     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
@@ -1026,9 +1034,8 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         logging.debug("%s file(s) updated", len(job_results['files']['updated']))
     if len(job_results['files']['exclude']) > 0:
         logging.debug("%s misnamed file(s) encountered", len(job_results['files']['exclude']))
-
-    if 'delete' in job_results['files'] and len(job_results['files']['deleted']) > 0:
-        logging.warning("%s file(s) deleted", len(job_results['files']['deleted']))
+    if 'deleted' in job_results['files'] and len(job_results['files']['deleted']) > 0:
+        logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     gearman_worker.send_job_status(current_job, 9, 10)
 
