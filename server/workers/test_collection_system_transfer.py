@@ -101,9 +101,6 @@ def test_smb_source_dir(gearman_worker):
 
     return_val = []
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
-
     # Verify the server exists
     server_test_command = ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-N'] if gearman_worker.collection_system_transfer['smbUser'] == 'guest' else ['smbclient', '-L', gearman_worker.collection_system_transfer['smbServer'], '-W', gearman_worker.collection_system_transfer['smbDomain'], '-m', 'SMB2', '-g', '-U', gearman_worker.collection_system_transfer['smbUser'] + '%' + gearman_worker.collection_system_transfer['smbPass']]
     logging.debug('SMB Server test command: %s', ' '.join(server_test_command))
@@ -134,6 +131,9 @@ def test_smb_source_dir(gearman_worker):
         return return_val
 
     return_val.append({"partName": "SMB Server", "result": "Pass"})
+
+    # Create temp directory
+    tmpdir = tempfile.mkdtemp()
 
     # Create mountpoint
     mntpoint = os.path.join(tmpdir, 'mntpoint')
