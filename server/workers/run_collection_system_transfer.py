@@ -57,6 +57,8 @@ def temporary_directory():
 
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
+    
+    logging.info(line)
     file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
 
     if not file_or_dir.startswith('-'):
@@ -83,11 +85,10 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     return ('exclude', filepath, None)
 
 
-def process_batch(file_batch, filters, data_start_time, data_end_time):
-    include = []
-    exclude = []
+def process_batch(batch, filters, data_start_time, data_end_time):
+    results = []
 
-    for filepath in file_batch:
+    for filepath in batch:
         try:
             if os.path.islink(filepath):
                 continue
@@ -103,31 +104,32 @@ def process_batch(file_batch, filters, data_start_time, data_end_time):
                 continue
 
             if not is_ascii(filepath):
-                exclude.append(filepath)
+                results.append(("exclude", filepath, "0"))
                 continue
 
             if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
                 if not any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
-                    include.append((filepath, size))
+                    results.append(("include", filepath, str(size)))
                 else:
-                    exclude.append(filepath)
+                    results.append(("exclude", filepath, "0"))
             else:
-                exclude.append(filepath)
+                results.append(("exclude", filepath, "0"))
 
         except FileNotFoundError:
             continue
 
-    return include, exclude
+    return results
 
 
 def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     """Process a batch of rsync output lines."""
     results = []
-    for line in batch:
-        result = process_rsync_line(line, filters, data_start_time, data_end_time, epoch)
+    for filepath in batch:
+        result = process_rsync_line(filepath, filters, data_start_time, data_end_time, epoch)
         if result:
             results.append(result)
-
+    
+    print(results)
     return results
 
 
@@ -135,7 +137,7 @@ def verify_staleness_batch(paths_sizes):
     verified = []
     for filepath, old_size in paths_sizes:
         try:
-            if os.stat(filepath).st_size == old_size:
+            if os.stat(filepath).st_size == int(old_size):
                 verified.append((filepath, old_size))
         except FileNotFoundError:
             continue
@@ -375,11 +377,12 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
     # Get file list based on transfer_type
-    if transfer_type == 'local':
+    if transfer_type in ['local', 'smb']:
         filepaths = []
         for root, _, filenames in os.walk(source_dir):
             for filename in filenames:
                 filepaths.append(os.path.join(root, filename))
+        logging.info(json.dumps(filepaths, indent=2))
     else:
         command = ['rsync', '-r']
         if transfer_type == 'rsync':
@@ -404,6 +407,7 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
         logging.info("File list Command: %s", ' '.join(command))
         proc = subprocess.run(command, capture_output=True, text=True, check=False)
         filepaths = proc.stdout.splitlines()
+        filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
 
     total_files = len(filepaths)
     logging.info("Discovered %d files", total_files)
@@ -412,7 +416,7 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
     batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        if transfer_type == 'local':
+        if transfer_type in ['local', 'smb']:
             futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
                        for batch in batches]
         else:
@@ -435,7 +439,8 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
         logging.info("Checking staleness (wait %ss)...", staleness)
         time.sleep(int(staleness))
 
-        if transfer_type == 'local':
+        if transfer_type in ['local', 'smb']:
+            logging.info(json.dumps(return_files, indent=2))
             paths_sizes = list(zip(return_files['include'], return_files['filesize']))
             stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
             verified_paths = []
@@ -464,10 +469,12 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
 
     # Format final output
     del return_files['filesize']
-    if transfer_type == 'local':
+    if transfer_type in ['local', 'smb']:
         base_len = len(source_dir.rstrip(os.sep)) + 1
         return_files['include'] = [f[base_len:] for f in return_files['include']]
         return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
+
+    logging.info(json.dumps(return_files, indent=2))
 
     return {'verdict': True, 'files': return_files}
 
@@ -593,7 +600,7 @@ def delete_from_dest(dest_dir, include_files):
     for filename in os.listdir(dest_dir):
         full_path = os.path.join(dest_dir, filename)
         if os.path.isfile(full_path) and filename not in include_files:
-            logging.debug("Deleting: {filename}")
+            logging.debug("Deleting: %s", filename)
             try:
                 os.remove(full_path)
                 deleted_files.append(filename)
