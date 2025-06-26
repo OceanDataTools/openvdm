@@ -153,7 +153,7 @@ def check_darwin(cst_cfg):
     return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
 
 
-def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
+def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
     filters = build_filters(gearman_worker)
@@ -265,41 +265,30 @@ def build_filters(gearman_worker):
     Replace wildcard string in filters
     """
 
-    filters = {
-        'includeFilter': gearman_worker.collection_system_transfer['includeFilter']
-            .replace('{cruiseID}', gearman_worker.cruise_id)
-            .replace('{loweringID}', gearman_worker.lowering_id)
-            .replace('{YYYY}', '20[0-9][0-9]')
-            .replace('{YY}', '[0-9][0-9]')
-            .replace('{mm}', '[0-1][0-9]')
-            .replace('{DD}', '[0-3][0-9]')
-            .replace('{HH}', '[0-2][0-9]')
-            .replace('{MM}', '[0-5][0-9]'),
-        'excludeFilter': gearman_worker.collection_system_transfer['excludeFilter']
-            .replace('{cruiseID}', gearman_worker.cruise_id)
-            .replace('{loweringID}', gearman_worker.lowering_id)
-            .replace('{YYYY}', '20[0-9][0-9]')
-            .replace('{YY}', '[0-9][0-9]')
-            .replace('{mm}', '[0-1][0-9]')
-            .replace('{DD}', '[0-3][0-9]')
-            .replace('{HH}', '[0-2][0-9]')
-            .replace('{MM}', '[0-5][0-9]'),
-        'ignoreFilter': gearman_worker.collection_system_transfer['ignoreFilter']
-            .replace('{cruiseID}', gearman_worker.cruise_id)
-            .replace('{loweringID}', gearman_worker.lowering_id)
-            .replace('{YYYY}', '20[0-9][0-9]')
-            .replace('{YY}', '[0-9][0-9]')
-            .replace('{mm}', '[0-1][0-9]')
-            .replace('{DD}', '[0-3][0-9]')
-            .replace('{HH}', '[0-2][0-9]')
-            .replace('{MM}', '[0-5][0-9]')
+    def expand_placeholders(template: str, context: dict) -> str:
+        for key, value in context.items():
+            template = template.replace(key, value)
+        return template
+
+    context = {
+        '{cruiseID}': gearman_worker.cruise_id,
+        '{loweringID}': gearman_worker.lowering_id,
+        '{YYYY}': '20[0-9][0-9]',
+        '{YY}': '[0-9][0-9]',
+        '{mm}': '[0-1][0-9]',
+        '{DD}': '[0-3][0-9]',
+        '{HH}': '[0-2][0-9]',
+        '{MM}': '[0-5][0-9]',
+        '{SS}': '[0-5][0-9]',
     }
 
-    return {
-        'include_filters': filters['includeFilter'].split(',') if filters['includeFilter'] else [],
-        'exclude_filters': filters['excludeFilter'].split(',') if filters['excludeFilter'] else [],
-        'ignore_filters': filters['ignoreFilter'].split(',') if filters['ignoreFilter'] else []
-    }
+    filters = {}
+    for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
+        raw = gearman_worker.collection_system_transfer.get(key, '')
+        expanded = expand_placeholders(raw, context)
+        filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
+
+    return filters
 
 
 def build_include_file(include_list, filepath):
@@ -529,10 +518,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             is_darwin = check_darwin(cfg)
 
         # Build filelist (from local, SMB mount, etc.)
-        filelist_result = build_filelist_unified(gearman_worker, transfer_type=transfer_type, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
-        # filelist_result = build_filelist(gearman_worker, prefix=prefix) if transfer_type in ['local', 'smb'] else (
-        #     build_rsync_filelist(gearman_worker, password_file) if transfer_type == 'rsync' else build_ssh_filelist(gearman_worker, is_darwin)
-        # )
+        filelist_result = build_filelist(gearman_worker, transfer_type=transfer_type, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
 
         if not filelist_result['verdict']:
             if mntpoint:
@@ -725,15 +711,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
                 cruise_end = self.ovdm.get_cruise_end_date()
                 self.data_end_date = cruise_end + ":59" if cruise_end else "9999/12/31 23:59:59"
-                # self.data_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj and payload_obj['cruiseStartDate'] != '' else "1970/01/01 00:00"
-                # self.data_end_date = payload_obj['cruiseEndDate'] if 'cruiseEndDate' in payload_obj and payload_obj['cruiseEndDate'] != '' else "9999/12/31 23:59"
             else:
                 logging.debug("Using lowering Time bounds")
                 self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
                 lowering_end = self.ovdm.get_lowering_end_date()
                 self.data_end_date = lowering_end + ":59" if lowering_end else "9999/12/31 23:59:59"
-                # self.data_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj and payload_obj['loweringStartDate'] != '' else "1970/01/01 00:00"
-                # self.data_end_date = payload_obj['loweringEndDate'] if 'loweringEndDate' in payload_obj and payload_obj['loweringEndDate'] != '' else "9999/12/31 23:59"
 
             if self.collection_system_transfer['staleness'] != "0":
                 staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
@@ -831,7 +813,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.shutdown()
 
     # --- Helper Methods ---
-
     def _fail_job(self, current_job, part_name, reason):
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
