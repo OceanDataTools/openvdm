@@ -127,8 +127,6 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
         result = process_rsync_line(filepath, filters, data_start_time, data_end_time, epoch)
         if result:
             results.append(result)
-
-    print(results)
     return results
 
 
