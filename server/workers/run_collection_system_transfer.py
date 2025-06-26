@@ -57,8 +57,7 @@ def temporary_directory():
 
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
-    
-    logging.info(line)
+
     file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
 
     if not file_or_dir.startswith('-'):
@@ -128,7 +127,7 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
         result = process_rsync_line(filepath, filters, data_start_time, data_end_time, epoch)
         if result:
             results.append(result)
-    
+
     print(results)
     return results
 
@@ -154,220 +153,6 @@ def check_darwin(cst_cfg):
     return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
 
 
-# def build_filelist(gearman_worker, prefix=None, batch_size=500, max_workers=16):
-#     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
-#     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
-
-#     logging.info("Starting filelist build in %s", source_dir)
-
-#     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-#     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-#     filters = build_filters(gearman_worker)
-
-#     # Step 1: Gather all file paths
-#     filepaths = []
-#     for root, _, filenames in os.walk(source_dir):
-#         for filename in filenames:
-#             filepaths.append(os.path.join(root, filename))
-
-#     total_files = len(filepaths)
-#     logging.info("Discovered %d files", total_files)
-
-#     # Step 2: Batch file paths
-#     batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
-
-#     # Step 3: Process in thread pool
-#     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-#         futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
-#                    for batch in batches]
-
-#         for future in as_completed(futures):
-#             include, exclude = future.result()
-#             return_files['include'].extend(f for f, _ in include)
-#             return_files['filesize'].extend(s for _, s in include)
-#             return_files['exclude'].extend(exclude)
-
-#     logging.info("Initial filtering complete: %d included, %d excluded",
-#                  len(return_files['include']), len(return_files['exclude']))
-
-#     # Step 4: Optional staleness check
-#     staleness = gearman_worker.collection_system_transfer.get('staleness')
-#     if staleness and staleness != '0':
-#         wait_secs = int(staleness)
-#         logging.info("Waiting %ds to verify staleness...", wait_secs)
-#         time.sleep(wait_secs)
-
-#         paths_sizes = list(zip(return_files['include'], return_files['filesize']))
-#         stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
-
-#         verified_paths = []
-#         verified_sizes = []
-
-#         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-#             futures = [executor.submit(verify_staleness_batch, batch) for batch in stale_batches]
-
-#             for future in as_completed(futures):
-#                 verified = future.result()
-#                 for filepath, size in verified:
-#                     verified_paths.append(filepath)
-#                     verified_sizes.append(size)
-
-#         return_files['include'] = verified_paths
-#         return_files['filesize'] = verified_sizes
-
-#         logging.info("Staleness check complete: %d files remain", len(verified_paths))
-
-#     # Step 5: Format output
-#     del return_files['filesize']
-#     return_files['include'].sort()
-#     return_files['exclude'].sort()
-
-#     base_len = len(source_dir.rstrip(os.sep)) + 1
-#     return_files['include'] = [f[base_len:] for f in return_files['include']]
-#     return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
-
-#     # logging.debug("Final return_files object: %s", json.dumps(return_files, indent=2))
-#     return {'verdict': True, 'files': return_files}
-
-
-# def build_rsync_filelist(gearman_worker, rsync_password_filepath, batch_size=500, max_workers=16):
-#     """Build the list of files to include, exclude or ignore, for an rsync server transfer."""
-#     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
-#     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
-#     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-#     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-
-#     filters = build_filters(gearman_worker)
-
-#     command = ['rsync', '-r', '--password-file=' + rsync_password_filepath, '--no-motd',
-#                f"rsync://{gearman_worker.collection_system_transfer['rsyncUser']}@"
-#                f"{gearman_worker.collection_system_transfer['rsyncServer']}"
-#                f"{gearman_worker.source_dir}/"]
-
-#     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-#         command.insert(2, '--min-size=1')
-
-#     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-#         command.insert(2, '-m')
-
-#     logging.info("File list Command: %s", ' '.join(command))
-
-#     proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-#     lines = proc.stdout.splitlines()
-#     total_files = len(lines)
-#     logging.info("Discovered %d files", total_files)
-
-#     batches = [lines[i:i + batch_size] for i in range(0, total_files, batch_size)]
-
-#     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-#         futures = [executor.submit(process_rsync_batch, batch, filters, data_start_time, data_end_time, epoch)
-#                    for batch in batches]
-
-#         for future in as_completed(futures):
-#             result = future.result()
-#             if result:
-#                 for category, filepath, filesize in result:
-#                     return_files[category].append(filepath)
-#                     if category == 'include':
-#                         return_files['filesize'].append(filesize)
-
-#     if gearman_worker.collection_system_transfer['staleness'] != '0':
-#         logging.info("Checking for changing filesizes")
-#         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-#         proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-#         for line in proc.stdout.splitlines():
-#             file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
-
-#             if not file_or_dir.startswith('-'):
-#                 continue
-
-#             try:
-#                 younger_file_idx = return_files['include'].index(filepath)
-#                 if return_files['filesize'][younger_file_idx] != size:
-#                     del return_files['filesize'][younger_file_idx]
-#                     del return_files['include'][younger_file_idx]
-#             except ValueError:
-#                 pass
-#             except Exception as err:
-#                 logging.error(str(err))
-
-#     del return_files['filesize']
-
-#     # logging.debug('return_files: %s', json.dumps(return_files, indent=2))
-#     return {'verdict': True, 'files': return_files}
-
-
-# def build_ssh_filelist(gearman_worker, is_darwin=False, batch_size=500, max_workers=16):
-#     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
-
-#     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
-#     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
-#     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
-#     filters = build_filters(gearman_worker)
-
-#     # Build rsync command
-#     command = ['rsync', '-r', '-e', 'ssh',
-#                f"{gearman_worker.collection_system_transfer['sshUser']}@{gearman_worker.collection_system_transfer['sshServer']}:{gearman_worker.source_dir}/"]
-
-#     if not is_darwin:
-#         command.insert(2, '--protect-args')
-
-#     if gearman_worker.collection_system_transfer['skipEmptyFiles'] == '1':
-#         command.insert(2, '--min-size=1')
-
-#     if gearman_worker.collection_system_transfer['skipEmptyDirs'] == '1':
-#         command.insert(2, '-m')
-
-#     if gearman_worker.collection_system_transfer['sshUseKey'] == '0':
-#         command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
-
-#     logging.info("File list Command: %s", ' '.join(command))
-
-#     proc = subprocess.run(command, capture_output=True, text=True, check=False)
-#     lines = proc.stdout.splitlines()
-
-#     batches = [lines[i:i + batch_size] for i in range(0, len(lines), batch_size)]
-
-#     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-#         futures = [executor.submit(process_rsync_batch, batch, filters, data_start_time, data_end_time, epoch)
-#                    for batch in batches]
-#         for future in as_completed(futures):
-#             result = future.result()
-#             if result:
-#                 for item in result:
-#                     if item[0] == 'include':
-#                         return_files['include'].append(item[1])
-#                         return_files['filesize'].append(item[2])
-#                     elif item[0] == 'exclude':
-#                         return_files['exclude'].append(item[1])
-
-#     # Optional staleness check
-#     if gearman_worker.collection_system_transfer['staleness'] != '0':
-#         time.sleep(int(gearman_worker.collection_system_transfer['staleness']))
-#         proc = subprocess.run(command, capture_output=True, text=True, check=False)
-#         for line in proc.stdout.splitlines():
-#             try:
-#                 file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
-#                 idx = return_files['include'].index(filepath)
-#                 if return_files['filesize'][idx] != size:
-#                     del return_files['filesize'][idx]
-#                     del return_files['include'][idx]
-#             except (ValueError, Exception) as err:
-#                 logging.warning("Error verifying staleness: %s", err)
-
-#     del return_files['filesize']
-
-#     # return_files['include'] = [f.split(gearman_worker.source_dir + '/', 1).pop()
-#     #                            for f in return_files['include']]
-#     # return_files['exclude'] = [f.split(gearman_worker.source_dir + '/', 1).pop()
-#     #                            for f in return_files['exclude']]
-
-#     # logging.debug('return_files: %s', json.dumps(return_files, indent=2))
-#     return {'verdict': True, 'files': return_files}
-
-
 def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
@@ -382,7 +167,6 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
         for root, _, filenames in os.walk(source_dir):
             for filename in filenames:
                 filepaths.append(os.path.join(root, filename))
-        logging.info(json.dumps(filepaths, indent=2))
     else:
         command = ['rsync', '-r']
         if transfer_type == 'rsync':
@@ -440,7 +224,6 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
         time.sleep(int(staleness))
 
         if transfer_type in ['local', 'smb']:
-            logging.info(json.dumps(return_files, indent=2))
             paths_sizes = list(zip(return_files['include'], return_files['filesize']))
             stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
             verified_paths = []
@@ -473,8 +256,6 @@ def build_filelist_unified(gearman_worker, transfer_type='local', prefix=None, r
         base_len = len(source_dir.rstrip(os.sep)) + 1
         return_files['include'] = [f[base_len:] for f in return_files['include']]
         return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
-
-    logging.info(json.dumps(return_files, indent=2))
 
     return {'verdict': True, 'files': return_files}
 
@@ -513,7 +294,6 @@ def build_filters(gearman_worker):
             .replace('{HH}', '[0-2][0-9]')
             .replace('{MM}', '[0-5][0-9]')
     }
-    # logging.debug(json.dumps(filters, indent=2))
 
     return {
         'include_filters': filters['includeFilter'].split(',') if filters['includeFilter'] else [],
@@ -600,7 +380,7 @@ def delete_from_dest(dest_dir, include_files):
     for filename in os.listdir(dest_dir):
         full_path = os.path.join(dest_dir, filename)
         if os.path.isfile(full_path) and filename not in include_files:
-            logging.debug("Deleting: %s", filename)
+            logging.info("Deleting: %s", filename)
             try:
                 os.remove(full_path)
                 deleted_files.append(filename)
@@ -682,8 +462,6 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
             if not line:
                 continue
 
-            # logging.debug("%s", line)
-
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
                 new_files.append(filename.rstrip('\n'))
@@ -711,7 +489,6 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
     """
     Perform a collection system transfer from the configured source type.
     """
-    logging.debug("Starting unified transfer: %s", transfer_type)
 
     cfg = gearman_worker.collection_system_transfer
     source_dir = gearman_worker.source_dir
@@ -1140,7 +917,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Transfer completed successfully")
+    logging.info("Transfer completed successfully")
     job_results['files'] = output_results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
 
@@ -1166,10 +943,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
-        logging.debug("Building logfiles")
-
         logfile_filename = gearman_worker.collection_system_transfer['name'] + '_' + gearman_worker.transfer_start_date + '.log'
-
         logfile_contents = {
             'files': {
                 'new': job_results['files']['new'],
@@ -1245,12 +1019,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT
