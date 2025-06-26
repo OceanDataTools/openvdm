@@ -257,11 +257,15 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
+    if 'deleted' not in payload_obj['files']:
+        payload_obj['files']['deleted'] = []
+
+    if len(payload_obj['files']['new']) + len(payload_obj['files']['updated']) + len(payload_obj['files']['deleted']) == 0:
+        return json.dumps(job_results)
+
     if payload_obj['files']['new'] or payload_obj['files']['updated']:
         filelist.extend(payload_obj['files']['new'])
         filelist.extend(payload_obj['files']['updated'])
-    else:
-        return json.dumps(job_results)
 
     #filelist = [os.path.join(gearman_worker.cruiseID, filename) for filename in filelist]
     logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
@@ -300,6 +304,7 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     row_added = 0
     row_updated = 0
+    row_deleted = 0
 
     for new_hash in new_hashes:
         updated = False
@@ -314,10 +319,17 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
             existing_hashes.append({'hash': new_hash['hash'], 'filename': new_hash['filename']})
             row_added += 1
 
+    if 'deleted' in payload_obj['files']:
+        hashes = len(existing_hashes)
+        existing_hashes = [existing_hash for existing_hash in existing_hashes if existing_hash.get(filename) not in payload_obj['files']['deleted']]
+        row_deleted = hashes - len(existing_hashes)
+
     if row_added > 0:
         logging.debug("%s row(s) added", row_added)
     if row_updated > 0:
         logging.debug("%s row(s) updated", row_updated)
+    if row_deleted > 0:
+        logging.debug("%s row(s) deleted", row_deleted)
 
     gearman_worker.send_job_status(gearman_job, 85, 100)
 
