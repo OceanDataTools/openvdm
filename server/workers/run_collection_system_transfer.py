@@ -39,7 +39,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.connection_utils import detect_smb_version, mount_smb_share, check_darwin, build_rsync_command, build_rsync_options, delete_from_dest
+from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, delete_from_dest, detect_smb_version, get_transfer_type, mount_smb_share
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -362,12 +362,18 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
     return new_files, updated_files
 
 
-def transfer_from_source(gearman_worker, gearman_job, transfer_type):
+def transfer_from_source(gearman_worker, gearman_job):
     """
     Perform a collection system transfer from the configured source type.
     """
 
-    cfg = gearman_worker.collection_system_transfer
+    cst_cfg = gearman_worker.collection_system_transfer
+    transfer_type = get_transfer_type(cst_cfg['transferType'])
+
+    if not transfer_type:
+        logging.error("Unknown Transfer Type")
+        return {'verdict': False, 'reason': 'Unknown Transfer Type'}
+
     source_dir = gearman_worker.source_dir
     dest_dir = gearman_worker.dest_dir
 
@@ -384,8 +390,8 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             # Mount SMB Share
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(cfg)
-            success = mount_smb_share(cfg, mntpoint, smb_version)
+            smb_version = detect_smb_version(cst_cfg)
+            success = mount_smb_share(cst_cfg, mntpoint, smb_version)
             if not success:
                 return {'verdict': False, 'reason': 'Failed to mount SMB share'}
             prefix = mntpoint
@@ -403,7 +409,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             password_file = None
 
         if transfer_type == 'ssh':
-            is_darwin = check_darwin(cfg)
+            is_darwin = check_darwin(cst_cfg)
 
         # Build filelist (from local, SMB mount, etc.)
         filelist_result = build_filelist(gearman_worker, transfer_type=transfer_type, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
@@ -444,11 +450,11 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
             extra_args = [f"--password-file={password_file}"]
 
         # Base command
-        rsync_flags = build_rsync_options(cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
+        rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
 
         cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
-        if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
-            cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
+        if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == '0':
+            cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
 
         # Transfer files
         files['new'], files['updated'] = run_transfer_command(
@@ -456,7 +462,7 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         )
 
         # Delete files if sync'ing with source
-        if cfg['syncFromSource'] == '1':
+        if cst_cfg['syncFromSource'] == '1':
             files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
         # Cleanup
@@ -786,47 +792,30 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     }
 
     completed_job_request = gm_client.submit_job("testCollectionSystemTransfer", json.dumps(gm_data))
-    results_obj = json.loads(completed_job_request.result)
+    results = json.loads(completed_job_request.result)
 
-    logging.debug('Connection Test Results: %s', json.dumps(results_obj, indent=2))
+    logging.debug('Connection Test Results: %s', json.dumps(results, indent=2))
 
-    if results_obj['parts'][-1]['result'] == "Pass": # Final Verdict
-        logging.debug("Connection test passed")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Pass"})
-    else:
+    if results['parts'][-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results_obj['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results['parts'][-1]['reason']})
         return json.dumps(job_results)
+
+    logging.debug("Connection test passed")
+    job_results['parts'].append({"partName": "Connection Test", "result": "Pass"})
 
     gearman_worker.send_job_status(current_job, 2, 10)
 
-    # if gearman_worker.collection_system_transfer['cruiseOrLowering'] == "1" and gearman_worker.lowering_id is None:
-    #     logging.info("Verifying lowering_id is set")
-    #     job_results['parts'].append({'partName': 'Destination Directory Test', "result": "Fail", 'reason': 'Lowering ID is not defined'})
-    #     return json.dumps(job_results)
-
     logging.info("Transferring files")
-    output_results = None
-    if gearman_worker.collection_system_transfer['transferType'] == "1": # Local Directory
-        output_results = transfer_from_source(gearman_worker, current_job, 'local')
-    elif  gearman_worker.collection_system_transfer['transferType'] == "2": # Rsync Server
-        output_results = transfer_from_source(gearman_worker, current_job, 'rsync')
-    elif  gearman_worker.collection_system_transfer['transferType'] == "3": # SMB Server
-        output_results = transfer_from_source(gearman_worker, current_job, 'smb')
-    elif  gearman_worker.collection_system_transfer['transferType'] == "4": # SSH Server
-        output_results = transfer_from_source(gearman_worker, current_job, 'ssh')
-    else:
-        logging.error("Unknown Transfer Type")
-        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": "Unknown transfer type"})
-        return json.dumps(job_results)
+    results = transfer_from_source(gearman_worker, current_job)
 
-    if not output_results['verdict']:
-        logging.error("Transfer of remote files failed: %s", output_results['reason'])
-        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": output_results['reason']})
+    if not results['verdict']:
+        logging.error("Transfer of remote files failed: %s", results['reason'])
+        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
     logging.info("Transfer completed successfully")
-    job_results['files'] = output_results['files']
+    job_results['files'] = results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
 
     if len(job_results['files']['new']) > 0:
@@ -835,7 +824,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         logging.debug("%s file(s) updated", len(job_results['files']['updated']))
     if len(job_results['files']['exclude']) > 0:
         logging.debug("%s misnamed file(s) encountered", len(job_results['files']['exclude']))
-    if 'deleted' in job_results['files'] and len(job_results['files']['deleted']) > 0:
+    if job_results['files'].get('deleted') and len(job_results['files']['deleted']) > 0:
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     gearman_worker.send_job_status(current_job, 9, 10)
@@ -843,11 +832,11 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.info("Setting file permissions")
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.dest_dir)
+        results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.dest_dir)
 
-        if not output_results['verdict']:
+        if not results['verdict']:
             logging.error("Error setting destination directory file/directory ownership/permissions: %s", gearman_worker.dest_dir)
-            job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+            job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": results['reason']})
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
@@ -859,19 +848,19 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             }
         }
 
-        output_results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
+        results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-        if output_results['verdict']:
+        if results['verdict']:
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
         else:
             logging.error("Error writing transfer logfile: %s", logfile_filename)
-            job_results['parts'].append({"partName": "Write transfer logfile", "result": "Fail", "reason": output_results['reason']})
+            job_results['parts'].append({"partName": "Write transfer logfile", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
+        results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
 
-        if not output_results['verdict']:
-            job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        if not results['verdict']:
+            job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
     logfile_filename = gearman_worker.collection_system_transfer['name'] + '_Exclude.log'
@@ -882,20 +871,20 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     }
     logfile_contents['files']['exclude'] = job_results['files']['exclude']
 
-    output_results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
+    results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-    if output_results['verdict']:
+    if results['verdict']:
         job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
     else:
-        logging.error("Error writing transfer logfile: %s", output_results['reason'])
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": output_results['reason']})
-        return job_results
+        logging.error("Error writing transfer logfile: %s", results['reason'])
+        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
+        return json.dumps(job_results)
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
+    results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
 
-    if not output_results['verdict']:
+    if not results['verdict']:
         logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
-        job_results['parts'].append({"partName": "Set transfer logfile ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Set transfer logfile ownership/permissions", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
     gearman_worker.send_job_status(current_job, 10, 10)
