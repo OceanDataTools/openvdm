@@ -277,7 +277,7 @@ def build_filters(cst_cfg, cruise_id, lowering_id):
 
     context = {
         '{cruiseID}': cruise_id,
-        '{loweringID}': lowering_id,
+        '{loweringID}': lowering_id or '{loweringID}',
         '{YYYY}': '20[0-9][0-9]',
         '{YY}': '[0-9][0-9]',
         '{mm}': '[0-1][0-9]',
@@ -501,17 +501,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if not isinstance(s, str):
             return None
 
-        result = s.replace(
-            '{cruiseID}', self.cruise_id
-        ).replace(
-            '{loweringDataBaseDir}',
-            self.shipboard_data_warehouse_config['loweringDataBaseDir']
-        )
-
-        if self.lowering_id is not None:
-            result = result.replace('{loweringID}', self.lowering_id)
-
-        return result.rstrip('/')
+        return (s.replace('{cruiseID}', self.cruise_id)
+                .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+                .replace('{loweringID}', self.lowering_id if self.lowering_id is not None else '{loweringID}')
+                .rstrip('/')
+               )
 
 
     def build_dest_dir(self):
