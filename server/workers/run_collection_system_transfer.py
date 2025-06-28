@@ -544,6 +544,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
+    def test_destination_dir(self):
+        """
+        Verify the destination directory exists
+        """
+
+        results = []
+
+        dest_dir_exists = os.path.isdir(self.dest_dir)
+        if not dest_dir_exists:
+            reason = f"Unable to find destination directory: {self.dest_dir}"
+            results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
+
+            return results
+
+        results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+
+        return results
+
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
@@ -776,35 +795,36 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     logging.debug("Setting transfer status to 'Running'")
     gearman_worker.ovdm.set_running_collection_system_transfer(gearman_worker.collection_system_transfer['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
-    logging.info("Testing connection")
+    logging.info("Testing source")
     gearman_worker.send_job_status(current_job, 1, 10)
 
     results = test_cst_source(gearman_worker.collection_system_transfer, gearman_worker.source_dir)
     logging.info(json.dumps(results, indent=2))
 
-    gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
-
-    gm_data = {
-        'collectionSystemTransfer': gearman_worker.collection_system_transfer,
-        'cruiseID': gearman_worker.cruise_id
-    }
-
-    completed_job_request = gm_client.submit_job("testCollectionSystemTransfer", json.dumps(gm_data))
-    results = json.loads(completed_job_request.result)
-
-    logging.debug('Connection Test Results: %s', json.dumps(results, indent=2))
-
-    if results['parts'][-1]['result'] == "Fail": # Final Verdict
+    if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
     logging.debug("Connection test passed")
     job_results['parts'].append({"partName": "Connection Test", "result": "Pass"})
 
-    gearman_worker.send_job_status(current_job, 2, 10)
+    logging.info("Testing destination")
+    gearman_worker.send_job_status(current_job, 15, 100)
+
+    results = gearman_worker.test_destination_dir()
+    logging.info(json.dumps(results, indent=2))
+
+    if results[-1]['result'] == "Fail": # Final Verdict
+        logging.warning("Destination test failed, quitting job")
+        job_results['parts'].append({"partName": "Destination Test", "result": "Fail", "reason": results[-1]['reason']})
+        return json.dumps(job_results)
+
+    logging.debug("Destination test passed")
+    job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
 
     logging.info("Transferring files")
+    gearman_worker.send_job_status(current_job, 2, 10)
     results = transfer_from_source(gearman_worker, current_job)
 
     if not results['verdict']:

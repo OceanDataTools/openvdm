@@ -88,7 +88,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
-    def test_destination(self):
+    def test_destination_dir(self):
         """
         Verify the destination directory exists
         """
@@ -283,7 +283,7 @@ def task_test_collection_system_transfer(gearman_worker, current_job):
 
     if cfg['enable'] == '1':
         logging.info("Testing Destination")
-        job_results['parts'].extend(gearman_worker.test_destination())
+        job_results['parts'].extend(gearman_worker.test_destination_dir())
         gearman_worker.send_job_status(current_job, 3, 4)
 
     for test in job_results['parts']:
