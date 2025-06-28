@@ -513,7 +513,7 @@ def task_test_collection_system_transfer(gearman_worker, current_job):
     for test in job_results['parts']:
         if test['result'] == "Fail":
             job_results['parts'].extend([{"partName": "Final Verdict", "result": "Fail", "reason": test['reason']}])
-            return job_results
+            return json.dumps(job_results)
 
     job_results['parts'].extend([{"partName": "Final Verdict", "result": "Pass"}])
 
