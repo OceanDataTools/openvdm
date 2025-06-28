@@ -39,7 +39,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii
 from server.lib.output_json_data_to_file import output_json_data_to_file
 from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, delete_from_dest, detect_smb_version, get_transfer_type, mount_smb_share
+from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, delete_from_dest, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -155,9 +155,10 @@ def verify_staleness_batch(paths_sizes):
     return verified
 
 
-def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
+def build_filelist(gearman_worker, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
     cst_cfg = gearman_worker.collection_system_transfer
+    transfer_type = get_transfer_type(cst_cfg['transferType'])
     filters = build_filters(cst_cfg, gearman_worker.cruise_id, gearman_worker.lowering_id)
 
     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
@@ -412,7 +413,7 @@ def transfer_from_source(gearman_worker, gearman_job):
             is_darwin = check_darwin(cst_cfg)
 
         # Build filelist (from local, SMB mount, etc.)
-        filelist_result = build_filelist(gearman_worker, transfer_type=transfer_type, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
+        filelist_result = build_filelist(gearman_worker, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
 
         if not filelist_result['verdict']:
             if mntpoint:
@@ -450,7 +451,7 @@ def transfer_from_source(gearman_worker, gearman_job):
             extra_args = [f"--password-file={password_file}"]
 
         # Base command
-        rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
+        rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
 
         cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
         if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == '0':
@@ -777,6 +778,9 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     logging.info("Testing connection")
     gearman_worker.send_job_status(current_job, 1, 10)
+
+    results = test_cst_source(gearman_worker.collection_system_transfer, gearman_worker.source_dir)
+    logging.info(json.dumps(results, indent=2))
 
     gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
 

@@ -176,24 +176,27 @@ def delete_from_dest(dest_dir, include_files):
     return deleted_files
 
 
-def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
+def build_rsync_options(cst_cfg, mode='dry-run', is_darwin=False):
     """
     Builds a list of rsync options based on config, transfer mode, and destination type.
 
-    :param cfg: dict-like config object (e.g., gearman_worker.collection_system_transfer)
+    :param cst_cfg: dict-like config object (e.g., gearman_worker.collection_system_transfer)
     :param mode: 'dry-run' or 'real'
     :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
     :return: list of rsync flags
     """
+
+    transfer_type = get_transfer_type(cst_cfg['transferType'])
+
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
 
     if not is_darwin:
         flags.insert(1, '--protect-args')
 
-    if cfg.get('skipEmptyFiles') == '1':
+    if cst_cfg.get('skipEmptyFiles') == '1':
         flags.insert(1, '--min-size=1')
 
-    if cfg.get('skipEmptyDirs') == '1':
+    if cst_cfg.get('skipEmptyDirs') == '1':
         flags.insert(1, '-m')
 
     if mode == 'dry-run':
@@ -204,10 +207,10 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None
         if transfer_type == 'rsync':
             flags.append('--no-motd')
 
-        if cfg.get('bandwidthLimit') not in (None, '0'):
-            flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
+        if cst_cfg.get('bandwidthLimit') not in (None, '0'):
+            flags.insert(1, f"--bwlimit={cst_cfg['bandwidthLimit']}")
 
-        if cfg['removeSourceFiles'] == '1':
+        if cst_cfg['removeSourceFiles'] == '1':
             flags.insert(2, '--remove-source-files')
 
     return flags
