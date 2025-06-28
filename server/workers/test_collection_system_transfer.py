@@ -38,6 +38,15 @@ def temporary_directory():
     try:
         yield tmpdir
     finally:
+        mntpoint_path = os.path.join(tmpdir, 'mntpoint')
+
+        if os.path.ismount(mntpoint_path):
+            try:
+                subprocess.run(['umount', mntpoint_path], check=True)
+                logging.info(f"Unmounted {mntpoint_path} before cleanup.")
+            except subprocess.CalledProcessError as e:
+                logging.warning(f"Failed to unmount {mntpoint_path}: {e}")
+
         try:
             shutil.rmtree(tmpdir)
         except Exception as e:
@@ -174,9 +183,6 @@ def test_source(cst_cfg, source_dir):
                 return results
 
             results.extend([{"partName": "Write test", "result": "Pass"}])
-
-            time.sleep(2)
-            subprocess.call(['umount', mntpoint])
 
         # Tests for rsync
         if transfer_type == 'rsync':
