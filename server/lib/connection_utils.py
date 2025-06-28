@@ -77,7 +77,7 @@ def mount_smb_share(cst_cfg, mntpoint, smb_version):
         opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
 
     cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.info("Mount command: %s", ' '.join(cmd).replace(f'password={cst_cfg['smbPass']}', 'password=****'))
+    logging.info("Mount command: %s", ' '.join(cmd).replace(f'password={cst_cfg["smbPass"]}', 'password=****'))
 
     try:
         subprocess.run(cmd, check=True)
