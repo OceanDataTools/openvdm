@@ -245,7 +245,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return return_obj['cruiseID']
+            return return_obj.get('cruiseID', None)
         except Exception as err:
             logging.error("Unable to retrieve CruiseID from OpenVDM API")
             raise err
@@ -387,7 +387,8 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return return_obj['loweringID'] if return_obj['loweringID'] != '' else None
+            lowering_id = return_obj.get('loweringID', None)
+            return lowering_id if lowering_id and len(lowering_id) > 0 else None
         except Exception as err:
             logging.error("Unable to retrieve LoweringID from OpenVDM API")
             raise err

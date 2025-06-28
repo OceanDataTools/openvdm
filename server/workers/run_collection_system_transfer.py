@@ -59,65 +59,78 @@ def temporary_directory():
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
 
-    file_or_dir, size, mdate, mtime, filepath = line.split(None, 4)
+    parts = line.strip().split(None, 4)
+    if len(parts) < 5:
+        logging.warning("Skipping malformed rsync line: %s", line)
+        return None
+
+    file_or_dir, size, mdate, mtime, filepath = parts
 
     if not file_or_dir.startswith('-'):
         return None
 
-    file_mod_time = datetime.strptime(mdate + ' ' + mtime, "%Y/%m/%d %H:%M:%S")
-    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
-
-    if not (data_start_time <= file_mod_time_seconds <= data_end_time):
+    try:
+        file_mod_time = datetime.strptime(f"{mdate} {mtime}", "%Y/%m/%d %H:%M:%S")
+    except ValueError as e:
+        logging.warning("Could not parse date/time from line: %s (%s)", line, e)
         return None
 
-    if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
+    file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
+    if not (data_start_time <= file_mod_time_seconds <= data_end_time):
         return None
 
     if not is_ascii(filepath):
         return ('exclude', filepath, None)
 
+    if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
+        return None
+
     if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
-        if not any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
-            return ('include', filepath, size)
-        else:
+        if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
             return ('exclude', filepath, None)
 
+        return ('include', filepath, size)
+
     return ('exclude', filepath, None)
+
+
+def process_filepath(filepath, filters, data_start_time, data_end_time):
+    try:
+        if os.path.islink(filepath):
+            return None
+
+        stat = os.stat(filepath)
+        mod_time = stat.st_mtime
+        size = stat.st_size
+
+        if not (data_start_time <= mod_time <= data_end_time):
+            return None
+
+        if not is_ascii(filepath):
+            return ("exclude", filepath, None)
+
+        if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
+            return None
+
+        if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
+            if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
+                return ("exclude", filepath, None)
+
+            return ("include", filepath, str(size))
+
+        return ("exclude", filepath, None)
+
+    except FileNotFoundError:
+        return None
 
 
 def process_batch(batch, filters, data_start_time, data_end_time):
     results = []
 
     for filepath in batch:
-        try:
-            if os.path.islink(filepath):
-                continue
-
-            stat = os.stat(filepath)
-            mod_time = stat.st_mtime
-            size = stat.st_size
-
-            if not (data_start_time <= mod_time <= data_end_time):
-                continue
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
-                continue
-
-            if not is_ascii(filepath):
-                results.append(("exclude", filepath, "0"))
-                continue
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
-                if not any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
-                    results.append(("include", filepath, str(size)))
-                else:
-                    results.append(("exclude", filepath, "0"))
-            else:
-                results.append(("exclude", filepath, "0"))
-
-        except FileNotFoundError:
-            continue
-
+        result = process_filepath(filepath, filters, data_start_time, data_end_time)
+        if result:
+            results.append(result)
     return results
 
 
@@ -144,11 +157,14 @@ def verify_staleness_batch(paths_sizes):
 
 def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
-    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
-    filters = build_filters(gearman_worker)
+    cst_cfg = gearman_worker.collection_system_transfer
+    filters = build_filters(cst_cfg, gearman_worker.cruise_id, gearman_worker.lowering_id)
+
     epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
     data_start_time = calendar.timegm(time.strptime(gearman_worker.data_start_date, "%Y/%m/%d %H:%M"))
     data_end_time = calendar.timegm(time.strptime(gearman_worker.data_end_date, "%Y/%m/%d %H:%M:%S"))
+
+    return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
     # Get file list based on transfer_type
     if transfer_type in ['local', 'smb']:
@@ -160,21 +176,21 @@ def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_pas
         command = ['rsync', '-r']
         if transfer_type == 'rsync':
             command += ['--password-file=' + rsync_password_filepath, '--no-motd',
-                        f"rsync://{gearman_worker.collection_system_transfer['rsyncUser']}@"
-                        f"{gearman_worker.collection_system_transfer['rsyncServer']}"
+                        f"rsync://{cst_cfg['rsyncUser']}@"
+                        f"{cst_cfg['rsyncServer']}"
                         f"{gearman_worker.source_dir}/"]
         elif transfer_type == 'ssh':
             command += ['-e', 'ssh',
-                        f"{gearman_worker.collection_system_transfer['sshUser']}@"
-                        f"{gearman_worker.collection_system_transfer['sshServer']}:{gearman_worker.source_dir}/"]
+                        f"{cst_cfg['sshUser']}@"
+                        f"{cst_cfg['sshServer']}:{gearman_worker.source_dir}/"]
             if not is_darwin:
                 command.insert(2, '--protect-args')
-            if gearman_worker.collection_system_transfer.get('sshUseKey') == '0':
-                command = ['sshpass', '-p', gearman_worker.collection_system_transfer['sshPass']] + command
+            if cst_cfg.get('sshUseKey') == '0':
+                command = ['sshpass', '-p', cst_cfg['sshPass']] + command
 
-        if gearman_worker.collection_system_transfer.get('skipEmptyFiles') == '1':
+        if cst_cfg.get('skipEmptyFiles') == '1':
             command.insert(2, '--min-size=1')
-        if gearman_worker.collection_system_transfer.get('skipEmptyDirs') == '1':
+        if cst_cfg.get('skipEmptyDirs') == '1':
             command.insert(2, '-m')
 
         logging.info("File list Command: %s", ' '.join(command))
@@ -207,7 +223,7 @@ def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_pas
                         return_files['exclude'].append(item[1])
 
     # Optional staleness check
-    staleness = gearman_worker.collection_system_transfer.get('staleness')
+    staleness = cst_cfg.get('staleness')
     if staleness and staleness != '0':
         logging.info("Checking staleness (wait %ss)...", staleness)
         time.sleep(int(staleness))
@@ -249,7 +265,7 @@ def build_filelist(gearman_worker, transfer_type='local', prefix=None, rsync_pas
     return {'verdict': True, 'files': return_files}
 
 
-def build_filters(gearman_worker):
+def build_filters(cst_cfg, cruise_id, lowering_id):
     """
     Replace wildcard string in filters
     """
@@ -260,8 +276,8 @@ def build_filters(gearman_worker):
         return template
 
     context = {
-        '{cruiseID}': gearman_worker.cruise_id,
-        '{loweringID}': gearman_worker.lowering_id,
+        '{cruiseID}': cruise_id,
+        '{loweringID}': lowering_id,
         '{YYYY}': '20[0-9][0-9]',
         '{YY}': '[0-9][0-9]',
         '{mm}': '[0-1][0-9]',
@@ -273,7 +289,7 @@ def build_filters(gearman_worker):
 
     filters = {}
     for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
-        raw = gearman_worker.collection_system_transfer.get(key, '')
+        raw = cst_cfg.get(key, '')
         expanded = expand_placeholders(raw, context)
         filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
 
@@ -292,7 +308,7 @@ def build_include_file(include_list, filepath):
     return True
 
 
-def run_transfer_command(gearman_worker, gearman_job, command, file_count):
+def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
     """
     run the rsync command and return the list of new/updated files
     """
@@ -302,13 +318,13 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
         logging.info("Skipping Transfer Command: nothing to transfer")
         return [], []
 
-    logging.info('Transfer Command: %s', ' '.join(command))
+    logging.info('Transfer Command: %s', ' '.join(cmd))
 
     new_files = []
     updated_files = []
     last_percent_reported = -1
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     while proc.poll() is None:
 
         for line in proc.stdout:
@@ -461,14 +477,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.stop = False
         self.ovdm = OpenVDM()
         self.cruise_id = None
-        self.system_status = None
+        self.lowering_id = None
         self.collection_system_transfer = None
         self.shipboard_data_warehouse_config = None
 
         self.cruise_dir = None
         self.source_dir = None
         self.dest_dir = None
-        self.lowering_id = None
         self.data_start_date = None
         self.data_end_date = None
         self.transfer_start_date = None
@@ -488,7 +503,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Replace wildcard string in destDir
         """
 
-        return self.keyword_replace(self.collection_system_transfer['destDir']) if self.collection_system_transfer else ""
+        if not self.collection_system_transfer:
+            return None
+
+        dest_dir = self.keyword_replace(self.collection_system_transfer['destDir']).lstrip('/')
+
+        if self.collection_system_transfer.get('cruiseOrLowering') == '1':
+            if self.lowering_id is None:
+                return None
+
+            return os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, dest_dir)
+
+        return os.path.join(self.cruise_dir, dest_dir)
 
 
     def build_source_dir(self):
@@ -496,7 +522,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Replace wildcard string in sourceDir
         """
 
-        return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else ""
+        return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
     def build_logfile_dirpath(self):
@@ -508,6 +534,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_execute(self, current_job):
+        """
+        Function run whenever a new job arrives
+        """
+
         logging.debug("Received job: %s", current_job)
         self.stop = False
 
@@ -515,69 +545,70 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", current_job.data)
 
-            cst_id = payload_obj['collectionSystemTransfer']['collectionSystemTransferID']
+            cst_cfg = payload_obj.get('collectionSystemTransfer', {})
+            cst_id = cst_cfg.get('collectionSystemTransferID')
+
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
             if self.collection_system_transfer is None:
                 self.collection_system_transfer = {
-                    'name': "Unknown Transfer"
+                    'name': "UNKNOWN"
                 }
 
                 return self._fail_job(current_job, "Located Collection System Transfer Data",
-                                      "Could not find configuration data for collection system transfer")
-
-            if self.collection_system_transfer['status'] == "1":
-                logging.info("Transfer already in-progress for %s", self.collection_system_transfer['name'])
-                return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
+                                      "Could not find collection system transfer config to use for transferring files")
 
         except Exception:
-            logging.exception("Failed to retrieve collection system transfer config")
-            return self._fail_job(current_job, "Located Collection System Transfer Data",
-                                  "Could not retrieve data for collection system transfer from OpenVDM API")
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
         ))
 
-        logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        # verify the transfer is NOT already in-progress
+        if self.collection_system_transfer['status'] == "1":
+            logging.info("Transfer already in-progress")
+            return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
-        self.system_status = payload_obj['systemStatus'] if 'systemStatus' in payload_obj else self.ovdm.get_system_status()
+        start_time = time.gmtime()
+        self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", start_time)
+
+        logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", start_time))
+
+        system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
 
-        if self.system_status == "Off" or self.collection_system_transfer['enable'] == '0':
+        if system_status == "Off" or self.collection_system_transfer['enable'] == '0':
             logging.info("Transfer disabled for %s", self.collection_system_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
-        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id()) or ""
+        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
+
+        # Check for empty lowering ID passed via payload
+        if self.lowering_id is not None and len(self.lowering_id) == 0:
+            self.lowering_id = None
+
+        # fail if lowering ID is required but not found
+        if (self.collection_system_transfer.get('cruiseOrLowering') == '1'  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
+            return self._fail_job(current_job, "Validate Lowering ID",
+                                    "Lowering ID is not defined")
+
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-
-        if len(self.lowering_id) == 0:
-            # exit with error if trying to run a lowering collection system transfer
-            if self.collection_system_transfer['cruiseOrLowering'] == "1" or '{loweringID}' in self.collection_system_transfer['destDir']:
-                return self._fail_job(current_job, "Validate Lowering ID",
-                                      "Lowering ID is not defined")
-
-        if self.collection_system_transfer['cruiseOrLowering'] == "1":
-            self.dest_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, self.build_dest_dir())
-        else:
-            self.dest_dir = os.path.join(self.cruise_dir, self.build_dest_dir())
-
+        self.dest_dir = self.build_dest_dir()
         self.source_dir = self.build_source_dir()
 
-        self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-
         ### Set temporal bounds for transfer
-        # if temporal bands are not used then set to absolute min/max
-        if self.collection_system_transfer['useStartDate'] == '0':
-            self.data_start_date = "1970/01/01 00:00"
-            self.data_end_date = "9999/12/31 23:59:59"
+        self.data_start_date = "1970/01/01 00:00"
+        self.data_end_date = "9999/12/31 23:59:59"
 
-        # if temporal bands are used then set to specified bounds for the corresponding cruise/lowering
-        else:
+        # if requested, set to specified bounds for the corresponding cruise/lowering
+        if self.collection_system_transfer['useStartDate'] == '1':
             if self.collection_system_transfer['cruiseOrLowering'] == "0":
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
@@ -607,19 +638,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle,
-                      self.collection_system_transfer['name'], time.strftime("%D %T", time.gmtime()))
-
-        self.send_job_data(current_job, json.dumps([{
-            "partName": "Worker crashed", "result": "Fail", "reason": "Unknown"
-        }]))
-        self.ovdm.set_error_collection_system_transfer(
-            self.collection_system_transfer['collectionSystemTransferID'], 'Worker crashed'
-        )
+        logging.error("Job: %s, transfer failed at: %s", current_job.handle,
+                      time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
+
+        if cst_id:
+            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -629,57 +662,68 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Function run whenever the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
+        job_parts = results.get('parts', [])
+        final_verdict = job_parts[-1] if len(job_parts) else None
+        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
-        final_part = results_obj['parts'][-1] if results_obj['parts'] else None
+        if cst_id:
+            if final_verdict:
+                if final_verdict.get('result') == "Fail":
+                    self.ovdm.set_error_collection_system_transfer_test(cst_id, final_verdict.get('reason', "undefined"))
+                else:
 
-        if final_part:
-            if final_part['result'] == "Fail" and final_part['partName'] != "Located Collection System Transfer Data":
-                self.ovdm.set_error_collection_system_transfer(
-                    self.collection_system_transfer['collectionSystemTransferID'], final_part['reason']
-                )
-            elif final_part['result'] == "Pass":
+                    new_files = results['files'].get('new', [])
+                    updated_files = results['files'].get('updated', [])
+                    deleted_files = results['files'].get('deleted', [])
 
-                if results_obj['files']['new'] or results_obj['files']['updated'] or ('deleted' in results_obj['files'] and results_obj['files']['deleted']):
+                    if len(new_files) > 0 or len(updated_files) > 0 or len(deleted_files) > 0:
 
-                    logging.info("Preparing subsequent Gearman jobs")
-                    gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+                        logging.info("Preparing subsequent Gearman jobs")
+                        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-                    job_data = {
-                        'cruiseID': self.cruise_id,
-                        'collectionSystemTransferID': self.collection_system_transfer['collectionSystemTransferID'] if self.collection_system_transfer else '-1',
-                        'files': {
-                            'new': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['new']],
-                            'updated': [ os.path.join(self.collection_system_transfer['destDir'], filepath).lstrip('/') for filepath in results_obj['files']['updated']]
+                        job_data = {
+                            'cruiseID': self.cruise_id,
+                            'collectionSystemTransferID': cst_id,
+                            'files': {
+                                'new': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in new_files],
+                                'updated': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in updated_files],
+                                'deleted': [
+                                    os.path.normpath(os.path.join(self.destDir, filepath)).lstrip('/')
+                                    for filepath in deleted_files
+                                ]
+                            }
                         }
-                    }
 
-                    if 'deleted' in results_obj['files']:
-                        job_data['files']['deleted'] = [
-                            os.path.normpath(os.path.join(self.collection_system_transfer['destDir'], filepath))
-                            for filepath in results_obj['files']['deleted']
-                        ]
+                        for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
+                            logging.info("Adding post task: %s", task)
+                            gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-                    for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
-                        logging.info("Adding post task: %s", task)
-                        gm_client.submit_job(task, json.dumps(job_data), background=True)
+                    self.ovdm.set_idle_collection_system_transfer(cst_id)
+            else:
+                self.ovdm.set_idle_collection_system_transfer(cst_id)
 
-                self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
-        else:
-            self.ovdm.set_idle_collection_system_transfer(self.collection_system_transfer['collectionSystemTransferID'])
-
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s transfer completed at: %s", current_job.handle,
                      time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
+
     def stop_task(self):
+        """
+        Function to stop the current job
+        """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
 
     def quit_worker(self):
+        """
+        Function to quit the worker
+        """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -690,6 +734,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
             'files': {'new': [], 'updated': [], 'exclude': []}
         }))
+
 
     def _ignore_job(self, current_job, part_name, reason):
         return self.on_job_complete(current_job, json.dumps({

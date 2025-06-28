@@ -3,18 +3,39 @@ import logging
 import subprocess
 
 
-def check_darwin(cst_cfg):
-    # Detect if Darwin (macOS)
-    is_darwin_cmd = ['ssh', f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}", "uname -s"]
-    if cst_cfg['sshUseKey'] == '0':
-        is_darwin_cmd = ['sshpass', '-p', cst_cfg['sshPass']] + is_darwin_cmd
+def get_transfer_type(transfer_type):
 
-    proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
-    return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
+    if transfer_type == "1": # Local Directory
+        return 'local'
+
+    if  transfer_type == "2": # Rsync Server
+        return 'rsync'
+
+    if  transfer_type == "3": # SMB Server
+        return 'smb'
+
+    if  transfer_type == "4": # SSH Server
+        return 'ssh'
+
+    return None
+
+
+def check_darwin(cst_cfg):
+    # Detect if Darwin (MacOS)
+    cmd = ['ssh', f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}", "uname -s"]
+    if cst_cfg['sshUseKey'] == '0':
+        cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
+    except subprocess.SubprocessError as e:
+        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(e))
+        return False
 
 
 def detect_smb_version(cst_cfg):
-    if cst_cfg['smbUser'] == 'guest':
+    if cst_cfg.get('smbUser') == 'guest':
         cmd = [
             'smbclient', '-L', cst_cfg['smbServer'],
             '-W', cst_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
@@ -27,12 +48,21 @@ def detect_smb_version(cst_cfg):
         ]
 
     logging.info("SMB version test command: %s", ' '.join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
-    for line in proc.stdout.splitlines():
-        if line.startswith('OS=[Windows 5.1]'):
-            return '1.0'
-    return '2.1'
+        if proc.returncode != 0 or "NT_STATUS" in proc.stderr or "failed" in proc.stderr.lower():
+            logging.error("Failed to connect to SMB server: %s", proc.stderr.strip())
+            return None
+
+        for line in proc.stdout.splitlines():
+            if line.startswith('OS=[Windows 5.1]'):
+                return '1.0'
+        return '2.1'
+
+    except subprocess.SubprocessError as e:
+        logging.error("SMB version detection failed: %s", str(e))
+        return None
 
 
 def mount_smb_share(cst_cfg, mntpoint, smb_version):
@@ -46,30 +76,77 @@ def mount_smb_share(cst_cfg, mntpoint, smb_version):
     else:
         opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
 
-    mount_cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.info("Mount command: %s", ' '.join(mount_cmd))
+    cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
+    logging.info("Mount command: %s", ' '.join(cmd).replace(f'password={cst_cfg['smbPass']}', 'password=****'))
 
-    result = subprocess.run(mount_cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        logging.error("Failed to mount SMB share.")
-        logging.error("STDOUT: %s", result.stdout.strip())
-        logging.error("STDERR: %s", result.stderr.strip())
+    try:
+        subprocess.run(cmd, check=True)
+        logging.info("Successfully mounted %s to %s", cst_cfg['smbServer'], mntpoint)
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.error("Failed to mount SMB share: %s", str(e))
 
         # Try to unmount in case of partial mount
         subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return False
 
-    logging.info("Mounted SMB share successfully.")
-    return True
+
+def test_rsync_connection(server, user, password_file=None):
+    flags = ['--no-motd', '--contimeout=5']
+    extra_args = None
+
+    if password_file is not None:
+        extra_args = [f'--password-file={password_file}']
+
+    cmd = build_rsync_command(flags, extra_args, f'rsync://{user}@{server}', None, None)
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode not in [0, 24]:
+            logging.warning("rsync failed: %s", proc.stderr.strip())
+            return False
+        return True
+    except Exception as e:
+        logging.error("rsync connection test failed: %s", str(e))
+        return False
 
 
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_path=None):
+def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
     cmd = ['rsync'] + flags
-    cmd += extra_args
-    if include_file_path is not None:
-        cmd.append(f"--files-from={include_file_path}")
-    cmd += [source_dir, dest_dir]
+    if extra_args is not None:
+        cmd += extra_args
+
+    if include_filepath is not None:
+        cmd.append(f"--files-from={include_filepath}")
+
+    cmd += [source_dir] if dest_dir is None else [source_dir, dest_dir]
+    return cmd
+
+
+def test_ssh_connection(server, user, passwd, use_pubkey):
+    cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, 'ls', passwd, use_pubkey)
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            return False
+        return True
+    except Exception as e:
+        logging.error("SSH connection test failed: %s", str(e))
+        return False
+
+
+def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
+
+    if (passwd is None or len(passwd) == 0) and use_pubkey is False:
+        raise ValueError("Must specify either a passwd or use_pubkey")
+
+    cmd = ['ssh']
+    if passwd is None or len(passwd) == 0:
+        cmd = ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
+
+    cmd += flags or []
+    cmd += [f'{user}@{server}', post_cmd]
     return cmd
 
 
