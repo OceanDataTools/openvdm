@@ -181,7 +181,7 @@ def test_source(cst_cfg, source_dir):
 
                 return results
 
-            results.extend([{"partName": "Write test", "result": "Pass"}])
+                results.extend([{"partName": "Write test", "result": "Pass"}])
 
         # Tests for rsync
         if transfer_type == 'rsync':
