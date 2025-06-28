@@ -244,7 +244,7 @@ def test_source(cst_cfg, source_dir):
             cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], cst_cfg['sshUser'], cst_cfg['sshServer'], f'ls "{source_dir}"', cst_cfg['sshPass'], use_pubkey)
             proc = subprocess.run(cmd, capture_output=True, check=False)
             if proc.returncode != 0:
-                reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
+                reason = f"Unable to find source directory: {source_dir} on the SSH Server: {cst_cfg['rsyncServer']}"
                 results.extend([
                     {"partName": "Source Directory", "result": "Fail", "reason": reason}
                 ])
@@ -286,7 +286,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if self.lowering_id is not None:
             result = result.replace('{loweringID}', self.lowering_id)
 
-        return result.rstrip('/')
+        return result.rstrip('/') if result != '/' else result
 
 
     def build_dest_dir(self):
