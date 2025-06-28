@@ -490,16 +490,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
+
     def keyword_replace(self, s):
         if not isinstance(s, str):
             return None
 
-        return (
-            s.replace('{cruiseID}', self.cruise_id)
-             .replace('{loweringID}', self.lowering_id)
-             .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
-             .rstrip('/')
+        result = s.replace(
+            '{cruiseID}', self.cruise_id
+        ).replace(
+            '{loweringDataBaseDir}',
+            self.shipboard_data_warehouse_config['loweringDataBaseDir']
         )
+
+        if self.lowering_id is not None:
+            result = result.replace('{loweringID}', self.lowering_id)
+
+        return result.rstrip('/')
+
 
     def build_dest_dir(self):
         """
