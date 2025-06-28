@@ -26,6 +26,7 @@ def check_darwin(cst_cfg):
     if cst_cfg['sshUseKey'] == '0':
         cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
 
+    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'{cst_cfg["sshPass"]}', '****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
@@ -47,7 +48,7 @@ def detect_smb_version(cst_cfg):
             '-U', f"{cst_cfg['smbUser']}%{cst_cfg['smbPass']}"
         ]
 
-    logging.info("SMB version test command: %s", ' '.join(cmd))
+    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'password={cst_cfg["smbPass"]}', 'password=****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
@@ -77,8 +78,8 @@ def mount_smb_share(cst_cfg, mntpoint, smb_version):
         opts += f",username={cst_cfg['smbUser']},password={cst_cfg['smbPass']}"
 
     cmd = ['mount', '-t', 'cifs', cst_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.info("Mount command: %s", ' '.join(cmd).replace(f'password={cst_cfg["smbPass"]}', 'password=****'))
 
+    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cst_cfg["smbPass"]}', 'password=****'))
     try:
         subprocess.run(cmd, check=True)
         logging.info("Successfully mounted %s to %s", cst_cfg['smbServer'], mntpoint)
@@ -100,6 +101,7 @@ def test_rsync_connection(server, user, password_file=None):
 
     cmd = build_rsync_command(flags, extra_args, f'rsync://{user}@{server}', None, None)
 
+    logging.debug("test_rsync_connection cmd: %s", ' '.join(cmd))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode not in [0, 24]:
@@ -126,6 +128,7 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
 def test_ssh_connection(server, user, passwd, use_pubkey):
     cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, 'ls', passwd, use_pubkey)
 
+    logging.debug("test_ssh_connection cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
