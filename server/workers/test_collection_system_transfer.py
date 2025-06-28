@@ -267,6 +267,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def keyword_replace(self, s):
+
+        if not isinstance(s, str):
+            return None
+
         return (
             s.replace('{cruiseID}', self.cruise_id)
              .replace('{loweringID}', self.lowering_id)
