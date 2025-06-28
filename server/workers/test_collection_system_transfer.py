@@ -179,7 +179,7 @@ def test_source(cst_cfg, source_dir):
                     reason = f"Unable to delete source files from: {source_dir} on SMB share"
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
-                return results
+                    return results
 
                 results.extend([{"partName": "Write test", "result": "Pass"}])
 
