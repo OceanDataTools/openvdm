@@ -29,7 +29,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.connection_utils import get_transfer_type, detect_smb_version, mount_smb_share, test_rsync_connection, test_ssh_connection, build_ssh_command
+from server.lib.connection_utils import build_ssh_command, detect_smb_version, get_transfer_type, mount_smb_share, test_rsync_connection, test_ssh_connection
 from server.lib.openvdm import OpenVDM
 
 @contextmanager
