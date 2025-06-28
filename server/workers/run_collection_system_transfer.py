@@ -802,12 +802,12 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     logging.debug(json.dumps(results, indent=2))
 
     if results[-1]['result'] == "Fail": # Final Verdict
-        logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results[-1]['reason']})
+        logging.warning("Source test failed, quitting job")
+        job_results['parts'].append({"partName": "Source Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Connection test passed")
-    job_results['parts'].append({"partName": "Connection Test", "result": "Pass"})
+    logging.debug("Source test passed")
+    job_results['parts'].append({"partName": "Source Test", "result": "Pass"})
 
     logging.info("Testing destination")
     gearman_worker.send_job_status(current_job, 15, 100)
