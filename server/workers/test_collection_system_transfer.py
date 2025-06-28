@@ -26,7 +26,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connectio_utils import test_cst_source
+from server.lib.connection_utils import test_cst_source
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
