@@ -799,7 +799,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     gearman_worker.send_job_status(current_job, 1, 10)
 
     results = test_cst_source(gearman_worker.collection_system_transfer, gearman_worker.source_dir)
-    logging.info(json.dumps(results, indent=2))
+    logging.debug(json.dumps(results, indent=2))
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
@@ -813,7 +813,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     gearman_worker.send_job_status(current_job, 15, 100)
 
     results = gearman_worker.test_destination_dir()
-    logging.info(json.dumps(results, indent=2))
+    logging.debug(json.dumps(results, indent=2))
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Destination test failed, quitting job")
