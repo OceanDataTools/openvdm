@@ -144,10 +144,7 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
     if (passwd is None or len(passwd) == 0) and use_pubkey is False:
         raise ValueError("Must specify either a passwd or use_pubkey")
 
-    cmd = ['ssh']
-    if passwd is None or len(passwd) == 0:
-        cmd = ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
-
+    cmd = ['ssh'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
     cmd += flags or []
     cmd += [f'{user}@{server}', post_cmd]
     return cmd
