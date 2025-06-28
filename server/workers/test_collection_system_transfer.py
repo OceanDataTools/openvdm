@@ -74,7 +74,6 @@ def test_source(cst_cfg, source_dir):
 
     results = []
 
-    prefix = None
     mntpoint = None
     smb_version = None
     transfer_type = get_transfer_type(cst_cfg['transferType'])
@@ -162,7 +161,7 @@ def test_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SMB Share", "result": "Pass"}])
 
-            smb_source_dir = os.path.join(prefix, source_dir.lstrip('/'))
+            smb_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
             source_dir_exists = os.path.isdir(smb_source_dir)
             if not source_dir_exists:
                 reason = f"Unable to find source directory: {source_dir} on SMB share"
@@ -314,7 +313,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Replace wildcard string in sourceDir
         """
 
-        return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else ""
+        return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
     def test_destination(self):
@@ -496,7 +495,6 @@ def task_test_collection_system_transfer(gearman_worker, current_job):
     """
 
     cfg = gearman_worker.collection_system_transfer
-    source_dir = gearman_worker.build_source_dir()
 
     job_results = {'parts':[]}
 
@@ -507,7 +505,7 @@ def task_test_collection_system_transfer(gearman_worker, current_job):
     gearman_worker.send_job_status(current_job, 1, 4)
 
     logging.info("Testing Source")
-    job_results['parts'].extend(test_source(cfg, source_dir))
+    job_results['parts'].extend(test_source(cfg, gearman_worker.source_dir))
 
     gearman_worker.send_job_status(current_job, 2, 4)
 
