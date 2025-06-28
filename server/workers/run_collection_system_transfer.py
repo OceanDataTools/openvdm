@@ -446,13 +446,13 @@ def transfer_from_source(gearman_worker, gearman_job, transfer_type):
         # Base command
         rsync_flags = build_rsync_options(cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
 
-        rsync_cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
+        cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
         if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
-            rsync_cmd = ['sshpass', '-p', cfg['sshPass']] + rsync_cmd
+            cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
 
         # Transfer files
         files['new'], files['updated'] = run_transfer_command(
-            gearman_worker, gearman_job, rsync_cmd, len(files['include'])
+            gearman_worker, gearman_job, cmd, len(files['include'])
         )
 
         # Delete files if sync'ing with source
