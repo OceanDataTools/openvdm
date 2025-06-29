@@ -77,9 +77,11 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
         return None
 
     if not is_ascii(filepath):
+        logging.warning('is_ascii_exclude %s', filepath)
         return ('exclude', filepath, None)
 
     if not is_rsync_patial_file(filepath):
+        logging.warning('is_rsync_patial_file_exclude %s', filepath)
         return ("exclude", filepath, None)
 
     if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
@@ -87,10 +89,12 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
 
     if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
         if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
+            logging.warning('filter_exclude %s', filepath)
             return ('exclude', filepath, None)
 
         return ('include', filepath, size)
 
+    logging.warning('general_exclude %s', filepath)
     return ('exclude', filepath, None)
 
 
@@ -107,9 +111,11 @@ def process_filepath(filepath, filters, data_start_time, data_end_time):
             return None
 
         if not is_ascii(filepath):
+            logging.warning('is_ascii_exclude %s', filepath)
             return ("exclude", filepath, None)
 
         if not is_rsync_patial_file(filepath):
+            logging.warning('is_rsync_patial_file_exclude %s', filepath)
             return ("exclude", filepath, None)
 
         if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
@@ -117,10 +123,12 @@ def process_filepath(filepath, filters, data_start_time, data_end_time):
 
         if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
             if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
+                logging.warning('filter_exclude %s', filepath)
                 return ("exclude", filepath, None)
 
             return ("include", filepath, str(size))
 
+        logging.warning('general_exclude %s', filepath)
         return ("exclude", filepath, None)
 
     except FileNotFoundError:
