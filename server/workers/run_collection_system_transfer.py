@@ -445,7 +445,7 @@ def transfer_from_source(gearman_worker, gearman_job):
         elif transfer_type == 'smb':
             source_path = os.path.join(mntpoint, source_dir.lstrip('/').rstrip('/'))
 
-        source_path = source_path + '/'
+        source_path += '/'
 
         extra_args = []
         if transfer_type == 'ssh':
@@ -466,7 +466,6 @@ def transfer_from_source(gearman_worker, gearman_job):
         )
 
         # Delete files if sync'ing with source
-        logging.warning('syncFromSource: %s', cst_cfg['syncFromSource'])
         if cst_cfg['syncFromSource'] == '1':
             files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
