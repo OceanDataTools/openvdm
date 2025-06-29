@@ -26,8 +26,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.directory_utils import create_directories, lockdown_directory
+from server.lib.file_utils import create_directories, lockdown_directory, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 CUSTOM_TASKS = [

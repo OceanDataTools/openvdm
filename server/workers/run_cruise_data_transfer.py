@@ -33,8 +33,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.file_utils import is_ascii
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.file_utils import is_ascii, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')

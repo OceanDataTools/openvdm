@@ -25,7 +25,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.file_utils import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 from server.lib.md5_util import hashlib_md5
 

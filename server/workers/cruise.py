@@ -29,9 +29,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.file_utils import bad_filename
-from server.lib.output_json_data_to_file import output_json_data_to_file
+from server.lib.file_utils import bad_filename, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 

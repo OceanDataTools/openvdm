@@ -45,10 +45,8 @@ def delete_from_dest(dest_dir, include_files):
         for filename in files:
             full_path = os.path.join(root, filename)
             rel_path = os.path.relpath(full_path, dest_dir)
-            logging.warning("rel_path: %s", rel_path)
 
             if rel_path not in include_files:
-                logging.warning("Deleting: %s", full_path)
                 try:
                     os.remove(full_path)
                     deleted_files.append(rel_path)
@@ -61,23 +59,6 @@ def delete_from_dest(dest_dir, include_files):
                     logging.error("OS error deleting file %s: %s", full_path, str(e))
 
     return deleted_files
-
-    # for filename in os.listdir(dest_dir):
-    #     full_path = os.path.join(dest_dir, filename)
-    #     logging.warning('delete: %s', full_path)
-    #     if os.path.isfile(full_path) and filename not in include_files:
-    #         logging.info("Deleting: %s", filename)
-    #         try:
-    #             os.remove(full_path)
-    #             deleted_files.append(filename)
-    #         except FileNotFoundError:
-    #             logging.error("File to delete not found: %s", filename)
-    #         except PermissionError:
-    #             logging.error("Insufficent permission to delete file: %s", filename)
-    #         except OSError as e:
-    #             logging.error("OS error occurred while deleting file: %s --> %s", filename, str(e))
-
-    # return deleted_files
 
 
 def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive=False):
