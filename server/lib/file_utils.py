@@ -43,23 +43,22 @@ def delete_from_dest(dest_dir, include_files):
 
     for root, _, files in os.walk(dest_dir):
         for filename in files:
-            logging.warning('filename %s', filename)
-            if filename in include_files:
-                continue
-
             full_path = os.path.join(root, filename)
-            logging.warning('Delete: %s', full_path)
+            rel_path = os.path.relpath(full_path, dest_dir)
+            logging.warning("rel_path: %s", rel_path)
 
-            try:
-                os.remove(full_path)
-                deleted_files.append(full_path)
-                logging.info("Deleted: %s", full_path)
-            except FileNotFoundError:
-                logging.error("File not found: %s", full_path)
-            except PermissionError:
-                logging.error("Insufficient permission to delete file: %s", full_path)
-            except OSError as e:
-                logging.error("OS error deleting file %s: %s", full_path, str(e))
+            if rel_path not in include_files:
+                logging.warning("Deleting: %s", full_path)
+                try:
+                    os.remove(full_path)
+                    deleted_files.append(rel_path)
+                    logging.info("Deleted: %s", rel_path)
+                except FileNotFoundError:
+                    logging.error("File not found: %s", full_path)
+                except PermissionError:
+                    logging.error("Permission denied: %s", full_path)
+                except OSError as e:
+                    logging.error("OS error deleting file %s: %s", full_path, str(e))
 
     return deleted_files
 
