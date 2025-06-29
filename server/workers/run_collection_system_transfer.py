@@ -719,10 +719,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             'cruiseID': self.cruise_id,
                             'collectionSystemTransferID': cst_id,
                             'files': {
-                                'new': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in new_files],
-                                'updated': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in updated_files],
+                                'new': [ os.path.join(self.dest_dir, filepath) for filepath in new_files],
+                                'updated': [ os.path.join(self.dest_dir, filepath) for filepath in updated_files],
                                 'deleted': [
-                                    os.path.normpath(os.path.join(self.dest_dir, filepath)).lstrip('/')
+                                    os.path.normpath(os.path.join(self.dest_dir, filepath))
                                     for filepath in deleted_files
                                 ]
                             }
