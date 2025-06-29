@@ -41,22 +41,43 @@ def is_rsync_patial_file(filename):
 def delete_from_dest(dest_dir, include_files):
     deleted_files = []
 
-    for filename in os.listdir(dest_dir):
-        full_path = os.path.join(dest_dir, filename)
-        logging.warning('delete: %s', full_path)
-        if os.path.isfile(full_path) and filename not in include_files:
-            logging.info("Deleting: %s", filename)
+    for root, _, files in os.walk(dest_dir):
+        for filename in files:
+            if filename in include_files:
+                continue
+
+            full_path = os.path.join(root, filename)
+            logging.warning('Delete: %s', full_path)
+
             try:
                 os.remove(full_path)
-                deleted_files.append(filename)
+                deleted_files.append(full_path)
+                logging.info("Deleted: %s", full_path)
             except FileNotFoundError:
-                logging.error("File to delete not found: %s", filename)
+                logging.error("File not found: %s", full_path)
             except PermissionError:
-                logging.error("Insufficent permission to delete file: %s", filename)
+                logging.error("Insufficient permission to delete file: %s", full_path)
             except OSError as e:
-                logging.error("OS error occurred while deleting file: %s --> %s", filename, str(e))
+                logging.error("OS error deleting file %s: %s", full_path, str(e))
 
     return deleted_files
+
+    # for filename in os.listdir(dest_dir):
+    #     full_path = os.path.join(dest_dir, filename)
+    #     logging.warning('delete: %s', full_path)
+    #     if os.path.isfile(full_path) and filename not in include_files:
+    #         logging.info("Deleting: %s", filename)
+    #         try:
+    #             os.remove(full_path)
+    #             deleted_files.append(filename)
+    #         except FileNotFoundError:
+    #             logging.error("File to delete not found: %s", filename)
+    #         except PermissionError:
+    #             logging.error("Insufficent permission to delete file: %s", filename)
+    #         except OSError as e:
+    #             logging.error("OS error occurred while deleting file: %s --> %s", filename, str(e))
+
+    # return deleted_files
 
 
 def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive=False):
