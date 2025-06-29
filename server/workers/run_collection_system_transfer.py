@@ -722,7 +722,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                                 'new': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in new_files],
                                 'updated': [ os.path.join(self.dest_dir, filepath).lstrip('/') for filepath in updated_files],
                                 'deleted': [
-                                    os.path.normpath(os.path.join(self.destDir, filepath)).lstrip('/')
+                                    os.path.normpath(os.path.join(self.dest_dir, filepath)).lstrip('/')
                                     for filepath in deleted_files
                                 ]
                             }
