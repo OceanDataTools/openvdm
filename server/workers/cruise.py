@@ -54,33 +54,50 @@ def build_filelist(source_dir):
     return return_files
 
 
-def clear_directory(directory):
+def clear_directory(directory, delete_self=False):
     """
     Deletes all empty sub-directorties within the specified directory
     """
 
     reasons = []
 
-    # Clear out PublicData
-    for root, dirs, files in os.walk(directory + '/', topdown=False):
-        for dir_name in dirs:
-            result = clear_directory(realpath(os.path.join(root, dir_name)))
-            if not result['verdict']:
-                reasons.extend(result['reasons'].split('\n'))
-        if not dirs and not files:
+    if not os.path.exists(directory):
+        msg = f"Directory not found: {directory}"
+        logging.error(msg)
+        return {'verdict': False, 'reason': [msg]}
+
+    try:
+        for entry in os.listdir(directory):
+            path = os.path.join(directory, entry)
+
             try:
-                logging.debug("Deleting %s", root)
-                os.rmdir(root)
+                if os.path.islink(path) or os.path.isfile(path):
+                    os.remove(path)
+                    logging.debug("Deleted file: %s", path)
+                elif os.path.isdir(path):
+                    # Recurse into subdirectory
+                    result = clear_directory(path, delete_self=True)
+                    if not result['verdict']:
+                        reasons.extend(result['reasons'])
             except OSError as err:
-                logging.error("Unable to delete %s", root)
-                logging.debug(str(err))
-                reasons.append(f"Unable to delete {root}")
+                logging.error("Failed to delete %s: %s", path, err)
+                reasons.append(f"Failed to delete {path}: {err}")
 
+        if delete_self:
+            try:
+                os.rmdir(directory)
+                logging.debug("Deleted directory: %s", directory)
+            except OSError as err:
+                logging.error("Failed to delete directory %s: %s", directory, err)
+                reasons.append(f"Failed to delete {directory}: {err}")
+    except OSError as err:
+        logging.error("Failed to list contents of %s: %s", directory, err)
+        reasons.append(f"Failed to list contents of {directory}: {err}")
 
-    if len(reasons) > 0:
-        return {'verdict': False, 'reason': "\n".join(reasons)}
-
-    return {'verdict': True}
+    return {
+        'verdict': len(reasons) == 0,
+        'reason': reasons
+    }
 
 
 def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False):
