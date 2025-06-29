@@ -43,6 +43,7 @@ def delete_from_dest(dest_dir, include_files):
 
     for root, _, files in os.walk(dest_dir):
         for filename in files:
+            logging.warning('filename %s', filename)
             if filename in include_files:
                 continue
 
