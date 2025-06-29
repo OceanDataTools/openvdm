@@ -35,10 +35,7 @@ import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-
-from server.lib.file_utils import is_ascii
-from server.lib.output_json_data_to_file import output_json_data_to_file
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.file_utils import is_ascii, is_rsync_patial_file, output_json_data_to_file, set_owner_group_permissions
 from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, delete_from_dest, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
@@ -82,6 +79,9 @@ def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     if not is_ascii(filepath):
         return ('exclude', filepath, None)
 
+    if not is_rsync_patial_file(filepath):
+        return ("exclude", filepath, None)
+
     if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
         return None
 
@@ -107,6 +107,9 @@ def process_filepath(filepath, filters, data_start_time, data_end_time):
             return None
 
         if not is_ascii(filepath):
+            return ("exclude", filepath, None)
+
+        if not is_rsync_patial_file(filepath):
             return ("exclude", filepath, None)
 
         if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
@@ -491,6 +494,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.cruise_dir = None
         self.source_dir = None
         self.dest_dir = None
+
         self.data_start_date = None
         self.data_end_date = None
         self.transfer_start_date = None
@@ -506,7 +510,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
                 .replace('{loweringID}', self.lowering_id if self.lowering_id is not None else '{loweringID}')
                 .rstrip('/')
-               )
+               ) if s != '/' else s
 
 
     def build_dest_dir(self):
@@ -682,7 +686,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -700,9 +704,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if cst_id:
             if final_verdict:
                 if final_verdict.get('result') == "Fail":
-                    self.ovdm.set_error_collection_system_transfer_test(cst_id, final_verdict.get('reason', "undefined"))
+                    self.ovdm.set_error_collection_system_transfer(cst_id, final_verdict.get('reason', "undefined"))
                 else:
-
                     new_files = results['files'].get('new', [])
                     updated_files = results['files'].get('updated', [])
                     deleted_files = results['files'].get('deleted', [])
@@ -758,6 +761,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         logging.warning("Quitting worker...")
         self.shutdown()
 
+
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         return self.on_job_complete(current_job, json.dumps({
@@ -780,6 +784,8 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     time.sleep(randint(0,2))
 
+    cst_cfg = gearman_worker.collection_system_transfer
+
     job_results = {
         'parts': [
             {"partName": "Transfer In-Progress", "result": "Pass"},
@@ -793,13 +799,10 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    gearman_worker.ovdm.set_running_collection_system_transfer(gearman_worker.collection_system_transfer['collectionSystemTransferID'], os.getpid(), current_job.handle)
+    gearman_worker.ovdm.set_running_collection_system_transfer(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing source")
-    gearman_worker.send_job_status(current_job, 1, 10)
-
-    results = test_cst_source(gearman_worker.collection_system_transfer, gearman_worker.source_dir)
-    logging.debug(json.dumps(results, indent=2))
+    results = test_cst_source(cst_cfg, gearman_worker.source_dir)
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Source test failed, quitting job")
@@ -808,12 +811,10 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     logging.debug("Source test passed")
     job_results['parts'].append({"partName": "Source Test", "result": "Pass"})
+    gearman_worker.send_job_status(current_job, 5, 100)
 
     logging.info("Testing destination")
-    gearman_worker.send_job_status(current_job, 15, 100)
-
     results = gearman_worker.test_destination_dir()
-    logging.debug(json.dumps(results, indent=2))
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Destination test failed, quitting job")
@@ -822,9 +823,9 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
     logging.debug("Destination test passed")
     job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
+    gearman_worker.send_job_status(current_job, 1, 10)
 
     logging.info("Transferring files")
-    gearman_worker.send_job_status(current_job, 2, 10)
     results = transfer_from_source(gearman_worker, current_job)
 
     if not results['verdict']:
@@ -848,7 +849,6 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
     gearman_worker.send_job_status(current_job, 9, 10)
 
     if job_results['files']['new'] or job_results['files']['updated']:
-
         logging.info("Setting file permissions")
         results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.dest_dir)
 
@@ -858,7 +858,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
-        logfile_filename = gearman_worker.collection_system_transfer['name'] + '_' + gearman_worker.transfer_start_date + '.log'
+        logfile_filename = cst_cfg['name'] + '_' + gearman_worker.transfer_start_date + '.log'
         logfile_contents = {
             'files': {
                 'new': job_results['files']['new'],
@@ -881,7 +881,7 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
-    logfile_filename = gearman_worker.collection_system_transfer['name'] + '_Exclude.log'
+    logfile_filename = cst_cfg['name'] + '_Exclude.log'
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']
@@ -897,6 +897,8 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
         logging.error("Error writing transfer logfile: %s", results['reason'])
         job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
+
+    gearman_worker.send_job_status(current_job, 95, 100)
 
     results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename))
 

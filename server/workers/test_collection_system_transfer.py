@@ -41,6 +41,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.collection_system_transfer = None
         self.shipboard_data_warehouse_config = None
 
+        self.cruise_dir = None
+        self.source_dir = None
+        self.dest_dir = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
@@ -48,17 +52,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if not isinstance(s, str):
             return None
 
-        result = s.replace(
-            '{cruiseID}', self.cruise_id
-        ).replace(
-            '{loweringDataBaseDir}',
-            self.shipboard_data_warehouse_config['loweringDataBaseDir']
-        )
-
-        if self.lowering_id is not None:
-            result = result.replace('{loweringID}', self.lowering_id)
-
-        return result.rstrip('/') if result != '/' else result
+        return (s.replace('{cruiseID}', self.cruise_id)
+                .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+                .replace('{loweringID}', self.lowering_id if self.lowering_id is not None else '{loweringID}')
+                .rstrip('/')
+               ) if s != '/' else s
 
 
     def build_dest_dir(self):
@@ -105,6 +103,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results.extend([{"partName": "Destination Directory", "result": "Pass"}])
 
         return results
+
 
     def on_job_execute(self, current_job):
         """
@@ -171,10 +170,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.dest_dir = self.build_dest_dir()
         self.source_dir = self.build_source_dir()
-
-        logging.info("Job: %s, transfer test started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        self.dest_dir = self.build_dest_dir()
 
         return super().on_job_execute(current_job)
 
@@ -266,22 +263,21 @@ def task_test_collection_system_transfer(gearman_worker, current_job):
     Run connection tests for a collection system transfer
     """
 
-    cfg = gearman_worker.collection_system_transfer
+    cst_cfg = gearman_worker.collection_system_transfer
 
     job_results = {'parts':[]}
 
-    if 'collectionSystemTransferID' in cfg:
+    if 'collectionSystemTransferID' in cst_cfg:
         logging.debug("Setting transfer test status to 'Running'")
-        gearman_worker.ovdm.set_running_collection_system_transfer_test(cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
-
-    gearman_worker.send_job_status(current_job, 1, 4)
+        gearman_worker.ovdm.set_running_collection_system_transfer_test(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing Source")
-    job_results['parts'].extend(test_cst_source(cfg, gearman_worker.source_dir))
+    gearman_worker.send_job_status(current_job, 1, 4)
 
+    job_results['parts'].extend(test_cst_source(cst_cfg, gearman_worker.source_dir))
     gearman_worker.send_job_status(current_job, 2, 4)
 
-    if cfg['enable'] == '1':
+    if cst_cfg['enable'] == '1':
         logging.info("Testing Destination")
         job_results['parts'].extend(gearman_worker.test_destination_dir())
         gearman_worker.send_job_status(current_job, 3, 4)

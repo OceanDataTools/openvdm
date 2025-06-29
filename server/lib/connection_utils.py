@@ -4,10 +4,11 @@ import shutil
 import logging
 import tempfile
 import subprocess
-from os.path import dirname, realpath
 from contextlib import contextmanager
+from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
+from server.lib.file_utils import verfy_write_access
 
 def get_transfer_type(transfer_type):
 
@@ -98,6 +99,18 @@ def mount_smb_share(cst_cfg, mntpoint, smb_version):
         return False
 
 
+def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
+    cmd = ['rsync'] + flags
+    if extra_args is not None:
+        cmd += extra_args
+
+    if include_filepath is not None:
+        cmd.append(f"--files-from={include_filepath}")
+
+    cmd += [source_dir] if dest_dir is None else [source_dir, dest_dir]
+    return cmd
+
+
 def test_rsync_connection(server, user, password_file=None):
     flags = ['--no-motd', '--contimeout=5']
     extra_args = None
@@ -119,15 +132,14 @@ def test_rsync_connection(server, user, password_file=None):
         return False
 
 
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
-    cmd = ['rsync'] + flags
-    if extra_args is not None:
-        cmd += extra_args
+def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
-    if include_filepath is not None:
-        cmd.append(f"--files-from={include_filepath}")
+    if (passwd is None or len(passwd) == 0) and use_pubkey is False:
+        raise ValueError("Must specify either a passwd or use_pubkey")
 
-    cmd += [source_dir] if dest_dir is None else [source_dir, dest_dir]
+    cmd = ['ssh'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
+    cmd += flags or []
+    cmd += [f'{user}@{server}', post_cmd]
     return cmd
 
 
@@ -143,37 +155,6 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
     except Exception as e:
         logging.error("SSH connection test failed: %s", str(e))
         return False
-
-
-def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
-
-    if (passwd is None or len(passwd) == 0) and use_pubkey is False:
-        raise ValueError("Must specify either a passwd or use_pubkey")
-
-    cmd = ['ssh'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
-    cmd += flags or []
-    cmd += [f'{user}@{server}', post_cmd]
-    return cmd
-
-
-def delete_from_dest(dest_dir, include_files):
-    deleted_files = []
-
-    for filename in os.listdir(dest_dir):
-        full_path = os.path.join(dest_dir, filename)
-        if os.path.isfile(full_path) and filename not in include_files:
-            logging.info("Deleting: %s", filename)
-            try:
-                os.remove(full_path)
-                deleted_files.append(filename)
-            except FileNotFoundError:
-                logging.error("File to delete not found: %s", filename)
-            except PermissionError:
-                logging.error("Insufficent permission to delete file: %s", filename)
-            except OSError as e:
-                logging.error("OS error occurred while deleting file: %s --> %s", filename, str(e))
-
-    return deleted_files
 
 
 def build_rsync_options(cst_cfg, mode='dry-run', is_darwin=False):
@@ -421,21 +402,3 @@ def test_cst_source(cst_cfg, source_dir):
             results.append({"partName": "Source Directory", "result": "Pass"})
 
         return results
-
-
-def verfy_write_access(dest_dir):
-    """
-    Verify the current user has write permissions to the dest_dir
-    """
-
-    try:
-        test_file = os.path.join(dest_dir, 'writeTest.txt')
-        with open(test_file, 'w', encoding='utf-8') as f:
-            f.write("This file tests if the directory can be written to.")
-        os.remove(test_file)
-        logging.info("Write test passed for %s", dest_dir)
-        return True
-    except Exception:
-        logging.exception("Write test failed for %s", dest_dir)
-        return False
-
