@@ -29,7 +29,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.file_utils import bad_filename, output_json_data_to_file, set_owner_group_permissions
+from server.lib.file_utils import is_ascii, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 
@@ -40,15 +40,16 @@ def build_filelist(source_dir):
 
     return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
 
-    for root, _, filenames in os.walk(source_dir):
+    for root, _, files in os.walk(source_dir):
 
-        include_files = [os.path.join(root, filename) for filename in filenames]
+        for filename in files:
+            full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, source_dir)
 
-        return_files['exclude'].extend(list(filter(lambda filename: os.path.islink(filename) or bad_filename(filename), include_files)))
-        return_files['include'].extend(list(filter(lambda filename: not os.path.islink(filename) and not bad_filename(filename), include_files)))
-
-    return_files['exclude'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['exclude']]
-    return_files['include'] = [filename.split(source_dir + '/',1).pop() for filename in return_files['include']]
+            if not os.path.islink(full_path) and is_ascii(full_path):
+                return_files['include'].append(rel_path)
+            else:
+                return_files['exclude'].append(rel_path)
 
     return return_files
 
