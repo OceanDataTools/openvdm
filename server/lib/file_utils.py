@@ -43,6 +43,7 @@ def delete_from_dest(dest_dir, include_files):
 
     for filename in os.listdir(dest_dir):
         full_path = os.path.join(dest_dir, filename)
+        logging.warning('delete: %s', full_path)
         if os.path.isfile(full_path) and filename not in include_files:
             logging.info("Deleting: %s", filename)
             try:
