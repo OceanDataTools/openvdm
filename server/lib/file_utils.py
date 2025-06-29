@@ -58,6 +58,16 @@ def delete_from_dest(dest_dir, include_files):
                 except OSError as e:
                     logging.error("OS error deleting file %s: %s", full_path, str(e))
 
+    for root, dirs, _ in os.walk(dest_dir, topdown=False):
+        for d in dirs:
+            dir_path = os.path.join(root, d)
+            try:
+                if not os.listdir(dir_path):  # is empty
+                    os.rmdir(dir_path)
+                    logging.info("Removed empty directory: %s", dir_path)
+            except OSError as e:
+                logging.error("Could not remove directory %s: %s", dir_path, str(e))
+
     return deleted_files
 
 
