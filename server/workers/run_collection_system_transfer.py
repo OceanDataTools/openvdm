@@ -466,6 +466,7 @@ def transfer_from_source(gearman_worker, gearman_job):
         )
 
         # Delete files if sync'ing with source
+        logging.warning('syncFromSource: %s', cst_cfg['syncFromSource'])
         if cst_cfg['syncFromSource'] == '1':
             files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
