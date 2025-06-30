@@ -82,7 +82,7 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason']}
 
-    gearman_worker.update_md5_summary(output_results.get('files', {'new':[], 'updated':[]}))
+    gearman_worker.update_md5_summary({'files', {'updated':[cruise_config_file_path]}})
 
     return {'verdict': True}
 
@@ -249,7 +249,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def update_md5_summary(self, files):
         gm_data = {
             'cruiseID': self.cruise_id,
-            'files': files
+            'files': {
+                'new': files.get('new', []),
+                'updated': files.get('updated', []),
+                'deleted': files.get('deleted', [])
+            }
         }
 
         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
