@@ -295,7 +295,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
                     if percent != last_percent_reported:
                         logging.info("Progress Update: %d%%", percent)
-                        gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                        gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
                         last_percent_reported = percent
 
     return new_files, updated_files

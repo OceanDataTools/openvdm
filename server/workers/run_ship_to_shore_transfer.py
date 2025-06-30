@@ -168,13 +168,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
             logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            gearman_worker.send_job_status(gearman_job, int(50 * file_index/file_count) + 20, 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
             logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
+            gearman_worker.send_job_status(gearman_job, int(50 * file_index/file_count) + 20, 100)
             file_index += 1
 
     # Cleanup

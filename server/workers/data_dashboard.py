@@ -357,7 +357,8 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             if datatype_proc.stderr:
                 logging.error("Err: %s", datatype_proc.stderr)
 
-        gearman_worker.send_job_status(gearman_job, int(10 + 70*float(file_index)/float(file_count)), 100)
+        gearman_worker.send_job_status(gearman_job, int(70 * file_index/file_count) + 10, 100)
+
         file_index += 1
 
     gearman_worker.send_job_status(gearman_job, 8, 10)
@@ -605,7 +606,7 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
                 if datatype_proc.stderr:
                     logging.error('err: %s', datatype_proc.stderr)
 
-            gearman_worker.send_job_status(gearman_job, int(10 + 70*float(file_index)/float(file_count)), 100)
+                    gearman_worker.send_job_status(gearman_job, int(60 * file_index/file_count) + 10, 100)
             file_index += 1
 
         collection_system_transfer_index += 1

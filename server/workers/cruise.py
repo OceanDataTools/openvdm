@@ -135,7 +135,8 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
                     if percent != last_percent_reported:
                         logging.info("Progress Update: %d%%", percent)
                         if gearman_job:
-                            gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                            gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
+
                         last_percent_reported = percent
 
     return new_files, updated_files
@@ -224,9 +225,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.ovdm = OpenVDM()
         self.task = None
         self.cruise_id = None
+        self.cruise_dir = None
         self.cruise_start_date = None
         self.shipboard_data_warehouse_config = None
-        self.cruise_dir = None
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
@@ -279,7 +280,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
-        self.cruise_start_date = payload_obj.get('cruiseStartDate',self.ovdm.get_cruise_start_date())
+        self.cruise_start_date = payload_obj.get('cruiseStartDate', self.ovdm.get_cruise_start_date())
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
