@@ -272,14 +272,10 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
         filelist.extend(new_files)
         filelist.extend(updated_files)
 
-    #filelist = [os.path.join(gearman_worker.cruiseID, filename) for filename in filelist]
-    logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
-
     logging.debug("Building hashes")
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
     new_hashes = build_md5_hashes(gearman_worker, gearman_job, filelist)
-    logging.debug('Hashes: %s', json.dumps(new_hashes, indent=2))
 
     if gearman_worker.stop:
         return json.dumps(job_results)
@@ -328,16 +324,11 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
             existing_index[fn] = entry
             row_added += 1
 
-    logging.debug("Existing hashes (before): \n%s", json.dumps(existing_hashes, indent=2))
-    logging.debug("deleted files: \n%s", json.dumps(deleted_files, indent=2))
     # Delete obsolete entries
     if deleted_files:
-        logging.debug("Delete hashes for files that no longer exists")
         before = len(existing_hashes)
         existing_hashes = [e for e in existing_hashes if e['filename'] not in deleted_files]
         row_deleted = before - len(existing_hashes)
-
-    logging.debug("Existing hashes (after): \n%s", json.dumps(existing_hashes, indent=2))
 
     # Log summary
     for label, count in (("added", row_added), ("updated", row_updated), ("deleted", row_deleted)):
