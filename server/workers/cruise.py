@@ -236,6 +236,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
+    def build_logfile_dirpath(self):
+        """
+        build the path to save transfer logfiles
+        """
+
+        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+
+
     def update_md5_summary(self, files):
         gm_data = {
             'cruiseID': self.cruise_id,
