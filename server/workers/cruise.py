@@ -71,7 +71,7 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
                     transfer.pop(key)
 
     # scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
-    scrub_transfer(cruise_config.get('collectionSystemTransfersConfig', []))
+    scrub_transfer(cruise_config.get('collectionSystemTransfersConfig', []), cruise_config.get('loweringDataBaseDir'))
 
     cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
     cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
