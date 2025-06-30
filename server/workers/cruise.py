@@ -29,7 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
-from server.lib.file_utils import build_filelist, build_include_file, clear_directory, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import build_filelist, build_include_file, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -142,7 +142,7 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
     return new_files, updated_files
 
 
-def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_status, remove_source_files=False):
+def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_status):
     """
     Transfer the contents of the PublicData share to the Cruise Data Directory
     """
@@ -174,7 +174,21 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
     if len(files['exclude']) > 0:
         logging.warning("Found %s problem filename(s):", len(files['exclude']))
         logging.warning("\t %s", "\n\t".join(files['exclude']))
-        return {'verdict': False, 'reason': f"Symbolic links or Non-ASCii filenames in {source_dir}: {', '.join(files['exclude'])}"}
+
+    logfile_filename = 'PublicData_Exclude.log'
+    logfile_contents = {
+        'files': {
+            'exclude': files['exclude']
+        }
+    }
+    results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
+
+    if results['verdict']:
+        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
+    else:
+        logging.error("Error writing transfer logfile: %s", results['reason'])
+        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
+        return json.dumps(job_results)
 
     with temporary_directory() as tmpdir:    # Create temp directory
         include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -185,11 +199,6 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
 
         # Build transfer command
         rsync_flags = ['-trivm', '--progress', '--protect-args', '--min-size=1']
-
-        if remove_source_files:
-            rsync_flags.append('--remove-source-files')
-        else:
-            rsync_flags.append('--delete')
 
         cmd = build_rsync_command(rsync_flags, [], source_dir, dest_dir, include_file)
 
@@ -535,7 +544,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         # job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
         logging.debug("Transferring public data files to cruise data directory")
-        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 70, 90, True)
+        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 70, 90)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -545,16 +554,16 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
         gearman_worker.send_job_status(gearman_job, 9, 10)
 
-        logging.info("Clearing files from PublicData")
-        publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-        output_results = clear_directory(publicdata_dir)
-        logging.debug("Clearing Complete")
+        # logging.info("Clearing files from PublicData")
+        # publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
+        # output_results = clear_directory(publicdata_dir)
+        # logging.debug("Clearing Complete")
 
-        if not output_results['verdict']:
-            job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
-            return json.dumps(job_results)
+        # if not output_results['verdict']:
+        #     job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
+        #     return json.dumps(job_results)
 
-        gearman_worker.send_job_status(gearman_job, 93, 100)
+        # gearman_worker.send_job_status(gearman_job, 93, 100)
 
         # if len(files['new']) > 0 or len(files['updated']) > 0:
 
@@ -566,7 +575,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
         #     job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
 
-    gearman_worker.send_job_status(gearman_job, 95, 100)
+    # gearman_worker.send_job_status(gearman_job, 95, 100)
 
     #build OpenVDM Config file
     logging.info("Exporting OpenVDM Configuration")

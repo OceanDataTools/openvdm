@@ -856,22 +856,21 @@ def task_run_collection_system_transfer(gearman_worker, current_job): # pylint: 
             job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
-    logfile_filename = cst_cfg['name'] + '_Exclude.log'
-    logfile_contents = {
-        'files': {
-            'exclude': job_results['files']['exclude']
+    if job_results['files']['exclude']:
+        logfile_filename = cst_cfg['name'] + '_Exclude.log'
+        logfile_contents = {
+            'files': {
+                'exclude': job_results['files']['exclude']
+            }
         }
-    }
-    logfile_contents['files']['exclude'] = job_results['files']['exclude']
+        results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-    results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
-
-    if results['verdict']:
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
-    else:
-        logging.error("Error writing transfer logfile: %s", results['reason'])
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
-        return json.dumps(job_results)
+        if results['verdict']:
+            job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
+        else:
+            logging.error("Error writing transfer logfile: %s", results['reason'])
+            job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
+            return json.dumps(job_results)
 
     gearman_worker.send_job_status(current_job, 95, 100)
 
