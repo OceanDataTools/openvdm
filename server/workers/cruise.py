@@ -29,7 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
-from server.lib.file_utils import build_filelist, build_include_file, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import build_filelist, build_include_file, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -207,6 +207,8 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
             gearman_worker, gearman_job, cmd, len(files['include'])
         )
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 70/100) + start_status, 100)
+
+        files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
         output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 80/100) + start_status, 100)

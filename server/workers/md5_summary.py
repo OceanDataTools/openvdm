@@ -247,8 +247,17 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(gearman_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+    try:
+        payload_obj = json.loads(gearman_job.data)
+        logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+
+        new_files = payload_obj['file'].get('new', [])
+        updated_files = payload_obj['file'].get('updated', [])
+        deleted_files = payload_obj['file'].get('deleted', [])
+
+    except Exception:
+        raise ValueError("Unable to parse job payload")
+
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
@@ -257,15 +266,12 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
-    if 'deleted' not in payload_obj['files']:
-        payload_obj['files']['deleted'] = []
-
-    if len(payload_obj['files']['new']) + len(payload_obj['files']['updated']) + len(payload_obj['files']['deleted']) == 0:
+    if len(new_files) + len(updated_files) + len(deleted_files) == 0:
         return json.dumps(job_results)
 
-    if payload_obj['files']['new'] or payload_obj['files']['updated']:
-        filelist.extend(payload_obj['files']['new'])
-        filelist.extend(payload_obj['files']['updated'])
+    if new_files or updated_files:
+        filelist.extend(new_files)
+        filelist.extend(updated_files)
 
     #filelist = [os.path.join(gearman_worker.cruiseID, filename) for filename in filelist]
     logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
@@ -288,48 +294,53 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("Processing existing MD5 summary file")
 
     try:
-        with open(gearman_worker.md5_summary_filepath, mode='r', encoding="utf-8") as md5_summary_file:
-
-            for line in md5_summary_file:
-                (md5_hash, filename) = line.split(' ', 1)
-                existing_hashes.append({'hash': md5_hash, 'filename': filename.rstrip('\n')})
-
+        with open(gearman_worker.md5_summary_filepath, 'r', encoding='utf-8') as f:
+            existing_hashes = [
+                {'hash': line.split(' ', 1)[0], 'filename': line.split(' ', 1)[1].rstrip('\n')}
+                for line in f if ' ' in line
+            ]
     except IOError:
-        logging.error("Error Reading pre-existing MD5 Summary file: %s", gearman_worker.md5_summary_filepath)
-        job_results['parts'].append({"partName": "Reading pre-existing MD5 Summary file", "result": "Fail", "reason": "Error Reading pre-existing MD5 Summary file: " + gearman_worker.md5_summary_filepath})
+        msg = f"Error Reading pre-existing MD5 Summary file: {gearman_worker.md5_summary_filepath}"
+        logging.error(msg)
+        job_results['parts'].append({
+            "partName": "Reading pre-existing MD5 Summary file",
+            "result": "Fail",
+            "reason": msg
+        })
         return json.dumps(job_results)
 
-    #logging.debug('Existing Hashes:', json.dumps(existing_hashes, indent=2))
-    job_results['parts'].append({"partName": "Reading pre-existing MD5 Summary file", "result": "Pass"})
+    job_results['parts'].append({
+        "partName": "Reading pre-existing MD5 Summary file",
+        "result": "Pass"
+    })
 
-    row_added = 0
-    row_updated = 0
-    row_deleted = 0
+    row_added = row_updated = row_deleted = 0
 
-    for new_hash in new_hashes:
-        updated = False
-        for existing_hash in existing_hashes:
-            if new_hash['filename'] == existing_hash['filename']:
-                existing_hash['hash'] = new_hash['hash']
-                updated = True
-                row_updated += 1
-                break
+    # Index existing hashes by filename
+    existing_index = {entry['filename']: entry for entry in existing_hashes}
 
-        if not updated:
-            existing_hashes.append({'hash': new_hash['hash'], 'filename': new_hash['filename']})
+    # Update or add new hashes
+    for new in new_hashes:
+        fn = new['filename']
+        if fn in existing_index:
+            existing_index[fn]['hash'] = new['hash']
+            row_updated += 1
+        else:
+            entry = {'filename': fn, 'hash': new['hash']}
+            existing_hashes.append(entry)
+            existing_index[fn] = entry
             row_added += 1
 
-    if 'deleted' in payload_obj['files']:
-        hashes = len(existing_hashes)
-        existing_hashes = [existing_hash for existing_hash in existing_hashes if existing_hash.get(filename) not in payload_obj['files']['deleted']]
-        row_deleted = hashes - len(existing_hashes)
+    # Delete obsolete entries
+    if deleted_files:
+        before = len(existing_hashes)
+        existing_hashes = [e for e in existing_hashes if e['filename'] not in deleted_files]
+        row_deleted = before - len(existing_hashes)
 
-    if row_added > 0:
-        logging.debug("%s row(s) added", row_added)
-    if row_updated > 0:
-        logging.debug("%s row(s) updated", row_updated)
-    if row_deleted > 0:
-        logging.debug("%s row(s) deleted", row_deleted)
+    # Log summary
+    for label, count in (("added", row_added), ("updated", row_updated), ("deleted", row_deleted)):
+        if count > 0:
+            logging.debug("%s row(s) %s", count, label)
 
     gearman_worker.send_job_status(gearman_job, 85, 100)
 
