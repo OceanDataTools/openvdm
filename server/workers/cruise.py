@@ -82,7 +82,8 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
     if not output_results['verdict']:
         return {'verdict': False, 'reason': output_results['reason']}
 
-    gearman_worker.update_md5_summary({'files', {'updated':[cruise_config_file_path]}})
+    # gearman_worker.update_md5_summary(output_results.get('files', {'new':[], 'updated':[]}))
+    gearman_worker.update_md5_summary({'new':[], 'updated':[cruise_config_file_path]})
 
     return {'verdict': True}
 
