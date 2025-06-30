@@ -18,6 +18,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -29,9 +30,10 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.workers.set_run_collection_system_transfer import run_transfer_command
+# from server.workers.set_run_collection_system_transfer import run_transfer_command
 from server.lib.openvdm import OpenVDM
 
+TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
 def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False):
     """
@@ -71,6 +73,61 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
     gearman_worker.update_md5_summary(output_results.get('files', {'new':[], 'updated':[]}))
 
     return {'verdict': True}
+
+
+def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
+    """
+    run the rsync command and return the list of new/updated files
+    """
+
+    # if there are no files to transfer, then don't
+    if file_count == 0:
+        logging.info("Skipping Transfer Command: nothing to transfer")
+        return [], []
+
+    logging.info('Transfer Command: %s', ' '.join(cmd))
+
+    new_files = []
+    updated_files = []
+    last_percent_reported = -1
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    while proc.poll() is None:
+
+        for line in proc.stdout:
+
+            if gearman_worker.stop:
+                logging.debug("Stopping")
+                proc.terminate()
+                break
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith( '>f+++++++++' ):
+                filename = line.split(' ',1)[1]
+                new_files.append(filename.rstrip('\n'))
+            elif line.startswith( '>f.' ):
+                filename = line.split(' ',1)[1]
+                updated_files.append(filename.rstrip('\n'))
+
+            # Extract progress from `to-chk=` lines
+            match = TO_CHK_RE.search(line)
+            if match:
+                remaining = int(match.group(1))
+                total = int(match.group(2))
+                if total > 0:
+                    percent = int(100 * (total - remaining) / total)
+
+                    if percent != last_percent_reported:
+                        logging.info("Progress Update: %d%%", percent)
+                        if gearman_job:
+                            gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                        last_percent_reported = percent
+
+    return new_files, updated_files
 
 
 def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=False):
