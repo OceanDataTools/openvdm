@@ -59,11 +59,19 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
             for key in ['sshPass', 'rsyncPass', 'smbPass']:
                 transfer.pop(key, None)
 
-    def replace_transfer_type(transfer_list):
+    def scrub_transfer(transfer_list, lowering_data_base_dir):
         for transfer in transfer_list:
             transfer['transferType'] = get_transfer_type(transfer['transferType'])
+            if transfer['cruiseOrLowering'] == '1':
+                transfer['destDir'] = os.path.join(lowering_data_base_dir, "{loweringID}", transfer['destDir'])
 
-    scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
+            allowed_keys = ['name', 'longName', 'destDir']
+            for key in list(transfer.keys()):
+                if key not in allowed_keys:
+                    transfer.pop(key)
+
+    # scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
+    scrub_transfer(cruise_config.get('collectionSystemTransfersConfig', []))
 
     cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
     cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
