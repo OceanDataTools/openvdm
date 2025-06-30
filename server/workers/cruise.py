@@ -479,9 +479,9 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
 
         results = clear_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir'])
 
-        if results['parts'][-1]['result'] == "Fail": # Final Verdict
+        if not results['verdict']: # Final Verdict
             logging.error("Failed to clear out PublicData directory")
-            job_results['parts'].append({"partName": "Clear out PublicData directory", "result": "Fail", "reason": results['parts'][-1]['reason']})
+            job_results['parts'].append({"partName": "Clear out PublicData directory", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Clear out PublicData directory", "result": "Pass"})
