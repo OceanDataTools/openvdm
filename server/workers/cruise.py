@@ -30,7 +30,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import get_transfer_type
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -61,7 +60,6 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
 
     def scrub_transfer(transfer_list, lowering_data_base_dir):
         for transfer in transfer_list:
-            transfer['transferType'] = get_transfer_type(transfer['transferType'])
             if transfer['cruiseOrLowering'] == '1':
                 transfer['destDir'] = os.path.join(lowering_data_base_dir, "{loweringID}", transfer['destDir'])
 
