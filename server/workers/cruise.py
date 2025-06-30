@@ -59,8 +59,14 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
             for key in ['sshPass', 'rsyncPass', 'smbPass']:
                 transfer.pop(key, None)
 
-    scrub_passwords(cruise_config.get('cruiseDataTransfersConfig', []))
     scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
+
+    cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
+    cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
+
+    del cruise_config['warehouseConfig']
+    del cruise_config['cruiseDataTransfersConfig']
+    del cruise_config['shipToShoreTransfersConfig']
 
     output_results = output_json_data_to_file(cruise_config_file_path, cruise_config)
     if not output_results['verdict']:
