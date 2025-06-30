@@ -412,8 +412,13 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
         gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
+    exclude_transfer_logs = gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'] + '/'
+
     filelist = build_filelist(gearman_worker.cruise_dir).get('include', [])
-    filtered_filelist = [f for f in filelist if f not in exclude_set]
+    filtered_filelist = [
+        f for f in filelist
+        if f not in exclude_set and not f.startswith(exclude_transfer_logs)
+    ]
 
     logging.debug("File list:\n%s", json.dumps(filtered_filelist, indent=2))
 
