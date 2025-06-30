@@ -427,7 +427,7 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
     logging.info("Building hashes")
-    new_hashes = build_md5_hashes(gearman_worker, gearman_job, filelist)
+    new_hashes = build_md5_hashes(gearman_worker, gearman_job, filtered_filelist)
     logging.debug("Hashes: %s", json.dumps(new_hashes, indent=2))
 
     if gearman_worker.stop:
