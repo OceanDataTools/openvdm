@@ -53,11 +53,6 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
             logging.debug("Error reading config: %s", err)
             return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
-    def scrub_passwords(transfer_list):
-        for transfer in transfer_list:
-            for key in ['sshPass', 'rsyncPass', 'smbPass']:
-                transfer.pop(key, None)
-
     def scrub_transfer(transfer_list, lowering_data_base_dir):
         for transfer in transfer_list:
             if transfer['cruiseOrLowering'] == '1':
@@ -147,7 +142,7 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
     return new_files, updated_files
 
 
-def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=False):
+def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_status, remove_source_files=False):
     """
     Transfer the contents of the PublicData share to the Cruise Data Directory
     """
@@ -174,6 +169,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
     logging.debug("Building file list")
     files = build_filelist(source_dir)
     logging.debug("Files: %s", json.dumps(files, indent=2))
+    gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 10/100) + start_status, 100)
 
     if len(files['exclude']) > 0:
         logging.warning("Found %s problem filename(s):", len(files['exclude']))
@@ -184,6 +180,8 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
         include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
         if not build_include_file(files['include'], include_file):
             return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file"}
+
+        gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 20/100) + start_status, 100)
 
         # Build transfer command
         rsync_flags = ['-trivm', '--progress', '--protect-args', '--min-size=1']
@@ -197,15 +195,18 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
 
         # Transfer files
         files['new'], files['updated'] = run_transfer_command(
-            gearman_worker, None, cmd, len(files['include'])
+            gearman_worker, gearman_worker, cmd, len(files['include'])
         )
+        gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 70/100) + start_status, 100)
 
         output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
+        gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 80/100) + start_status, 100)
 
         if not output_results['verdict']:
             return {'verdict': False, 'reason': output_results['reason']}
 
         gearman_worker.update_md5_summary(files)
+        gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 90/100) + start_status, 100)
 
         return {'verdict': True}
 
@@ -531,7 +532,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         # job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
         logging.debug("Transferring public data files to cruise data directory")
-        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, True)
+        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 40, 80, True)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -539,6 +540,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
+        gearman_worker.send_job_status(gearman_job, 8, 10)
 
         logging.info("Clearing files from PublicData")
         publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
@@ -628,47 +630,13 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
     logging.info("Transferring files from PublicData to the cruise data directory")
-    output_results = transfer_publicdata_dir(gearman_worker, gearman_job)
+    output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 50, 100)
 
     if not output_results['verdict']:
         job_results['parts'].append({"partName": "Transfer files", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Transfer files", "result": "Pass"})
-
-    files = output_results['files']
-
-    logging.debug("Files Transferred: %s",json.dumps(files, indent=2))
-
-    gearman_worker.send_job_status(gearman_job, 8, 10)
-
-    if len(files['new']) > 0 or len(files['updated']) > 0:
-
-        logging.info("Setting file permissions")
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], from_publicdata_dir)
-
-        if output_results['verdict']:
-            job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
-        else:
-            job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-            return json.dumps(job_results)
-
-        gearman_worker.send_job_status(gearman_job, 9, 100)
-
-        logging.info("Initiating MD5 Summary Task")
-
-        gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
-        gm_data = {}
-        gm_data['cruiseID'] = gearman_worker.cruise_id
-        gm_data['files'] = files
-        gm_data['files']['new'] = [os.path.join(from_publicdata_dir,filename) for filename in gm_data['files']['new']]
-        gm_data['files']['updated'] = [os.path.join(from_publicdata_dir,filename) for filename in gm_data['files']['updated']]
-
-        gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
-
-        logging.info("MD5 Summary Task Complete")
-
-    # TODO: verify update MD5 completed successfully
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
