@@ -265,6 +265,8 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     updated_files = payload_obj['files'].get('updated', [])
     deleted_files = payload_obj['files'].get('deleted', [])
 
+    logging.debug('Deleted files: %s', json.dumps(deleted_files, indent=2))
+
     if len(new_files) + len(updated_files) + len(deleted_files) == 0:
         return json.dumps(job_results)
 
