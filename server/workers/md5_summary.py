@@ -412,7 +412,7 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
         gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    filelist = build_filelist(gearman_worker).get('include', [])
+    filelist = build_filelist(gearman_worker.cruise_dir).get('include', [])
     filtered_filelist = [f for f in filelist if f not in exclude_set]
 
     logging.debug("File list:\n%s", json.dumps(filtered_filelist, indent=2))
