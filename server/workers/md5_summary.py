@@ -251,9 +251,9 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
         payload_obj = json.loads(gearman_job.data)
         logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-        new_files = payload_obj['file'].get('new', [])
-        updated_files = payload_obj['file'].get('updated', [])
-        deleted_files = payload_obj['file'].get('deleted', [])
+        new_files = payload_obj['files'].get('new', [])
+        updated_files = payload_obj['files'].get('updated', [])
+        deleted_files = payload_obj['files'].get('deleted', [])
 
     except Exception:
         raise ValueError("Unable to parse job payload")
