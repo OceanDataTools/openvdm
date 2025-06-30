@@ -338,6 +338,9 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
                             gearman_worker.send_job_status(gearman_job, int(50 * percent / 100) + 20, 100) # 70 - 20
                         last_percent_reported = percent
 
+    logging.warning("new_files: \n%s", json.dumps(new_files, indent=2))
+    logging.warning("updated_files: \n%s", json.dumps(updated_files, indent=2))
+
     return new_files, updated_files
 
 
@@ -444,11 +447,6 @@ def transfer_from_source(gearman_worker, gearman_job):
         if cst_cfg['syncFromSource'] == '1':
             files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
-        # Cleanup
-        if mntpoint:
-            time.sleep(2)
-            subprocess.call(['umount', mntpoint])
-
     return {'verdict': True, 'files': files}
 
 
@@ -502,9 +500,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.lowering_id is None:
                 return None
 
-            return os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, dest_dir)
+            return os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, dest_dir)
 
-        return dest_dir
+        return os.path.join(self.cruise_dir, dest_dir)
 
 
     def build_source_dir(self):
@@ -530,11 +528,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         results = []
 
-        destination_dir = os.path.join(self.cruise_dir, self.dest_dir)
-        dest_dir_exists = os.path.isdir(destination_dir)
-
+        dest_dir_exists = os.path.isdir(self.dest_dir)
         if not dest_dir_exists:
-            reason = f"Unable to find destination directory: {destination_dir}"
+            reason = f"Unable to find destination directory: {self.dest_dir}"
             results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
 
             return results
@@ -696,12 +692,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             'cruiseID': self.cruise_id,
                             'collectionSystemTransferID': cst_id,
                             'files': {
-                                'new': [ os.path.join(self.dest_dir, filepath) for filepath in new_files],
-                                'updated': [ os.path.join(self.dest_dir, filepath) for filepath in updated_files],
-                                'deleted': [
-                                    os.path.normpath(os.path.join(self.dest_dir, filepath))
-                                    for filepath in deleted_files
-                                ]
+                                'new': new_files,
+                                'updated': updated_files,
+                                'deleted': deleted_files
+                                # 'new': [ os.path.join(self.dest_dir, filepath) for filepath in new_files],
+                                # 'updated': [ os.path.join(self.dest_dir, filepath) for filepath in updated_files],
+                                # 'deleted': [
+                                #     os.path.normpath(os.path.join(self.dest_dir, filepath))
+                                #     for filepath in deleted_files
+                                # ]
                             }
                         }
 
