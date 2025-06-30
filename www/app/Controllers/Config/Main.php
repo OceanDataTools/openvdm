@@ -622,7 +622,7 @@ class Main extends Controller {
     
     public function finalizeCurrentCruise() {
 
-        $gmData = array();
+        $gmData = (object) array();
         
         # create the gearman client
         $gmc= new \GearmanClient();
@@ -666,7 +666,7 @@ class Main extends Controller {
 	    }
         }
 
-        $gmData = array();
+        $gmData = (object) array();
         
         # create the gearman client
         $gmc= new \GearmanClient();
@@ -687,7 +687,7 @@ class Main extends Controller {
     
     public function exportOVDMConfig() {
         
-        $gmData = array();
+        $gmData = (object) array();
         
         # create the gearman client
         $gmc= new \GearmanClient();
@@ -716,7 +716,7 @@ class Main extends Controller {
     
     public function exportLoweringConfig() {
         
-        $gmData = array();
+        $gmData = (object) array();
         
         # create the gearman client
         $gmc= new \GearmanClient();
@@ -746,7 +746,7 @@ class Main extends Controller {
 
     public function rsyncPublicDataToCruiseData() {
         
-        $gmData = array();
+        $gmData = (object) array();
         
         # create the gearman client
         $gmc= new \GearmanClient();
