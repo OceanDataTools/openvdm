@@ -195,7 +195,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
 
         # Transfer files
         files['new'], files['updated'] = run_transfer_command(
-            gearman_worker, gearman_worker, cmd, len(files['include'])
+            gearman_worker, gearman_job, cmd, len(files['include'])
         )
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 70/100) + start_status, 100)
 
