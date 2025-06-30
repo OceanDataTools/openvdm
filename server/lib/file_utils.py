@@ -4,11 +4,16 @@
 
 import os
 import re
+import json
 import time
 import fnmatch
+import tempfile
+import shutil
 import logging
 import errno
-import json
+import subprocess
+import traceback
+from contextlib import contextmanager
 from pwd import getpwnam
 from datetime import timedelta
 
@@ -36,6 +41,88 @@ def is_rsync_patial_file(filename):
         logging.warning("Ignoring %s, this is an rsync partial file", filename)
 
     return file_match
+
+
+def build_filelist(source_dir):
+    """
+    Builds the list of files in the source directory
+    """
+
+    return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
+
+    for root, _, files in os.walk(source_dir):
+
+        for filename in files:
+            if is_rsync_patial_file(filename):
+                continue
+
+            full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, source_dir)
+
+            if not os.path.islink(full_path) and is_ascii(full_path):
+                return_files['include'].append(rel_path)
+            else:
+                return_files['exclude'].append(rel_path)
+
+    return return_files
+
+
+def build_include_file(include_list, filepath):
+    try:
+        with open(filepath, mode='w', encoding="utf-8") as f:
+            f.write('\n'.join(include_list))
+            f.write('\0')
+    except IOError as e:
+        logging.error("Error writing include file: %s", e)
+        return False
+
+    return True
+
+
+def clear_directory(target_dir, delete_self=False):
+    """
+    Deletes all empty sub-directorties within the specified target_dir
+    """
+
+    reasons = []
+
+    if not os.path.exists(target_dir):
+        msg = f"Directory not found: {target_dir}"
+        logging.error(msg)
+        return {'verdict': False, 'reason': [msg]}
+
+    try:
+        for entry in os.listdir(target_dir):
+            path = os.path.join(target_dir, entry)
+
+            try:
+                if os.path.islink(path) or os.path.isfile(path):
+                    os.remove(path)
+                    logging.debug("Deleted file: %s", path)
+                elif os.path.isdir(path):
+                    # Recurse into subdirectory
+                    result = clear_directory(path, delete_self=True)
+                    if not result['verdict']:
+                        reasons.extend(result['reasons'])
+            except OSError as err:
+                logging.error("Failed to delete %s: %s", path, err)
+                reasons.append(f"Failed to delete {path}: {err}")
+
+        if delete_self:
+            try:
+                os.rmdir(target_dir)
+                logging.debug("Deleted directory: %s", target_dir)
+            except OSError as err:
+                logging.error("Failed to delete directory %s: %s", target_dir, err)
+                reasons.append(f"Failed to delete {target_dir}: {err}")
+    except OSError as err:
+        logging.error("Failed to list contents of %s: %s", target_dir, err)
+        reasons.append(f"Failed to list contents of {target_dir}: {err}")
+
+    return {
+        'verdict': len(reasons) == 0,
+        'reason': reasons
+    }
 
 
 def delete_from_dest(dest_dir, include_files):
@@ -239,6 +326,39 @@ def set_owner_group_permissions(user, path):
         return {'verdict': False, 'reason': f"Unable to set ownership/permissions for {len(reasons)} file"}
 
     return {'verdict': True}
+
+
+@contextmanager
+def temporary_directory(preserve_on_error=False):
+    tmpdir = tempfile.mkdtemp()
+    mntpoint_path = os.path.join(tmpdir, 'mntpoint')
+
+    def _cleanup_temp_dir(tmpdir, mntpoint_path):
+        """Helper to unmount and delete a temporary directory safely."""
+        if os.path.ismount(mntpoint_path):
+            try:
+                subprocess.run(['umount', mntpoint_path], check=True)
+                logging.info(f"Unmounted {mntpoint_path} before cleanup.")
+            except subprocess.CalledProcessError as e:
+                logging.warning(f"Failed to unmount {mntpoint_path}: {e}")
+
+        try:
+            shutil.rmtree(tmpdir)
+            logging.debug(f"Deleted temporary directory: {tmpdir}")
+        except Exception as e:
+            logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
+
+    try:
+        yield tmpdir
+    except Exception:
+        if preserve_on_error:
+            logging.warning(f"Exception occurred. Preserving temp dir: {tmpdir}")
+            logging.debug("Preserved due to exception:\n%s", traceback.format_exc())
+        else:
+            _cleanup_temp_dir(tmpdir, mntpoint_path)
+        raise  # Re-raise the original exception
+    else:
+        _cleanup_temp_dir(tmpdir, mntpoint_path)
 
 
 def create_directories(directorylist):

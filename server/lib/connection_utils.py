@@ -1,14 +1,11 @@
 import os
 import sys
-import shutil
 import logging
-import tempfile
 import subprocess
-from contextlib import contextmanager
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import verfy_write_access
+from server.lib.file_utils import verfy_write_access, temporary_directory
 
 def get_transfer_type(transfer_type):
 
@@ -199,25 +196,25 @@ def build_rsync_options(cst_cfg, mode='dry-run', is_darwin=False):
 
 def test_cst_source(cst_cfg, source_dir):
 
-    @contextmanager
-    def temporary_directory():
-        tmpdir = tempfile.mkdtemp()
-        try:
-            yield tmpdir
-        finally:
-            mntpoint_path = os.path.join(tmpdir, 'mntpoint')
+    # @contextmanager
+    # def temporary_directory():
+    #     tmpdir = tempfile.mkdtemp()
+    #     try:
+    #         yield tmpdir
+    #     finally:
+    #         mntpoint_path = os.path.join(tmpdir, 'mntpoint')
 
-            if os.path.ismount(mntpoint_path):
-                try:
-                    subprocess.run(['umount', mntpoint_path], check=True)
-                    logging.info(f"Unmounted {mntpoint_path} before cleanup.")
-                except subprocess.CalledProcessError as e:
-                    logging.warning(f"Failed to unmount {mntpoint_path}: {e}")
+    #         if os.path.ismount(mntpoint_path):
+    #             try:
+    #                 subprocess.run(['umount', mntpoint_path], check=True)
+    #                 logging.info(f"Unmounted {mntpoint_path} before cleanup.")
+    #             except subprocess.CalledProcessError as e:
+    #                 logging.warning(f"Failed to unmount {mntpoint_path}: {e}")
 
-            try:
-                shutil.rmtree(tmpdir)
-            except Exception as e:
-                logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
+    #         try:
+    #             shutil.rmtree(tmpdir)
+    #         except Exception as e:
+    #             logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
 
 
     results = []

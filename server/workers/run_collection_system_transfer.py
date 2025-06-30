@@ -21,13 +21,10 @@ import logging
 import os
 import re
 import sys
-import shutil
 import signal
 import subprocess
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from os.path import dirname, realpath
 from random import randint
@@ -35,22 +32,11 @@ import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, is_rsync_patial_file, delete_from_dest, output_json_data_to_file, set_owner_group_permissions
+from server.lib.file_utils import build_include_file, is_ascii, is_rsync_patial_file, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-
-@contextmanager
-def temporary_directory():
-    tmpdir = tempfile.mkdtemp()
-    try:
-        yield tmpdir
-    finally:
-        try:
-            shutil.rmtree(tmpdir)
-        except Exception as e:
-            logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
 
 
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
@@ -158,7 +144,7 @@ def verify_staleness_batch(paths_sizes):
     return verified
 
 
-def build_filelist(gearman_worker, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
+def build_cst_filelist(gearman_worker, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
     source_dir = os.path.join(prefix, gearman_worker.source_dir.lstrip('/')) if prefix else gearman_worker.source_dir
     cst_cfg = gearman_worker.collection_system_transfer
     transfer_type = get_transfer_type(cst_cfg['transferType'])
@@ -300,18 +286,6 @@ def build_filters(cst_cfg, cruise_id, lowering_id):
     return filters
 
 
-def build_include_file(include_list, filepath):
-    try:
-        with open(filepath, mode='w', encoding="utf-8") as f:
-            f.write('\n'.join(include_list))
-            f.write('\0')
-    except IOError as e:
-        logging.error("Error writing include file: %s", e)
-        return False
-
-    return True
-
-
 def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
     """
     run the rsync command and return the list of new/updated files
@@ -360,7 +334,8 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
 
                     if percent != last_percent_reported:
                         logging.info("Progress Update: %d%%", percent)
-                        gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
+                        if gearman_job:
+                            gearman_worker.send_job_status(gearman_job, int(20 + 70 * percent / 100), 100)
                         last_percent_reported = percent
 
     return new_files, updated_files
@@ -416,7 +391,7 @@ def transfer_from_source(gearman_worker, gearman_job):
             is_darwin = check_darwin(cst_cfg)
 
         # Build filelist (from local, SMB mount, etc.)
-        filelist_result = build_filelist(gearman_worker, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
+        filelist_result = build_cst_filelist(gearman_worker, prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
 
         if not filelist_result['verdict']:
             if mntpoint:

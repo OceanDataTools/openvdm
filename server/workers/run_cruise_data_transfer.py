@@ -79,7 +79,7 @@ def process_batch(filepaths, filters):
     return include, exclude
 
 
-def build_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=8):
+def build_cdt_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=8):
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': []}
     logging.info("Starting filelist build in %s", source_dir)
 
@@ -370,7 +370,7 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
     dest_dir = None
 
     logging.debug("Building file list")
-    files = build_filelist(gearman_worker, cruise_dir)
+    files = build_cdt_filelist(gearman_worker, cruise_dir)
     is_darwin = False
 
     with temporary_directory() as tmpdir:

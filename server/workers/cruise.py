@@ -18,93 +18,25 @@ import argparse
 import json
 import logging
 import os
-import shutil
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 from os.path import dirname, realpath
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.file_utils import is_ascii, output_json_data_to_file, set_owner_group_permissions
+from server.lib.file_utils import build_filelist, build_include_file, build_rsync_command, clear_directory, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.workers.set_running_collection_system_transfer import run_transfer_command
 from server.lib.openvdm import OpenVDM
-
-
-def build_filelist(source_dir):
-    """
-    Builds the list of files in the source directory
-    """
-
-    return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
-
-    for root, _, files in os.walk(source_dir):
-
-        for filename in files:
-            full_path = os.path.join(root, filename)
-            rel_path = os.path.relpath(full_path, source_dir)
-
-            if not os.path.islink(full_path) and is_ascii(full_path):
-                return_files['include'].append(rel_path)
-            else:
-                return_files['exclude'].append(rel_path)
-
-    return return_files
-
-
-def clear_directory(directory, delete_self=False):
-    """
-    Deletes all empty sub-directorties within the specified directory
-    """
-
-    reasons = []
-
-    if not os.path.exists(directory):
-        msg = f"Directory not found: {directory}"
-        logging.error(msg)
-        return {'verdict': False, 'reason': [msg]}
-
-    try:
-        for entry in os.listdir(directory):
-            path = os.path.join(directory, entry)
-
-            try:
-                if os.path.islink(path) or os.path.isfile(path):
-                    os.remove(path)
-                    logging.debug("Deleted file: %s", path)
-                elif os.path.isdir(path):
-                    # Recurse into subdirectory
-                    result = clear_directory(path, delete_self=True)
-                    if not result['verdict']:
-                        reasons.extend(result['reasons'])
-            except OSError as err:
-                logging.error("Failed to delete %s: %s", path, err)
-                reasons.append(f"Failed to delete {path}: {err}")
-
-        if delete_self:
-            try:
-                os.rmdir(directory)
-                logging.debug("Deleted directory: %s", directory)
-            except OSError as err:
-                logging.error("Failed to delete directory %s: %s", directory, err)
-                reasons.append(f"Failed to delete {directory}: {err}")
-    except OSError as err:
-        logging.error("Failed to list contents of %s: %s", directory, err)
-        reasons.append(f"Failed to list contents of {directory}: {err}")
-
-    return {
-        'verdict': len(reasons) == 0,
-        'reason': reasons
-    }
 
 
 def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False):
     """
-    Export the current cruise configuration to the specified filepath
+    Export the current cruise configuration to the specified file.
+    If 'finalize' is True, mark the config as finalized.
     """
-
     cruise_config = gearman_worker.ovdm.get_cruise_config()
 
     if finalize:
@@ -112,26 +44,32 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
     elif os.path.isfile(cruise_config_file_path):
         logging.info("Reading existing configuration file")
         try:
-            with open(cruise_config_file_path, mode='r', encoding='utf-8') as json_file:
-                data = json.load(json_file)
-                if "cruiseFinalizedOn" in data:
-                    cruise_config['cruiseFinalizedOn'] = data['cruiseFinalizedOn']
-
+            with open(cruise_config_file_path, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                cruise_config['cruiseFinalizedOn'] = existing_data.get('cruiseFinalizedOn')
         except OSError as err:
-            logging.debug(str(err))
+            logging.debug("Error reading config: %s", err)
             return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
-    for transfer in cruise_config['cruiseDataTransfersConfig']:
-        del transfer['sshPass']
-        del transfer['rsyncPass']
-        del transfer['smbPass']
+    def scrub_passwords(transfer_list):
+        for transfer in transfer_list:
+            for key in ['sshPass', 'rsyncPass', 'smbPass']:
+                transfer.pop(key, None)
 
-    for transfer in cruise_config['collectionSystemTransfersConfig']:
-        del transfer['sshPass']
-        del transfer['rsyncPass']
-        del transfer['smbPass']
+    scrub_passwords(cruise_config.get('cruiseDataTransfersConfig', []))
+    scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
 
-    return output_json_data_to_file(cruise_config_file_path, cruise_config)
+    output_results = output_json_data_to_file(cruise_config_file_path, cruise_config)
+    if not output_results['verdict']:
+        return {'verdict': False, 'reason': output_results['reason']}
+
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
+    if not output_results['verdict']:
+        return {'verdict': False, 'reason': output_results['reason']}
+
+    gearman_worker.update_md5_summary(output_results.get('files', {'new':[], 'updated':[]}))
+
+    return {'verdict': True}
 
 
 def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=False):
@@ -139,86 +77,62 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, remove_source_files=Fal
     Transfer the contents of the PublicData share to the Cruise Data Directory
     """
 
-    publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
+    job_results = {'parts':[]}
+
+    source_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
+    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
+
+    logging.debug("Verify PublicData Directory exists")
+    if not os.path.exists(source_dir):
+        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + source_dir + " could not be found"})
+        return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
+
+    logging.debug("Verify From_PublicData directory exists within the cruise data directory")
+    if not os.path.exists(dest_dir):
+        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + dest_dir + " could not be found"})
+        return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
 
     logging.debug("Building file list")
-    files = build_filelist(publicdata_dir)
-
+    files = build_filelist(source_dir)
     logging.debug("Files: %s", json.dumps(files, indent=2))
 
     if len(files['exclude']) > 0:
         logging.warning("Found %s problem filename(s):", len(files['exclude']))
         logging.warning("\t %s", "\n\t".join(files['exclude']))
-        return {'verdict': False, 'reason': f"Symbolic links or Non-ASCii filenames in {publicdata_dir}: {', '.join(files['exclude'])}", 'files': files }
+        return {'verdict': False, 'reason': f"Symbolic links or Non-ASCii filenames in {source_dir}: {', '.join(files['exclude'])}"}
 
-    # Create temp directory
-    tmpdir = tempfile.mkdtemp()
+    with temporary_directory() as tmpdir:    # Create temp directory
+        include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
+        if not build_include_file(files['include'], include_file):
+            return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file"}
 
-    # Build rsync file transfer list
-    rsync_filelist_path = os.path.join(tmpdir, "rsyncFileList.txt")
+        # Build transfer command
+        rsync_flags = ['-trivm', '--progress', '--protect-args', '--min-size=1']
 
-    try:
-        local_transfer_filelist = [filename.replace(publicdata_dir, '', 1) for filename in files['include']]
-        with open(rsync_filelist_path, mode='w', encoding='utf-8') as rsync_filelist_file:
-            rsync_filelist_file.write('\n'.join([str(file) for file in local_transfer_filelist]))
-    except IOError:
-        logging.error("Error Saving temporary rsync filelist file")
+        if remove_source_files:
+            rsync_flags.append('--remove-source-files')
+        else:
+            rsync_flags.append('--delete')
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
+        cmd = build_rsync_command(rsync_flags, [], source_dir, dest_dir, include_file)
 
-        return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file", 'files': files }
+        # Transfer files
+        files['new'], files['updated'] = run_transfer_command(
+            gearman_worker, None, cmd, len(files['include'])
+        )
 
-    # Build transfer command
-    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
-    command = ['rsync', '-tri', '--files-from=' + rsync_filelist_path, publicdata_dir + '/', dest_dir]
+        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
 
-    if remove_source_files:
-        command.insert(2, '--remove-source-files')
+        if not output_results['verdict']:
+            return {'verdict': False, 'reason': output_results['reason']}
 
-    logging.debug("Command: %s", ' '.join(command))
+        gearman_worker.update_md5_summary(files)
 
-    file_index = 0
-    file_count = len(files['include'])
-
-    # Transfer files
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
-    while True:
-
-        line = proc.stdout.readline().rstrip('\n')
-
-        if proc.poll() is not None:
-            break
-
-        if not line:
-            continue
-
-        logging.debug("Line: %s", line) # yield line
-        if line.startswith( '>f+++++++++' ):
-            filename = line.split(' ',1)[1]
-            files['new'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_count += 1
-        elif line.startswith( '>f.' ):
-            filename = line.split(' ',1)[1]
-            files['updated'].append(filename)
-            gearman_worker.send_job_status(gearman_job, int(20 + 70*float(file_index)/float(file_count)), 100)
-            file_count += 1
-
-        if gearman_worker.stop:
-            logging.error("Stopping rsync transfer")
-            proc.terminate()
-            break
-
-    files['new'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['new']]
-    files['updated'] = [os.path.join(dest_dir.replace(gearman_worker.cruise_dir, '').lstrip('/'), filename) for filename in files['updated']]
-
-    # Cleanup
-    shutil.rmtree(tmpdir)
-
-    logging.info("files:\n%s", json.dumps(files, indent=2))
-
-    return {'verdict': True, 'files':files }
+        return {'verdict': True}
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
@@ -237,16 +151,34 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
+    def update_md5_summary(self, files):
+        gm_data = {
+            'cruiseID': self.cruise_id,
+            'files': files
+        }
+
+        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+        gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
+
+        logging.debug("MD5 Summary Task Complete")
+
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
-
-        payload_obj = json.loads(current_job.data)
-
         self.stop = False
+
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
+
         self.task = self.ovdm.get_task_by_name(current_job.task)
         logging.debug("task: %s", self.task)
 
@@ -255,8 +187,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+        self.cruise_start_date = payload_obj.get('cruiseStartDate',self.ovdm.get_cruise_start_date())
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
@@ -271,15 +203,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Worker crashed"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', 'Worker crashed')
-
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -288,7 +224,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run whenever the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
         job_data = {
             'cruiseID': self.cruise_id,
@@ -311,19 +247,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
+        if len(results['parts']) > 0:
+            if results['parts'][-1]['result'] == "Fail": # Final Verdict
                 if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
+                    self.ovdm.set_error_task(self.task['taskID'], results['parts'][-1]['reason'])
                 else:
-                    self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
+                    self.ovdm.send_msg(self.task['longName'] + ' failed', results['parts'][-1]['reason'])
             else:
                 self.ovdm.set_idle_task(self.task['taskID'])
         else:
             self.ovdm.set_idle_task(self.task['taskID'])
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
+        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle,
+                     time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -347,15 +284,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.shutdown()
 
 
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
+
+
 def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-many-return-statements,too-many-statements
     """
     Setup a new cruise
     """
 
     job_results = {'parts':[]}
-
-    payload_obj = json.loads(gearman_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
     cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
@@ -398,12 +339,6 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
-
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
-
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
 
     gearman_worker.send_job_status(gearman_job, 7, 10)
 
@@ -459,7 +394,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
+    # publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
 
     cruise_config_file_path = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
@@ -494,38 +429,33 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     gearman_worker.send_job_status(gearman_job, 3, 10)
 
-    if len(collection_system_transfer_jobs) > 0:
-        logging.info("Submitting runCollectionSystemTransfer jobs")
-        submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
+    logging.info("Submitting runCollectionSystemTransfer jobs")
+    submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
 
-        gearman_worker.send_job_status(gearman_job, 4, 10)
+    gearman_worker.send_job_status(gearman_job, 4, 10)
 
-        time.sleep(1)
-        gm_client.wait_until_jobs_completed(submitted_job_request)
-        logging.info("Completed runCollectionSystemTransfers jobs")
-
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+    time.sleep(1)
 
     if gearman_worker.ovdm.get_transfer_public_data():
 
-        logging.info("Transferring files from PublicData to the cruise data directory")
-        from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
+        # logging.info("Transferring files from PublicData to the cruise data directory")
+        # from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
 
-        logging.debug("Verify From_PublicData directory exists within the cruise data directory")
-        if not os.path.exists(from_publicdata_dir):
-            job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + from_publicdata_dir + " could not be found"})
-            return json.dumps(job_results)
+        # logging.debug("Verify From_PublicData directory exists within the cruise data directory")
+        # if not os.path.exists(from_publicdata_dir):
+        #     job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + from_publicdata_dir + " could not be found"})
+        #     return json.dumps(job_results)
 
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
+        # job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
 
-        logging.debug("Verify PublicData Directory exists")
-        if not os.path.exists(publicdata_dir):
-            job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + publicdata_dir + " could not be found"})
-            return json.dumps(job_results)
+        # logging.debug("Verify PublicData Directory exists")
+        # if not os.path.exists(publicdata_dir):
+        #     job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + publicdata_dir + " could not be found"})
+        #     return json.dumps(job_results)
 
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
+        # job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
-        logging.debug("Transferring files")
+        logging.debug("Transferring public data files to cruise data directory")
         output_results = transfer_publicdata_dir(gearman_worker, gearman_job, True)
         logging.debug("Transfer Complete")
 
@@ -535,11 +465,8 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
 
-        files = output_results['files']
-
-        logging.debug("PublicData Files Transferred: %s", json.dumps(files, indent=2))
-
         logging.info("Clearing files from PublicData")
+        publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
         output_results = clear_directory(publicdata_dir)
         logging.debug("Clearing Complete")
 
@@ -549,17 +476,19 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
         gearman_worker.send_job_status(gearman_job, 9, 10)
 
-        if len(files['new']) > 0 or len(files['updated']) > 0:
+        # if len(files['new']) > 0 or len(files['updated']) > 0:
 
-            output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], from_publicdata_dir)
+        #     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], from_publicdata_dir)
 
-            if not output_results['verdict']:
-                job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-                return json.dumps(job_results)
+        #     if not output_results['verdict']:
+        #         job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        #         return json.dumps(job_results)
 
-            job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
-    else:
-        files = { 'include':[], 'exclude':[], 'new':[], 'updated':[] }
+        #     job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
+
+    gm_client.wait_until_jobs_completed(submitted_job_request)
+    logging.info("Completed runCollectionSystemTransfers jobs")
+    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 95, 100)
 
@@ -573,26 +502,26 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
+    # output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
 
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
+    # if not output_results['verdict']:
+    #     job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+    #     return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Pass"})
+    # job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Pass"})
 
-    logging.info("Initiating MD5 Summary Task")
+    # logging.info("Initiating MD5 Summary Task")
 
-    gm_data = {
-        'cruiseID': gearman_worker.cruise_id,
-        'files': files
-    }
+    # gm_data = {
+    #     'cruiseID': gearman_worker.cruise_id,
+    #     'files': files
+    # }
 
-    gm_data['files']['updated'].append(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
+    # gm_data['files']['updated'].append(gearman_worker.shipboard_data_warehouse_config['cruiseConfigFn'])
 
-    gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
+    # gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
 
-    logging.debug("MD5 Summary Task Complete")
+    # logging.debug("MD5 Summary Task Complete")
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
