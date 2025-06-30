@@ -151,18 +151,19 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
     job_results = {'parts':[]}
 
     source_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-    dest_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
+    from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir']
+    dest_dir = os.path.join(gearman_worker.cruise_dir, from_publicdata_dir)
 
     logging.debug("Verify PublicData Directory exists")
     if not os.path.exists(source_dir):
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "PublicData directory: " + source_dir + " could not be found"})
+        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": f"PublicData directory: {source_dir} could not be found"})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
     logging.debug("Verify From_PublicData directory exists within the cruise data directory")
     if not os.path.exists(dest_dir):
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "From_PublicData directory: " + dest_dir + " could not be found"})
+        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": f"From_PublicData directory: {dest_dir} could not be found"})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
@@ -207,6 +208,9 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
         files['new'], files['updated'] = run_transfer_command(
             gearman_worker, gearman_job, cmd, len(files['include'])
         )
+
+        files['new'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in files['new'] ]
+        files['updated'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in files['updated'] ]
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 70/100) + start_status, 100)
 
         files['deleted'] = delete_from_dest(dest_dir, files['include'])
@@ -633,27 +637,8 @@ def task_rsync_publicdata_to_cruise_data(gearman_worker, gearman_job):
 
     job_results = {'parts':[]}
 
-    publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
-    from_publicdata_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir'])
-
-    gearman_worker.send_job_status(gearman_job, 1, 10)
-
-    if os.path.exists(from_publicdata_dir):
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": "Unable to locate the From_PublicData directory: " + from_publicdata_dir})
-        return json.dumps(job_results)
-
-    if os.path.exists(publicdata_dir):
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": "Unable to locate the PublicData directory: " + publicdata_dir})
-        return json.dumps(job_results)
-
-    gearman_worker.send_job_status(gearman_job, 5, 10)
-
     logging.info("Transferring files from PublicData to the cruise data directory")
-    output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 50, 100)
+    output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 10, 90)
 
     if not output_results['verdict']:
         job_results['parts'].append({"partName": "Transfer files", "result": "Fail", "reason": output_results['reason']})
