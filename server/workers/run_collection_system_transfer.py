@@ -694,7 +694,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     if len(new_files) > 0 or len(updated_files) > 0 or len(deleted_files) > 0:
 
                         logging.info("Preparing subsequent Gearman jobs")
-                        rel_dir = self.build_dest_dir
+                        rel_dir = self.build_dest_dir()
                         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
                         job_data = {
