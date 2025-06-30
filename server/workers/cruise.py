@@ -508,9 +508,12 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     logging.info("Submitting runCollectionSystemTransfer jobs")
     submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
 
-    gearman_worker.send_job_status(gearman_job, 4, 10)
-
     time.sleep(1)
+    gm_client.wait_until_jobs_completed(submitted_job_request)
+    logging.info("Completed runCollectionSystemTransfers jobs")
+    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
+
+    gearman_worker.send_job_status(gearman_job, 7, 10)
 
     if gearman_worker.ovdm.get_transfer_public_data():
 
@@ -532,7 +535,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         # job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
 
         logging.debug("Transferring public data files to cruise data directory")
-        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 40, 80, True)
+        output_results = transfer_publicdata_dir(gearman_worker, gearman_job, 70, 90, True)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -540,7 +543,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
-        gearman_worker.send_job_status(gearman_job, 8, 10)
+        gearman_worker.send_job_status(gearman_job, 9, 10)
 
         logging.info("Clearing files from PublicData")
         publicdata_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
@@ -551,7 +554,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
             job_results['parts'].append({"partName": "Clear out PublicData files", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-        gearman_worker.send_job_status(gearman_job, 9, 10)
+        gearman_worker.send_job_status(gearman_job, 93, 100)
 
         # if len(files['new']) > 0 or len(files['updated']) > 0:
 
@@ -562,10 +565,6 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
         #         return json.dumps(job_results)
 
         #     job_results['parts'].append({"partName": "Set file/directory ownership/permissions", "result": "Pass"})
-
-    gm_client.wait_until_jobs_completed(submitted_job_request)
-    logging.info("Completed runCollectionSystemTransfers jobs")
-    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 95, 100)
 
