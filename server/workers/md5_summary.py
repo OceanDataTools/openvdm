@@ -25,7 +25,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.file_utils import set_owner_group_permissions
+from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 from server.lib.md5_util import hashlib_md5
 
@@ -38,23 +38,6 @@ CUSTOM_TASKS = [
 ]
 
 BUF_SIZE = 65536  # read files in 64kb chunks
-
-
-def build_filelist(gearman_worker):
-    """
-    Build the filelist
-    """
-
-    logging.debug("sourceDir: %s", gearman_worker.cruise_dir)
-
-    return_files = []
-    for root, _, filenames in os.walk(gearman_worker.cruise_dir):
-        for filename in filenames:
-            if filename not in (gearman_worker.shipboard_data_warehouse_config['md5SummaryFn'], gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']):
-                return_files.append(os.path.join(root, filename))
-
-    return_files = [filename.replace(gearman_worker.cruise_dir + '/', '', 1) for filename in return_files]
-    return return_files
 
 
 def hash_file(filepath):
@@ -102,7 +85,7 @@ def build_md5_hashes(gearman_worker, gearman_job, filelist):
             logging.error("Could not generate md5 hash for file: %s", filename)
             logging.debug(str(err))
 
-        gearman_worker.send_job_status(gearman_job, int(20 + 60*float(idx)/float(len(filelist))), 100)
+        gearman_worker.send_job_status(gearman_job, int(60 * idx / len(filelist)) + 20, 100) # 80-20
 
     return hashes
 
@@ -156,9 +139,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         logging.debug("current_job: %s", current_job)
-
         self.stop = False
-        payload_obj = json.loads(current_job.data)
+
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
 
         self.task = self._get_custom_task(current_job) if self._get_custom_task(current_job) is not None else self.ovdm.get_task_by_name(current_job.task)
         logging.debug("task: %s", self.task)
@@ -170,11 +159,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+        self.cruise_start_date = payload_obj.get('cruiseStartDate', self.ovdm.get_cruise_start_date())
+
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
+
         self.md5_summary_filepath = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['md5SummaryFn'])
         self.md5_summary_md5_filepath = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['md5SummaryMd5Fn'])
+
         return super().on_job_execute(current_job)
 
 
@@ -185,15 +178,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', 'Worker crashed')
-
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -218,7 +215,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 self.ovdm.set_idle_task(self.task['taskID'])
 
         logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle,
+                     time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -227,6 +225,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to stop the current job
         """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
@@ -235,9 +234,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Function to quit the worker
         """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
+
+
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
 
 
 def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -246,25 +253,16 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     """
 
     job_results = {'parts':[]}
+    payload_obj = json.loads(gearman_job.data)
 
-    try:
-        payload_obj = json.loads(gearman_job.data)
-        logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-        new_files = payload_obj['files'].get('new', [])
-        updated_files = payload_obj['files'].get('updated', [])
-        deleted_files = payload_obj['files'].get('deleted', [])
-
-    except Exception:
-        raise ValueError("Unable to parse job payload")
-
-
+    logging.info("Update MD5 Summary")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     logging.debug("Building filelist")
     filelist = []
-
-    job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
+    new_files = payload_obj['files'].get('new', [])
+    updated_files = payload_obj['files'].get('updated', [])
+    deleted_files = payload_obj['files'].get('deleted', [])
 
     if len(new_files) + len(updated_files) + len(deleted_files) == 0:
         return json.dumps(job_results)
@@ -276,23 +274,21 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     #filelist = [os.path.join(gearman_worker.cruiseID, filename) for filename in filelist]
     logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
 
+    logging.debug("Building hashes")
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
-    logging.debug("Building hashes")
     new_hashes = build_md5_hashes(gearman_worker, gearman_job, filelist)
     logging.debug('Hashes: %s', json.dumps(new_hashes, indent=2))
-
-    gearman_worker.send_job_status(gearman_job, 8, 10)
 
     if gearman_worker.stop:
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
-    existing_hashes = []
-
     logging.debug("Processing existing MD5 summary file")
+    gearman_worker.send_job_status(gearman_job, 8, 10)
 
+    existing_hashes = []
     try:
         with open(gearman_worker.md5_summary_filepath, 'r', encoding='utf-8') as f:
             existing_hashes = [
@@ -342,12 +338,11 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
         if count > 0:
             logging.debug("%s row(s) %s", count, label)
 
-    gearman_worker.send_job_status(gearman_job, 85, 100)
+    logging.debug("Building MD5 Summary file")
+    gearman_worker.send_job_status(gearman_job, 9, 10)
 
-    #logging.debug("Sorting hashes")
     sorted_hashes = sorted(existing_hashes, key=lambda hashes: hashes['filename'])
 
-    logging.debug("Building MD5 Summary file")
     try:
         with open(gearman_worker.md5_summary_filepath, mode='w', encoding="utf-8") as md5_summary_file:
 
@@ -369,9 +364,8 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set MD5 Summary file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
 
-    gearman_worker.send_job_status(gearman_job, 9, 10)
-
     logging.debug("Building MD5 Summary MD5 file")
+    gearman_worker.send_job_status(gearman_job, 95, 100)
 
     output_results = build_md5_summary_md5(gearman_worker)
 
@@ -399,10 +393,11 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
 
     job_results = {'parts':[]}
 
+    logging.info("Rebuild MD5 Summary")
+    gearman_worker.send_job_status(gearman_job, 1, 10)
+
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-    gearman_worker.send_job_status(gearman_job, 1, 10)
 
     if os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
@@ -412,8 +407,15 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
         return json.dumps(job_results)
 
     logging.info("Building filelist")
-    filelist = build_filelist(gearman_worker)
-    logging.debug('Filelist: %s', json.dumps(filelist, indent=2))
+    exclude_set = {
+        gearman_worker.shipboard_data_warehouse_config['md5SummaryFn'],
+        gearman_worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
+    }
+
+    filelist = build_filelist(gearman_worker).get('include', [])
+    filtered_filelist = [f for f in filelist if f not in exclude_set]
+
+    logging.debug("File list:\n%s", json.dumps(filtered_filelist, indent=2))
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
@@ -429,14 +431,10 @@ def task_rebuild_md5_summary(gearman_worker, gearman_job): # pylint: disable=too
 
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
-    gearman_worker.send_job_status(gearman_job, 85, 100)
-
-    logging.debug("Sorting Hashes")
-    sorted_hashes = sorted(new_hashes, key=lambda hashes: hashes['filename'])
-
-    gearman_worker.send_job_status(gearman_job, 9, 10)
-
     logging.info("Building MD5 Summary file")
+    gearman_worker.send_job_status(gearman_job, 80, 100)
+
+    sorted_hashes = sorted(new_hashes, key=lambda hashes: hashes['filename'])
     try:
         #logging.debug("Saving new MD5 Summary file")
         with open(gearman_worker.md5_summary_filepath, mode='w', encoding='utf-8') as md5_summary_file:
