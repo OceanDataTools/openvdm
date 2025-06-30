@@ -55,19 +55,16 @@ def export_cruise_config(gearman_worker, finalize=False):
             logging.debug("Error reading config: %s", err)
             return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
-    def scrub_transfer(transfer_list, lowering_data_base_dir):
+    def scrub_transfers(transfer_list):
         for transfer in transfer_list:
-            if transfer['cruiseOrLowering'] == '1':
-                transfer['destDir'] = os.path.join(lowering_data_base_dir, "{loweringID}", transfer['destDir'])
 
             allowed_keys = ['name', 'longName', 'destDir']
             for key in list(transfer.keys()):
                 if key not in allowed_keys:
                     transfer.pop(key)
 
-    # scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
-    scrub_transfer(cruise_config.get('collectionSystemTransfersConfig', []), cruise_config.get('loweringDataBaseDir'))
-    scrub_transfer(cruise_config.get('extraDirectoriesConfig', []), cruise_config.get('loweringDataBaseDir'))
+    scrub_transfers(cruise_config.get('collectionSystemTransfersConfig', []))
+    scrub_transfers(cruise_config.get('extraDirectoriesConfig', []))
 
     cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
     cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
@@ -76,15 +73,14 @@ def export_cruise_config(gearman_worker, finalize=False):
     del cruise_config['cruiseDataTransfersConfig']
     del cruise_config['shipToShoreTransfersConfig']
 
-    output_results = output_json_data_to_file(cruise_config_file_path, cruise_config)
-    if not output_results['verdict']:
-        return {'verdict': False, 'reason': output_results['reason']}
+    results = output_json_data_to_file(cruise_config_file_path, cruise_config)
+    if not results['verdict']:
+        return {'verdict': False, 'reason': results['reason']}
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
-    if not output_results['verdict']:
-        return {'verdict': False, 'reason': output_results['reason']}
+    results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], cruise_config_file_path)
+    if not results['verdict']:
+        return {'verdict': False, 'reason': results['reason']}
 
-    # gearman_worker.update_md5_summary(output_results.get('files', {'new':[], 'updated':[]}))
     gearman_worker.update_md5_summary({'new':[], 'updated':[cruise_config_fn]})
 
     return {'verdict': True}
@@ -150,25 +146,17 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
     Transfer the contents of the PublicData share to the Cruise Data Directory
     """
 
-    job_results = {'parts':[]}
-
     source_dir = gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
     from_publicdata_dir = gearman_worker.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir']
     dest_dir = os.path.join(gearman_worker.cruise_dir, from_publicdata_dir)
 
     logging.debug("Verify PublicData Directory exists")
     if not os.path.exists(source_dir):
-        job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Fail", "reason": f"PublicData directory: {source_dir} could not be found"})
-        return json.dumps(job_results)
-
-    job_results['parts'].append({"partName": "Verify PublicData directory exists", "result": "Pass"})
+        return {'verdict': False, "reason": f"PublicData directory: {source_dir} could not be found"}
 
     logging.debug("Verify From_PublicData directory exists within the cruise data directory")
     if not os.path.exists(dest_dir):
-        job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Fail", "reason": f"From_PublicData directory: {dest_dir} could not be found"})
-        return json.dumps(job_results)
-
-    job_results['parts'].append({"partName": "Verify From_PublicData directory exists", "result": "Pass"})
+        return {'verdict': False, "reason": f"From_PublicData directory: {dest_dir} could not be found"}
 
     logging.debug("Building file list")
     files = build_filelist(source_dir)
@@ -187,12 +175,9 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
     }
     results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-    if results['verdict']:
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
-    else:
+    if not results['verdict']:
         logging.error("Error writing transfer logfile: %s", results['reason'])
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
-        return json.dumps(job_results)
+        return {'verdict': False, "reason": results['reason'][-1]}
 
     with temporary_directory() as tmpdir:    # Create temp directory
         include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -217,11 +202,11 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
 
         files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
+        results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 80/100) + start_status, 100)
 
-        if not output_results['verdict']:
-            return {'verdict': False, 'reason': output_results['reason']}
+        if not results['verdict']:
+            return {'verdict': False, 'reason': results['reason']}
 
         gearman_worker.update_md5_summary(files)
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 90/100) + start_status, 100)
