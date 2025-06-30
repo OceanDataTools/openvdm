@@ -260,12 +260,10 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     logging.debug("Building filelist")
     filelist = []
-    logging.debug('Payload Filelist: %s', json.dumps(payload_obj['files'], indent=2))
+
     new_files = payload_obj['files'].get('new', [])
     updated_files = payload_obj['files'].get('updated', [])
     deleted_files = payload_obj['files'].get('deleted', [])
-
-    logging.debug('Deleted files: %s', json.dumps(deleted_files, indent=2))
 
     if len(new_files) + len(updated_files) + len(deleted_files) == 0:
         return json.dumps(job_results)
@@ -332,6 +330,7 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     # Delete obsolete entries
     if deleted_files:
+        logging.debug("Delete hashes for files that no longer exists")
         before = len(existing_hashes)
         existing_hashes = [e for e in existing_hashes if e['filename'] not in deleted_files]
         row_deleted = before - len(existing_hashes)
