@@ -338,8 +338,8 @@ def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
                             gearman_worker.send_job_status(gearman_job, int(50 * percent / 100) + 20, 100) # 70 - 20
                         last_percent_reported = percent
 
-    logging.warning("new_files: \n%s", json.dumps(new_files, indent=2))
-    logging.warning("updated_files: \n%s", json.dumps(updated_files, indent=2))
+    # logging.warning("new_files: \n%s", json.dumps(new_files, indent=2))
+    # logging.warning("updated_files: \n%s", json.dumps(updated_files, indent=2))
 
     return new_files, updated_files
 
@@ -500,9 +500,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if self.lowering_id is None:
                 return None
 
-            return os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, dest_dir)
+            return os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id, dest_dir)
 
-        return os.path.join(self.cruise_dir, dest_dir)
+        return dest_dir
 
 
     def build_source_dir(self):
@@ -511,6 +511,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
 
         return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
+
+
+    def build_destination_dir(self):
+        """
+        Replace wildcard string in destDir AND add full cruise path
+        """
+
+        return os.path.join(self.cruise_dir, self.build_dest_dir())
 
 
     def build_logfile_dirpath(self):
@@ -607,7 +615,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.dest_dir = self.build_dest_dir()
+        self.dest_dir = self.build_destination_dir()
         self.source_dir = self.build_source_dir()
 
         ### Set temporal bounds for transfer
@@ -686,21 +694,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     if len(new_files) > 0 or len(updated_files) > 0 or len(deleted_files) > 0:
 
                         logging.info("Preparing subsequent Gearman jobs")
+                        rel_dir = self.build_dest_dir
                         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
                         job_data = {
                             'cruiseID': self.cruise_id,
                             'collectionSystemTransferID': cst_id,
                             'files': {
-                                'new': new_files,
-                                'updated': updated_files,
-                                'deleted': deleted_files
-                                # 'new': [ os.path.join(self.dest_dir, filepath) for filepath in new_files],
-                                # 'updated': [ os.path.join(self.dest_dir, filepath) for filepath in updated_files],
-                                # 'deleted': [
-                                #     os.path.normpath(os.path.join(self.dest_dir, filepath))
-                                #     for filepath in deleted_files
-                                # ]
+                                'new': [ os.path.join(rel_dir, filepath) for filepath in new_files],
+                                'updated': [ os.path.join(rel_dir, filepath) for filepath in updated_files],
+                                'deleted': [
+                                    os.path.normpath(os.path.join(rel_dir, filepath))
+                                    for filepath in deleted_files
+                                ]
                             }
                         }
 
