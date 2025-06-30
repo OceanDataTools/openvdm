@@ -201,7 +201,7 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
         files['updated'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in files['updated'] ]
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 70/100) + start_status, 100)
 
-        files['deleted'] = delete_from_dest(dest_dir, files['include'])
+        files['deleted'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in delete_from_dest(dest_dir, files['include']) ]
 
         results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], dest_dir)
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 80/100) + start_status, 100)
