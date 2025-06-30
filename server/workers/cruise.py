@@ -30,7 +30,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-# from server.workers.set_run_collection_system_transfer import run_transfer_command
+from server.lib.connection_utils import get_transfer_type
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -58,6 +58,10 @@ def export_cruise_config(gearman_worker, cruise_config_file_path, finalize=False
         for transfer in transfer_list:
             for key in ['sshPass', 'rsyncPass', 'smbPass']:
                 transfer.pop(key, None)
+
+    def replace_transfer_type(transfer_list):
+        for transfer in transfer_list:
+            transfer['transferType'] = get_transfer_type(transfer['transferType'])
 
     scrub_passwords(cruise_config.get('collectionSystemTransfersConfig', []))
 
