@@ -116,37 +116,39 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", current_job.data)
-
-            cst_cfg = payload_obj.get('collectionSystemTransfer', {})
-            cst_id = cst_cfg.get('collectionSystemTransferID')
-
-            if cst_id:
-                self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
-
-                if not self.collection_system_transfer:
-                    reason = "Could not find configuration data for collection system transfer"
-                    return self.on_job_complete(current_job, json.dumps({'parts':[
-                        {"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": reason},
-                        {"partName": "Final Verdict", "result": "Fail", "reason": reason}
-                    ]}))
-
-                self.collection_system_transfer.update(cst_cfg)
-
-            elif not cst_cfg:
-                self.collection_system_transfer = {
-                    'name': "UNKNOWN"
-                }
-
-                return self._fail_job(current_job, "Located Collection System Transfer Data",
-                                      "Could not find collection system transfer config to use for connection test")
-
-            else:
-                self.collection_system_transfer = cst_cfg
-
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
-            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
+
+        cst_cfg = payload_obj.get('collectionSystemTransfer', {})
+        cst_id = cst_cfg.get('collectionSystemTransferID')
+
+        if cst_id:
+            self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
+
+            if not self.collection_system_transfer:
+                return self._fail_job(current_job, "Locate Collection System Transfer Data",
+                                      "Could not find collection system transfer config to use for connection test")
+
+                # reason = "Could not find configuration data for collection system transfer"
+                # return self.on_job_complete(current_job, json.dumps({'parts':[
+                #     {"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": reason},
+                #     {"partName": "Final Verdict", "result": "Fail", "reason": reason}
+                # ]}))
+
+            self.collection_system_transfer.update(cst_cfg)
+
+        elif not cst_cfg:
+            # self.collection_system_transfer = {
+            #     'name': "UNKNOWN"
+            # }
+
+            return self._fail_job(current_job, "Locate Collection System Transfer Data",
+                                  "Could not find collection system transfer config to use for connection test")
+
+        else:
+            self.collection_system_transfer = cst_cfg
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -210,18 +212,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         final_verdict = job_parts[-1] if len(job_parts) else None
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
-        if cst_id:
-            if final_verdict:
-                if final_verdict.get('result') == "Fail":
-                    self.ovdm.set_error_collection_system_transfer_test(cst_id, final_verdict.get('reason', "undefined"))
-                else:
-                    self.ovdm.clear_error_collection_system_transfer(cst_id, self.collection_system_transfer.get('status'))
-            else:
-                self.ovdm.clear_error_collection_system_transfer(cst_id, self.collection_system_transfer.get('status'))
-
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s transfer completed at: %s", current_job.handle,
                      time.strftime("%D %T", time.gmtime()))
+
+        if not cst_id:
+            return super().send_job_complete(current_job, job_result)
+
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', "undefined")
+            self.ovdm.set_error_collection_system_transfer_test(cst_id, reason)
+            return super().send_job_complete(current_job, job_result)
+
+        # Always set idle at the end if not failed
+        self.ovdm.clear_error_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -324,7 +328,6 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("QUIT Signal Received")
@@ -335,7 +338,6 @@ if __name__ == "__main__":
         Signal Handler for INT
         """
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
