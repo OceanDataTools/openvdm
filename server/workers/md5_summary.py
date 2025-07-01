@@ -279,9 +279,6 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
 
     new_hashes = gearman_worker.build_md5_hashes(gearman_job, filelist)
 
-    if gearman_worker.stop:
-        return json.dumps(job_results)
-
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
     logging.debug("Processing existing MD5 summary file")
@@ -340,13 +337,13 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     logging.debug("Building MD5 Summary file")
     gearman_worker.send_job_status(gearman_job, 9, 10)
 
-    output_results = gearman_worker.build_md5_summary_md5(hashes)
+    output_results = gearman_worker.build_md5_summary(hashes)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Calculate hashes", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Calculate hashes", "result": "Pass"})
+    job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Pass"})
 
     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.md5_summary_filepath)
 
@@ -512,6 +509,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -519,6 +518,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
