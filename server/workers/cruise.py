@@ -30,6 +30,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.worker.set_running_collection_system_transfer import run_transfer_command
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -86,60 +87,60 @@ def export_cruise_config(gearman_worker, finalize=False):
     return {'verdict': True}
 
 
-def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
-    """
-    run the rsync command and return the list of new/updated files
-    """
+# def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
+#     """
+#     run the rsync command and return the list of new/updated files
+#     """
 
-    # if there are no files to transfer, then don't
-    if file_count == 0:
-        logging.info("Skipping Transfer Command: nothing to transfer")
-        return [], []
+#     # if there are no files to transfer, then don't
+#     if file_count == 0:
+#         logging.info("Skipping Transfer Command: nothing to transfer")
+#         return [], []
 
-    logging.info('Transfer Command: %s', ' '.join(cmd))
+#     logging.info('Transfer Command: %s', ' '.join(cmd))
 
-    new_files = []
-    updated_files = []
-    last_percent_reported = -1
+#     new_files = []
+#     updated_files = []
+#     last_percent_reported = -1
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is None:
+#     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+#     while proc.poll() is None:
 
-        for line in proc.stdout:
+#         for line in proc.stdout:
 
-            if gearman_worker.stop:
-                logging.debug("Stopping")
-                proc.terminate()
-                break
+#             if gearman_worker.stop:
+#                 logging.debug("Stopping")
+#                 proc.terminate()
+#                 break
 
-            line = line.strip()
+#             line = line.strip()
 
-            if not line:
-                continue
+#             if not line:
+#                 continue
 
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                new_files.append(filename.rstrip('\n'))
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                updated_files.append(filename.rstrip('\n'))
+#             if line.startswith( '>f+++++++++' ):
+#                 filename = line.split(' ',1)[1]
+#                 new_files.append(filename.rstrip('\n'))
+#             elif line.startswith( '>f.' ):
+#                 filename = line.split(' ',1)[1]
+#                 updated_files.append(filename.rstrip('\n'))
 
-            # Extract progress from `to-chk=` lines
-            match = TO_CHK_RE.search(line)
-            if match:
-                remaining = int(match.group(1))
-                total = int(match.group(2))
-                if total > 0:
-                    percent = int(100 * (total - remaining) / total)
+#             # Extract progress from `to-chk=` lines
+#             match = TO_CHK_RE.search(line)
+#             if match:
+#                 remaining = int(match.group(1))
+#                 total = int(match.group(2))
+#                 if total > 0:
+#                     percent = int(100 * (total - remaining) / total)
 
-                    if percent != last_percent_reported:
-                        logging.info("Progress Update: %d%%", percent)
-                        if gearman_job:
-                            gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
+#                     if percent != last_percent_reported:
+#                         logging.info("Progress Update: %d%%", percent)
+#                         if gearman_job:
+#                             gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
 
-                        last_percent_reported = percent
+#                         last_percent_reported = percent
 
-    return new_files, updated_files
+#     return new_files, updated_files
 
 
 def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_status):
@@ -169,16 +170,22 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
         logging.warning("\t %s", "\n\t".join(files['exclude']))
 
     logfile_filename = 'PublicData_Exclude.log'
+    logfile_filepath = os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename)
     logfile_contents = {
         'files': {
             'exclude': files['exclude']
         }
     }
-    results = output_json_data_to_file(os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
+    results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
 
     if not results['verdict']:
-        logging.error("Error writing transfer logfile: %s", results['reason'])
-        return {'verdict': False, "reason": results['reason'][-1]}
+        return {'verdict': False, "reason": f"Error writing exclude logfile {logfile_filename}"}
+
+    results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], logfile_filepath)
+
+    if not results['verdict']:
+        logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
+        return {'verdict': False, "reason": f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"}
 
     with temporary_directory() as tmpdir:    # Create temp directory
         include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -208,6 +215,25 @@ def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_statu
 
         if not results['verdict']:
             return {'verdict': False, 'reason': results['reason']}
+
+        logfile_filename = f"PublicData_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.log"
+        logfile_filepath = os.path.join(gearman_worker.build_logfile_dirpath(), logfile_filename)
+        logfile_contents = {
+            'files': {
+                'new': files['new'],
+                'updated': files['updated']
+            }
+        }
+        results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
+
+        if not results['verdict']:
+            return {'verdict': False, "reason": f"Error writing transfer logfile {logfile_filename}"}
+
+        results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], logfile_filepath)
+
+        if not results['verdict']:
+            logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
+            return {'verdict': False, "reason": f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"}
 
         gearman_worker.update_md5_summary(files)
         gearman_worker.send_job_status(gearman_job, int((end_status - start_status) * 90/100) + start_status, 100)
