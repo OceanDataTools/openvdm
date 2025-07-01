@@ -295,15 +295,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
-            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
 
         self.task = self.ovdm.get_task_by_name(current_job.task)
-        logging.debug("task: %s", self.task)
 
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.task['longName']}: %(message)s"
+        ))
 
-        logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
+
+        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.cruise_start_date = payload_obj.get('cruiseStartDate', self.ovdm.get_cruise_start_date())
@@ -319,7 +322,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -344,41 +347,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         results = json.loads(job_result)
 
-        job_data = {
-            'cruiseID': self.cruise_id,
-            'cruiseStartDate': self.cruise_start_date
-        }
-
-        if current_job.task == "setupNewCruise":
-
+        if current_job.task in ("setupNewCruise", "finalizeCurrentCruise"):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            for task in self.ovdm.get_tasks_for_hook('setupNewCruise'):
+            job_data = {
+                'cruiseID': self.cruise_id,
+                'cruiseStartDate': self.cruise_start_date
+            }
+
+            for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        elif current_job.task == "finalizeCurrentCruise":
+        parts = results.get('parts', [])
+        last_part = parts[-1] if parts else None
 
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-            for task in self.ovdm.get_tasks_for_hook('finalizeCurrentCruise'):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-        if len(results['parts']) > 0:
-            if results['parts'][-1]['result'] == "Fail": # Final Verdict
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results['parts'][-1]['reason'])
-                else:
-                    self.ovdm.send_msg(self.task['longName'] + ' failed', results['parts'][-1]['reason'])
+        if last_part and last_part.get('result') == "Fail":
+            reason = last_part.get('reason', 'Unknown failure')
+            if int(self.task['taskID']) > 0:
+                self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
-                self.ovdm.set_idle_task(self.task['taskID'])
+                self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
         else:
             self.ovdm.set_idle_task(self.task['taskID'])
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle,
-                     time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -668,6 +662,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -675,6 +671,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
