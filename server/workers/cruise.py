@@ -87,62 +87,6 @@ def export_cruise_config(gearman_worker, finalize=False):
     return {'verdict': True}
 
 
-# def run_transfer_command(gearman_worker, gearman_job, cmd, file_count):
-#     """
-#     run the rsync command and return the list of new/updated files
-#     """
-
-#     # if there are no files to transfer, then don't
-#     if file_count == 0:
-#         logging.info("Skipping Transfer Command: nothing to transfer")
-#         return [], []
-
-#     logging.info('Transfer Command: %s', ' '.join(cmd))
-
-#     new_files = []
-#     updated_files = []
-#     last_percent_reported = -1
-
-#     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-#     while proc.poll() is None:
-
-#         for line in proc.stdout:
-
-#             if gearman_worker.stop:
-#                 logging.debug("Stopping")
-#                 proc.terminate()
-#                 break
-
-#             line = line.strip()
-
-#             if not line:
-#                 continue
-
-#             if line.startswith( '>f+++++++++' ):
-#                 filename = line.split(' ',1)[1]
-#                 new_files.append(filename.rstrip('\n'))
-#             elif line.startswith( '>f.' ):
-#                 filename = line.split(' ',1)[1]
-#                 updated_files.append(filename.rstrip('\n'))
-
-#             # Extract progress from `to-chk=` lines
-#             match = TO_CHK_RE.search(line)
-#             if match:
-#                 remaining = int(match.group(1))
-#                 total = int(match.group(2))
-#                 if total > 0:
-#                     percent = int(100 * (total - remaining) / total)
-
-#                     if percent != last_percent_reported:
-#                         logging.info("Progress Update: %d%%", percent)
-#                         if gearman_job:
-#                             gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
-
-#                         last_percent_reported = percent
-
-#     return new_files, updated_files
-
-
 def transfer_publicdata_dir(gearman_worker, gearman_job, start_status, end_status):
     """
     Transfer the contents of the PublicData share to the Cruise Data Directory
@@ -440,19 +384,8 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
 
     job_results['parts'].append({"partName": "Create cruise data directory structure", "result": "Pass"})
 
-    logging.info("Exporting Cruise Configuration")
-    gearman_worker.send_job_status(gearman_job, 5, 10)
-
-    output_results = export_cruise_config(gearman_worker)
-
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
-
-    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
-
     logging.info("Creating MD5 summary files")
-    gearman_worker.send_job_status(gearman_job, 6, 10)
+    gearman_worker.send_job_status(gearman_job, 5, 10)
 
     completed_job_request = gm_client.submit_job("rebuildMD5Summary", gearman_job.data)
 
@@ -464,6 +397,17 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Create MD5 summary files", "result": "Pass"})
+
+    logging.info("Exporting Cruise Configuration")
+    gearman_worker.send_job_status(gearman_job, 6, 10)
+
+    output_results = export_cruise_config(gearman_worker)
+
+    if not output_results['verdict']:
+        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
     logging.info("Creating data dashboard directory structure and manifest file")
     gearman_worker.send_job_status(gearman_job, 7, 10)
