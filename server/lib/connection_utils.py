@@ -52,7 +52,7 @@ def detect_smb_version(cst_cfg):
             '-U', f"{cst_cfg['smbUser']}%{cst_cfg['smbPass']}"
         ]
 
-    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'password={cst_cfg["smbPass"]}', 'password=****'))
+    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'%{cst_cfg["smbPass"]}', '%****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
