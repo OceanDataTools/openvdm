@@ -676,48 +676,47 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         results = json.loads(job_result)
         job_parts = results.get('parts', [])
-        final_verdict = job_parts[-1] if len(job_parts) else None
+        final_verdict = job_parts[-1] if job_parts else None
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
-
-        if cst_id:
-            if final_verdict:
-                if final_verdict.get('result') == "Fail":
-                    self.ovdm.set_error_collection_system_transfer(cst_id, final_verdict.get('reason', "undefined"))
-                else:
-                    new_files = results['files'].get('new', [])
-                    updated_files = results['files'].get('updated', [])
-                    deleted_files = results['files'].get('deleted', [])
-
-                    if len(new_files) > 0 or len(updated_files) > 0 or len(deleted_files) > 0:
-
-                        logging.info("Preparing subsequent Gearman jobs")
-                        rel_dir = self.build_rel_dir()
-                        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-                        job_data = {
-                            'cruiseID': self.cruise_id,
-                            'collectionSystemTransferID': cst_id,
-                            'files': {
-                                'new': [ os.path.join(rel_dir, filepath) for filepath in new_files],
-                                'updated': [ os.path.join(rel_dir, filepath) for filepath in updated_files],
-                                'deleted': [
-                                    os.path.normpath(os.path.join(rel_dir, filepath))
-                                    for filepath in deleted_files
-                                ]
-                            }
-                        }
-
-                        for task in self.ovdm.get_tasks_for_hook('runCollectionSystemTransfer'):
-                            logging.info("Adding post task: %s", task)
-                            gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-                    self.ovdm.set_idle_collection_system_transfer(cst_id)
-            else:
-                self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s transfer completed at: %s", current_job.handle,
                      time.strftime("%D %T", time.gmtime()))
+
+        if not cst_id:
+            return super().send_job_complete(current_job, job_result)
+
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', "undefined")
+            self.ovdm.set_error_collection_system_transfer(cst_id, reason)
+            return super().send_job_complete(current_job, job_result)
+
+        # If not a failure, prepare potential follow-up jobs
+        new_files = results.get('files', {}).get('new', [])
+        updated_files = results.get('files', {}).get('updated', [])
+        deleted_files = results.get('files', {}).get('deleted', [])
+
+        if new_files or updated_files or deleted_files:
+            logging.info("Preparing subsequent Gearman jobs")
+            rel_dir = self.build_rel_dir()
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            job_data = {
+                'cruiseID': self.cruise_id,
+                'collectionSystemTransferID': cst_id,
+                'files': {
+                    'new': [os.path.join(rel_dir, f) for f in new_files],
+                    'updated': [os.path.join(rel_dir, f) for f in updated_files],
+                    'deleted': [os.path.normpath(os.path.join(rel_dir, f)) for f in deleted_files],
+                }
+            }
+
+            for task in self.ovdm.get_tasks_for_hook(current_job.task):
+                logging.info("Adding post task: %s", task)
+                gm_client.submit_job(task, json.dumps(job_data), background=True)
+
+        # Always set idle at the end if not failed
+        self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -921,7 +920,6 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("QUIT Signal Received")
@@ -932,7 +930,6 @@ if __name__ == "__main__":
         Signal Handler for INT
         """
 
-        LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
