@@ -268,7 +268,9 @@ def task_update_md5_summary(gearman_worker, gearman_job): # pylint: disable=too-
     deleted_files = payload_obj['files'].get('deleted', [])
 
     if len(new_files) + len(updated_files) + len(deleted_files) == 0:
-        return json.dumps(job_results)
+        return json.dumps({
+            'parts': [{"partName": "Update MD5 Summary", "result": "Ignore", "reason": "Nothing to update"}]
+        })
 
     if new_files or updated_files:
         filelist.extend(new_files)
