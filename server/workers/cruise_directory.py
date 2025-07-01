@@ -56,7 +56,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_id = None
         self.cruise_dir = None
         self.lowering_id = None
-        self.cruise_start_date = None
         self.shipboard_data_warehouse_config = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
@@ -147,24 +146,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         logging.debug("current_job: %s", current_job)
-
         self.stop = False
-        payload_obj = json.loads(current_job.data)
 
-        self.task = self._get_custom_task(current_job) if self._get_custom_task(current_job) is not None else self.ovdm.get_task_by_name(current_job.task)
-        logging.debug("task: %s", self.task)
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
+
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.task['longName']}: %(message)s"
+        ))
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
 
-        logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.cruise_start_date = payload_obj['cruiseStartDate'] if 'cruiseStartDate' in payload_obj else self.ovdm.get_cruise_start_date()
-        self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)
@@ -175,7 +182,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
         if int(self.task['taskID']) > 0:
@@ -195,23 +202,34 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
-                else:
-                    self.ovdm.send_msg(f"{self.task['longName']} failed", results_obj['parts'][-1]['reason'])
-            else:
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_idle_task(self.task['taskID'])
-        else:
+        if current_job.task in ("setupNewCruise", "finalizeCurrentCruise"):
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            job_data = {
+                'cruiseID': self.cruise_id,
+                'cruiseStartDate': self.cruise_start_date
+            }
+
+            for task in self.ovdm.get_tasks_for_hook(current_job.task):
+                logging.info("Adding post task: %s", task)
+                gm_client.submit_job(task, json.dumps(job_data), background=True)
+
+        parts = results.get('parts', [])
+        last_part = parts[-1] if parts else None
+
+        if last_part and last_part.get('result') == "Fail":
+            reason = last_part.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
-                self.ovdm.set_idle_task(self.task['taskID'])
+                self.ovdm.set_error_task(self.task['taskID'], reason)
+            else:
+                self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
+        else:
+            self.ovdm.set_idle_task(self.task['taskID'])
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
+        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -233,6 +251,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
+
+
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
 
 
 def task_create_cruise_directory(gearman_worker, gearman_job):
@@ -438,6 +463,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -445,6 +472,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
