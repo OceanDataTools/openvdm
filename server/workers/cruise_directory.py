@@ -388,7 +388,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
     logging.info("Build directory list")
-    directorylist = gearman_worker.uild_directorylist()
+    directorylist = gearman_worker.build_directorylist()
     logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
 
     if len(directorylist) > 0:
