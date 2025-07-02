@@ -93,6 +93,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 logging.debug(str("Error reading config: %s", err))
                 return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
+        logging.debug(json.dumps(lowering_config))
+
+        if lowering_config['loweringFinalizedOn'] is None:
+            del lowering_config['loweringFinalizedOn']
+
         def scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
@@ -102,9 +107,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                         transfer.pop(key)
 
         scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
-
-        if lowering_config['loweringFinalizedOn'] is None:
-            del lowering_config['loweringFinalizedOn']
 
         results = output_json_data_to_file(lowering_config_filepath, lowering_config)
         if not results['verdict']:
