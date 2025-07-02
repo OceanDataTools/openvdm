@@ -65,18 +65,18 @@ def build_directorylist(gearman_worker):
     return_directories = [ gearman_worker.lowering_dir ]
 
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(cruise=False)
-    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(cruise=False)
-    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(extra_directory['destDir'])) for extra_directory in extra_directories ])
 
     # Special case where an collection system needs to be created outside of the lowering directory
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
-    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
 
     # Special case where an extra directory needs to be created outside of the lowering directory
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
-    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
 
     return return_directories
 
@@ -141,19 +141,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # Retrieve active collection system transfers for lowering-related transfers
         collection_system_transfers = self.ovdm.get_active_collection_system_transfers(cruise=False)
-        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(self, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
+        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
         # Retrieve active collection system transfers for lowering-related extra directories
         extra_directories = self.ovdm.get_active_extra_directories(cruise=False)
-        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(self, extra_directory['destDir'])) for extra_directory in extra_directories ])
+        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(extra_directory['destDir'])) for extra_directory in extra_directories ])
 
         # Special case where an collection system needs to be created outside of the lowering directory
         collection_system_transfers = self.ovdm.get_active_collection_system_transfers(lowering=False)
-        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(self, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
 
         # Special case where an extra directory needs to be created outside of the lowering directory
         extra_directories = self.ovdm.get_active_extra_directories(lowering=False)
-        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(self, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
+        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
 
         return list(set(return_directories))
 
