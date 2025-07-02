@@ -381,13 +381,20 @@ def create_directories(directorylist):
     return {'verdict': True}
 
 
-def lockdown_directory(base_dir):
+def lockdown_directory(base_dir, exempt_dirs=[]):
     """
     Lockdown permissions on the base directory, skip the exempt directories if
     present
     """
 
     reasons = []
+
+    if not isinstance(exempt_dirs, list):
+        logging.error("Except directories not provided as a list")
+        raise ValueError("Except directories not provided as a list")
+
+    exempt_dirs = [ os.path.join(base_dir, exempt_dir) for exempt_dir in exempt_dirs ]
+
     try:
         dir_contents = [os.path.join(base_dir, f) for f in os.listdir(base_dir)]
     except OSError as e:
@@ -403,6 +410,8 @@ def lockdown_directory(base_dir):
             reasons.append(f"Could not change permissions for file {file}")
 
     for directory in filter(os.path.isdir, dir_contents):
+        if os.path.abspath(directory) in exempt_dirs:
+            continue
         try:
             os.chmod(directory, 0o700)
         except (OSError, PermissionError) as e:

@@ -303,7 +303,11 @@ def task_create_cruise_directory(gearman_worker, gearman_job):
         logging.info("Clear read permissions for all cruise directories")
         gearman_worker.send_job_status(gearman_job, 7, 10)
 
-        lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
+        output_results = lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], [gearman_worker.cruise_dir])
+
+        if not output_results['verdict']:
+            job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
@@ -338,7 +342,12 @@ def task_set_cruise_data_directory_permissions(gearman_worker, gearman_job):
         logging.info("Clear read permissions for all directories within CruiseData")
         gearman_worker.send_job_status(gearman_job, 2, 10)
 
-        lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
+        output_results = lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], [gearman_worker.cruise_dir])
+
+        if not output_results['verdict']:
+            job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
+
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
     if os.path.isdir(gearman_worker.cruise_dir):
@@ -377,7 +386,7 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
         logging.info("Clear CruiseData Directory Read Permissions")
         gearman_worker.send_job_status(gearman_job, 2, 100)
 
-        output_results = lockdown_directory(gearman_worker.cruise_dir)
+        output_results = lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], [gearman_worker.cruise_dir])
 
         if not output_results['verdict']:
             job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Fail", "reason": output_results['reason']})
