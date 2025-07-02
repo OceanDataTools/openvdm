@@ -29,10 +29,15 @@ from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 from server.lib.md5_util import hash_file
 
+TASK_NAMES = {
+    'REBUILD_MD5_SUMMARY': 'rebuildMD5Summary',
+    'UPDATE_MD5_SUMMARY': 'updateMD5Summary'
+}
+
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": "updateMD5Summary",
+        "name": TASK_NAMES['UPDATE_MD5_SUMMARY'],
         "longName": "Updating MD5 Summary",
     }
 ]
@@ -531,10 +536,10 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: updateMD5Summary")
-    new_worker.register_task("updateMD5Summary", task_update_md5_summary)
-    logging.info("\tTask: rebuildMD5Summary")
-    new_worker.register_task("rebuildMD5Summary", task_rebuild_md5_summary)
+    logging.info("\tTask: %s", TASK_NAMES['UPDATE_MD5_SUMMARY'])
+    new_worker.register_task(TASK_NAMES['UPDATE_MD5_SUMMARY'], task_update_md5_summary)
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_MD5_SUMMARY'])
+    new_worker.register_task(TASK_NAMES['REBUILD_MD5_SUMMARY'], task_rebuild_md5_summary)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

@@ -27,7 +27,14 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
+from server.lib.hooks import UPDATE_MD5SUMMARY_TASK_NAME
 from server.lib.openvdm import OpenVDM
+
+TASK_NAMES = {
+    'CREATE_LOWERING': 'setupNewLowering',
+    'FINALIZE_LOWERING': 'finalizeCurrentLowering',
+    'EXPORT_LOWERING_CONFIG': 'exportLoweringConfig'
+}
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """
@@ -66,7 +73,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }
 
         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-        gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
+        gm_client.submit_job(UPDATE_MD5SUMMARY_TASK_NAME, json.dumps(gm_data))
 
         logging.debug("MD5 Summary Task Complete")
 
@@ -188,7 +195,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         results = json.loads(job_result)
 
-        if current_job.task in ("setupNewLowering", "finalizeCurrentLowering"):
+        if current_job.task in (TASK_NAMES['CREATE_LOWERING'], TASK_NAMES['FINALIZE_LOWERING']):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
             job_data = {
@@ -438,14 +445,14 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: setupNewLowering")
-    new_worker.register_task("setupNewLowering", task_setup_new_lowering)
+    logging.info("\tTask: %s", TASK_NAMES['CREATE_LOWERING'])
+    new_worker.register_task(TASK_NAMES['CREATE_LOWERING'], task_setup_new_lowering)
 
-    logging.info("\tTask: finalizeCurrentLowering")
-    new_worker.register_task("finalizeCurrentLowering", task_finalize_current_lowering)
+    logging.info("\tTask: %s", TASK_NAMES['FINALIZE_LOWERING'])
+    new_worker.register_task(TASK_NAMES['FINALIZE_LOWERING'], task_finalize_current_lowering)
 
-    logging.info("\tTask: exportLoweringConfig")
-    new_worker.register_task("exportLoweringConfig", task_export_lowering_config)
+    logging.info("\tTask: %s", TASK_NAMES['EXPORT_LOWERING_CONFIG'])
+    new_worker.register_task(TASK_NAMES['EXPORT_LOWERING_CONFIG'], task_export_lowering_config)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

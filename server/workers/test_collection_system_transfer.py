@@ -28,6 +28,10 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 from server.lib.connection_utils import test_cst_source
 
+TASK_NAMES = {
+    'TEST_COLLECTION_SYSTEM_TRANSFER': 'testCollectionSystemTransfer'
+}
+
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
     Class for the current Gearman worker
@@ -348,8 +352,8 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: testCollectionSystemTransfer")
-    new_worker.register_task("testCollectionSystemTransfer", task_test_collection_system_transfer)
+    logging.info("\tTask: %s", TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
+    new_worker.register_task(TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], task_test_collection_system_transfer)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

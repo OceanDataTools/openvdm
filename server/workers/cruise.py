@@ -32,6 +32,13 @@ from server.lib.file_utils import build_filelist, build_include_file, clear_dire
 from server.workers.run_collection_system_transfer import run_transfer_command
 from server.lib.openvdm import OpenVDM
 
+TASK_NAMES = {
+    'CREATE_CRUISE': 'setupNewCruise',
+    'FINALIZE_CRUISE': 'finalizeCurrentCruise',
+    'EXPORT_CRUISE_CONFIG': 'exportOVDMConfig',
+    'SYNC_PUBLICDATA': 'rsyncPublicDataToCruiseData'
+}
+
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
     Class for the current Gearman worker
@@ -288,7 +295,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         results = json.loads(job_result)
 
-        if current_job.task in ("setupNewCruise", "finalizeCurrentCruise"):
+        if current_job.task in (TASK_NAMES['CREATE_CRUISE'], TASK_NAMES['FINALIZE_CRUISE']):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
             job_data = {
@@ -623,17 +630,17 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: setupNewCruise")
-    new_worker.register_task("setupNewCruise", task_setup_new_cruise)
+    logging.info("\tTask: %s", TASK_NAMES.get('CREATE_CRUISE'))
+    new_worker.register_task(TASK_NAMES.get('CREATE_CRUISE'), task_setup_new_cruise)
 
-    logging.info("\tTask: finalizeCurrentCruise")
-    new_worker.register_task("finalizeCurrentCruise", task_finalize_current_cruise)
+    logging.info("\tTask: %s", TASK_NAMES.get('FINALIZE_CRUISE'))
+    new_worker.register_task(TASK_NAMES.get('FINALIZE_CRUISE'), task_finalize_current_cruise)
 
-    logging.info("\tTask: exportOVDMConfig")
-    new_worker.register_task("exportOVDMConfig", task_export_cruise_config)
+    logging.info("\tTask: %s", TASK_NAMES.get('EXPORT_CRUISE_CONFIG'))
+    new_worker.register_task(TASK_NAMES.get('EXPORT_CRUISE_CONFIG'), task_export_cruise_config)
 
-    logging.info("\tTask: rsyncPublicDataToCruiseData")
-    new_worker.register_task("rsyncPublicDataToCruiseData", task_rsync_publicdata_to_cruise_data)
+    logging.info("\tTask: %s", TASK_NAMES.get('SYNC_PUBLICDATA'))
+    new_worker.register_task(TASK_NAMES.get('SYNC_PUBLICDATA'), task_rsync_publicdata_to_cruise_data)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

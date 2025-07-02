@@ -38,6 +38,9 @@ from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
+TASK_NAMES = {
+    'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
+}
 
 def process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
     """Process a single line from rsync output."""
@@ -940,8 +943,8 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: runCollectionSystemTransfer")
-    new_worker.register_task("runCollectionSystemTransfer", task_run_collection_system_transfer)
+    logging.info("\tTask: %s", TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
+    new_worker.register_task(TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], task_run_collection_system_transfer)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

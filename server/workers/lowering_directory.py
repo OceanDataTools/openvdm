@@ -29,15 +29,21 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import create_directories, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+TASK_NAMES = {
+    'CREATE_CRUISE_DIRECTORY': 'createCruiseDirectory',
+    'REBUILD_CRUISE_DIRECTORY': 'rebuildCruiseDirectory',
+    'SET_CRUISEDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
+}
+
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": "createLoweringDirectory",
+        "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
         "longName": "Creating Lowering Directory",
     },
     {
         "taskID": "0",
-        "name": "setLoweringDataDirectoryPermissions",
+        "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
         "longName": "Setting Lowering Data Directory Permissions",
     }
 
@@ -429,14 +435,14 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: createLoweringDirectory")
-    new_worker.register_task("createLoweringDirectory", task_create_lowering_directory)
+    logging.info("\tTask: %s", TASK_NAMES['CREATE_CRUISE_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['CREATE_CRUISE_DIRECTORY'], task_create_lowering_directory)
 
-    logging.info("\tTask: setLoweringDataDirectoryPermissions")
-    new_worker.register_task("setLoweringDataDirectoryPermissions", task_set_lowering_data_directory_permissions)
+    logging.info("\tTask: %s", TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'])
+    new_worker.register_task(TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], task_set_lowering_data_directory_permissions)
 
-    logging.info("\tTask: rebuildLoweringDirectory")
-    new_worker.register_task("rebuildLoweringDirectory", task_rebuild_lowering_directory)
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_CRUISE_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['REBUILD_CRUISE_DIRECTORY'], task_rebuild_lowering_directory)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

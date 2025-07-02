@@ -29,18 +29,23 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import create_directories, lockdown_directory, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+TASK_NAMES = {
+    'CREATE_CRUISE_DIRECTORY': 'createCruiseDirectory',
+    'REBUILD_CRUISE_DIRECTORY': 'rebuildCruiseDirectory',
+    'SET_CRUISEDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
+}
+
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": "createCruiseDirectory",
+        "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
         "longName": "Creating Cruise Directory",
     },
     {
         "taskID": "0",
-        "name": "setCruiseDataDirectoryPermissions",
+        "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
         "longName": "Setting CruiseData Directory Permissions",
     }
-
 ]
 
 
@@ -326,7 +331,7 @@ def task_create_cruise_directory(worker, current_job):
     return json.dumps(job_results)
 
 
-def task_set_cruise_data_directory_permissions(worker, current_job):
+def task_set_cruisedata_directory_permissions(worker, current_job):
     """
     Set the permissions for the specified cruise ID
     """
@@ -479,14 +484,14 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: createCruiseDirectory")
-    new_worker.register_task("createCruiseDirectory", task_create_cruise_directory)
+    logging.info("\tTask: %s", TASK_NAMES['CREATE_CRUISE_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['CREATE_CRUISE_DIRECTORY'], task_create_cruise_directory)
 
-    logging.info("\tTask: setCruiseDataDirectoryPermissions")
-    new_worker.register_task("setCruiseDataDirectoryPermissions", task_set_cruise_data_directory_permissions)
+    logging.info("\tTask: %s", TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'])
+    new_worker.register_task(TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], task_set_cruisedata_directory_permissions)
 
-    logging.info("\tTask: rebuildCruiseDirectory")
-    new_worker.register_task("rebuildCruiseDirectory", task_rebuild_cruise_directory)
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_CRUISE_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['REBUILD_CRUISE_DIRECTORY'], task_rebuild_cruise_directory)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
