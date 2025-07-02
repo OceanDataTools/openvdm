@@ -366,7 +366,7 @@ def task_rebuild_lowering_directory(gearman_worker, gearman_job):
     logging.info("Set directory ownership/permissions")
     gearman_worker.send_job_status(gearman_job, 7, 10)
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_dir)
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_full_dir)
 
     if not output_results['verdict']:
         logging.error("Failed to set directory ownership")
