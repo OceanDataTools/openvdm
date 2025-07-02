@@ -44,16 +44,16 @@ CUSTOM_TASKS = [
 ]
 
 
-def build_dest_dir(gearman_worker, dest_dir):
-    """
-    Replace any wildcards in the provided directory
-    """
+# def build_dest_dir(gearman_worker, dest_dir):
+#     """
+#     Replace any wildcards in the provided directory
+#     """
 
-    return_dest_dir = dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)
-    return_dest_dir = return_dest_dir.replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'],)
-    return_dest_dir = return_dest_dir.replace('{loweringID}', gearman_worker.lowering_id)
+#     return_dest_dir = dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)
+#     return_dest_dir = return_dest_dir.replace('{loweringDataBaseDir}', gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'],)
+#     return_dest_dir = return_dest_dir.replace('{loweringID}', gearman_worker.lowering_id)
 
-    return return_dest_dir
+#     return return_dest_dir
 
 
 def build_directorylist(gearman_worker):
@@ -65,18 +65,18 @@ def build_directorylist(gearman_worker):
     return_directories = [ gearman_worker.lowering_dir ]
 
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(cruise=False)
-    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
 
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(cruise=False)
-    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
+    return_directories.extend([ os.path.join(gearman_worker.lowering_dir, gearman_worker.build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories ])
 
     # Special case where an collection system needs to be created outside of the lowering directory
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(lowering=False)
-    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(gearman_worker, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
 
     # Special case where an extra directory needs to be created outside of the lowering directory
     extra_directories = gearman_worker.ovdm.get_active_extra_directories(lowering=False)
-    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
+    return_directories.extend([ os.path.join(gearman_worker.cruise_dir, gearman_worker.build_dest_dir(gearman_worker, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
 
     return return_directories
 
@@ -110,36 +110,91 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return task[0] if len(task) > 0 else None
 
 
+    def keyword_replace(self, s):
+        if not isinstance(s, str):
+            return None
+
+        return (s.replace('{cruiseID}', self.cruise_id)
+                .replace('{loweringDataBaseDir}', self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+                .replace('{loweringID}', self.lowering_id)
+                .rstrip('/')
+               ) if s != '/' else s
+
+
+    def build_dest_dir(self, dest_dir):
+        """
+        Replace any wildcards in the provided directory
+        """
+
+        return self.keyword_replace(dest_dir) if dest_dir else None
+
+
+    def build_directorylist(self):
+        """
+        build the list of directories to be created as part of creating the new
+        cruise
+        """
+
+        lowering_full_dir = os.path.join(self.cruise_dir, self.lowering_dir)
+
+        return_directories = [ lowering_full_dir ]
+
+        # Retrieve active collection system transfers for lowering-related transfers
+        collection_system_transfers = self.ovdm.get_active_collection_system_transfers(cruise=False)
+        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(self, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers ])
+
+        # Retrieve active collection system transfers for lowering-related extra directories
+        extra_directories = self.ovdm.get_active_extra_directories(cruise=False)
+        return_directories.extend([ os.path.join(lowering_full_dir, self.build_dest_dir(self, extra_directory['destDir'])) for extra_directory in extra_directories ])
+
+        # Special case where an collection system needs to be created outside of the lowering directory
+        collection_system_transfers = self.ovdm.get_active_collection_system_transfers(lowering=False)
+        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(self, collection_system_transfer['destDir'])) for collection_system_transfer in collection_system_transfers if '{loweringID}' in collection_system_transfer['destDir']])
+
+        # Special case where an extra directory needs to be created outside of the lowering directory
+        extra_directories = self.ovdm.get_active_extra_directories(lowering=False)
+        return_directories.extend([ os.path.join(self.cruise_dir, self.build_dest_dir(self, extra_directory['destDir'])) for extra_directory in extra_directories  if '{loweringID}' in extra_directory['destDir']])
+
+        return list(set(return_directories))
+
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
+        self.stop = False
 
-        payload_obj = json.loads(current_job.data)
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
 
-        self.task = self._get_custom_task(current_job) if self._get_custom_task(current_job) is not None else self.ovdm.get_task_by_name(current_job.task)
-        logging.debug("task: %s", self.task)
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.task['longName']}: %(message)s"
+        ))
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
 
-        logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
-        if self.lowering_id is None or self.lowering_id == "":
-            return self.on_job_complete(current_job, json.dumps({
-                'parts':[],
-                'result': "Pass"
-            }))
+        if not self.lowering_id:
+            return self._fail_job(current_job, "Lowering ID not found", reason)
 
-        self.lowering_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj else self.ovdm.get_lowering_start_date()
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-        self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
+        self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
         return super().on_job_execute(current_job)
 
@@ -149,17 +204,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
-
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', 'Worker crashed')
+        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -168,23 +227,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
-                else:
-                    self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
-            else:
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_idle_task(self.task['taskID'])
-        else:
+        parts = results.get('parts', [])
+        last_part = parts[-1] if parts else None
+
+        if last_part and last_part.get('result') == "Fail":
+            reason = last_part.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
-                self.ovdm.set_idle_task(self.task['taskID'])
+                self.ovdm.set_error_task(self.task['taskID'], reason)
+            else:
+                self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
+        else:
+            self.ovdm.set_idle_task(self.task['taskID'])
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
+        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -208,6 +266,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.shutdown()
 
 
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
+
+
 def task_create_lowering_directory(gearman_worker, gearman_job):
     """
     Setup the lowering directory for the specified lowering ID
@@ -218,89 +283,85 @@ def task_create_lowering_directory(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
+    logging.debug("Pre-tasks checks")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    lowering_data_base_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
+    lowering_base_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir'])
+    lowering_full_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.lowering_dir)
 
-    if os.path.exists(gearman_worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
-    else:
-        logging.error("Failed to find cruise directory: %s", gearman_worker.cruise_dir)
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to find cruise directory: " + gearman_worker.cruise_dir})
+    if not os.path.exists(gearman_worker.cruise_dir):
+        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": f"Cruise directory {gearman_worker.cruise_dir} does not exists"})
         return json.dumps(job_results)
 
-    if os.path.exists(lowering_data_base_dir):
-        job_results['parts'].append({"partName": "Verify Lowering Data Directory exists", "result": "Pass"})
-    else:
-        logging.error("Lowering Data Directory doesn not exist: %s", lowering_data_base_dir)
-        job_results['parts'].append({"partName": "Verify Lowering Data Directory exists", "result": "Fail", "reason": "Unable to find lowering data base directory: " + lowering_data_base_dir})
+    job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
+
+    if not os.path.exists(lowering_base_dir):
+        job_results['parts'].append({"partName": "Verify Lowering Base Directory exists", "result": "Fail", "reason": f"Lowering base directory {lowering_base_dir} does not exists"})
         return json.dumps(job_results)
 
-    if not os.path.exists(gearman_worker.lowering_dir):
-        job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Pass"})
-    else:
-        logging.error("Lowering directory already exists: %s", gearman_worker.lowering_dir)
-        job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Fail", "reason": "Lowering directory " + gearman_worker.lowering_dir + " already exists"})
+    job_results['parts'].append({"partName": "Verify Lowering Base Directory exists", "result": "Pass"})
+
+    if os.path.exists(lowering_full_dir):
+        job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Fail", "reason": f"Lowering directory {lowering_full_dir} already exists"})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Pass"})
+
+    logging.debug("Build directory list")
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
-    directorylist = build_directorylist(gearman_worker)
+    directorylist = gearman_worker.build_directorylist()
     logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
 
-    if len(directorylist) > 0:
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
-    else:
-        logging.warning("Directory list is empty")
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
-        return json.dumps(job_results)
+    job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
+    logging.debug("Create lowering directories")
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
     output_results = create_directories(directorylist)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Failed to create any/all of the lowering data directory structure")
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
 
+    job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
+
+    logging.debug("Set lowering directory ownership/permissions")
     gearman_worker.send_job_status(gearman_job, 8, 10)
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_dir)
+    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], lowering_full_dir)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
 
+    gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
 
 
-def task_set_lowering_data_directory_permissions(gearman_worker, gearman_job):
-    """
-    Set the permissions for the specified lowering ID
-    """
+# def task_set_lowering_data_directory_permissions(gearman_worker, gearman_job):
+#     """
+#     Set the permissions for the specified lowering ID
+#     """
 
-    job_results = {'parts':[]}
+#     job_results = {'parts':[]}
 
-    payload_obj = json.loads(gearman_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+#     payload_obj = json.loads(gearman_job.data)
+#     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+#     gearman_worker.send_job_status(gearman_job, 5, 10)
 
-    if os.path.isdir(gearman_worker.lowering_dir):
-        logging.info("Clear read permissions")
-        set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_dir)
-        job_results['parts'].append({"partName": "Set Directory Permissions for current lowering", "result": "Pass"})
+#     if os.path.isdir(gearman_worker.lowering_dir):
+#         logging.info("Clear read permissions")
+#         set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_dir)
+#         job_results['parts'].append({"partName": "Set Directory Permissions for current lowering", "result": "Pass"})
 
-    job_results['parts'].append({"partName": "Set LoweringData Directory Permissions", "result": "Pass"})
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+#     job_results['parts'].append({"partName": "Set LoweringData Directory Permissions", "result": "Pass"})
+#     gearman_worker.send_job_status(gearman_job, 10, 10)
 
-    return json.dumps(job_results)
+#     return json.dumps(job_results)
 
 
 def task_rebuild_lowering_directory(gearman_worker, gearman_job):
@@ -313,54 +374,46 @@ def task_rebuild_lowering_directory(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
+    logging.info("Pre-task checks")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     if not os.path.exists(gearman_worker.lowering_dir):
-        logging.error("Lowering directory not found")
         job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": "Unable to find lowering directory: " + gearman_worker.lowering_dir})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
 
+    logging.info("Build directory list")
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
-    logging.info("Build directory list")
     directorylist = build_directorylist(gearman_worker)
     logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
-
-    if len(directorylist) == 0:
-        logging.error("Directory list is empty")
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
-        return json.dumps(job_results)
-
     job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+    if len(directorylist) > 0:
+        logging.info("Create directories")
+        gearman_worker.send_job_status(gearman_job, 5, 10)
 
-    logging.info("Create directories")
+        output_results = create_directories(directorylist)
 
-    output_results = create_directories(directorylist)
-
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
-    else:
-        logging.error("Unable to create any/all of the lowering data directory structure")
-        job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
-
-    gearman_worker.send_job_status(gearman_job, 7, 10)
+        if output_results['verdict']:
+            job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
+        else:
+            logging.error("Unable to create any/all of the lowering data directory structure")
+            job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
 
     logging.info("Set directory ownership/permissions")
+    gearman_worker.send_job_status(gearman_job, 7, 10)
 
     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.lowering_dir)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
 
+    gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
 
 
@@ -415,8 +468,10 @@ if __name__ == "__main__":
 
     logging.info("\tTask: createLoweringDirectory")
     new_worker.register_task("createLoweringDirectory", task_create_lowering_directory)
-    logging.info("\tTask: setLoweringDataDirectoryPermissions")
-    new_worker.register_task("setLoweringDataDirectoryPermissions", task_set_lowering_data_directory_permissions)
+
+    # logging.info("\tTask: setLoweringDataDirectoryPermissions")
+    # new_worker.register_task("setLoweringDataDirectoryPermissions", task_set_lowering_data_directory_permissions)
+
     logging.info("\tTask: rebuildLoweringDirectory")
     new_worker.register_task("rebuildLoweringDirectory", task_rebuild_lowering_directory)
 

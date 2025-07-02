@@ -30,27 +30,30 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.lib.openvdm import OpenVDM
 
 
-def build_filelist(source_dir):
-    """
-    Builds the list of files in the source directory
-    """
+# def build_filelist(source_dir):
+#     """
+#     Builds the list of files in the source directory
+#     """
 
-    logging.debug("source_dir: %s", source_dir)
+#     logging.debug("source_dir: %s", source_dir)
 
-    return_files = []
-    for root, _, filenames in os.walk(source_dir):
-        for filename in filenames:
-            return_files.append(os.path.join(root, filename))
+#     return_files = []
+#     for root, _, filenames in os.walk(source_dir):
+#         for filename in filenames:
+#             return_files.append(os.path.join(root, filename))
 
-    return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
-    return return_files
+#     return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
+#     return return_files
 
 
-def export_lowering_config(gearman_worker, lowering_config_filepath, finalize=False):
+def export_lowering_config(gearman_worker, finalize=False):
     """
     Export the current OpenVDM configuration to the specified filepath
     """
 
+    lowering_config_fn = gearman_worker.shipboard_data_warehouse_config['loweringConfigFn']
+    lowering_config_relfilepath = os.path.join(gearman_worker.lowering_dir, lowering_config_fn)
+    lowering_config_filepath = os.path.join(gearman_worker.cruise_dir, lowering_config_relfilepath)
     lowering_config = gearman_worker.ovdm.get_lowering_config()
 
     if finalize:
@@ -58,21 +61,34 @@ def export_lowering_config(gearman_worker, lowering_config_filepath, finalize=Fa
     elif os.path.isfile(lowering_config_filepath):
         logging.info("Reading existing configuration file")
         try:
-            with open(lowering_config_filepath, mode='r', encoding='utf-8') as json_file:
-                data = json.load(json_file)
-                if "loweringFinalizedOn" in data:
-                    lowering_config['loweringFinalizedOn'] = data['loweringFinalizedOn']
-
+            with open(lowering_config_filepath, mode='r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                lowering_config['loweringFinalizedOn'] = existing_data.get('loweringFinalizedOn')
         except OSError as err:
-            logging.debug(str(err))
+            logging.debug(str("Error reading config: %s", err))
             return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
-    for transfer in lowering_config['collectionSystemTransfersConfig']:
-        del transfer['sshPass']
-        del transfer['rsyncPass']
-        del transfer['smbPass']
+    def scrub_transfers(transfer_list):
+        for transfer in transfer_list:
 
-    return output_json_data_to_file(lowering_config_filepath, lowering_config)
+            allowed_keys = ['name', 'longName', 'destDir']
+            for key in list(transfer.keys()):
+                if key not in allowed_keys:
+                    transfer.pop(key)
+
+    scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
+
+    results = output_json_data_to_file(lowering_config_filepath, lowering_config)
+    if not results['verdict']:
+        return {'verdict': False, 'reason': results['reason']}
+
+    results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], lowering_config_filepath)
+    if not results['verdict']:
+        return {'verdict': False, 'reason': results['reason']}
+
+    gearman_worker.update_md5_summary({'new':[], 'updated':[lowering_config_relfilepath]})
+
+    return {'verdict': True}
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
@@ -92,29 +108,67 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
+
+    def build_logfile_dirpath(self):
+        """
+        build the path to save transfer logfiles
+        """
+
+        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+
+
+    def update_md5_summary(self, files):
+        gm_data = {
+            'cruiseID': self.cruise_id,
+            'files': {
+                'new': files.get('new', []),
+                'updated': files.get('updated', []),
+                'deleted': files.get('deleted', [])
+            }
+        }
+
+        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+        gm_client.submit_job("updateMD5Summary", json.dumps(gm_data))
+
+        logging.debug("MD5 Summary Task Complete")
+
+
     def on_job_execute(self, current_job):
         """
         Function run whenever a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
-
-        payload_obj = json.loads(current_job.data)
-
         self.stop = False
+
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
+
         self.task = self.ovdm.get_task_by_name(current_job.task)
-        logging.debug("task: %s", self.task)
 
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.task['longName']}: %(message)s"
+        ))
 
-        logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
 
-        self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
-        self.lowering_id = payload_obj['loweringID'] if 'loweringID' in payload_obj else self.ovdm.get_lowering_id()
-        self.lowering_start_date = payload_obj['loweringStartDate'] if 'loweringStartDate' in payload_obj else self.ovdm.get_lowering_start_date()
+        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+
+        self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
+
+        self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
+        self.lowering_start_date = payload_obj.get('loweringStartDate', self.ovdm.get_lowering_start_date())
+        self.lowering_end_date = payload_obj.get('loweringEndDate', self.ovdm.get_lowering_end_date())
+        self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
+
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
-        self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)
 
@@ -124,17 +178,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job has an exception
         """
 
-        logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
-
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Worker crashed"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', 'Worker crashed')
+        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -143,43 +201,36 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run whenever the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
-        job_data = {
-            'cruiseID': self.cruise_id,
-            'loweringID': self.lowering_id,
-            'loweringStartDate': self.lowering_start_date
-        }
-
-        if current_job.task == 'setupNewLowering':
-
+        if current_job.task in ("setupNewLowering", "finalizeCurrentLowering"):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            for task in self.ovdm.get_tasks_for_hook('setupNewLowering'):
+            job_data = {
+                'cruiseID': self.cruise_id,
+                'loweringID': self.lowering_id,
+                'loweringStartDate': self.lowering_start_date,
+                'loweringEndDate': self.lowering_end_date
+            }
+
+            for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        elif current_job.task == 'finalizeCurrentLowering':
+        parts = results.get('parts', [])
+        last_part = parts[-1] if parts else None
 
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-            for task in self.ovdm.get_tasks_for_hook('finalizeCurrentLowering'):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
-                else:
-                    self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
+        if last_part and last_part.get('result') == "Fail":
+            reason = last_part.get('reason', 'Unknown failure')
+            if int(self.task['taskID']) > 0:
+                self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
-                self.ovdm.set_idle_task(self.task['taskID'])
+                self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
         else:
             self.ovdm.set_idle_task(self.task['taskID'])
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
+        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
 
@@ -203,6 +254,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.shutdown()
 
 
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
+
+
 def task_setup_new_lowering(gearman_worker, gearman_job):
     """
     Setup a new lowering
@@ -210,57 +268,48 @@ def task_setup_new_lowering(gearman_worker, gearman_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(gearman_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
-
+    logging.info('Setting up new lowering')
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
 
     logging.info("Creating lowering data directory")
+    gearman_worker.send_job_status(gearman_job, 2, 10)
+
     completed_job_request = gm_client.submit_job("createLoweringDirectory", gearman_job.data)
 
-    result_obj = json.loads(completed_job_request.result)
+    results = json.loads(completed_job_request.result)
 
-    if result_obj['parts'][-1]['result'] == "Pass": # Final Verdict
-        job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Pass"})
-    else:
+    if results['parts'][-1]['result'] == "Fail": # Final Verdict
         logging.error("Failed to create lowering data directory")
-        job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Fail", "reason": result_obj['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Fail", "reason": results['parts'][-1]['reason']})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Pass"})
+
+
+    logging.info("Exporting Lowering Configuration")
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
-    #build lowering Config file
-    logging.info("Exporting Lowering Configuration")
-    output_results = export_lowering_config(gearman_worker, lowering_config_filepath)
+    output_results = export_lowering_config(gearman_worker)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], lowering_config_filepath)
+    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
-    if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set lowering config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
-
+    logging.info("Update Lowering Size")
     gearman_worker.send_job_status(gearman_job, 9, 10)
 
-    logging.info("Updating Lowering Size")
-    lowering_size_proc = subprocess.run(['du','-sb', gearman_worker.lowering_dir], capture_output=True, text=True, check=False)
+    lowering_size_proc = subprocess.run(['du','-sb', os.path.join(gearman_worker.cruise_dir, gearman_worker.lowering_dir)], capture_output=True, text=True, check=False)
     if lowering_size_proc.returncode == 0:
-        logging.info("Cruise Size: %s", lowering_size_proc.stdout.split()[0])
+        logging.info("Lowering Size: %s", lowering_size_proc.stdout.split()[0])
         gearman_worker.ovdm.set_lowering_size(lowering_size_proc.stdout.split()[0])
     else:
         gearman_worker.ovdm.set_lowering_size("0")
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
-
     return json.dumps(job_results)
 
 def task_finalize_current_lowering(gearman_worker, gearman_job):
@@ -270,72 +319,59 @@ def task_finalize_current_lowering(gearman_worker, gearman_job):
 
     job_results = {'parts':[]}
 
+    logging.info("Finalizing current lowering")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
+    full_lowering_dir = os.path.join(gearman_worker.cruise_dir, gearman_worker.lowering_dir)
 
-    if os.path.exists(gearman_worker.lowering_dir) and (gearman_worker.lowering_id != ''):
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": "Lowering directory: " + gearman_worker.lowering_dir + " could not be found"})
+    if not os.path.exists(full_lowering_dir):
+        job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Fail", "reason": f"lowering directory: {full_lowering_dir} could not be found"})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 3, 10)
+    job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Pass"})
+
     logging.info("Queuing Collection System Transfers")
+    gearman_worker.send_job_status(gearman_job, 2, 10)
 
     gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
 
     gm_data = {
         'loweringID': gearman_worker.lowering_id,
         'loweringStartDate': gearman_worker.lowering_start_date,
+        'loweringEndDate': gearman_worker.lowering_end_date,
         'systemStatus': "On",
         'collectionSystemTransfer': {}
     }
 
     collection_system_transfer_jobs = []
-
     collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers(cruise=False)
 
     for collection_system_transfer in collection_system_transfers:
-
         logging.debug("Queuing runCollectionSystemTransfer job for %s", collection_system_transfer['name'])
         gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
 
         collection_system_transfer_jobs.append( {"task": "runCollectionSystemTransfer", "data": json.dumps(gm_data)} )
 
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+    logging.info("Submitting runCollectionSystemTransfer jobs")
+    gearman_worker.send_job_status(gearman_job, 3, 10)
 
-    if len(collection_system_transfer_jobs) > 0:
-        logging.info("Submitting runCollectionSystemTransfer jobs")
-        submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
+    submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
 
-        gearman_worker.send_job_status(gearman_job, 7, 10)
+    time.sleep(1)
+    gm_client.wait_until_jobs_completed(submitted_job_request)
 
-        time.sleep(1)
-        gm_client.wait_until_jobs_completed(submitted_job_request)
-        logging.info("Completed runCollectionSystemTransfers jobs")
+    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
 
+    logging.info("Exporting Lowering Configuration")
     gearman_worker.send_job_status(gearman_job, 9, 10)
 
-    #build Lowering Config file
-    logging.info("Exporting Lowering Configuration")
-    output_results = export_lowering_config(gearman_worker, lowering_config_filepath, finalize=True)
+    output_results = export_lowering_config(gearman_worker, finalize=True)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Export Lowering config data to file", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Export Lowering config data to file", "result": "Fail", "reason": output_results['reason']})
+    if not output_results['verdict']:
+        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], lowering_config_filepath)
-
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set Lowering config file ownership/permissions", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Set Lowering config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
-
-    # need to add code for updating MD5
+    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
@@ -343,44 +379,21 @@ def task_finalize_current_lowering(gearman_worker, gearman_job):
 
 def task_export_lowering_config(gearman_worker, gearman_job):
     """
-    Export the Lowering configuration to file
+    Export the lowering configuration to file
     """
 
     job_results = {'parts':[]}
 
-    lowering_config_filepath = os.path.join(gearman_worker.lowering_dir, gearman_worker.shipboard_data_warehouse_config['loweringConfigFn'])
-
+    logging.info("Exporting Lowering Configuration")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    logging.info("Verifying lowering directory exists")
-    if os.path.exists(gearman_worker.lowering_dir) and (gearman_worker.lowering_id != ''):
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": "Unable to locate the lowering directory: " + gearman_worker.lowering_dir})
+    output_results = export_lowering_config(gearman_worker)
+
+    if not output_results['verdict']:
+        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 3, 10)
-
-    #build OpenVDM Config file
-    logging.info("Exporting Lowering Configuration")
-    output_results = export_lowering_config(gearman_worker, lowering_config_filepath)
-
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Export Lowering config data to file", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Export Lowering config data to file", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
-
-    gearman_worker.send_job_status(gearman_job, 6, 10)
-
-    logging.info("Setting file ownership/permissions")
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], lowering_config_filepath)
-
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set file ownership/permissions", "result": "Pass"})
-    else:
-        job_results['parts'].append({"partName": "Set file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
+    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
     gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
@@ -420,6 +433,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -427,6 +442,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
@@ -438,8 +455,10 @@ if __name__ == "__main__":
 
     logging.info("\tTask: setupNewLowering")
     new_worker.register_task("setupNewLowering", task_setup_new_lowering)
+
     logging.info("\tTask: finalizeCurrentLowering")
     new_worker.register_task("finalizeCurrentLowering", task_finalize_current_lowering)
+
     logging.info("\tTask: exportLoweringConfig")
     new_worker.register_task("exportLoweringConfig", task_export_lowering_config)
 
