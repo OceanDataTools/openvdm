@@ -27,7 +27,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
-from server.lib.hooks import UPDATE_MD5SUMMARY_TASK_NAME
+from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
@@ -73,7 +73,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }
 
         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-        gm_client.submit_job(UPDATE_MD5SUMMARY_TASK_NAME, json.dumps(gm_data))
+        gm_client.submit_job(MD5_TASK_NAMES['UPDATE_MD5_SUMMARY'], json.dumps(gm_data))
 
         logging.debug("MD5 Summary Task Complete")
 
