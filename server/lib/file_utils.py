@@ -386,16 +386,34 @@ def lockdown_directory(base_dir, exempt_dir):
     Lockdown permissions on the base directory, skip the exempt directory if present
     """
 
-    dir_contents = [ os.path.join(base_dir,f) for f in os.listdir(base_dir)]
-    files = filter(os.path.isfile, dir_contents)
-    for file in files:
-        os.chmod(file, 0o600)
+    reasons = []
+    try:
+        dir_contents = [os.path.join(base_dir, f) for f in os.listdir(base_dir)]
+    except OSError as e:
+        logging.error("Failed to list contents of directory %s: %s", base_dir, e)
+        reasons.append(f"Failed to list contents of directory {base_dir}")
+        return {'verdict': False, 'reason': '\n'.join(reasons)}
 
-    directories = filter(os.path.isdir, dir_contents)
-    for directory in directories:
-        if not directory == exempt_dir:
+    for file in filter(os.path.isfile, dir_contents):
+        try:
+            os.chmod(file, 0o600)
+        except (OSError, PermissionError) as e:
+            logging.warning("Could not change permissions for file %s: %s", file, e)
+            reasons.append(f"Could not change permissions for file {file}")
+
+    for directory in filter(os.path.isdir, dir_contents):
+        if os.path.abspath(directory) == os.path.abspath(exempt_dir):
+            continue
+        try:
             os.chmod(directory, 0o700)
+        except (OSError, PermissionError) as e:
+            logging.warning("Could not change permissions for directory %s: %s", directory, e)
+            reasons.append(f"Could not change permissions for directory {directory}")
 
+    if len(reasons) > 0:
+        return {'verdict': False, 'reason': '\n'.join(reasons)}
+
+    return {'verdict': True}
 
 def verfy_write_access(dest_dir):
     """

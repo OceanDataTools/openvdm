@@ -184,15 +184,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", 'Worker crashed')
-
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -203,18 +206,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         results = json.loads(job_result)
-
-        if current_job.task in ("setupNewCruise", "finalizeCurrentCruise"):
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-            job_data = {
-                'cruiseID': self.cruise_id,
-                'cruiseStartDate': self.cruise_start_date
-            }
-
-            for task in self.ovdm.get_tasks_for_hook(current_job.task):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         parts = results.get('parts', [])
         last_part = parts[-1] if parts else None
@@ -270,63 +261,64 @@ def task_create_cruise_directory(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
+    logging.debug("Pre-tasks checks")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    if os.path.exists(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']):
-        job_results['parts'].append({"partName": "Verify Base Directory exists", "result": "Pass"})
-    else:
-        logging.error("Failed to find base directory: %s", gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'])
+    if not os.path.exists(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']):
         job_results['parts'].append({"partName": "Verify Base Directory exists", "result": "Fail", "reason": f"Failed to find base directory: {gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']}"})
         return json.dumps(job_results)
 
-    if not os.path.exists(gearman_worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory does not exists", "result": "Pass"})
-    else:
-        logging.error("Cruise directory already exists: %s", gearman_worker.cruise_dir)
+    job_results['parts'].append({"partName": "Verify Base Directory exists", "result": "Pass"})
+
+    if os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory does not exists", "result": "Fail", "reason": f"Cruise directory {gearman_worker.cruise_dir} already exists"})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Verify Cruise Directory does not exists", "result": "Pass"})
+
+    logging.debug("Build directory list")
     gearman_worker.send_job_status(gearman_job, 2, 10)
 
     directorylist = gearman_worker.build_directorylist()
     logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
 
-    if len(directorylist) > 0:
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
-    else:
+    if len(directorylist) == 0:
         job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
+
+    logging.debug("Create cruise directories")
     gearman_worker.send_job_status(gearman_job, 5, 10)
 
     output_results = create_directories(directorylist)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
-    else:
-        logging.error("Failed to create any/all of the cruise data directory structure")
+    if not output_results['verdict']:
+        logging.error("Failed to create any/all of the lowering data directory structure")
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
 
-    gearman_worker.send_job_status(gearman_job, 7, 10)
+    job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
 
     if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear read permissions for all cruise directories")
+        gearman_worker.send_job_status(gearman_job, 7, 10)
+
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
 
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
+    logging.debug("Set lowering directory ownership/permissions")
     gearman_worker.send_job_status(gearman_job, 8, 10)
 
     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.cruise_dir)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
 
+    gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
 
 
@@ -340,23 +332,25 @@ def task_set_cruise_data_directory_permissions(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+    gearman_worker.send_job_status(gearman_job, 1, 10)
 
     if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear read permissions for all directories within CruiseData")
+        gearman_worker.send_job_status(gearman_job, 2, 10)
+
         lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
-    gearman_worker.send_job_status(gearman_job, 8, 10)
-
     if os.path.isdir(gearman_worker.cruise_dir):
         logging.info("Set ownership and read/write permissions for current cruise directory within CruiseData")
+        gearman_worker.send_job_status(gearman_job, 6, 10)
+
         set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.cruise_dir)
         job_results['parts'].append({"partName": "Set Directory Permissions for current cruise", "result": "Pass"})
 
     job_results['parts'].append({"partName": "Set CruiseData Directory Permissions", "result": "Pass"})
-    gearman_worker.send_job_status(gearman_job, 10, 10)
 
+    gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
 
 
@@ -370,63 +364,56 @@ def task_rebuild_cruise_directory(gearman_worker, gearman_job):
     payload_obj = json.loads(gearman_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
+    logging.info("Pre-task checks")
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
-    if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
-        logging.info("Clear read permissions")
-        lockdown_directory(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_dir)
-        job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
-
-    if os.path.exists(gearman_worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
-
-    else:
-        logging.error("Cruise directory not found")
+    if not os.path.exists(gearman_worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to locate the cruise directory: " + gearman_worker.cruise_dir})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 2, 10)
+    job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
 
-    logging.info("Build directory list")
-    directorylist = gearman_worker.build_directorylist()
-    logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
+    if gearman_worker.ovdm.show_only_current_cruise_dir() is True:
+        logging.info("Clear CruiseData Directory Read Permissions")
+        gearman_worker.send_job_status(gearman_job, 2, 100)
 
-    if len(directorylist) > 0:
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
+        output_results = lockdown_directory(gearman_worker.cruise_dir)
 
-    else:
-        logging.error("Directory list is empty")
-        job_results['parts'].append({"partName": "Build Directory List", "result": "Fail", "reason": "Empty list of directories to create"})
+        if not output_results['verdict']:
+            job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 5, 10)
+        job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
+
+    logging.info("Build directory list")
+    gearman_worker.send_job_status(gearman_job, 3, 10)
+
+    directorylist = gearman_worker.build_directorylist()
+    logging.debug("Directory List: %s", json.dumps(directorylist, indent=2))
+    job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
     logging.info("Create directories")
+    gearman_worker.send_job_status(gearman_job, 5, 10)
 
     output_results = create_directories(directorylist)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
-
-    else:
-        logging.error("Failed to create any/all of the cruise data directory structure")
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 7, 10)
+    job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
 
     logging.info("Set directory ownership/permissions")
+    gearman_worker.send_job_status(gearman_job, 7, 10)
 
     output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.cruise_dir)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
-
-    else:
-        logging.error("Failed to set directory ownership")
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
 
+    gearman_worker.send_job_status(gearman_job, 10, 10)
     return json.dumps(job_results)
 
 

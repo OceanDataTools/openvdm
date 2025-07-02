@@ -371,7 +371,7 @@ def task_setup_new_cruise(gearman_worker, gearman_job): # pylint: disable=too-ma
     job_results['parts'].append({"partName": "Set ownership/permissions for CruiseData directory", "result": "Pass"})
 
     logging.info("Creating cruise data directory")
-    gearman_worker.send_job_status(gearman_job, 1, 10)
+    gearman_worker.send_job_status(gearman_job, 2, 10)
 
     completed_job_request = gm_client.submit_job("createCruiseDirectory", gearman_job.data)
 
@@ -464,7 +464,7 @@ def task_finalize_current_cruise(gearman_worker, gearman_job): # pylint: disable
     gearman_worker.send_job_status(gearman_job, 1, 10)
 
     if not os.path.exists(gearman_worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": "Cruise directory: " + gearman_worker.cruise_dir + " could not be found"})
+        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": f"Cruise directory: {gearman_worker.cruise_dir} could not be found"})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
