@@ -161,10 +161,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
-
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
+
         self.lowering_start_date = payload_obj.get('loweringStartDate', self.ovdm.get_lowering_start_date())
         self.lowering_end_date = payload_obj.get('loweringEndDate', self.ovdm.get_lowering_end_date())
+
+        logging.debug("loweringDataBaseDir: %s", self.self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+        logging.debug("lowering_id: %s", self.lowering_id)
+
         self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
