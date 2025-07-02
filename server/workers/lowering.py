@@ -95,9 +95,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.debug(json.dumps(lowering_config))
 
-        if lowering_config['loweringFinalizedOn'] is None:
-            del lowering_config['loweringFinalizedOn']
-
         def scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
