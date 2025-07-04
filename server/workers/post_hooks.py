@@ -359,7 +359,6 @@ def task_post_hook(worker, current_job):
     if len(reasons) > 0:
         job_results['parts'].append({"partName": "Running Commands", "result": "Fail", "reason": '\n'.join(reasons)})
 
-    job_results['parts'].append({"partName": "Running Commands", "result": "Pass"})
     worker.send_job_status(current_job, 10, 10)
 
     return json.dumps(job_results)
