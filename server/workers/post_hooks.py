@@ -173,7 +173,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if self.task['name'] in [
             TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
-            TASK_NAMES['POST_DATA_DASHBOARD_HOOK_NAME']
+            TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK']
         ]:
             cst_cfg = self.ovdm.get_collection_system_transfer(self.job_data['collectionSystemTransferID'])
             if not cst_cfg:
