@@ -223,7 +223,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.shutdown()
 
 
-def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Update the existing dashboard files with new/updated raw data
     """
@@ -236,18 +236,18 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
         }
     }
 
-    payload_obj = json.loads(gearman_job.data)
+    payload_obj = json.loads(current_job.data)
     logging.debug('Payload: %s', json.dumps(payload_obj, indent=2))
 
-    gearman_worker.send_job_status(gearman_job, 5, 100)
+    worker.send_job_status(current_job, 5, 100)
 
-    logging.info('Collection System Transfer: %s', gearman_worker.collection_system_transfer['name'])
+    logging.info('Collection System Transfer: %s', worker.collection_system_transfer['name'])
 
     new_manifest_entries = []
     remove_manifest_entries = []
 
     #check for processing file
-    processing_script_filename = os.path.join(gearman_worker.ovdm.get_plugin_dir(), gearman_worker.collection_system_transfer['name'].lower() + gearman_worker.ovdm.get_plugin_suffix())
+    processing_script_filename = os.path.join(worker.ovdm.get_plugin_dir(), worker.collection_system_transfer['name'].lower() + worker.ovdm.get_plugin_suffix())
     logging.debug("Processing Script Filename: %s", processing_script_filename)
 
     if os.path.isfile(processing_script_filename):
@@ -256,7 +256,7 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
         logging.warning("Processing script not found: %s", processing_script_filename)
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 10, 100)
+    worker.send_job_status(current_job, 10, 100)
 
     #build filelist
     filelist = []
@@ -276,13 +276,13 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
     file_index = 0
     for filename in filelist:  # pylint: disable=too-many-nested-blocks
 
-        if gearman_worker.stop:
+        if worker.stop:
             break
 
         logging.info("Processing file: %s", filename)
         json_filename = os.path.splitext(filename)[0] + '.json'
-        raw_filepath = os.path.join(gearman_worker.cruise_dir, filename)
-        json_filepath = os.path.join(gearman_worker.data_dashboard_dir, json_filename)
+        raw_filepath = os.path.join(worker.cruise_dir, filename)
+        json_filepath = os.path.join(worker.data_dashboard_dir, json_filename)
 
         if not os.path.isfile(raw_filepath):
             job_results['parts'].append({"partName": "Verify data file exists", "result": "Fail", "reason": "Unable to find data file: " + filename})
@@ -322,12 +322,12 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
                         error_title = 'Datafile Parsing error'
                         error_body = "Parser returned no output. Parsing command: {}", ' '.join(command)
                         logging.error("%s: %s", error_title, error_body)
-                        gearman_worker.ovdm.send_msg(error_title,error_body)
+                        worker.ovdm.send_msg(error_title,error_body)
                     elif 'error' in out_obj:
                         error_title = 'Datafile Parsing error'
                         error_body = out_obj['error']
                         logging.error("%s: %s", error_title, error_body)
-                        gearman_worker.ovdm.send_msg(error_title,error_body)
+                        worker.ovdm.send_msg(error_title,error_body)
                     else:
                         output_results = output_json_data_to_file(json_filepath, out_obj)
 
@@ -337,51 +337,51 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
                             error_title = 'Data Dashboard Processing failed'
                             error_body = "Error Writing DashboardData file: " + filename + ". Reason: " + output_results['reason']
                             logging.error("%s: %s", error_title, error_body)
-                            gearman_worker.ovdm.send_msg(error_title,error_body)
+                            worker.ovdm.send_msg(error_title,error_body)
                             job_results['parts'].append({"partName": "Writing Dashboard file: " + filename, "result": "Fail", "reason": output_results['reason']})
 
-                        new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
+                        new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
             else:
                 error_title = 'Data Dashboard Processing failed'
                 error_body = 'No JSON output recieved from file.  Parsing Command: ' + ' '.join(command)
                 logging.error("%s: %s", error_title, error_body)
-                gearman_worker.ovdm.send_msg(error_title,error_body)
-                remove_manifest_entries.append({"dd_json": json_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
+                worker.ovdm.send_msg(error_title,error_body)
+                remove_manifest_entries.append({"dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
 
                 if data_proc.stderr:
                     logging.error("Err: %s", data_proc.stderr)
         else:
             logging.warning("File is of unknown datatype: %s", raw_filepath)
-            remove_manifest_entries.append({"dd_json": json_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data":raw_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
+            remove_manifest_entries.append({"dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data":raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
 
             if datatype_proc.stderr:
                 logging.error("Err: %s", datatype_proc.stderr)
 
-        gearman_worker.send_job_status(gearman_job, int(70 * file_index/file_count) + 10, 100)
+        worker.send_job_status(current_job, int(70 * file_index/file_count) + 10, 100)
 
         file_index += 1
 
-    gearman_worker.send_job_status(gearman_job, 8, 10)
+    worker.send_job_status(current_job, 8, 10)
 
     if len(new_manifest_entries) > 0:
-        logging.info("Updating Manifest file: %s", gearman_worker.data_dashboard_manifest_file_path)
+        logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
 
         rows_removed = 0
 
         existing_manifest_entries = []
 
         try:
-            with open(gearman_worker.data_dashboard_manifest_file_path, mode='r', encoding='utf-8') as dashboard_manifest_file:
+            with open(worker.data_dashboard_manifest_file_path, mode='r', encoding='utf-8') as dashboard_manifest_file:
                 existing_manifest_entries = json.load(dashboard_manifest_file)
 
             job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
 
         except IOError:
-            logging.warning("Error Reading Dashboard Manifest file %s", gearman_worker.data_dashboard_manifest_file_path)
+            logging.warning("Error Reading Dashboard Manifest file %s", worker.data_dashboard_manifest_file_path)
 
         except Exception as err:
             logging.error(str(err))
-            job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": "Error reading dashboard manifest file: " + gearman_worker.data_dashboard_manifest_file_path})
+            job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": "Error reading dashboard manifest file: " + worker.data_dashboard_manifest_file_path})
             return json.dumps(job_results)
 
         logging.debug("Entries to remove: %s", json.dumps(remove_manifest_entries, indent=2))
@@ -391,9 +391,9 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
                     del existing_manifest_entries[idx]
                     rows_removed += 1
 
-                    if os.path.isfile(os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json'])):
-                        logging.info("Deleting orphaned dd_json file %s", os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
-                        os.remove(os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
+                    if os.path.isfile(os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json'])):
+                        logging.info("Deleting orphaned dd_json file %s", os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
+                        os.remove(os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
                     break
 
         logging.debug("Entries to add/update: %s", json.dumps(new_manifest_entries, indent=2))
@@ -402,11 +402,11 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             for existing_entry in existing_manifest_entries:
                 if new_entry['raw_data'] == existing_entry['raw_data']:
                     updated = True
-                    job_results['files']['updated'].append(new_entry['dd_json'].replace(gearman_worker.cruise_id + '/',''))
+                    job_results['files']['updated'].append(new_entry['dd_json'].replace(worker.cruise_id + '/',''))
                     break
 
             if not updated: #added
-                job_results['files']['new'].append(new_entry['dd_json'].replace(gearman_worker.cruise_id + '/',''))
+                job_results['files']['new'].append(new_entry['dd_json'].replace(worker.cruise_id + '/',''))
                 existing_manifest_entries.append(new_entry)
 
         if len(job_results['files']['new']) > 0:
@@ -416,20 +416,20 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
         if rows_removed:
             logging.info("%s row(s) removed", rows_removed)
 
-        output_results = output_json_data_to_file(gearman_worker.data_dashboard_manifest_file_path, existing_manifest_entries)
+        output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, existing_manifest_entries)
 
         if not output_results['verdict']:
-            logging.error("Error Writing Dashboard manifest file: %s", gearman_worker.data_dashboard_manifest_file_path)
+            logging.error("Error Writing Dashboard manifest file: %s", worker.data_dashboard_manifest_file_path)
             job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
-        job_results['files']['updated'].append(os.path.join(gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], gearman_worker.shipboard_data_warehouse_config['dataDashboardManifestFn']))
+        job_results['files']['updated'].append(os.path.join(worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], worker.shipboard_data_warehouse_config['dataDashboardManifestFn']))
 
-        gearman_worker.send_job_status(gearman_job, 9, 10)
+        worker.send_job_status(current_job, 9, 10)
 
         logging.info("Setting file ownership/permissions")
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.data_dashboard_dir)
+        output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
 
         if output_results['verdict']:
             job_results['parts'].append({"partName": "Set file/directory ownership", "result": "Pass"})
@@ -437,12 +437,12 @@ def task_update_data_dashboard(gearman_worker, gearman_job): # pylint: disable=t
             job_results['parts'].append({"partName": "Set file/directory ownership", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    worker.send_job_status(current_job, 10, 10)
 
     return json.dumps(job_results)
 
 
-def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Rebuild the existing dashboard files
     """
@@ -455,20 +455,20 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
         }
     }
 
-    payload_obj = json.loads(gearman_job.data)
+    payload_obj = json.loads(current_job.data)
     logging.debug('Payload: %s', json.dumps(payload_obj, indent=2))
 
 
-    if os.path.exists(gearman_worker.data_dashboard_dir):
+    if os.path.exists(worker.data_dashboard_dir):
         job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Pass"})
     else:
-        logging.error("Data dashboard directory not found: %s", gearman_worker.data_dashboard_dir)
-        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": "Unable to locate the data dashboard directory: " + gearman_worker.data_dashboard_dir})
+        logging.error("Data dashboard directory not found: %s", worker.data_dashboard_dir)
+        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": "Unable to locate the data dashboard directory: " + worker.data_dashboard_dir})
         return json.dumps(job_results)
 
-    collection_system_transfers = gearman_worker.ovdm.get_active_collection_system_transfers()
+    collection_system_transfers = worker.ovdm.get_active_collection_system_transfers()
 
-    gearman_worker.send_job_status(gearman_job, 1, 100)
+    worker.send_job_status(current_job, 1, 100)
 
     new_manifest_entries = []
 
@@ -478,30 +478,30 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
 
         logging.info('Processing data from: %s', collection_system_transfer['name'])
 
-        processing_script_filename = os.path.join(gearman_worker.ovdm.get_plugin_dir(), collection_system_transfer['name'].lower() + gearman_worker.ovdm.get_plugin_suffix())
+        processing_script_filename = os.path.join(worker.ovdm.get_plugin_dir(), collection_system_transfer['name'].lower() + worker.ovdm.get_plugin_suffix())
         logging.debug("Processing Script Filename: %s", processing_script_filename)
 
         if not os.path.isfile(processing_script_filename):
             logging.warning("Processing script for collection system %s not found, moving on.", collection_system_transfer['name'])
-            gearman_worker.send_job_status(gearman_job, int(10 + (80*float(collection_system_transfer_index)/float(collection_system_transfer_count))), 100)
+            worker.send_job_status(current_job, int(10 + (80*float(collection_system_transfer_index)/float(collection_system_transfer_count))), 100)
             collection_system_transfer_index += 1
             continue
 
-        # collection_system_transferOutputDir = os.path.join(gearman_worker.data_dashboard_dir, collection_system_transfer['destDir'])
+        # collection_system_transferOutputDir = os.path.join(worker.data_dashboard_dir, collection_system_transfer['destDir'])
 
         #build filelist
         filelist = []
         if collection_system_transfer['cruiseOrLowering'] == "0":
-            collection_system_transfer_input_dir = os.path.join(gearman_worker.cruise_dir, collection_system_transfer['destDir'])
+            collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, collection_system_transfer['destDir'])
             filelist.extend(build_filelist(collection_system_transfer_input_dir))
             filelist = [os.path.join(collection_system_transfer['destDir'], filename) for filename in filelist]
 
         else:
-            lowerings = gearman_worker.ovdm.get_lowerings()
-            lowering_base_dir = gearman_worker.shipboard_data_warehouse_config['loweringDataBaseDir']
+            lowerings = worker.ovdm.get_lowerings()
+            lowering_base_dir = worker.shipboard_data_warehouse_config['loweringDataBaseDir']
 
             for lowering in lowerings:
-                collection_system_transfer_input_dir = os.path.join(gearman_worker.cruise_dir, lowering_base_dir, lowering, collection_system_transfer['destDir'])
+                collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, lowering_base_dir, lowering, collection_system_transfer['destDir'])
                 lowering_filelist = build_filelist(collection_system_transfer_input_dir)
                 filelist.extend([os.path.join(lowering_base_dir, lowering, collection_system_transfer['destDir'], filename) for filename in lowering_filelist])
 
@@ -513,16 +513,16 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
 
         for filename in filelist:
 
-            if gearman_worker.stop:
+            if worker.stop:
                 break
 
             logging.info("Processing file: %s", filename)
             root, _ = os.path.splitext(filename)
             json_filename = root + '.json'
             logging.debug("jsonFileName: %s", json_filename)
-            raw_filepath = os.path.join(gearman_worker.cruise_dir, filename)
+            raw_filepath = os.path.join(worker.cruise_dir, filename)
             logging.debug("rawFilePath: %s", raw_filepath)
-            json_filepath = os.path.join(gearman_worker.data_dashboard_dir, json_filename)
+            json_filepath = os.path.join(worker.data_dashboard_dir, json_filename)
             logging.debug("jsonFilePath: %s", json_filepath)
 
             if os.stat(raw_filepath).st_size == 0:
@@ -555,14 +555,14 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
                         error_title = 'Error parsing output'
                         error_body = 'Invalid JSON output recieved from processing. Command: ' + ' '.join(command)
                         logging.error("%s: %s", error_title, error_body)
-                        gearman_worker.ovdm.send_msg(error_title, error_body)
+                        worker.ovdm.send_msg(error_title, error_body)
                         job_results['parts'].append({"partName": "Parsing JSON output " + filename, "result": "Fail", "reason": error_title + ':' + error_body})
                     else:
                         if out_obj is None:
                             error_title = 'Error processing file'
                             error_body = 'No JSON output recieved from file. Processing Command: ' + ' '.join(command)
                             logging.error("%s: %s", error_title, error_body)
-                            gearman_worker.ovdm.send_msg(error_title, error_body)
+                            worker.ovdm.send_msg(error_title, error_body)
                             job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail", "reason": error_title + ': ' + error_body})
 
                             if data_proc.stderr:
@@ -572,7 +572,7 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
                             error_title = 'Error processing file'
                             error_body = out_obj['error']
                             logging.error("%s: %s", error_title, error_body)
-                            gearman_worker.ovdm.send_msg(error_title, error_body)
+                            worker.ovdm.send_msg(error_title, error_body)
                             job_results['parts'].append({"partName": "Processing Datafile " + filename, "result": "Fail", "reason": error_title + ':' + error_body})
 
                         else:
@@ -585,16 +585,16 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
                                 error_title = 'Error writing file'
                                 error_body = "Error Writing DashboardData file: " + filename
                                 logging.error("%s: %s", error_title, error_body)
-                                gearman_worker.ovdm.send_msg(error_title, error_body)
+                                worker.ovdm.send_msg(error_title, error_body)
 
                                 job_results['parts'].append({"partName": "Writing Dashboard file: " + filename, "result": "Fail", "reason": output_results['verdict']})
 
-                            new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
+                            new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
                 else:
                     error_title = 'Error processing file'
                     error_body = 'No JSON output recieved from file. Processing Command: ' + ' '.join(command)
                     logging.error("%s: %s", error_title, error_body)
-                    gearman_worker.ovdm.send_msg(error_title, error_body)
+                    worker.ovdm.send_msg(error_title, error_body)
                     job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail", "reason": error_title + ': ' + error_body})
 
                     if data_proc.stderr:
@@ -606,27 +606,27 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
                 if datatype_proc.stderr:
                     logging.error('err: %s', datatype_proc.stderr)
 
-                    gearman_worker.send_job_status(gearman_job, int(60 * file_index/file_count) + 10, 100)
+                    worker.send_job_status(current_job, int(60 * file_index/file_count) + 10, 100)
             file_index += 1
 
         collection_system_transfer_index += 1
 
-    gearman_worker.send_job_status(gearman_job, 90, 100)
+    worker.send_job_status(current_job, 90, 100)
 
     logging.info("Update Dashboard Manifest file")
-    output_results = output_json_data_to_file(gearman_worker.data_dashboard_manifest_file_path, new_manifest_entries)
+    output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, new_manifest_entries)
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Updating manifest file", "result": "Pass"})
     else:
-        logging.error("Error updating manifest file %s", gearman_worker.data_dashboard_manifest_file_path)
+        logging.error("Error updating manifest file %s", worker.data_dashboard_manifest_file_path)
         job_results['parts'].append({"partName": "Updating manifest file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 95, 100)
+    worker.send_job_status(current_job, 95, 100)
 
     logging.info("Setting file ownership/permissions")
-    output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], gearman_worker.data_dashboard_dir)
+    output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
 
     if output_results['verdict']:
         job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Pass"})
@@ -635,12 +635,12 @@ def task_rebuild_data_dashboard(gearman_worker, gearman_job): # pylint: disable=
         job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(gearman_job, 99, 100)
+    worker.send_job_status(current_job, 99, 100)
 
-    data_dashboard_dest_dir = gearman_worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir']
-    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(gearman_worker.data_dashboard_dir)]# might need to remove cruise_dir from begining of filepaths
+    data_dashboard_dest_dir = worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir']
+    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(worker.data_dashboard_dir)]# might need to remove cruise_dir from begining of filepaths
 
-    gearman_worker.send_job_status(gearman_job, 10, 10)
+    worker.send_job_status(current_job, 10, 10)
 
     return json.dumps(job_results)
 
