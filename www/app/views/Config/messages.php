@@ -63,19 +63,16 @@ use Helpers\Session;
                                 <a href="<?php echo DIR; ?>config/messages/viewedMessage/<?php echo $row->messageID; ?>">
                                     <strong><?php echo $row->messageTitle; ?></strong>
                                 </a>
-                            </td>
-                            <td style="white-space: pre-line;">
-                                <?php echo $row->messageBody; ?>
 <?php
             } else {
 ?>
                                 <?php echo $row->messageTitle; ?>
-                            </td>
-                            <td style="white-space: pre-line;">
-                                <?php echo $row->messageBody; ?>
 <?php
             }
 ?>
+                            </td>
+                            <td style="white-space: pre-line;">
+                                <?php echo $row->messageBody; ?>
                             </td>
                             <td>
 <?php
