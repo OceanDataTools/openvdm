@@ -767,7 +767,8 @@ class OpenVDM():
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
-            return json.loads(req.text)
+            return_obj = json.loads(req.text)
+            return next(iter(return_obj), None)
         except Exception as err:
             logging.error("Unable to retrieve collection system transfer: %s from OpenVDM API", collection_system_transfer_id)
             raise err
