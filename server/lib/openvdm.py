@@ -235,6 +235,13 @@ class OpenVDM():
 
         return self.config.get('transferInterval')
 
+    def get_logfile_purge_timedelta(self):
+        """
+        Return the logfile purge time delta
+        """
+
+        return self.config.get('logfilePurgeTimedelta')
+
 
     def get_cruise_id(self):
         """
