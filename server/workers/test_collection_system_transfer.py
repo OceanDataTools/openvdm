@@ -131,7 +131,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if cst_id:
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
-            if not self.collection_system_transfer:
+            if self.collection_system_transfer is None:
                 return self._fail_job(current_job, "Locate Collection System Transfer Data",
                                       "Could not find collection system transfer config to use for connection test")
 
