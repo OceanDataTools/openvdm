@@ -579,9 +579,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
 
         # Set logging format with cruise transfer name
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
-            f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
-        ))
+        # logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+        #     f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
+        # ))
 
         # verify the transfer is NOT already in-progress
         if self.collection_system_transfer['status'] == "1":
