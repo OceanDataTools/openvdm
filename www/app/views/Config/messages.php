@@ -64,7 +64,7 @@ use Helpers\Session;
 <?php
             } else {
 ?>
-                        <?php echo $row->messageTitle; ?></td><td><?php echo $row->messageBody; ?>
+                        <?php echo $row->messageTitle; ?></td><td style="white-space: pre-line;"><?php echo $row->messageBody; ?>
 <?php
             }
 ?>
