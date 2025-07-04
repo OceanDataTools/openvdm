@@ -71,9 +71,7 @@ use Helpers\Session;
             }
 ?>
                             </td>
-                            <td style="white-space: pre-line;">
-                                <?php echo $row->messageBody; ?>
-                            </td>
+                            <td style="white-space: pre-line;"><?php echo $row->messageBody; ?></td>
                             <td>
 <?php
             if($row->messageViewed == 0) {
