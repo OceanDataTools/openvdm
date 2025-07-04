@@ -60,11 +60,19 @@ use Helpers\Session;
 <?php
             if($row->messageViewed == 0) {
 ?>
-                                <a href="<?php echo DIR; ?>config/messages/viewedMessage/<?php echo $row->messageID; ?>"><strong><?php echo $row->messageTitle; ?></strong></a></td><td><?php echo $row->messageBody; ?>
+                                <a href="<?php echo DIR; ?>config/messages/viewedMessage/<?php echo $row->messageID; ?>">
+                                    <strong><?php echo $row->messageTitle; ?></strong>
+                                </a>
+                            </td>
+                            <td style="white-space: pre-line;">
+                                <?php echo $row->messageBody; ?>
 <?php
             } else {
 ?>
-                        <?php echo $row->messageTitle; ?></td><td style="white-space: pre-line;"><?php echo $row->messageBody; ?>
+                                <?php echo $row->messageTitle; ?>
+                            </td>
+                            <td style="white-space: pre-line;">
+                                <?php echo $row->messageBody; ?>
 <?php
             }
 ?>
