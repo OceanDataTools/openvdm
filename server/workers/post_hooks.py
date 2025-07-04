@@ -167,13 +167,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Retrieve list of commands for the specified hook_name
         """
-        post_hook_name = self.task['name']
-        post_hook_commands = self.hook_commands.get(post_hook_name)
 
-        if not post_hook_commands:
+        if not self.hook_commands:
             return {'verdict': True, 'commandList': None}
 
-        if post_hook_name in [
+        if self.task['name'] in [
             TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
             TASK_NAMES['POST_DATA_DASHBOARD_HOOK_NAME']
         ]:
@@ -182,12 +180,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 return {'verdict': False, 'reason': 'Could not find collection system transfer'}
 
             command_list = next(
-                (x.get('commandList') for x in post_hook_commands
+                (x.get('commandList') for x in self.hook_commands
                  if x.get('collectionSystemTransferName') == cst_cfg['name']),
                 None
             )
         else:
-            command_list = post_hook_commands.get('commandList')
+            command_list = self.hook_commands.get('commandList')
 
         return {"verdict": True, "commandList": self._build_commands(self, command_list)}
 
