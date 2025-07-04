@@ -59,14 +59,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
+
     @staticmethod
     def _get_custom_task(current_job):
         """
-        Fetch task metadata
+        Fetch task metadata by name from CUSTOM_TASKS
         """
 
-        task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
-        return task[0] if len(task) > 0 else None
+        return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
     def build_md5_hashes(self, current_job, filelist):
@@ -154,7 +154,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
 
-        self.task = self._get_custom_task(current_job) if self._get_custom_task(current_job) is not None else self.ovdm.get_task_by_name(current_job.task)
+        self.task = (self._get_custom_task(current_job)
+            if self._get_custom_task(current_job) is not None
+            else self.ovdm.get_task_by_name(current_job.task)
+        )
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
