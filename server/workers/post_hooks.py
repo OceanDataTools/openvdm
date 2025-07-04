@@ -124,7 +124,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
-    def _build_commands(self, command_list):
+    def _build_commands(self, command_list, cst_cfg=None):
         """
         Process the provided command_list to replace any wildcard strings
         """
@@ -140,11 +140,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         replacements = {
             '{cruiseID}': self.cruise_id,
             '{loweringID}': self.lowering_id,
-            '{collectionSystemTransferID}': self.collection_system_transfer.get('collectionSystemTransferID')
-            if self.collection_system_transfer else None,
+            '{collectionSystemTransferID}': cst_cfg.get('collectionSystemTransferID')
+            if cst_cfg else None,
 
-            '{collectionSystemTransferName}': self.collection_system_transfer.get('name')
-            if self.collection_system_transfer else None,
+            '{collectionSystemTransferName}': cst_cfg.get('name')
+            if cst_cfg else None,
 
             '{newFiles}': ' '.join(self.files.get('new', [])) if self.files else None,
             '{updatedFiles}': ' '.join(self.files.get('updated', [])) if self.files else None
@@ -171,6 +171,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if not self.hook_commands:
             return {'verdict': True, 'commandList': None}
 
+        cst_cfg = None
+
         if self.task['name'] in [
             TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
             TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK']
@@ -187,7 +189,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         else:
             command_list = self.hook_commands.get('commandList')
 
-        return {"verdict": True, "commandList": self._build_commands(command_list)}
+        return {"verdict": True, "commandList": self._build_commands(command_list, cst_cfg)}
 
 
     def on_job_execute(self, current_job):
