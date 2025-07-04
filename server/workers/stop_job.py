@@ -133,48 +133,48 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.shutdown()
 
 
-def task_stop_job(gearman_worker, gearman_job):
+def task_stop_job(worker, current_job):
     """
     Stop the specified OpenVDM task/transfer/process
     """
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(gearman_job.data)
+    payload_obj = json.loads(current_job.data)
     logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
     job_results['parts'].append({"partName": "Retrieve Job Info", "result": "Pass"})
 
-    if gearman_worker.job_info['type'] != "unknown":
+    if worker.job_info['type'] != "unknown":
         job_results['parts'].append({"partName": "Valid OpenVDM Job", "result": "Pass"})
 
-        logging.debug("Quitting job: %s", gearman_worker.job_info['pid'])
+        logging.debug("Quitting job: %s", worker.job_info['pid'])
         try:
-            os.kill(int(gearman_worker.job_info['pid']), signal.SIGQUIT)
+            os.kill(int(worker.job_info['pid']), signal.SIGQUIT)
 
         except OSError as err:
             if err.errno == 3:
                 logging.warning("Unable to kill process because the process doesn't exist")
             else:
-                logging.error("Error killing PID: %s", gearman_worker.job_info['pid'])
+                logging.error("Error killing PID: %s", worker.job_info['pid'])
                 logging.error(str(err))
-                job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": f"Error killing PID: {gearman_worker.job_info['pid']} --> {err}"})
+                job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": f"Error killing PID: {worker.job_info['pid']} --> {err}"})
 
         finally:
-            if gearman_worker.job_info['type'] == 'collectionSystemTransfer':
-                gearman_worker.ovdm.set_idle_collection_system_transfer(gearman_worker.job_info['id'])
-                gearman_worker.ovdm.send_msg("Manual Stop of transfer", gearman_worker.job_info['name'])
-            elif gearman_worker.job_info['type'] == 'cruiseDataTransfer':
-                gearman_worker.ovdm.set_idle_cruise_data_transfer(gearman_worker.job_info['id'])
-                gearman_worker.ovdm.send_msg("Manual Stop of transfer", gearman_worker.job_info['name'])
-            elif gearman_worker.job_info['type'] == 'task':
-                gearman_worker.ovdm.set_idle_task(gearman_worker.job_info['id'])
-                gearman_worker.ovdm.send_msg("Manual Stop of task", gearman_worker.job_info['name'])
+            if worker.job_info['type'] == 'collectionSystemTransfer':
+                worker.ovdm.set_idle_collection_system_transfer(worker.job_info['id'])
+                worker.ovdm.send_msg("Manual Stop of transfer", worker.job_info['name'])
+            elif worker.job_info['type'] == 'cruiseDataTransfer':
+                worker.ovdm.set_idle_cruise_data_transfer(worker.job_info['id'])
+                worker.ovdm.send_msg("Manual Stop of transfer", worker.job_info['name'])
+            elif worker.job_info['type'] == 'task':
+                worker.ovdm.set_idle_task(worker.job_info['id'])
+                worker.ovdm.send_msg("Manual Stop of task", worker.job_info['name'])
 
             job_results['parts'].append({"partName": "Stopped Job", "result": "Pass"})
     else:
-        logging.error("Unknown job type: %s", gearman_worker.job_info['type'])
-        job_results['parts'].append({"partName": "Valid OpenVDM Job", "result": "Fail", "reason": "Unknown job type: " + gearman_worker.job_info['type']})
+        logging.error("Unknown job type: %s", worker.job_info['type'])
+        job_results['parts'].append({"partName": "Valid OpenVDM Job", "result": "Fail", "reason": "Unknown job type: " + worker.job_info['type']})
 
     return json.dumps(job_results)
 
