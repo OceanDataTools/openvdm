@@ -187,7 +187,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         else:
             command_list = self.hook_commands.get('commandList')
 
-        return {"verdict": True, "commandList": self._build_commands(self, command_list)}
+        return {"verdict": True, "commandList": self._build_commands(command_list)}
 
 
     def on_job_execute(self, current_job):
