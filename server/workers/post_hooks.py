@@ -31,10 +31,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
-    'RUN_POST_HOOK': 'runPostHook',
-}
-
-HOOK_NAMES = {
     'POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK': 'postCollectionSystemTransfer',
     'POST_UPDATE_DATA_DASHBOARD_HOOK': 'postDataDashboard',
     'POST_CREATE_CRUISE_HOOK': 'postSetupNewCruise',
@@ -46,32 +42,32 @@ HOOK_NAMES = {
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
+        "name": TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
         "longName": "Post Collection System Transfer",
     },
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'],
+        "name": TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'],
         "longName": "Post Data Dashboard Processing",
     },
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_CREATE_CRUISE_HOOK'],
+        "name": TASK_NAMES['POST_CREATE_CRUISE_HOOK'],
         "longName": "Post Setup New Cruise",
     },
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_CREATE_LOWERING_HOOK'],
+        "name": TASK_NAMES['POST_CREATE_LOWERING_HOOK'],
         "longName": "Post Setup New Lowering",
     },
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
+        "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
         "longName": "Post Finalize Current Cruise",
     },
     {
         "taskID": "0",
-        "name": HOOK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
+        "name": TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
         "longName": "Post Finalize Current Lowering",
     }
 ]
@@ -178,8 +174,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             return {'verdict': True, 'commandList': None}
 
         if post_hook_name in [
-            HOOK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
-            HOOK_NAMES['POST_DATA_DASHBOARD_HOOK_NAME']
+            TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
+            TASK_NAMES['POST_DATA_DASHBOARD_HOOK_NAME']
         ]:
             cst_cfg = self.ovdm.get_collection_system_transfer(self.job_data['collectionSystemTransferID'])
             if not cst_cfg:
@@ -324,7 +320,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }))
 
 
-def task_run_post_hook(worker, current_job):
+def task_post_hook(worker, current_job):
     """
     Run the post-hook tasks
     """
@@ -422,8 +418,23 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: %s", TASK_NAMES['RUN_POST_HOOK'])
-    new_worker.register_task(TASK_NAMES['RUN_POST_HOOK'], task_run_post_hook)
+    logging.info("\tTask: %s", TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['POST_CREATE_CRUISE_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_CREATE_CRUISE_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['POST_CREATE_LOWERING_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_CREATE_LOWERING_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'])
+    new_worker.register_task(TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'], task_post_hook)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
