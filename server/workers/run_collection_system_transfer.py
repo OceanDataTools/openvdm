@@ -578,6 +578,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
 
+        logging.debug(self.collection_system_transfer)
+
         # Set logging format with cruise transfer name
         # logging.getLogger().handlers[0].setFormatter(logging.Formatter(
         #     f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
