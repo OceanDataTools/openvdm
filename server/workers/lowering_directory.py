@@ -74,8 +74,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Fetch task metadata
         """
 
-        task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
-        return task[0] if len(task) > 0 else None
+        return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
     def keyword_replace(self, s):
