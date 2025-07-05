@@ -135,18 +135,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return self._fail_job(current_job, "Locate Collection System Transfer Data",
                                       "Could not find collection system transfer config to use for connection test")
 
-                # reason = "Could not find configuration data for collection system transfer"
-                # return self.on_job_complete(current_job, json.dumps({'parts':[
-                #     {"partName": "Located Collection System Tranfer Data", "result": "Fail", "reason": reason},
-                #     {"partName": "Final Verdict", "result": "Fail", "reason": reason}
-                # ]}))
-
             self.collection_system_transfer.update(cst_cfg)
 
         elif not cst_cfg:
-            # self.collection_system_transfer = {
-            #     'name': "UNKNOWN"
-            # }
 
             return self._fail_job(current_job, "Locate Collection System Transfer Data",
                                   "Could not find collection system transfer config to use for connection test")
