@@ -343,8 +343,8 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: %s", TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
-    new_worker.register_task(TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], task_test_collection_system_transfer)
+    logging.info("\tTask: %s", TASK_NAMES['TEST_COLLECTION_SYSTEM_TRANSFER'])
+    new_worker.register_task(TASK_NAMES['TEST_COLLECTION_SYSTEM_TRANSFER'], task_test_collection_system_transfer)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
