@@ -169,6 +169,7 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", str(e))
         return False
 
+    # This code was an attempt to cleanup/delete the write_test.txt file
     #cmd = build_rsync_command(flags, ['-r', '--delete', '--include="write_test.txt"', '--exclude="*"'], '/dev/null/', f'rsync://{user}@{server}', None)
 
     #logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
@@ -180,6 +181,7 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     #except Exception as e:
     #    logging.error("rsync write test failed: %s", str(e))
     #    return False
+
     return True
 
 
@@ -250,15 +252,6 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
-    """
-    Builds a list of rsync options based on config, transfer mode, and destination type.
-
-    :param cfg: dict-like config object (e.g., gearman_worker.collection_system_transfer)
-    :param mode: 'dry-run' or 'real'
-    :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
-    :return: list of rsync flags
-    """
-
     transfer_type = get_transfer_type(cfg['transferType'])
 
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
