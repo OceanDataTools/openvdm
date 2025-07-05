@@ -531,7 +531,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return super().send_job_complete(current_job, job_result)
 
         # Always set idle at the end if not failed
-        self.ovdm.clear_error_cruise_data_transfer(cdt_id)
+        self.ovdm.set_idle_cruise_data_transfer(cdt_id)
 
         return super().send_job_complete(current_job, job_result)
 
