@@ -144,6 +144,44 @@ def test_rsync_connection(server, user, password_file=None):
         return False
 
 
+def test_rsync_write_access(server, user, tmpdir, password_file=None):
+    flags = ['--no-motd', '--contimeout=5']
+
+    if password_file is not None:
+        flags.extend([f'--password-file={password_file}'])
+
+    write_test_dir = os.mkdir(os.path.join("write_test"))
+    write_test_file = os.path.join(write_test_dir, 'write_test.txt')
+
+    with open(write_test_file, 'w', encoding='utf-8') as f:
+        f.write("this is a write test file used by OpenVDM to determine if destination is writable")
+
+    cmd = build_rsync_command(flags, ['--remove-source-files'], write_test_file, f'rsync://{user}@{server}', None)
+
+    logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode not in [0, 24]:
+            logging.warning("rsync failed: %s", proc.stderr.strip())
+            return False
+    except Exception as e:
+        logging.error("rsync write test failed: %s", str(e))
+        return False
+
+    cmd = build_rsync_command(flags, ['--delete'], write_test_dir, f'rsync://{user}@{server}', None)
+
+    logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode not in [0, 24]:
+            logging.warning("rsync failed: %s", proc.stderr.strip())
+            return False
+    except Exception as e:
+        logging.error("rsync write test failed: %s", str(e))
+        return False
+    return True
+
+
 def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
     if (passwd is None or len(passwd) == 0) and use_pubkey is False:
@@ -537,7 +575,7 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
             if not test_write_access(smb_dest_dir):
-                reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
+                reason = f"Unable to write to: {cdt_cfg['destDir']} on SMB share"
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -585,6 +623,17 @@ def test_cdt_destination(cdt_cfg):
                 return results
 
             results.append({"partName": "Destination directory", "result": "Pass"})
+
+            contest_success = test_rsync_write_access(cdt_cfg['rsyncServer'] + cdt_cfg['destDir'], cdt_cfg['rsyncUser'], tmpdir, password_file)
+            if not contest_success:
+                reason = f"Unable to write to: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
+                results.extend([
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+
+                return results
+
+            results.append({"partName": "Write test", "result": "Pass"})
 
         # Tests for SSH
         if transfer_type == 'ssh':
