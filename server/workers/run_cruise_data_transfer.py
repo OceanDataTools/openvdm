@@ -36,6 +36,10 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+TASK_NAMES = {
+    'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
+}
+
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
 @contextmanager
@@ -178,27 +182,27 @@ def check_darwin(cdt_cfg):
     return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
 
 
-def build_filters(gearman_worker):
+def build_filters(worker):
     """
     Build filters for the transfer
     """
 
     return {
         'include_filters': ['*'],
-        'exclude_filters': build_exclude_filterlist(gearman_worker),
+        'exclude_filters': build_exclude_filterlist(worker),
         'ignore_filters': []
     }
 
 
-def build_exclude_filterlist(gearman_worker):
+def build_exclude_filterlist(worker):
     """
     Build exclude filter for the transfer
     """
     exclude_filterlist = []
 
-    cfg = gearman_worker.shipboard_data_warehouse_config
-    transfer = gearman_worker.cruise_data_transfer
-    lowerings = gearman_worker.ovdm.get_lowerings() or []
+    cfg = worker.shipboard_data_warehouse_config
+    transfer = worker.cruise_data_transfer
+    lowerings = worker.ovdm.get_lowerings() or []
 
     # Exclude OVDM-related files if flag is set
     if transfer.get('includeOVDMFiles') == '0':
@@ -214,17 +218,17 @@ def build_exclude_filterlist(gearman_worker):
 
     for cs_id in filter(lambda x: x and x != '0', excluded_ids):
         try:
-            cs_transfer = gearman_worker.ovdm.get_collection_system_transfer(cs_id)
+            cs_transfer = worker.ovdm.get_collection_system_transfer(cs_id)
             cruise_or_lowering = cs_transfer.get('cruiseOrLowering')
             dest_dir = cs_transfer.get('destDir')
 
             if cruise_or_lowering == '0':
                 # Cruise-level exclusion
-                exclude_filterlist.append(f"*{dest_dir.replace('{cruiseID}', gearman_worker.cruise_id)}*")
+                exclude_filterlist.append(f"*{dest_dir.replace('{cruiseID}', worker.cruise_id)}*")
             else:
                 # Lowering-level exclusions
                 for lowering in lowerings:
-                    filter_path = dest_dir.replace('{cruiseID}', gearman_worker.cruise_id).replace('{loweringID}', lowering)
+                    filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
                     exclude_filterlist.append(f"*{lowering}/{filter_path}*")
 
         except Exception as err:
@@ -235,8 +239,8 @@ def build_exclude_filterlist(gearman_worker):
 
     for extra_id in filter(lambda x: x and x != '0', extra_dir_ids):
         try:
-            extra_dir = gearman_worker.ovdm.get_extra_directory(extra_id)
-            exclude_filterlist.append(f"*{extra_dir['destDir'].replace('{cruiseID}', gearman_worker.cruise_id)}*")
+            extra_dir = worker.ovdm.get_extra_directory(extra_id)
+            exclude_filterlist.append(f"*{extra_dir['destDir'].replace('{cruiseID}', worker.cruise_id)}*")
         except Exception as err:
             logging.warning("Could not retrieve extra directory %s: %s", extra_id, err)
 
@@ -244,7 +248,7 @@ def build_exclude_filterlist(gearman_worker):
     return exclude_filterlist
 
 
-def run_transfer_command(gearman_worker, gearman_job, command, file_count):
+def run_transfer_command(worker, current_job, command, file_count):
     """
     run the rsync command and return the list of new/updated files
     """
@@ -266,7 +270,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
         for line in proc.stdout:
 
-            if gearman_worker.stop:
+            if worker.stop:
                 logging.debug("Stopping")
                 proc.terminate()
                 break
@@ -295,7 +299,7 @@ def run_transfer_command(gearman_worker, gearman_job, command, file_count):
 
                     if percent != last_percent_reported:
                         logging.info("Progress Update: %d%%", percent)
-                        gearman_worker.send_job_status(gearman_job, int(50 * percent/100) + 20, 100)
+                        worker.send_job_status(current_job, int(50 * percent/100) + 20, 100)
                         last_percent_reported = percent
 
     return new_files, updated_files
@@ -358,19 +362,19 @@ def build_exclude_file(exclude_list, filepath):
     return True
 
 
-def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
+def transfer_to_destination(worker, current_job, transfer_type):
     """
     Unified transfer function to handle local, SMB, rsync, and SSH transfers
     """
     logging.debug("Starting unified transfer: %s", transfer_type)
 
-    cfg = gearman_worker.cruise_data_transfer
-    cruise_cfg = gearman_worker.shipboard_data_warehouse_config
-    cruise_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    cfg = worker.cruise_data_transfer
+    cruise_cfg = worker.shipboard_data_warehouse_config
+    cruise_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], worker.cruise_id)
     dest_dir = None
 
     logging.debug("Building file list")
-    files = build_cdt_filelist(gearman_worker, cruise_dir)
+    files = build_cdt_filelist(worker, cruise_dir)
     is_darwin = False
 
     with temporary_directory() as tmpdir:
@@ -438,14 +442,14 @@ def transfer_to_destination(gearman_worker, gearman_job, transfer_type):
                 real_cmd = ['sshpass', '-p', cfg['sshPass']] + real_cmd
 
             logging.debug("Real transfer command: %s", ' '.join(real_cmd))
-            files['new'], files['updated'] = run_transfer_command(gearman_worker, gearman_job, real_cmd, file_count)
+            files['new'], files['updated'] = run_transfer_command(worker, current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
             if transfer_type == 'local' and cfg.get('localDirIsMountPoint') == '0':
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
                     cruise_cfg['shipboardDataWarehouseUsername'],
-                    os.path.join(dest_dir, gearman_worker.cruise_id)
+                    os.path.join(dest_dir, worker.cruise_id)
                 )
                 if not output['verdict']:
                     return output
@@ -581,7 +585,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         }))
 
 
-def task_run_cruise_data_transfer(gearman_worker, current_job):
+def task_run_cruise_data_transfer(worker, current_job):
     """
     Run the cruise data transfer
     """
@@ -597,16 +601,16 @@ def task_run_cruise_data_transfer(gearman_worker, current_job):
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    gearman_worker.ovdm.set_running_cruise_data_transfer(gearman_worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
+    worker.ovdm.set_running_cruise_data_transfer(worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing configuration")
-    gearman_worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 1, 10)
 
-    gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
+    gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
 
     gm_data = {
-        'cruiseDataTransfer': gearman_worker.cruise_data_transfer,
-        'cruiseID': gearman_worker.cruise_id
+        'cruiseDataTransfer': worker.cruise_data_transfer,
+        'cruiseID': worker.cruise_id
     }
 
     completed_job_request = gm_client.submit_job("testCruiseDataTransfer", json.dumps(gm_data))
@@ -622,18 +626,18 @@ def task_run_cruise_data_transfer(gearman_worker, current_job):
         job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results_obj['parts'][-1]['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 2, 10)
 
     logging.info("Transferring files")
     output_results = None
-    if gearman_worker.cruise_data_transfer['transferType'] == "1": # Local Directory
-        output_results = transfer_to_destination(gearman_worker, current_job, 'local')
-    elif  gearman_worker.cruise_data_transfer['transferType'] == "2": # Rsync Server
-        output_results = transfer_to_destination(gearman_worker, current_job, 'rsync')
-    elif  gearman_worker.cruise_data_transfer['transferType'] == "3": # SMB Server
-        output_results = transfer_to_destination(gearman_worker, current_job, 'smb')
-    elif  gearman_worker.cruise_data_transfer['transferType'] == "4": # SSH Server
-        output_results = transfer_to_destination(gearman_worker, current_job, 'ssh')
+    if worker.cruise_data_transfer['transferType'] == "1": # Local Directory
+        output_results = transfer_to_destination(worker, current_job, 'local')
+    elif  worker.cruise_data_transfer['transferType'] == "2": # Rsync Server
+        output_results = transfer_to_destination(worker, current_job, 'rsync')
+    elif  worker.cruise_data_transfer['transferType'] == "3": # SMB Server
+        output_results = transfer_to_destination(worker, current_job, 'smb')
+    elif  worker.cruise_data_transfer['transferType'] == "4": # SSH Server
+        output_results = transfer_to_destination(worker, current_job, 'ssh')
     else:
         logging.error("Unknown Transfer Type")
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": "Unknown transfer type"})
@@ -655,7 +659,7 @@ def task_run_cruise_data_transfer(gearman_worker, current_job):
     if len(job_results['files']['exclude']) > 0:
         logging.debug("%s file(s) intentionally skipped", len(job_results['files']['exclude']))
 
-    gearman_worker.send_job_status(current_job, 9, 10)
+    worker.send_job_status(current_job, 9, 10)
 
     time.sleep(2)
 
@@ -711,8 +715,8 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: runCruiseDataTransfer")
-    new_worker.register_task("runCruiseDataTransfer", task_run_cruise_data_transfer)
+    logging.info("\tTask: %s", TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'])
+    new_worker.register_task(TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], task_run_cruise_data_transfer)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
