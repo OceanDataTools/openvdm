@@ -169,7 +169,7 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", str(e))
         return False
 
-    cmd = build_rsync_command(flags, ['--delete'], write_test_dir, f'rsync://{user}@{server}', None)
+    cmd = build_rsync_command(flags, ['-r', '--delete', '--include "write_test.txt"', '--exclude "*"'], write_test_dir, f'rsync://{user}@{server}', None)
 
     logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
     try:
