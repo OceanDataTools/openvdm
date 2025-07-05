@@ -441,9 +441,9 @@ def test_cdt_destination(cdt_cfg):
 
         # Tests for local
         if transfer_type == 'local':
-            dest_dir_exists = os.path.isdir(cdt_cfg['dest_dir'])
+            dest_dir_exists = os.path.isdir(cdt_cfg['destDir'])
             if not dest_dir_exists:
-                reason = f"Unable to find destination directory: {cdt_cfg['dest_dir']} on the Data Warehouse"
+                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Data Warehouse"
                 results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
 
                 if cdt_cfg['localDirIsMountPoint'] == '1':
@@ -456,11 +456,11 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination Directory", "result": "Pass"}])
 
             if cdt_cfg['localDirIsMountPoint'] == '1':
-                if not os.path.ismount(cdt_cfg['dest_dir']):
+                if not os.path.ismount(cdt_cfg['destDir']):
                     results.extend([{
                         "partName": "Destination Directory is a Mountpoint",
                         "result": "Fail",
-                        "reason": f"Destination directory: {cdt_cfg['dest_dir']} is not a mountpoint on the Data Warehouse"
+                        "reason": f"Destination directory: {cdt_cfg['destDir']} is not a mountpoint on the Data Warehouse"
                     }])
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
@@ -468,8 +468,8 @@ def test_cdt_destination(cdt_cfg):
 
                 results.extend([{"partName": "Destination Directory is a Mountpoint", "result": "Pass"}])
 
-            if not test_write_access(cdt_cfg['dest_dir']):
-                reason = f"Unable to delete source files from: {cdt_cfg['dest_dir']} on SMB share"
+            if not test_write_access(cdt_cfg['destDir']):
+                reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -510,10 +510,10 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "SMB Share", "result": "Pass"}])
 
-            smb_dest_dir = os.path.join(mntpoint, cdt_cfg['dest_dir'].lstrip('/'))
+            smb_dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
             dest_dir_exists = os.path.isdir(smb_dest_dir)
             if not dest_dir_exists:
-                reason = f"Unable to find destination directory: {cdt_cfg['dest_dir']} on SMB share"
+                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on SMB share"
                 results.extend([
                     {"partName": "Destination Directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
@@ -524,7 +524,7 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination Directory", "result": "Pass"}])
 
             if not test_write_access(smb_dest_dir):
-                reason = f"Unable to delete source files from: {cdt_cfg['dest_dir']} on SMB share"
+                reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -562,9 +562,9 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Rsync Connection", "result": "Pass"})
 
-            contest_success = test_rsync_connection(cdt_cfg['rsyncServer'] + cdt_cfg['dest_dir'], cdt_cfg['rsyncUser'], password_file)
+            contest_success = test_rsync_connection(cdt_cfg['rsyncServer'] + cdt_cfg['destDir'], cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
-                reason = f"Unable to find source directory: {cdt_cfg['dest_dir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
+                reason = f"Unable to find source directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 results.extend([
                     {"partName": "Destination Directory", "result": "Fail", "reason": reason}
                 ])
@@ -592,10 +592,10 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "SSH Connection", "result": "Pass"}])
 
-            contest_success = test_ssh_destination(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['dest_dir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success = test_ssh_destination(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
-                reason = f"Unable to find destination directory: {cdt_cfg['dest_dir']}"
+                reason = f"Unable to find destination directory: {cdt_cfg['destDir']}"
                 results.extend([
                     {"partName": "Destination Directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
@@ -606,10 +606,10 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination Directory", "result": "Pass"}])
 
 
-            contest_success = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['dest_dir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
-                reason = f"No write access on ssh server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']} at {cdt_cfg['dest_dir']}"
+                reason = f"No write access on ssh server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']} at {cdt_cfg['destDir']}"
                 results.extend([
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
