@@ -150,7 +150,8 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     if password_file is not None:
         flags.extend([f'--password-file={password_file}'])
 
-    write_test_dir = os.mkdir(os.path.join("write_test"))
+    write_test_dir = os.path.join("write_test")
+    os.mkdir(write_test_dir)
     write_test_file = os.path.join(write_test_dir, 'write_test.txt')
 
     with open(write_test_file, 'w', encoding='utf-8') as f:
