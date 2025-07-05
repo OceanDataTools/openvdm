@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+"""
+FILE:  connection_utils.py
+
+DESCRIPTION:  utilities used to connect with remote systems
+
+     BUGS:
+    NOTES:
+   AUTHOR:  Webb Pinner
+  VERSION:  2.10
+  CREATED:  2025-07-05
+ REVISION:
+"""
+
 import os
 import sys
 import logging

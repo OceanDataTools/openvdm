@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Utilities for processing files and filenames.
+"""
+FILE:  connection_utils.py
+
+DESCRIPTION:  utilities for dealing with local files/directories
+
+     BUGS:
+    NOTES:
+   AUTHOR:  Webb Pinner
+  VERSION:  2.10
+  CREATED:  2025-07-05
+ REVISION:
 """
 
 import os
