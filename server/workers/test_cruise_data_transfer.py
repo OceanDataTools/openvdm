@@ -453,7 +453,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
-            f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
+            f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
         ))
 
         logging.info("Job: %s, transfer test started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
