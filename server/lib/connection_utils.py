@@ -135,14 +135,15 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
     if (passwd is None or len(passwd) == 0) and use_pubkey is False:
         raise ValueError("Must specify either a passwd or use_pubkey")
 
-    cmd = ['ssh'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no']
+    cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'BatchMode=yes'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no','-o', 'StrictHostKeyChecking=no']
     cmd += flags or []
     cmd += [f'{user}@{server}', post_cmd]
     return cmd
 
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
-    cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, 'ls', passwd, use_pubkey)
+
+    cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
 
     logging.debug("test_ssh_connection cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
     try:
@@ -155,8 +156,8 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
     return True
 
 
-def test_ssh_destination(server, user, dest_dir, passwd, use_pubkey):
-    cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, f'ls "{dest_dir}"', passwd, use_pubkey)
+def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
+    cmd = build_ssh_command(None, user, server, f'ls "{remote_dir}"', passwd, use_pubkey)
 
     logging.debug("test_ssh_destination cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
     try:
@@ -170,7 +171,7 @@ def test_ssh_destination(server, user, dest_dir, passwd, use_pubkey):
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
-    cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
+    cmd = build_ssh_command(None, user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
     logging.debug("test_ssh_write_access cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
     try:
@@ -181,7 +182,7 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
         logging.error("SSH write test failed: %s", str(e))
         return False
 
-    cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
+    cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
     logging.debug("test_ssh_write_access cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
     try:
@@ -409,17 +410,17 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SSH Connection", "result": "Pass"}])
 
-            cmd = build_ssh_command(['-o', 'StrictHostKeyChecking=no'], cst_cfg['sshUser'], cst_cfg['sshServer'], f'ls "{source_dir}"', cst_cfg['sshPass'], use_pubkey)
-            proc = subprocess.run(cmd, capture_output=True, check=False)
-            if proc.returncode != 0:
-                reason = f"Unable to find source directory: {source_dir} on the SSH Server: {cst_cfg['rsyncServer']}"
+            contest_success = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], source_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+
+            if not contest_success:
+                reason = f"Unable to find destination directory: {source_dir}"
                 results.extend([
                     {"partName": "Source Directory", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.append({"partName": "Source Directory", "result": "Pass"})
+            results.extend([{"partName": "Source Directory", "result": "Pass"}])
 
         return results
 
@@ -592,7 +593,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "SSH Connection", "result": "Pass"}])
 
-            contest_success = test_ssh_destination(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']}"
