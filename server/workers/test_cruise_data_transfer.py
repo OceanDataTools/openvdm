@@ -451,18 +451,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         else:
             self.cruise_data_transfer = cdt_cfg
 
-        # if 'cruiseDataTransferID' in payload_obj['cruiseDataTransfer']:
-        #     self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(payload_obj['cruiseDataTransfer']['cruiseDataTransferID'])
-
-        #     if not self.cruise_data_transfer:
-        #         logging.error("could not find configuration data")
-        #         return self.on_job_complete(current_job, json.dumps({'parts':[{"partName": "Located Cruise Data Tranfer Data", "result": "Fail", "reason": "Could not find configuration data for cruise data transfer"},{"partName": "Final Verdict", "result": "Fail", "reason": "Could not find configuration data for cruise data transfer"}]}))
-
-        #     self.cruise_data_transfer.update(payload_obj['cruiseDataTransfer'])
-
-        # else:
-        #     self.cruise_data_transfer = payload_obj['cruiseDataTransfer']
-
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
