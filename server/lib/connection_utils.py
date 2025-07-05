@@ -9,16 +9,16 @@ from server.lib.file_utils import test_write_access, temporary_directory
 
 def get_transfer_type(transfer_type):
 
-    if transfer_type == "1": # Local Directory
+    if transfer_type == "1": # Local directory
         return 'local'
 
-    if  transfer_type == "2": # Rsync Server
+    if  transfer_type == "2": # Rsync server
         return 'rsync'
 
-    if  transfer_type == "3": # SMB Server
+    if  transfer_type == "3": # SMB server
         return 'smb'
 
-    if  transfer_type == "4": # SSH Server
+    if  transfer_type == "4": # SSH server
         return 'ssh'
 
     return None
@@ -246,7 +246,6 @@ def test_cst_source(cst_cfg, source_dir):
     transfer_type = get_transfer_type(cst_cfg['transferType'])
 
     if not transfer_type:
-        logging.error("Unknown Transfer Type")
         results.extend([{"partName": "Transfer type", "result": "Fail", "reason": "Unknown transfer type"}])
         return results
 
@@ -258,28 +257,28 @@ def test_cst_source(cst_cfg, source_dir):
             source_dir_exists = os.path.isdir(source_dir)
             if not source_dir_exists:
                 reason = f"Unable to find source directory: {source_dir} on the Data Warehouse"
-                results.extend([{"partName": "Source Directory", "result": "Fail", "reason": reason}])
+                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
                 if cst_cfg['localDirIsMountPoint'] == '1':
-                    results.extend([{"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": reason}])
 
                 if cst_cfg['removeSourceFiles'] == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
-            results.extend([{"partName": "Source Directory", "result": "Pass"}])
+            results.extend([{"partName": "Source directory", "result": "Pass"}])
 
             if cst_cfg['localDirIsMountPoint'] == '1':
                 if not os.path.ismount(source_dir):
-                    results.extend([{"partName": "Source Directory is a Mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the Data Warehouse"}])
+                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the Data Warehouse"}])
 
                     if cst_cfg['removeSourceFiles'] == '1':
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
-                results.extend([{"partName": "Source Directory is a Mountpoint", "result": "Pass"}])
+                results.extend([{"partName": "Source directory is a mountpoint", "result": "Pass"}])
 
             if cst_cfg['removeSourceFiles'] == '1':
                 if not test_write_access(source_dir):
@@ -298,12 +297,11 @@ def test_cst_source(cst_cfg, source_dir):
             smb_version = detect_smb_version(cst_cfg)
 
             if not smb_version:
-                logging.error("unable to connect to SMB server")
-                reason = f"Could not connect to SMB Server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
                 results.extend([
-                    {"partName": "SMB Server", "result": "Fail", "reason": reason},
-                    {"partName": "SMB Share", "result": "Fail", "reason": reason},
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "SMB server", "result": "Fail", "reason": reason},
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
                 if cst_cfg['removeSourceFiles'] == '1':
@@ -311,14 +309,14 @@ def test_cst_source(cst_cfg, source_dir):
 
                 return results
 
-            results.extend([{"partName": "SMB Server", "result": "Pass"}])
+            results.extend([{"partName": "SMB server", "result": "Pass"}])
 
             mnt_success = mount_smb_share(cst_cfg, mntpoint, smb_version)
             if not mnt_success:
-                reason = f"Could not connect to SMB Server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
                 results.extend([
-                    {"partName": "SMB Share", "result": "Fail", "reason": reason},
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
                 if cst_cfg['removeSourceFiles'] == '1':
@@ -326,20 +324,20 @@ def test_cst_source(cst_cfg, source_dir):
 
                 return results
 
-            results.extend([{"partName": "SMB Share", "result": "Pass"}])
+            results.extend([{"partName": "SMB share", "result": "Pass"}])
 
             smb_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
             source_dir_exists = os.path.isdir(smb_source_dir)
             if not source_dir_exists:
                 reason = f"Unable to find source directory: {source_dir} on SMB share"
-                results.extend([{"partName": "Source Directory", "result": "Fail", "reason": reason}])
+                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
                 if cst_cfg['removeSourceFiles'] == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
-            results.extend([{"partName": "Source Directory", "result": "Pass"}])
+            results.extend([{"partName": "Source directory", "result": "Pass"}])
 
             if cst_cfg['removeSourceFiles'] == '1':
                 if not test_write_access(smb_source_dir):
@@ -362,8 +360,8 @@ def test_cst_source(cst_cfg, source_dir):
                     reason = f"Unable to create temporary rsync password file: {password_file}"
                     results.extend([
                         {"partName": "Writing temporary rsync password file", "result": "Fail", "reason": reason},
-                        {"partName": "Rsync Connection", "result": "Fail", "reason": reason},
-                        {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                        {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                        {"partName": "Source directory", "result": "Fail", "reason": reason}
                     ])
 
                     return results
@@ -372,25 +370,25 @@ def test_cst_source(cst_cfg, source_dir):
 
             contest_success = test_rsync_connection(cst_cfg['rsyncServer'], cst_cfg['rsyncUser'], password_file)
             if not contest_success:
-                reason = f"Could not connect to Rsync Server: {cst_cfg['rsyncServer']} as {cst_cfg['rsyncUser']}"
+                reason = f"Could not connect to rsync server: {cst_cfg['rsyncServer']} as {cst_cfg['rsyncUser']}"
                 results.extend([
-                    {"partName": "Rsync Connection", "result": "Fail", "reason": reason},
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
                 return results
 
-            results.append({"partName": "Rsync Connection", "result": "Pass"})
+            results.append({"partName": "Rsync connection", "result": "Pass"})
 
             contest_success = test_rsync_connection(cst_cfg['rsyncServer'] + source_dir, cst_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
                 results.extend([
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.append({"partName": "Source Directory", "result": "Pass"})
+            results.append({"partName": "Source directory", "result": "Pass"})
 
         # Tests for SSH
         if transfer_type == 'ssh':
@@ -400,27 +398,27 @@ def test_cst_source(cst_cfg, source_dir):
             contest_success = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
-                reason = f"Unable to connect to ssh server: {cst_cfg['sshServer']} as {cst_cfg['sshUser']}"
+                reason = f"Unable to connect to SSH server: {cst_cfg['sshServer']} as {cst_cfg['sshUser']}"
                 results.extend([
-                    {"partName": "SSH Connection", "result": "Fail", "reason": reason},
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "SSH connection", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "SSH Connection", "result": "Pass"}])
+            results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
             contest_success = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], source_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to find destination directory: {source_dir}"
                 results.extend([
-                    {"partName": "Source Directory", "result": "Fail", "reason": reason}
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "Source Directory", "result": "Pass"}])
+            results.extend([{"partName": "Source directory", "result": "Pass"}])
 
         return results
 
@@ -433,7 +431,7 @@ def test_cdt_destination(cdt_cfg):
     transfer_type = get_transfer_type(cdt_cfg['transferType'])
 
     if not transfer_type:
-        logging.error("Unknown Transfer Type")
+        logging.error("Unknown transfer type")
         results.extend([{"partName": "Transfer type", "result": "Fail", "reason": "Unknown transfer type"}])
         return results
 
@@ -445,21 +443,21 @@ def test_cdt_destination(cdt_cfg):
             dest_dir_exists = os.path.isdir(cdt_cfg['destDir'])
             if not dest_dir_exists:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Data Warehouse"
-                results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
+                results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
 
                 if cdt_cfg['localDirIsMountPoint'] == '1':
-                    results.extend([{"partName": "Destination Directory is a Mountpoint", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Destination directory is a mountpoint", "result": "Fail", "reason": reason}])
 
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
-            results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+            results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
             if cdt_cfg['localDirIsMountPoint'] == '1':
                 if not os.path.ismount(cdt_cfg['destDir']):
                     results.extend([{
-                        "partName": "Destination Directory is a Mountpoint",
+                        "partName": "Destination directory is a mountpoint",
                         "result": "Fail",
                         "reason": f"Destination directory: {cdt_cfg['destDir']} is not a mountpoint on the Data Warehouse"
                     }])
@@ -467,7 +465,7 @@ def test_cdt_destination(cdt_cfg):
 
                     return results
 
-                results.extend([{"partName": "Destination Directory is a Mountpoint", "result": "Pass"}])
+                results.extend([{"partName": "Destination directory is a mountpoint", "result": "Pass"}])
 
             if not test_write_access(cdt_cfg['destDir']):
                 reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
@@ -486,43 +484,43 @@ def test_cdt_destination(cdt_cfg):
 
             if not smb_version:
                 logging.error("unable to connect to SMB server")
-                reason = f"Could not connect to SMB Server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+                reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
                 results.extend([
-                    {"partName": "SMB Server", "result": "Fail", "reason": reason},
-                    {"partName": "SMB Share", "result": "Fail", "reason": reason},
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason},
+                    {"partName": "SMB server", "result": "Fail", "reason": reason},
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "SMB Server", "result": "Pass"}])
+            results.extend([{"partName": "SMB server", "result": "Pass"}])
 
             mnt_success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
             if not mnt_success:
-                reason = f"Could not connect to SMB Server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+                reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
                 results.extend([
-                    {"partName": "SMB Share", "result": "Fail", "reason": reason},
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason},
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "SMB Share", "result": "Pass"}])
+            results.extend([{"partName": "SMB share", "result": "Pass"}])
 
             smb_dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
             dest_dir_exists = os.path.isdir(smb_dest_dir)
             if not dest_dir_exists:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on SMB share"
                 results.extend([
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+            results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
             if not test_write_access(smb_dest_dir):
                 reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
@@ -544,8 +542,8 @@ def test_cdt_destination(cdt_cfg):
                     reason = f"Unable to create temporary rsync password file: {password_file}"
                     results.extend([
                         {"partName": "Writing temporary rsync password file", "result": "Fail", "reason": reason},
-                        {"partName": "Rsync Connection", "result": "Fail", "reason": reason},
-                        {"partName": "Destination Directory", "result": "Fail", "reason": reason}
+                        {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                        {"partName": "Destination directory", "result": "Fail", "reason": reason}
                     ])
 
                     return results
@@ -554,25 +552,25 @@ def test_cdt_destination(cdt_cfg):
 
             contest_success = test_rsync_connection(cdt_cfg['rsyncServer'], cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
-                reason = f"Could not connect to Rsync Server: {cdt_cfg['rsyncServer']} as {cdt_cfg['rsyncUser']}"
+                reason = f"Could not connect to rsync server: {cdt_cfg['rsyncServer']} as {cdt_cfg['rsyncUser']}"
                 results.extend([
-                    {"partName": "Rsync Connection", "result": "Fail", "reason": reason},
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason}
+                    {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason}
                 ])
                 return results
 
-            results.append({"partName": "Rsync Connection", "result": "Pass"})
+            results.append({"partName": "Rsync connection", "result": "Pass"})
 
             contest_success = test_rsync_connection(cdt_cfg['rsyncServer'] + cdt_cfg['destDir'], cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find source directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 results.extend([
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason}
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.append({"partName": "Destination Directory", "result": "Pass"})
+            results.append({"partName": "Destination directory", "result": "Pass"})
 
         # Tests for SSH
         if transfer_type == 'ssh':
@@ -582,29 +580,29 @@ def test_cdt_destination(cdt_cfg):
             contest_success = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
-                reason = f"Unable to connect to ssh server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']}"
+                reason = f"Unable to connect to SSH server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']}"
                 results.extend([
-                    {"partName": "SSH Connection", "result": "Fail", "reason": reason},
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason},
+                    {"partName": "SSH connection", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "SSH Connection", "result": "Pass"}])
+            results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
             contest_success = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']}"
                 results.extend([
-                    {"partName": "Destination Directory", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
 
                 return results
 
-            results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+            results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
 
             contest_success = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
