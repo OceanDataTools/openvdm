@@ -423,7 +423,8 @@ def lockdown_directory(base_dir, exempt_dirs=[]):
 
     return {'verdict': True}
 
-def verfy_write_access(dest_dir):
+
+def test_write_access(dest_dir):
     """
     Verify the current user has write permissions to the dest_dir
     """
