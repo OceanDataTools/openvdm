@@ -33,14 +33,18 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
-def build_filelist(gearman_worker):
+TASK_NAMES = {
+    'RUN_SHIP_TO_SHORE_TRANSFER': 'runShipToShoreTransfer'
+}
+
+def build_filelist(worker):
     """
     Build the list of files for the ship-to-shore transfer
     """
 
     logging.debug("Building filters")
     raw_filters = {'includeFilter':[]}
-    ship_to_shore_transfers = gearman_worker.ovdm.get_ship_to_shore_transfers() + gearman_worker.ovdm.get_required_ship_to_shore_transfers()
+    ship_to_shore_transfers = worker.ovdm.get_ship_to_shore_transfers() + worker.ovdm.get_required_ship_to_shore_transfers()
 
     logging.debug('shipToShoreTransfers: %s', json.dumps(ship_to_shore_transfers, indent=2))
 
@@ -48,20 +52,20 @@ def build_filelist(gearman_worker):
         for ship_to_shore_transfer in ship_to_shore_transfers:
             if ship_to_shore_transfer['priority'] == str(priority) and ship_to_shore_transfer['enable'] == '1':
                 if not ship_to_shore_transfer['collectionSystem'] == "0":
-                    collection_system = gearman_worker.ovdm.get_collection_system_transfer(ship_to_shore_transfer['collectionSystem'])
-                    raw_filters['includeFilter'] += ['*/' + gearman_worker.cruise_id + '/' + collection_system['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    collection_system = worker.ovdm.get_collection_system_transfer(ship_to_shore_transfer['collectionSystem'])
+                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + collection_system['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
                 elif not ship_to_shore_transfer['extraDirectory'] == "0":
-                    extra_directory = gearman_worker.ovdm.get_extra_directory(ship_to_shore_transfer['extraDirectory'])
-                    raw_filters['includeFilter'] += ['*/' + gearman_worker.cruise_id + '/' + extra_directory['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    extra_directory = worker.ovdm.get_extra_directory(ship_to_shore_transfer['extraDirectory'])
+                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + extra_directory['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
                 else:
-                    raw_filters['includeFilter'] += ['*/' + gearman_worker.cruise_id + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
 
     logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
-    proc_filters = build_filters(gearman_worker, raw_filters)
+    proc_filters = build_filters(worker, raw_filters)
     logging.debug("Processed Filters: %s", json.dumps(raw_filters, indent=2))
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    cruise_dir = os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], worker.cruise_id)
 
     return_files = {'include':[], 'new':[], 'updated':[], 'exclude':[]}
     for root, _, filenames in os.walk(cruise_dir):
@@ -77,28 +81,28 @@ def build_filelist(gearman_worker):
     return { 'verdict': True, 'files': return_files }
 
 
-def build_logfile_dirpath(gearman_worker):
+def build_logfile_dirpath(worker):
     """
     Build the path for saving the transfer logfile
     """
 
-    cruise_dir = os.path.join(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_id)
+    cruise_dir = os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], worker.cruise_id)
 
-    return os.path.join(cruise_dir, gearman_worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+    return os.path.join(cruise_dir, worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
-def build_filters(gearman_worker, raw_filters):
+def build_filters(worker, raw_filters):
     """
     Replace any wildcards in the provided filters
     """
 
     return_filters = raw_filters
-    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', gearman_worker.cruise_id).replace('{cruise_config_fn}', gearman_worker.ovdm.get_cruise_config_fn()).replace('{md5_summary_fn}', gearman_worker.ovdm.get_md5_summary_fn()).replace('{md5_summary_md5_fn}', gearman_worker.ovdm.get_md5_summary_md5_fn()) for include_filter in return_filters['includeFilter']]
+    return_filters['includeFilter'] = [include_filter.replace('{cruiseID}', worker.cruise_id).replace('{cruise_config_fn}', worker.ovdm.get_cruise_config_fn()).replace('{md5_summary_fn}', worker.ovdm.get_md5_summary_fn()).replace('{md5_summary_md5_fn}', worker.ovdm.get_md5_summary_md5_fn()) for include_filter in return_filters['includeFilter']]
 
     return return_filters
 
 
-def transfer_ssh_dest_dir(gearman_worker, gearman_job):
+def transfer_ssh_dest_dir(worker, current_job):
     """
     Transfer the files to a destination on a ssh server
     """
@@ -106,7 +110,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
     logging.debug("Transfer to SSH Server")
 
     logging.debug("Building file list")
-    output_results = build_filelist(gearman_worker)
+    output_results = build_filelist(worker)
 
     if not output_results['verdict']:
         logging.error("Building list of files to transfer failed: %s", output_results['reason'])
@@ -114,7 +118,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
     files = output_results['files']
 
-    dest_dir = gearman_worker.cruise_data_transfer['destDir'].rstrip('/')
+    dest_dir = worker.cruise_data_transfer['destDir'].rstrip('/')
 
     # Create temp directory
     tmpdir = tempfile.mkdtemp()
@@ -126,7 +130,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
     try:
         with open(ssh_includelist_filepath, mode='w', encoding="utf-8") as ssh_includelist_file:
-            ssh_includelist_file.write('\n'.join([os.path.join(gearman_worker.cruise_id, filename) for filename in files['include']]))
+            ssh_includelist_file.write('\n'.join([os.path.join(worker.cruise_id, filename) for filename in files['include']]))
             ssh_includelist_file.write('\0')
 
     except IOError:
@@ -137,13 +141,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
         return {'verdict': False, 'reason': 'Error Saving temporary ssh exclude filelist file: ' + ssh_includelist_filepath, 'files':[]}
 
-    command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], gearman_worker.cruise_data_transfer['sshUser'] + '@' + gearman_worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], worker.cruise_data_transfer['sshUser'] + '@' + worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
 
-    if gearman_worker.cruise_data_transfer['bandwidthLimit'] != '0':
-        command.insert(2, f'--bwlimit={gearman_worker.cruise_data_transfer["bandwidthLimit"]}')
+    if worker.cruise_data_transfer['bandwidthLimit'] != '0':
+        command.insert(2, f'--bwlimit={worker.cruise_data_transfer["bandwidthLimit"]}')
 
-    if gearman_worker.cruise_data_transfer['sshUseKey'] == '0':
-        command = ['sshpass', '-p', gearman_worker.cruise_data_transfer['sshPass']] + command
+    if worker.cruise_data_transfer['sshUseKey'] == '0':
+        command = ['sshpass', '-p', worker.cruise_data_transfer['sshPass']] + command
 
     logging.debug("Transfer Command: %s", ' '.join(command))
 
@@ -152,7 +156,7 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
 
         proc.poll()
 
-        if gearman_worker.stop:
+        if worker.stop:
             logging.debug("Stopping")
             proc.terminate()
             break
@@ -168,13 +172,13 @@ def transfer_ssh_dest_dir(gearman_worker, gearman_job):
             filename = line.split(' ',1)[1]
             files['new'].append(filename)
             logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(50 * file_index/file_count) + 20, 100)
+            worker.send_job_status(current_job, int(50 * file_index/file_count) + 20, 100)
             file_index += 1
         elif line.startswith( '<f.' ):
             filename = line.split(' ',1)[1]
             files['updated'].append(filename)
             logging.info("Progress Update: %d%%", int(100 * (file_index + 1)/file_count))
-            gearman_worker.send_job_status(gearman_job, int(50 * file_index/file_count) + 20, 100)
+            worker.send_job_status(current_job, int(50 * file_index/file_count) + 20, 100)
             file_index += 1
 
     # Cleanup
@@ -304,7 +308,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.shutdown()
 
 
-def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disable=too-many-statements
+def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-many-statements
     """
     Perform the ship-to-shore transfer
     """
@@ -320,16 +324,16 @@ def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disa
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    gearman_worker.ovdm.set_running_cruise_data_transfer(gearman_worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
+    worker.ovdm.set_running_cruise_data_transfer(worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing configuration")
-    gearman_worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 1, 10)
 
-    gm_client = python3_gearman.GearmanClient([gearman_worker.ovdm.get_gearman_server()])
+    gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
 
     gm_data = {
-        'cruiseDataTransfer': gearman_worker.cruise_data_transfer,
-        'cruiseID': gearman_worker.cruise_id
+        'cruiseDataTransfer': worker.cruise_data_transfer,
+        'cruiseID': worker.cruise_id
     }
 
     completed_job_request = gm_client.submit_job("testCruiseDataTransfer", json.dumps(gm_data))
@@ -345,12 +349,12 @@ def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disa
         job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results_obj['parts'][-1]['reason']})
         return json.dumps(job_results)
 
-    gearman_worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 2, 10)
 
     logging.info("Transferring files")
     output_results = None
-    if  gearman_worker.cruise_data_transfer['transferType'] == "4": # SSH Server
-        output_results = transfer_ssh_dest_dir(gearman_worker, current_job)
+    if  worker.cruise_data_transfer['transferType'] == "4": # SSH Server
+        output_results = transfer_ssh_dest_dir(worker, current_job)
     else:
         logging.error("Unknown Transfer Type")
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": "Unknown transfer type"})
@@ -372,13 +376,13 @@ def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disa
     if len(job_results['files']['exclude']) > 0:
         logging.debug("%s file(s) intentionally skipped", len(job_results['files']['exclude']))
 
-    gearman_worker.send_job_status(current_job, 9, 10)
+    worker.send_job_status(current_job, 9, 10)
 
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.debug("Building logfiles")
 
-        logfile_filename = gearman_worker.cruise_data_transfer['name'] + '_' + gearman_worker.transfer_start_date + '.log'
+        logfile_filename = worker.cruise_data_transfer['name'] + '_' + worker.transfer_start_date + '.log'
 
         log_contents = {
             'files': {
@@ -387,7 +391,7 @@ def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disa
             }
         }
 
-        output_results = output_json_data_to_file(os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename), log_contents['files'])
+        output_results = output_json_data_to_file(os.path.join(build_logfile_dirpath(worker), logfile_filename), log_contents['files'])
 
         if output_results['verdict']:
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
@@ -396,13 +400,13 @@ def task_run_ship_to_shore_transfer(gearman_worker, current_job): # pylint: disa
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-        output_results = set_owner_group_permissions(gearman_worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(gearman_worker), logfile_filename))
+        output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(build_logfile_dirpath(worker), logfile_filename))
 
         if not output_results['verdict']:
             job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
             return json.dumps(job_results)
 
-    gearman_worker.send_job_status(current_job, 10, 10)
+    worker.send_job_status(current_job, 10, 10)
 
     time.sleep(2)
 
@@ -458,8 +462,8 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: runShipToShoreTransfer")
-    new_worker.register_task("runShipToShoreTransfer", task_run_ship_to_shore_transfer)
+    logging.info("\tTask: %s", TASK_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'])
+    new_worker.register_task(TASK_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], task_run_ship_to_shore_transfer)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
