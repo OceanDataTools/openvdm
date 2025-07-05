@@ -169,17 +169,17 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", str(e))
         return False
 
-    cmd = build_rsync_command(flags, ['-r', '--delete', '--include="write_test.txt"', '--exclude="*"'], os.path.join(write_test_dir, ''), f'rsync://{user}@{server}', None)
+    #cmd = build_rsync_command(flags, ['-r', '--delete', '--include="write_test.txt"', '--exclude="*"'], '/dev/null/', f'rsync://{user}@{server}', None)
 
-    logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode not in [0, 24]:
-            logging.warning("rsync failed: %s", proc.stderr.strip())
-            return False
-    except Exception as e:
-        logging.error("rsync write test failed: %s", str(e))
-        return False
+    #logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
+    #try:
+    #    proc = subprocess.run(cmd, capture_output=True, text=True)
+    #    if proc.returncode not in [0, 24]:
+    #        logging.warning("rsync failed: %s", proc.stderr.strip())
+    #        return False
+    #except Exception as e:
+    #    logging.error("rsync write test failed: %s", str(e))
+    #    return False
     return True
 
 
