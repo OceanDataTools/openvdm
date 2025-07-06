@@ -318,7 +318,7 @@ def transfer_to_destination(worker, current_job):
 
     # logging.debug("Building file list")
     # files = build_cdt_filelist(worker)
-    files = { 'new':[], 'updated':[] }
+    files = { 'new':[], 'updated':[], 'exclude': [] }
     is_darwin = False
 
     with temporary_directory() as tmpdir:
