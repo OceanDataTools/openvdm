@@ -186,6 +186,8 @@ def build_exclude_filterlist(worker):
         except Exception as err:
             logging.warning("Could not retrieve extra directory %s: %s", ed_id, err)
 
+    exclude_filterlist = [ worker.cruise_id + path_filter for path_filter in exclude_filterlist ]
+
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
     return exclude_filterlist
 
@@ -250,7 +252,7 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_pa
     if exclude_file_path:
         cmd.append(f"--exclude-from={exclude_file_path}")
     cmd += extra_args
-    cmd += [source_dir, dest_dir]
+    cmd += [source_dir+'/', dest_dir+'/']
     return cmd
 
 
@@ -359,7 +361,7 @@ def transfer_to_destination(worker, current_job):
         elif transfer_type == 'rsync':
             extra_args = [f"--password-file={password_file}"]
 
-        dry_cmd = build_rsync_command(dry_flags, extra_args, worker.cruise_dir, dest_dir, exclude_file)
+        dry_cmd = build_rsync_command(dry_flags, extra_args, worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, exclude_file)
         if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
             dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
