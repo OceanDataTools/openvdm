@@ -252,7 +252,7 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_pa
     if exclude_file_path:
         cmd.append(f"--exclude-from={exclude_file_path}")
     cmd += extra_args
-    cmd += [source_dir+'/', dest_dir+'/']
+    cmd += [source_dir, dest_dir.rstrip('/')+'/']
     return cmd
 
 
@@ -334,7 +334,7 @@ def transfer_to_destination(worker, current_job):
             success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
             if not success:
                 return {'verdict': False, 'reason': 'Failed to mount SMB share'}
-            dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/')).rstrip('/')
+            dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
 
         elif transfer_type == 'rsync':
             # Write rsync password file
@@ -342,17 +342,15 @@ def transfer_to_destination(worker, current_job):
             with open(password_file, 'w', encoding='utf-8') as f:
                 f.write(cdt_cfg['rsyncPass'])
             os.chmod(password_file, 0o600)
-            dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{cdt_cfg['rsyncServer']}{cdt_cfg['destDir'].rstrip('/')}/"
+            dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}/"
 
         elif transfer_type == 'ssh':
 
             is_darwin = check_darwin(cdt_cfg)
-            dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir'].rstrip('/')}"
+            dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir']}"
 
         else:  # local
-            dest_dir = cdt_cfg['destDir'].rstrip('/')
-
-        dest_dir += '/'
+            dest_dir = cdt_cfg['destDir']
 
         # === DRY RUN ===
         dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
