@@ -224,12 +224,10 @@ def run_transfer_command(worker, current_job, command, file_count):
             if not line:
                 continue
 
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                new_files.append(filename.rstrip('\n'))
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                updated_files.append(filename.rstrip('\n'))
+            if line.startswith(('>f+', '<f+')):
+                new_files.append(line.split(' ', 1)[1].rstrip('\n'))
+            elif line.startswith(('>f.', '<f.')):
+                updated_files.append(line.split(' ', 1)[1].rstrip('\n'))
 
             # Extract progress from `to-chk=` lines
             match = TO_CHK_RE.search(line)
