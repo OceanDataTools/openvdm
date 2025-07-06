@@ -316,14 +316,14 @@ def transfer_to_destination(worker, current_job):
         logging.error("Unknown Transfer Type")
         return {'verdict': False, 'reason': 'Unknown Transfer Type'}
 
-    logging.debug("Building file list")
-    files = build_cdt_filelist(worker)
-
+    # logging.debug("Building file list")
+    # files = build_cdt_filelist(worker)
+    files = { 'new':[], 'updated':[] }
     is_darwin = False
 
     with temporary_directory() as tmpdir:
         exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
-        if not build_exclude_file(files['exclude'], exclude_file):
+        if not build_exclude_file(build_exclude_filterlist(worker), exclude_file):
             return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
         if transfer_type == 'smb':
@@ -385,7 +385,6 @@ def transfer_to_destination(worker, current_job):
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
-            logging.debug("Real transfer command: %s", ' '.join(real_cmd).replace(f'-p {cdt_cfg["sshPass"]}', '-p ****'))
             files['new'], files['updated'] = run_transfer_command(worker, current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
