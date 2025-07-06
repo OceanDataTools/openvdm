@@ -785,6 +785,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     worker.ovdm.set_running_collection_system_transfer(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing source")
+    worker.send_job_status(current_job, 1, 10)
     results = test_cst_source(cst_cfg, worker.source_dir)
 
     if results[-1]['result'] == "Fail": # Final Verdict
@@ -794,9 +795,9 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     logging.debug("Source test passed")
     job_results['parts'].append({"partName": "Source Test", "result": "Pass"})
-    worker.send_job_status(current_job, 5, 100)
 
     logging.info("Testing destination")
+    worker.send_job_status(current_job, 15, 100)
     results = worker.test_destination_dir()
 
     if results[-1]['result'] == "Fail": # Final Verdict
@@ -806,9 +807,9 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     logging.debug("Destination test passed")
     job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
-    worker.send_job_status(current_job, 1, 10)
 
     logging.info("Transferring files")
+    worker.send_job_status(current_job, 2, 10)
     results = transfer_from_source(worker, current_job)
 
     if not results['verdict']:
