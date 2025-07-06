@@ -377,7 +377,7 @@ def transfer_to_destination(worker, current_job):
             logging.debug("Nothing to transfer")
         else:
             # === REAL TRANSFER ===
-            real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
+            real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
             real_cmd = build_rsync_command(real_flags, extra_args, worker.cruise_dir, dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
