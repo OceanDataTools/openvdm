@@ -104,7 +104,7 @@ def mount_smb_share(cfg, mntpoint, smb_version):
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
         return True
     except subprocess.CalledProcessError as e:
-        logging.error("Failed to mount SMB share: %s", str(e))
+        logging.error("Failed to mount SMB share: %s.  Are you running as root?", str(e))
 
         # Try to unmount in case of partial mount
         subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
