@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of OVDM data
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -26,7 +26,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
+from server.lib.file_utils import build_filelist, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
@@ -39,22 +39,22 @@ CUSTOM_TASKS = [
     }
 ]
 
-def build_filelist(source_dir):
-    """
-    return the list of files in the source directory
-    """
+# def build_filelist(source_dir):
+#     """
+#     return list of files in the source directory
+#     """
 
-    source_dir = source_dir.rstrip('/') or '/'
+#     source_dir = source_dir.rstrip('/') or '/'
 
-    logging.debug("sourceDir: %s", source_dir)
+#     logging.debug("sourceDir: %s", source_dir)
 
-    return_files = []
-    for root, _, filenames in os.walk(source_dir):
-        for filename in filenames:
-            return_files.append(os.path.join(root, filename))
+#     return_files = []
+#     for root, _, filenames in os.walk(source_dir):
+#         for filename in filenames:
+#             return_files.append(os.path.join(root, filename))
 
-    return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
-    return return_files
+#     return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
+#     return return_files
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
@@ -81,31 +81,167 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def get_custom_task(current_job):
         """
-        Retrieve task metadata
+        fetch task metadata
         """
 
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
 
 
+    @staticmethod
+    def _get_filetype(raw_path, processing_script_filename):
+        cmd = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout.strip(), result.stderr
+
+
+    @staticmethod
+    def _process_file(raw_path, processing_script_filename):
+        cmd = [PYTHON_BINARY, processing_script_filename, raw_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout.strip(), result.stderr, cmd
+
+
+    @staticmethod
+    def _add_manifest_entry(entries, dd_type, json_path, raw_path, base_dir):
+        rel_json = json_path.replace(base_dir + '/', '')
+        rel_raw = raw_path.replace(base_dir + '/', '')
+        entries.append({"type": dd_type, "dd_json": rel_json, "raw_data": rel_raw})
+
+
+    @staticmethod
+    def _remove_manifest_entry(entries, json_path, raw_path, base_dir):
+        rel_json = json_path.replace(base_dir + '/', '')
+        rel_raw = raw_path.replace(base_dir + '/', '')
+        entries.append({"dd_json": rel_json, "raw_data": rel_raw})
+
+
+    def _build_paths(self, filename):
+        json_filename = os.path.splitext(filename)[0] + '.json'
+        raw_path = os.path.join(self.cruise_dir, filename)
+        json_path = os.path.join(self.data_dashboard_dir, json_filename)
+        return raw_path, json_path
+
+    def _build_processing_filename(self):
+        processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), self.collection_system_transfer['name'].lower() + self.ovdm.get_plugin_suffix())
+        logging.debug("Processing Script Filename: %s", processing_script_filename)
+
+        return processing_script_filename if os.path.isfile(processing_script_filename) else None
+
+    def _process_filelist(self, current_job, filelist, processing_script_filename, job_results, start=0, end=100):
+
+        base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
+        new_manifest_entries = []
+        remove_manifest_entries = []
+        progress_factor = end - start
+        file_count = len(filelist)
+        file_index = 0
+
+        # Main Loop
+        for filename in filelist:
+            if self.stop:
+                break
+
+            logging.info("Processing file: %s", filename)
+            raw_path, json_path = self._build_paths(filename)
+
+            if not os.path.isfile(raw_path):
+                job_results['parts'].append({"partName": "Verify data file exists", "result": "Fail", "reason": f"Unable to find data file: {filename}"})
+                continue
+
+            if os.stat(raw_path).st_size == 0:
+                logging.warning("File is empty %s, skipping", filename)
+                continue
+
+            dd_type, type_err = self._get_filetype(raw_path, processing_script_filename)
+            if not dd_type:
+                logging.warning("File is of unknown datatype: %s", raw_path)
+                self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
+                if type_err:
+                    logging.error("Err: %s", type_err)
+                continue
+
+            logging.debug("DataType found to be: %s", dd_type)
+            output, error, cmd = self._process_file(raw_path, processing_script_filename)
+
+            if not output:
+                msg = f"No JSON output received from file. Parsing Command: {' '.join(cmd)}"
+                logging.error(msg)
+                self.ovdm.send_msg("Data Dashboard Processing failed", msg)
+                self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
+                if error:
+                    logging.error("Err: %s", error)
+                continue
+
+            try:
+                out_obj = json.loads(output)
+            except Exception as err:
+                logging.error("Error parsing JSON output from file: %s", filename)
+                logging.debug(str(err))
+                job_results['parts'].append({"partName": f"Parsing JSON output from file {filename}", "result": "Fail", "reason": f"Error parsing JSON output from file: {filename}"})
+                continue
+
+            if not out_obj:
+                msg = f"Parser returned no output. Parsing command: {' '.join(cmd)}"
+                logging.error("Datafile Parsing error: %s", msg)
+                self.ovdm.send_msg("Datafile Parsing error", msg)
+                continue
+
+            if 'error' in out_obj:
+                logging.error("Datafile Parsing error: %s", out_obj['error'])
+                self.ovdm.send_msg("Datafile Parsing error", out_obj['error'])
+                continue
+
+            result = output_json_data_to_file(json_path, out_obj)
+            if result['verdict']:
+                job_results['parts'].append({"partName": f"Writing DashboardData file: {filename}", "result": "Pass"})
+            else:
+                msg = f"Error Writing DashboardData file: {filename}. Reason: {result['reason']}"
+                logging.error("Data Dashboard Processing failed: %s", msg)
+                self.ovdm.send_msg("Data Dashboard Processing failed", msg)
+                job_results['parts'].append({"partName": f"Writing Dashboard file: {filename}", "result": "Fail", "reason": result['reason']})
+                continue
+
+            self._add_manifest_entry(new_manifest_entries, dd_type, json_path, raw_path, base_dir)
+
+            self.send_job_status(current_job, int((progress_factor) * file_index / file_count) + start, 100)
+            file_index += 1
+
+        return new_manifest_entries, remove_manifest_entries
+
+
     def on_job_execute(self, current_job):
         """
-        Function run whenever a new job arrives
+        Function run when a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
+        self.stop = False
 
-        payload_obj = json.loads(current_job.data)
+        try:
+            payload_obj = json.loads(current_job.data)
+            logging.debug("payload: %s", current_job.data)
+        except Exception:
+            reason = "Failed to parse current job payload"
+            logging.exception(reason)
+            return self._fail_job(current_job, "Retrieve job data", reason)
 
-        self.task = self.get_custom_task(current_job) if self.get_custom_task(current_job) is not None else self.ovdm.get_task_by_name(current_job.task)
-        logging.debug("task: %s", self.task)
+        self.task = (self.get_custom_task(current_job)
+            if self.get_custom_task(current_job) is not None
+            else self.ovdm.get_task_by_name(current_job.task)
+        )
+
+        # Set logging format with cruise transfer name
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(
+            f"%(asctime)-15s %(levelname)s - {self.task['longName']}: %(message)s"
+        ))
 
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
         else:
             self.ovdm.track_gearman_job(self.task['longName'], os.getpid(), current_job.handle)
 
-        logging.info("Job: %s (%s) started at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
@@ -134,7 +270,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_exception(self, current_job, exc_info):
         """
-        Function run whenever the current job has an exception
+        Function run when the current job has an exception
         """
 
         logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
@@ -153,7 +289,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_complete(self, current_job, job_result):
         """
-        Function run whenever the current job completes
+        Function run when the current job completes
         """
 
         results_obj = json.loads(job_result)
@@ -223,222 +359,151 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.shutdown()
 
 
+    # --- Helper Methods ---
+    def _fail_job(self, current_job, part_name, reason):
+        """
+        shortcut for completing the current job as failed
+        """
+        return self.on_job_complete(current_job, json.dumps({
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
+        }))
+
+
 def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
-    Update the existing dashboard files with new/updated raw data
+    update the data dashboard
     """
 
     job_results = {
         'parts':[],
         'files':{
             'new':[],
-            'updated':[]
+            'updated':[],
+            'deleted':[]
         }
     }
 
     payload_obj = json.loads(current_job.data)
-    logging.debug('Payload: %s', json.dumps(payload_obj, indent=2))
-
-    worker.send_job_status(current_job, 5, 100)
+    base_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
 
     logging.info('Collection System Transfer: %s', worker.collection_system_transfer['name'])
 
-    new_manifest_entries = []
-    remove_manifest_entries = []
+    logging.info("Verifying plugin file exists")
+    worker.send_job_status(current_job, 5, 100)
 
-    #check for processing file
-    processing_script_filename = os.path.join(worker.ovdm.get_plugin_dir(), worker.collection_system_transfer['name'].lower() + worker.ovdm.get_plugin_suffix())
-    logging.debug("Processing Script Filename: %s", processing_script_filename)
+    processing_script_filename = worker._build_processing_filename()
 
-    if os.path.isfile(processing_script_filename):
-        job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Pass"})
-    else:
-        logging.warning("Processing script not found: %s", processing_script_filename)
+    if processing_script_filename is None:
+        reason = f"Processing script not found: {processing_script_filename}"
+        logging.warning(reason)
+        job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Pass"})
+
+    logging.info("Build filelist for processing")
     worker.send_job_status(current_job, 10, 100)
 
     #build filelist
-    filelist = []
+    filelist = payload_obj['files']['new'] + payload_obj['files']['updated']
+    logging.debug('File List: %s', json.dumps(filelist, indent=2))
 
-    if payload_obj['files']['new'] or payload_obj['files']['updated']:
-        filelist = payload_obj['files']['new']
-        filelist += payload_obj['files']['updated']
-        logging.debug('File List: %s', json.dumps(filelist, indent=2))
-        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
-
-    else:
-        logging.warning("No new or updated files to process")
-        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
+    if len(filelist) == 0:
+        reason = "No new or updated files to process"
+        logging.warning(reason)
+        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Ignore", "reason": reason})
         return json.dumps(job_results)
 
-    file_count = len(filelist)
-    file_index = 0
-    for filename in filelist:  # pylint: disable=too-many-nested-blocks
+    job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
-        if worker.stop:
-            break
+    logging.info("Processing files")
+    worker.send_job_status(current_job, 15, 100)
 
-        logging.info("Processing file: %s", filename)
-        json_filename = os.path.splitext(filename)[0] + '.json'
-        raw_filepath = os.path.join(worker.cruise_dir, filename)
-        json_filepath = os.path.join(worker.data_dashboard_dir, json_filename)
+    new_manifest_entries, remove_manifest_entries = worker._process_filelist(current_job, filelist, job_results, 15, 90)
 
-        if not os.path.isfile(raw_filepath):
-            job_results['parts'].append({"partName": "Verify data file exists", "result": "Fail", "reason": "Unable to find data file: " + filename})
-            continue
+    logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
+    worker.send_job_status(current_job, 9, 10)
 
-        if os.stat(raw_filepath).st_size == 0:
-            logging.warning("File is empty %s, skipping", filename)
-            continue
+    if len(new_manifest_entries) == 0 and len(remove_manifest_entries) == 0:
+        reason = "No new, updated or obsolete entries to process"
+        logging.warning(reason)
+        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Ignore", "reason": reason})
+        return(json.dumps(job_results))
 
-        command = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_filepath]
+    rows_removed = 0
 
-        logging.debug("DataType Retrieval Command: %s", ' '.join(command))
+    # Load existing manifest
+    try:
+        with open(worker.data_dashboard_manifest_file_path, 'r', encoding='utf-8') as f:
+            existing_entries = json.load(f)
+        job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
+    except IOError:
+        logging.warning("Error reading manifest file: %s", worker.data_dashboard_manifest_file_path)
+        existing_entries = []
+    except Exception as err:
+        reason = f"Error reading dashboard manifest file: {worker.data_dashboard_manifest_file_path}"
+        logging.error("%s: %s", reason, str(err))
+        job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": reason})
+        return json.dumps(job_results)
 
-        datatype_proc = subprocess.run(command, capture_output=True, text=True, check=False)
+    # Remove entries
+    logging.debug("Entries to remove: %s", json.dumps(remove_manifest_entries, indent=2))
+    existing_entries_map = {entry['raw_data']: entry for entry in existing_entries}
+    for rm in remove_manifest_entries:
+        if rm['raw_data'] in existing_entries_map:
+            existing_entries.remove(existing_entries_map[rm['raw_data']])
+            rows_removed += 1
 
-        if datatype_proc.stdout:
-            dd_type = datatype_proc.stdout.rstrip('\n')
-            logging.debug("DataType found to be: %s", dd_type)
+            dd_json_path = os.path.join(base_dir, rm['dd_json'])
+            if os.path.isfile(dd_json_path):
+                logging.info("Deleting orphaned dd_json file %s", dd_json_path)
+                os.remove(dd_json_path)
 
-            command = [PYTHON_BINARY, processing_script_filename, raw_filepath]
+    # Update or add entries
+    logging.debug("Entries to add/update: %s", json.dumps(new_manifest_entries, indent=2))
+    for entry in new_manifest_entries:
+        raw_data = entry['raw_data']
+        dd_json_rel = entry['dd_json'].replace(worker.cruise_id + '/', '')
 
-            logging.debug("Data Processing Command: %s", ' '.join(command))
-
-            data_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-            if data_proc.stdout:
-                try:
-                    logging.debug("Verifying output")
-                    out_obj = json.loads(data_proc.stdout)
-                except Exception as err:
-                    logging.error("Error parsing JSON output from file: %s", filename)
-                    logging.debug(str(err))
-                    job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail", "reason": "Error parsing JSON output from file: " + filename})
-                    continue
-                else:
-                    if not out_obj:
-                        error_title = 'Datafile Parsing error'
-                        error_body = "Parser returned no output. Parsing command: {}", ' '.join(command)
-                        logging.error("%s: %s", error_title, error_body)
-                        worker.ovdm.send_msg(error_title,error_body)
-                    elif 'error' in out_obj:
-                        error_title = 'Datafile Parsing error'
-                        error_body = out_obj['error']
-                        logging.error("%s: %s", error_title, error_body)
-                        worker.ovdm.send_msg(error_title,error_body)
-                    else:
-                        output_results = output_json_data_to_file(json_filepath, out_obj)
-
-                        if output_results['verdict']:
-                            job_results['parts'].append({"partName": "Writing DashboardData file: " + filename, "result": "Pass"})
-                        else:
-                            error_title = 'Data Dashboard Processing failed'
-                            error_body = "Error Writing DashboardData file: " + filename + ". Reason: " + output_results['reason']
-                            logging.error("%s: %s", error_title, error_body)
-                            worker.ovdm.send_msg(error_title,error_body)
-                            job_results['parts'].append({"partName": "Writing Dashboard file: " + filename, "result": "Fail", "reason": output_results['reason']})
-
-                        new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
-            else:
-                error_title = 'Data Dashboard Processing failed'
-                error_body = 'No JSON output recieved from file.  Parsing Command: ' + ' '.join(command)
-                logging.error("%s: %s", error_title, error_body)
-                worker.ovdm.send_msg(error_title,error_body)
-                remove_manifest_entries.append({"dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
-
-                if data_proc.stderr:
-                    logging.error("Err: %s", data_proc.stderr)
+        if any(e['raw_data'] == raw_data for e in existing_entries):
+            job_results['files']['updated'].append(dd_json_rel)
         else:
-            logging.warning("File is of unknown datatype: %s", raw_filepath)
-            remove_manifest_entries.append({"dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data":raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
+            job_results['files']['new'].append(dd_json_rel)
+            existing_entries.append(entry)
 
-            if datatype_proc.stderr:
-                logging.error("Err: %s", datatype_proc.stderr)
+    # Logging summary
+    if job_results['files']['new']:
+        logging.info("%s row(s) added", len(job_results['files']['new']))
+    if job_results['files']['updated']:
+        logging.info("%s row(s) updated", len(job_results['files']['updated']))
+    if rows_removed:
+        logging.info("%s row(s) removed", rows_removed)
 
-        worker.send_job_status(current_job, int(70 * file_index/file_count) + 10, 100)
+    # Write updated manifest
+    result = output_json_data_to_file(worker.data_dashboard_manifest_file_path, existing_entries)
+    if not result['verdict']:
+        logging.error("Error writing manifest file: %s", worker.data_dashboard_manifest_file_path)
+        job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Fail", "reason": result['reason']})
+        return json.dumps(job_results)
 
-        file_index += 1
+    job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
 
-    worker.send_job_status(current_job, 8, 10)
+    manifest_filename = worker.shipboard_data_warehouse_config['dataDashboardManifestFn']
+    manifest_relpath = os.path.join(worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], manifest_filename)
+    job_results['files']['updated'].append(manifest_relpath)
 
-    if len(new_manifest_entries) > 0:
-        logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
+    # File ownership/permissions
+    logging.info("Setting file ownership/permissions")
+    worker.send_job_status(current_job, 9, 10)
+    result = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
 
-        rows_removed = 0
-
-        existing_manifest_entries = []
-
-        try:
-            with open(worker.data_dashboard_manifest_file_path, mode='r', encoding='utf-8') as dashboard_manifest_file:
-                existing_manifest_entries = json.load(dashboard_manifest_file)
-
-            job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
-
-        except IOError:
-            logging.warning("Error Reading Dashboard Manifest file %s", worker.data_dashboard_manifest_file_path)
-
-        except Exception as err:
-            logging.error(str(err))
-            job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": "Error reading dashboard manifest file: " + worker.data_dashboard_manifest_file_path})
-            return json.dumps(job_results)
-
-        logging.debug("Entries to remove: %s", json.dumps(remove_manifest_entries, indent=2))
-        for remove_entry in remove_manifest_entries:
-            for idx, existing_entry in enumerate(existing_manifest_entries):
-                if remove_entry['raw_data'] == existing_entry['raw_data']:
-                    del existing_manifest_entries[idx]
-                    rows_removed += 1
-
-                    if os.path.isfile(os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json'])):
-                        logging.info("Deleting orphaned dd_json file %s", os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
-                        os.remove(os.path.join(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],remove_entry['dd_json']))
-                    break
-
-        logging.debug("Entries to add/update: %s", json.dumps(new_manifest_entries, indent=2))
-        for new_entry in new_manifest_entries:
-            updated = False
-            for existing_entry in existing_manifest_entries:
-                if new_entry['raw_data'] == existing_entry['raw_data']:
-                    updated = True
-                    job_results['files']['updated'].append(new_entry['dd_json'].replace(worker.cruise_id + '/',''))
-                    break
-
-            if not updated: #added
-                job_results['files']['new'].append(new_entry['dd_json'].replace(worker.cruise_id + '/',''))
-                existing_manifest_entries.append(new_entry)
-
-        if len(job_results['files']['new']) > 0:
-            logging.info("%s row(s) added", len(job_results['files']['new']))
-        if len(job_results['files']['updated']) > 0:
-            logging.info("%s row(s) updated", len(job_results['files']['updated']))
-        if rows_removed:
-            logging.info("%s row(s) removed", rows_removed)
-
-        output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, existing_manifest_entries)
-
-        if not output_results['verdict']:
-            logging.error("Error Writing Dashboard manifest file: %s", worker.data_dashboard_manifest_file_path)
-            job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Fail", "reason": output_results['reason']})
-            return json.dumps(job_results)
-
-        job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
-        job_results['files']['updated'].append(os.path.join(worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], worker.shipboard_data_warehouse_config['dataDashboardManifestFn']))
-
-        worker.send_job_status(current_job, 9, 10)
-
-        logging.info("Setting file ownership/permissions")
-        output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
-
-        if output_results['verdict']:
-            job_results['parts'].append({"partName": "Set file/directory ownership", "result": "Pass"})
-        else:
-            job_results['parts'].append({"partName": "Set file/directory ownership", "result": "Fail", "reason": output_results['reason']})
-            return json.dumps(job_results)
+    part_result = {"partName": "Set file/directory ownership", "result": "Pass" if result['verdict'] else "Fail"}
+    if not result['verdict']:
+        part_result['reason'] = result['reason']
+        return json.dumps(job_results)
+    job_results['parts'].append(part_result)
 
     worker.send_job_status(current_job, 10, 10)
-
     return json.dumps(job_results)
 
 
@@ -455,193 +520,86 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         }
     }
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug('Payload: %s', json.dumps(payload_obj, indent=2))
+    logging.info("Rebuilding data dashboard")
+    worker.send_job_status(current_job, 1, 100)
 
-
-    if os.path.exists(worker.data_dashboard_dir):
-        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Pass"})
-    else:
+    if not os.path.exists(worker.data_dashboard_dir):
         logging.error("Data dashboard directory not found: %s", worker.data_dashboard_dir)
         job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": "Unable to locate the data dashboard directory: " + worker.data_dashboard_dir})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Pass"})
+
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers()
-
-    worker.send_job_status(current_job, 1, 100)
-
-    new_manifest_entries = []
 
     collection_system_transfer_count = len(collection_system_transfers)
     collection_system_transfer_index = 0
     for collection_system_transfer in collection_system_transfers:  # pylint: disable=too-many-nested-blocks
 
+        collection_system_transfer_index += 1
+
+        progress_factor = int(float(collection_system_transfer_index) / float(collection_system_transfer_count) * 100)
         logging.info('Processing data from: %s', collection_system_transfer['name'])
+        worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
-        processing_script_filename = os.path.join(worker.ovdm.get_plugin_dir(), collection_system_transfer['name'].lower() + worker.ovdm.get_plugin_suffix())
-        logging.debug("Processing Script Filename: %s", processing_script_filename)
+        processing_script_filename = worker._build_processing_filename()
 
-        if not os.path.isfile(processing_script_filename):
-            logging.warning("Processing script for collection system %s not found, moving on.", collection_system_transfer['name'])
-            worker.send_job_status(current_job, int(10 + (80*float(collection_system_transfer_index)/float(collection_system_transfer_count))), 100)
-            collection_system_transfer_index += 1
+        if processing_script_filename is None:
+            reason = f"Processing script not found: {processing_script_filename}"
+            logging.warning(reason)
             continue
 
-        # collection_system_transferOutputDir = os.path.join(worker.data_dashboard_dir, collection_system_transfer['destDir'])
-
-        #build filelist
-        filelist = []
         if collection_system_transfer['cruiseOrLowering'] == "0":
             collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, collection_system_transfer['destDir'])
-            filelist.extend(build_filelist(collection_system_transfer_input_dir))
+            filelist = build_filelist(collection_system_transfer_input_dir.get('include', []))
             filelist = [os.path.join(collection_system_transfer['destDir'], filename) for filename in filelist]
 
         else:
             lowerings = worker.ovdm.get_lowerings()
             lowering_base_dir = worker.shipboard_data_warehouse_config['loweringDataBaseDir']
+            filelist = []
 
             for lowering in lowerings:
                 collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, lowering_base_dir, lowering, collection_system_transfer['destDir'])
-                lowering_filelist = build_filelist(collection_system_transfer_input_dir)
+                lowering_filelist = build_filelist(collection_system_transfer_input_dir).get('include', [])
                 filelist.extend([os.path.join(lowering_base_dir, lowering, collection_system_transfer['destDir'], filename) for filename in lowering_filelist])
 
         logging.debug("FileList: %s", json.dumps(filelist, indent=2))
 
-        file_count = len(filelist)
-        file_index = 0
-        logging.info("%s file(s) to process", file_count)
+        start = 80 * progress_factor + 10
+        end = 80 * int(float(collection_system_transfer_index + 1) / float(collection_system_transfer_count) * 100) + 10
+        new_manifest_entries, _ = worker._process_filelist(current_job, filelist, job_results, start, end)
 
-        for filename in filelist:
+    logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
+    worker.send_job_status(current_job, 9, 10)
 
-            if worker.stop:
-                break
-
-            logging.info("Processing file: %s", filename)
-            root, _ = os.path.splitext(filename)
-            json_filename = root + '.json'
-            logging.debug("jsonFileName: %s", json_filename)
-            raw_filepath = os.path.join(worker.cruise_dir, filename)
-            logging.debug("rawFilePath: %s", raw_filepath)
-            json_filepath = os.path.join(worker.data_dashboard_dir, json_filename)
-            logging.debug("jsonFilePath: %s", json_filepath)
-
-            if os.stat(raw_filepath).st_size == 0:
-                logging.warning("File %s is empty", filename)
-                continue
-
-            command = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_filepath]
-
-            logging.debug("Get Datatype Command: %s", ' '.join(command))
-
-            datatype_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-            if datatype_proc.stdout:
-                dd_type = datatype_proc.stdout.rstrip('\n')
-                logging.debug("Found to be type: %s", dd_type)
-
-                command = [PYTHON_BINARY, processing_script_filename, raw_filepath]
-
-                logging.debug("Processing Command: %s", ' '.join(command))
-
-                data_proc = subprocess.run(command, capture_output=True, text=True, check=False)
-
-                if data_proc.stdout:
-                    try:
-                        logging.debug("Parsing output")
-                        # logging.debug(data_proc.stdout)
-                        out_obj = json.loads(data_proc.stdout)
-                    except Exception as err:
-                        logging.error(str(err))
-                        error_title = 'Error parsing output'
-                        error_body = 'Invalid JSON output recieved from processing. Command: ' + ' '.join(command)
-                        logging.error("%s: %s", error_title, error_body)
-                        worker.ovdm.send_msg(error_title, error_body)
-                        job_results['parts'].append({"partName": "Parsing JSON output " + filename, "result": "Fail", "reason": error_title + ':' + error_body})
-                    else:
-                        if out_obj is None:
-                            error_title = 'Error processing file'
-                            error_body = 'No JSON output recieved from file. Processing Command: ' + ' '.join(command)
-                            logging.error("%s: %s", error_title, error_body)
-                            worker.ovdm.send_msg(error_title, error_body)
-                            job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail", "reason": error_title + ': ' + error_body})
-
-                            if data_proc.stderr:
-                                logging.error('err: %s', data_proc.stderr)
-
-                        elif 'error' in out_obj:
-                            error_title = 'Error processing file'
-                            error_body = out_obj['error']
-                            logging.error("%s: %s", error_title, error_body)
-                            worker.ovdm.send_msg(error_title, error_body)
-                            job_results['parts'].append({"partName": "Processing Datafile " + filename, "result": "Fail", "reason": error_title + ':' + error_body})
-
-                        else:
-                            #job_results['parts'].append({"partName": "Processing Datafile " + filename, "result": "Pass"})
-                            output_results = output_json_data_to_file(json_filepath, out_obj)
-
-                            if output_results['verdict']:
-                                job_results['parts'].append({"partName": "Writing DashboardData file: " + filename, "result": "Pass"})
-                            else:
-                                error_title = 'Error writing file'
-                                error_body = "Error Writing DashboardData file: " + filename
-                                logging.error("%s: %s", error_title, error_body)
-                                worker.ovdm.send_msg(error_title, error_body)
-
-                                job_results['parts'].append({"partName": "Writing Dashboard file: " + filename, "result": "Fail", "reason": output_results['verdict']})
-
-                            new_manifest_entries.append({"type":dd_type, "dd_json": json_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/',''), "raw_data": raw_filepath.replace(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'] + '/','')})
-                else:
-                    error_title = 'Error processing file'
-                    error_body = 'No JSON output recieved from file. Processing Command: ' + ' '.join(command)
-                    logging.error("%s: %s", error_title, error_body)
-                    worker.ovdm.send_msg(error_title, error_body)
-                    job_results['parts'].append({"partName": "Parsing JSON output from file " + filename, "result": "Fail", "reason": error_title + ': ' + error_body})
-
-                    if data_proc.stderr:
-                        logging.error('err: %s', data_proc.stderr)
-
-            else:
-                logging.warning("File is of unknown datatype, moving on")
-
-                if datatype_proc.stderr:
-                    logging.error('err: %s', datatype_proc.stderr)
-
-                    worker.send_job_status(current_job, int(60 * file_index/file_count) + 10, 100)
-            file_index += 1
-
-        collection_system_transfer_index += 1
-
-    worker.send_job_status(current_job, 90, 100)
-
-    logging.info("Update Dashboard Manifest file")
     output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, new_manifest_entries)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Updating manifest file", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Error updating manifest file %s", worker.data_dashboard_manifest_file_path)
         job_results['parts'].append({"partName": "Updating manifest file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    worker.send_job_status(current_job, 95, 100)
+    job_results['parts'].append({"partName": "Updating manifest file", "result": "Pass"})
 
     logging.info("Setting file ownership/permissions")
+    worker.send_job_status(current_job, 95, 100)
+
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Error Setting file/directory ownership/permissions")
         job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Pass"})
+
     worker.send_job_status(current_job, 99, 100)
 
     data_dashboard_dest_dir = worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir']
-    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(worker.data_dashboard_dir)]# might need to remove cruise_dir from begining of filepaths
+    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(worker.data_dashboard_dir.get('include', []))]# might need to remove cruise_dir from begining of filepaths
 
     worker.send_job_status(current_job, 10, 10)
-
     return json.dumps(job_results)
 
 
@@ -679,6 +637,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -686,6 +646,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
@@ -697,6 +659,7 @@ if __name__ == "__main__":
 
     logging.info("\tTask: updateDataDashboard")
     new_worker.register_task("updateDataDashboard", task_update_data_dashboard)
+
     logging.info("\tTask: rebuildDataDashboard")
     new_worker.register_task("rebuildDataDashboard", task_rebuild_data_dashboard)
 
