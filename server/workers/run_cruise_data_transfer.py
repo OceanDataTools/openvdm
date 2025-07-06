@@ -176,7 +176,7 @@ def build_exclude_filterlist(worker):
 
             if cruise_or_lowering == '0':
                 # Cruise-level exclusion
-                exclude_filterlist.append(f"*{dest_dir.replace('{cruiseID}', worker.cruise_id)}*")
+                exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', worker.cruise_id)}/*")
             else:
                 # Lowering-level exclusions
                 for lowering in lowerings:
