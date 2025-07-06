@@ -217,7 +217,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def on_job_execute(self, current_job):
         """
-        Function run whenever a new job arrives
+        Function run when a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
@@ -254,7 +254,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def on_job_exception(self, current_job, exc_info):
         """
-        Function run whenever the current job has an exception
+        Function run when the current job has an exception
         """
 
         logging.error("Job: %s, %s transfer failed at: %s", current_job.handle, self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
@@ -270,7 +270,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def on_job_complete(self, current_job, job_result):
         """
-        Function run whenever the current job completes
+        Function run when the current job completes
         """
 
         results_obj = json.loads(job_result)

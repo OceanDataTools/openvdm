@@ -9,9 +9,9 @@ DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -69,13 +69,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def _get_custom_task(current_job):
         """
-        Fetch task metadata
+        fetch task metadata
         """
 
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
     def keyword_replace(self, s):
+        """
+        find/replace function used to build directory names containing wildcards
+        """
+
         if not isinstance(s, str):
             return None
 
@@ -88,7 +92,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_dest_dir(self, dest_dir):
         """
-        Replace any wildcards in the provided directory
+        replace any wildcards in the provided directory
         """
 
         return self.keyword_replace(dest_dir) if dest_dir else None
@@ -96,8 +100,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_directorylist(self):
         """
-        build the list of directories to be created as part of creating the new
-        cruise
+        build list of directories to created as part of creating the new cruise
         """
 
         return_directories = []
@@ -146,7 +149,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_execute(self, current_job):
         """
-        Function run whenever a new job arrives
+        Function run when a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
@@ -183,7 +186,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_exception(self, current_job, exc_info):
         """
-        Function run whenever the current job has an exception
+        Function run when the current job has an exception
         """
 
         logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
@@ -206,7 +209,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_complete(self, current_job, job_result):
         """
-        Function run whenever the current job completes
+        Function run when the current job completes
         """
 
         results = json.loads(job_result)
@@ -250,6 +253,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
+        """
+        shortcut for completing the current job as failed
+        """
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
@@ -257,7 +263,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 def task_create_cruise_directory(worker, current_job):
     """
-    Setup the cruise directory for the specified cruise ID
+    Build a new cruise directory
     """
 
     job_results = {'parts':[]}
@@ -332,7 +338,7 @@ def task_create_cruise_directory(worker, current_job):
 
 def task_set_cruisedata_directory_permissions(worker, current_job):
     """
-    Set the permissions for the specified cruise ID
+    Set the permissions for the CruiseData directory
     """
 
     job_results = {'parts':[]}
@@ -369,7 +375,8 @@ def task_set_cruisedata_directory_permissions(worker, current_job):
 
 def task_rebuild_cruise_directory(worker, current_job):
     """
-    Verify and create if necessary all the cruise sub-directories
+    Fix any file permission errors and create any missing directories within
+    the current cruise data directory
     """
 
     job_results = {'parts':[]}

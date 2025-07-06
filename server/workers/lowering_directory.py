@@ -127,7 +127,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_execute(self, current_job):
         """
-        Function run whenever a new job arrives
+        Function run when a new job arrives
         """
 
         logging.debug("current_job: %s", current_job)
@@ -170,7 +170,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_exception(self, current_job, exc_info):
         """
-        Function run whenever the current job has an exception
+        Function run when the current job has an exception
         """
 
         logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
@@ -193,7 +193,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def on_job_complete(self, current_job, job_result):
         """
-        Function run whenever the current job completes
+        Function run when the current job completes
         """
 
         results = json.loads(job_result)
@@ -237,6 +237,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
+        """
+        shortcut for completing the current job as failed
+        """
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
