@@ -181,7 +181,7 @@ def build_exclude_filterlist(worker):
                 # Lowering-level exclusions
                 for lowering in lowerings:
                     filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
-                    exclude_filterlist.append(f"*{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}*")
+                    exclude_filterlist.append(f"{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
         except Exception as err:
             logging.warning("Could not retrieve extra directory %s: %s", ed_id, err)
