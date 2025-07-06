@@ -20,38 +20,24 @@ import logging
 import os
 import re
 import sys
-import shutil
 import signal
 import subprocess
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 from os.path import dirname, realpath
 from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-
-from server.lib.file_utils import is_ascii, set_owner_group_permissions
+from server.lib.file_utils import is_ascii, set_owner_group_permissions, temporary_directory
+from server.lib.connection_utils import build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
 from server.lib.openvdm import OpenVDM
+
+TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
 TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }
-
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-
-@contextmanager
-def temporary_directory():
-    tmpdir = tempfile.mkdtemp()
-    try:
-        yield tmpdir
-    finally:
-        try:
-            shutil.rmtree(tmpdir)
-        except Exception as e:
-            logging.warning(f"Could not delete temp dir {tmpdir}: {e}")
 
 def process_batch(filepaths, filters):
     include = []
@@ -83,15 +69,15 @@ def process_batch(filepaths, filters):
     return include, exclude
 
 
-def build_cdt_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=8):
+def build_cdt_filelist(worker, batch_size=1000, max_workers=8):
     return_files = {'include': [], 'exclude': [], 'new': [], 'updated': []}
-    logging.info("Starting filelist build in %s", source_dir)
+    logging.info("Starting filelist build in %s", worker.cruise_dir)
 
-    filters = build_filters(gearman_worker)
+    filters = build_filters(worker)
 
     # Step 1: Gather all file paths
     filepaths = []
-    for root, _, filenames in os.walk(source_dir):
+    for root, _, filenames in os.walk(worker.cruise_dir):
         for filename in filenames:
             filepaths.append(os.path.join(root, filename))
 
@@ -116,70 +102,12 @@ def build_cdt_filelist(gearman_worker, source_dir, batch_size=1000, max_workers=
     return_files['include'].sort()
     return_files['exclude'].sort()
 
-    base_len = len(source_dir.rstrip(os.sep)) + 1
+    base_len = len(worker.cruise_dir.rstrip(os.sep)) + 1
     return_files['include'] = [f[base_len:] for f in return_files['include']]
     return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
 
     # logging.debug("Final return_files object: %s", json.dumps(return_files, indent=2))
     return return_files
-
-
-def detect_smb_version(cdt_cfg):
-    if cdt_cfg['smbUser'] == 'guest':
-        cmd = [
-            'smbclient', '-L', cdt_cfg['smbServer'],
-            '-W', cdt_cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
-        ]
-    else:
-        cmd = [
-            'smbclient', '-L', cdt_cfg['smbServer'],
-            '-W', cdt_cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{cdt_cfg['smbUser']}%{cdt_cfg['smbPass']}"
-        ]
-
-    logging.debug("SMB version test command: %s", ' '.join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-
-    for line in proc.stdout.splitlines():
-        if line.startswith('OS=[Windows 5.1]'):
-            return '1.0'
-    return '2.1'
-
-
-def mount_smb_share(cdt_cfg, mntpoint, smb_version):
-    opts = f"rw,domain={cdt_cfg['smbDomain']},vers={smb_version}"
-
-    if cdt_cfg['smbUser'] == 'guest':
-        opts += ",guest"
-    else:
-        opts += f",username={cdt_cfg['smbUser']},password={cdt_cfg['smbPass']}"
-
-    mount_cmd = ['sudo', 'mount', '-t', 'cifs', cdt_cfg['smbServer'], mntpoint, '-o', opts]
-    logging.debug("Mount command: %s", ' '.join(mount_cmd))
-
-    result = subprocess.run(mount_cmd, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        logging.error("Failed to mount SMB share.")
-        logging.error("STDOUT: %s", result.stdout.strip())
-        logging.error("STDERR: %s", result.stderr.strip())
-
-        # Try to unmount in case of partial mount
-        subprocess.run(['sudo', 'umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return False
-
-    logging.info("Mounted SMB share successfully.")
-    return True
-
-
-def check_darwin(cdt_cfg):
-    # Detect if Darwin (macOS)
-    is_darwin_cmd = ['ssh', f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}", "uname -s"]
-    if cdt_cfg['sshUseKey'] == '0':
-        is_darwin_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + is_darwin_cmd
-
-    proc = subprocess.run(is_darwin_cmd, capture_output=True, text=True, check=False)
-    return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
 
 
 def build_filters(worker):
@@ -200,27 +128,30 @@ def build_exclude_filterlist(worker):
     """
     exclude_filterlist = []
 
-    cfg = worker.shipboard_data_warehouse_config
-    transfer = worker.cruise_data_transfer
+    wh_cfg = worker.shipboard_data_warehouse_config
+    cdt_cfg = worker.cruise_data_transfer
     lowerings = worker.ovdm.get_lowerings() or []
 
     # Exclude OVDM-related files if flag is set
-    if transfer.get('includeOVDMFiles') == '0':
+    if cdt_cfg.get('includeOVDMFiles') == '0':
         exclude_filterlist.extend([
-            f"*{cfg['cruiseConfigFn']}",
-            f"*{cfg['md5SummaryFn']}",
-            f"*{cfg['md5SummaryMd5Fn']}"
+            f"*{wh_cfg['cruiseConfigFn']}",
+            f"*{wh_cfg['md5SummaryFn']}",
+            f"*{wh_cfg['md5SummaryMd5Fn']}"
         ])
-        # TODO: Exclude lowering.json files per lowering
+
+        for lowering in lowerings:
+            logging.debug(json.dumps(lowering, indent=2))
+            exclude_filterlist.append(f"*/{lowering}/{worker.ovdm.get_lowering_config_fn()}")
 
     # Handle excluded collection systems
-    excluded_ids = transfer.get('excludedCollectionSystems', '').split(',') if transfer.get('excludedCollectionSystems') else []
+    ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
 
-    for cs_id in filter(lambda x: x and x != '0', excluded_ids):
+    for cst_id in filter(lambda x: x and x != '0', ex_cst_ids):
         try:
-            cs_transfer = worker.ovdm.get_collection_system_transfer(cs_id)
-            cruise_or_lowering = cs_transfer.get('cruiseOrLowering')
-            dest_dir = cs_transfer.get('destDir')
+            cst_cfg = worker.ovdm.get_collection_system_transfer(cst_id)
+            cruise_or_lowering = cst_cfg.get('cruiseOrLowering')
+            dest_dir = cst_cfg.get('destDir')
 
             if cruise_or_lowering == '0':
                 # Cruise-level exclusion
@@ -229,20 +160,31 @@ def build_exclude_filterlist(worker):
                 # Lowering-level exclusions
                 for lowering in lowerings:
                     filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
-                    exclude_filterlist.append(f"*{lowering}/{filter_path}*")
+                    exclude_filterlist.append(f"*{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}*")
 
         except Exception as err:
-            logging.warning("Could not retrieve collection system transfer %s: %s", cs_id, err)
+            logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, err)
 
     # Handle excluded extra directories
-    extra_dir_ids = transfer.get('excludedExtraDirectories', '').split(',') if transfer.get('excludedExtraDirectories') else []
+    ex_ed_ids = cdt_cfg.get('excludedExtraDirectories', '').split(',') if cdt_cfg.get('excludedExtraDirectories') else []
 
-    for extra_id in filter(lambda x: x and x != '0', extra_dir_ids):
+    for ed_id in filter(lambda x: x and x != '0', ex_ed_ids):
         try:
-            extra_dir = worker.ovdm.get_extra_directory(extra_id)
-            exclude_filterlist.append(f"*{extra_dir['destDir'].replace('{cruiseID}', worker.cruise_id)}*")
+            ed_cfg = worker.ovdm.get_extra_directory(ed_id)
+            cruise_or_lowering = ed_cfg.get('cruiseOrLowering')
+            dest_dir = ed_cfg.get('destDir')
+
+            if cruise_or_lowering == '0':
+                # Cruise-level exclusion
+                exclude_filterlist.append(f"*{dest_dir.replace('{cruiseID}', worker.cruise_id)}*")
+            else:
+                # Lowering-level exclusions
+                for lowering in lowerings:
+                    filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
+                    exclude_filterlist.append(f"*{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}*")
+
         except Exception as err:
-            logging.warning("Could not retrieve extra directory %s: %s", extra_id, err)
+            logging.warning("Could not retrieve extra directory %s: %s", ed_id, err)
 
     logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
     return exclude_filterlist
@@ -280,8 +222,6 @@ def run_transfer_command(worker, current_job, command, file_count):
             if not line:
                 continue
 
-            # logging.debug("%s", line)
-
             if line.startswith( '>f+++++++++' ):
                 filename = line.split(' ',1)[1]
                 new_files.append(filename.rstrip('\n'))
@@ -314,40 +254,40 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_pa
     return cmd
 
 
-def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
-    """
-    Builds a list of rsync options based on config, transfer mode, and destination type.
+# def build_rsync_options(cfg, mode='dry-run', is_darwin=False, transfer_type=None):
+#     """
+#     Builds a list of rsync options based on config, transfer mode, and destination type.
 
-    :param cfg: dict-like config object (e.g., gearman_worker.cruise_data_transfer)
-    :param mode: 'dry-run' or 'real'
-    :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
-    :return: list of rsync flags
-    """
-    flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
+#     :param cfg: dict-like config object (e.g., worker.cruise_data_transfer)
+#     :param mode: 'dry-run' or 'real'
+#     :param transfer_type: 'local', 'smb', 'rsync', or 'ssh'
+#     :return: list of rsync flags
+#     """
+#     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
 
-    if not is_darwin:
-        flags.insert(1, '--protect-args')
+#     if not is_darwin:
+#         flags.insert(1, '--protect-args')
 
-    if cfg.get('skipEmptyFiles') == '1':
-        flags.insert(1, '--min-size=1')
+#     if cfg.get('skipEmptyFiles') == '1':
+#         flags.insert(1, '--min-size=1')
 
-    if cfg.get('skipEmptyDirs') == '1':
-        flags.insert(1, '-m')
+#     if cfg.get('skipEmptyDirs') == '1':
+#         flags.insert(1, '-m')
 
-    if mode == 'dry-run':
-        flags.append('--dry-run')
-        flags.append('--stats')
-    else:
-        if transfer_type == 'rsync':
-            flags.append('--no-motd')
+#     if mode == 'dry-run':
+#         flags.append('--dry-run')
+#         flags.append('--stats')
+#     else:
+#         if transfer_type == 'rsync':
+#             flags.append('--no-motd')
 
-        if cfg.get('bandwidthLimit') not in (None, '0'):
-            flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
+#         if cfg.get('bandwidthLimit') not in (None, '0'):
+#             flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
 
-        if cfg.get('syncToDest') == '1':
-            flags.insert(1, '--delete')
+#         if cfg.get('syncToDest') == '1':
+#             flags.insert(1, '--delete')
 
-    return flags
+#     return flags
 
 
 def build_exclude_file(exclude_list, filepath):
@@ -362,19 +302,21 @@ def build_exclude_file(exclude_list, filepath):
     return True
 
 
-def transfer_to_destination(worker, current_job, transfer_type):
+def transfer_to_destination(worker, current_job):
     """
     Unified transfer function to handle local, SMB, rsync, and SSH transfers
     """
-    logging.debug("Starting unified transfer: %s", transfer_type)
 
-    cfg = worker.cruise_data_transfer
-    cruise_cfg = worker.shipboard_data_warehouse_config
-    cruise_dir = os.path.join(cruise_cfg['shipboardDataWarehouseBaseDir'], worker.cruise_id)
-    dest_dir = None
+    cdt_cfg = worker.cruise_data_transfer
+    transfer_type = get_transfer_type(cdt_cfg['transferType'])
+
+    if not transfer_type:
+        logging.error("Unknown Transfer Type")
+        return {'verdict': False, 'reason': 'Unknown Transfer Type'}
 
     logging.debug("Building file list")
-    files = build_cdt_filelist(worker, cruise_dir)
+    files = build_cdt_filelist(worker)
+
     is_darwin = False
 
     with temporary_directory() as tmpdir:
@@ -386,30 +328,30 @@ def transfer_to_destination(worker, current_job, transfer_type):
             # Mount SMB Share
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(cfg)
-            success = mount_smb_share(cfg, mntpoint, smb_version)
+            smb_version = detect_smb_version(cdt_cfg)
+            success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
             if not success:
                 return {'verdict': False, 'reason': 'Failed to mount SMB share'}
-            dest_dir = os.path.join(mntpoint, cfg['destDir'].lstrip('/')).rstrip('/')
+            dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/')).rstrip('/')
 
         elif transfer_type == 'rsync':
             # Write rsync password file
             password_file = os.path.join(tmpdir, 'rsyncPass')
             with open(password_file, 'w', encoding='utf-8') as f:
-                f.write(cfg['rsyncPass'])
+                f.write(cdt_cfg['rsyncPass'])
             os.chmod(password_file, 0o600)
-            dest_dir = f"rsync://{cfg['rsyncUser']}@{cfg['rsyncServer']}{cfg['destDir'].rstrip('/')}/"
+            dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{cdt_cfg['rsyncServer']}{cdt_cfg['destDir'].rstrip('/')}/"
 
         elif transfer_type == 'ssh':
 
-            is_darwin = check_darwin(cfg)
-            dest_dir = f"{cfg['sshUser']}@{cfg['sshServer']}:{cfg['destDir'].rstrip('/')}"
+            is_darwin = check_darwin(cdt_cfg)
+            dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir'].rstrip('/')}"
 
         else:  # local
-            dest_dir = cfg['destDir'].rstrip('/')
+            dest_dir = cdt_cfg['destDir'].rstrip('/')
 
         # === DRY RUN ===
-        dry_flags = build_rsync_options(cfg, mode='dry-run', is_darwin=is_darwin, transfer_type=transfer_type)
+        dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
         extra_args = []
         if transfer_type == 'ssh':
@@ -417,11 +359,11 @@ def transfer_to_destination(worker, current_job, transfer_type):
         elif transfer_type == 'rsync':
             extra_args = [f"--password-file={password_file}"]
 
-        dry_cmd = build_rsync_command(dry_flags, extra_args, cruise_dir, dest_dir, exclude_file)
-        if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
-            dry_cmd = ['sshpass', '-p', cfg['sshPass']] + dry_cmd
+        dry_cmd = build_rsync_command(dry_flags, extra_args, worker.cruise_dir, dest_dir, exclude_file)
+        if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
+            dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
-        logging.debug("Dry run command: %s", ' '.join(dry_cmd))
+        logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg["sshPass"]}', '-p ****'))
         proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
 
         file_count = 0
@@ -435,28 +377,24 @@ def transfer_to_destination(worker, current_job, transfer_type):
             logging.debug("Nothing to transfer")
         else:
             # === REAL TRANSFER ===
-            real_flags = build_rsync_options(cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
+            real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin, transfer_type=transfer_type)
 
-            real_cmd = build_rsync_command(real_flags, extra_args, cruise_dir, dest_dir, exclude_file)
-            if transfer_type == 'ssh' and cfg.get('sshUseKey') == '0':
-                real_cmd = ['sshpass', '-p', cfg['sshPass']] + real_cmd
+            real_cmd = build_rsync_command(real_flags, extra_args, worker.cruise_dir, dest_dir, exclude_file)
+            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
+                real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
-            logging.debug("Real transfer command: %s", ' '.join(real_cmd))
+            logging.debug("Real transfer command: %s", ' '.join(real_cmd).replace(f'-p {cdt_cfg["sshPass"]}', '-p ****'))
             files['new'], files['updated'] = run_transfer_command(worker, current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
-            if transfer_type == 'local' and cfg.get('localDirIsMountPoint') == '0':
+            if transfer_type == 'local' and cdt_cfg.get('localDirIsMountPoint') == '0':
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
-                    cruise_cfg['shipboardDataWarehouseUsername'],
+                    worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'],
                     os.path.join(dest_dir, worker.cruise_id)
                 )
                 if not output['verdict']:
                     return output
-
-        if transfer_type == 'smb':
-            time.sleep(2)
-            subprocess.call(['umount', mntpoint])
 
     return {'verdict': True, 'files': files}
 
@@ -592,6 +530,8 @@ def task_run_cruise_data_transfer(worker, current_job):
 
     time.sleep(randint(0,2))
 
+    cdt_cfg = worker.cruise_data_transfer
+
     job_results = {
         'parts': [
             {"partName": "Transfer In-Progress", "result": "Pass"},
@@ -603,53 +543,29 @@ def task_run_cruise_data_transfer(worker, current_job):
     logging.debug("Setting transfer status to 'Running'")
     worker.ovdm.set_running_cruise_data_transfer(worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
-    logging.info("Testing configuration")
+    logging.info("Testing destination")
     worker.send_job_status(current_job, 1, 10)
+    results = test_cdt_destination(cdt_cfg)
 
-    gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
-
-    gm_data = {
-        'cruiseDataTransfer': worker.cruise_data_transfer,
-        'cruiseID': worker.cruise_id
-    }
-
-    completed_job_request = gm_client.submit_job("testCruiseDataTransfer", json.dumps(gm_data))
-    results_obj = json.loads(completed_job_request.result)
-
-    logging.debug('Connection Test Results: %s', json.dumps(results_obj, indent=2))
-
-    if results_obj['parts'][-1]['result'] == "Pass": # Final Verdict
-        logging.debug("Connection test passed")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Pass"})
-    else:
+    if results['parts'][-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results_obj['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results['parts'][-1]['reason']})
         return json.dumps(job_results)
 
-    worker.send_job_status(current_job, 2, 10)
+    logging.debug("Destination test passed")
+    job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
 
     logging.info("Transferring files")
-    output_results = None
-    if worker.cruise_data_transfer['transferType'] == "1": # Local Directory
-        output_results = transfer_to_destination(worker, current_job, 'local')
-    elif  worker.cruise_data_transfer['transferType'] == "2": # Rsync Server
-        output_results = transfer_to_destination(worker, current_job, 'rsync')
-    elif  worker.cruise_data_transfer['transferType'] == "3": # SMB Server
-        output_results = transfer_to_destination(worker, current_job, 'smb')
-    elif  worker.cruise_data_transfer['transferType'] == "4": # SSH Server
-        output_results = transfer_to_destination(worker, current_job, 'ssh')
-    else:
-        logging.error("Unknown Transfer Type")
-        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": "Unknown transfer type"})
-        return json.dumps(job_results)
+    worker.send_job_status(current_job, 2, 10)
+    results = transfer_to_destination(worker, current_job)
 
-    if not output_results['verdict']:
-        logging.error("Transfer of remote files failed: %s", output_results['reason'])
-        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": output_results['reason']})
+    if not results['verdict']:
+        logging.error("Transfer of remote files failed: %s", results['reason'])
+        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
     logging.debug("Transfer completed successfully")
-    job_results['files'] = output_results['files']
+    job_results['files'] = results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
 
     if len(job_results['files']['new']) > 0:
@@ -659,7 +575,7 @@ def task_run_cruise_data_transfer(worker, current_job):
     if len(job_results['files']['exclude']) > 0:
         logging.debug("%s file(s) intentionally skipped", len(job_results['files']['exclude']))
 
-    worker.send_job_status(current_job, 9, 10)
+    worker.send_job_status(current_job, 10, 10)
 
     time.sleep(2)
 
@@ -699,6 +615,8 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
+
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -706,6 +624,8 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
+
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
