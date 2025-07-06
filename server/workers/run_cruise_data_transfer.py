@@ -38,30 +38,6 @@ TASK_NAMES = {
 }
 
 
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
-    cmd = ['rsync'] + flags
-    if extra_args is not None:
-        cmd += extra_args
-
-    if exclude_file_path is not None:
-        cmd.append(f"--exclude-from={exclude_file_path}")
-
-    cmd += [source_dir, dest_dir.rstrip('/')+'/']
-    return cmd
-
-
-def build_exclude_file(exclude_list, filepath):
-    try:
-        with open(filepath, mode='w', encoding="utf-8") as f:
-            f.write('\n'.join(exclude_list))
-            f.write('\0')
-    except IOError as e:
-        logging.error("Error writing exclude file: %s", e)
-        return False
-
-    return True
-
-
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
     Gearman worker for OpenVDM-based cruise data transfers.
@@ -218,10 +194,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         files = { 'new':[], 'updated':[], 'exclude': [] }
         is_darwin = False
 
+        def _build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
+            cmd = ['rsync'] + flags
+            if extra_args is not None:
+                cmd += extra_args
+
+            if exclude_file_path is not None:
+                cmd.append(f"--exclude-from={exclude_file_path}")
+
+            cmd += [source_dir, dest_dir.rstrip('/')+'/']
+            return cmd
+
+        def _build_exclude_file(exclude_list, filepath):
+            try:
+                with open(filepath, mode='w', encoding="utf-8") as f:
+                    f.write('\n'.join(exclude_list))
+                    f.write('\0')
+            except IOError as e:
+                logging.error("Error writing exclude file: %s", e)
+                return False
+
+            return True
+
         with temporary_directory() as tmpdir:
             exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
             exclude_list = self.build_exclude_filterlist()
-            if not build_exclude_file(exclude_list, exclude_file):
+            if not _build_exclude_file(exclude_list, exclude_file):
                 return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
             if transfer_type == 'smb':
@@ -259,7 +257,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'rsync':
                 extra_args = [f"--password-file={password_file}"]
 
-            dry_cmd = build_rsync_command(dry_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
+            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
@@ -279,7 +277,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # === REAL TRANSFER ===
                 real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
-                real_cmd = build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
+                real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
                 if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                     real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
