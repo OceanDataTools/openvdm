@@ -135,14 +135,14 @@ def build_exclude_filterlist(worker):
     # Exclude OVDM-related files if flag is set
     if cdt_cfg.get('includeOVDMFiles') == '0':
         exclude_filterlist.extend([
-            f"{wh_cfg['cruiseConfigFn']}",
-            f"{wh_cfg['md5SummaryFn']}",
-            f"{wh_cfg['md5SummaryMd5Fn']}"
+            f"/{wh_cfg['cruiseConfigFn']}",
+            f"/{wh_cfg['md5SummaryFn']}",
+            f"/{wh_cfg['md5SummaryMd5Fn']}"
         ])
 
         for lowering in lowerings:
             logging.debug(json.dumps(lowering, indent=2))
-            exclude_filterlist.append(f"{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, worker.ovdm.get_lowering_config_fn())}")
+            exclude_filterlist.append(f"/{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, worker.ovdm.get_lowering_config_fn())}")
 
     # Handle excluded collection systems
     ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
@@ -155,12 +155,12 @@ def build_exclude_filterlist(worker):
 
             if cruise_or_lowering == '0':
                 # Cruise-level exclusion
-                exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', worker.cruise_id)}/*")
+                exclude_filterlist.append(f"/{dest_dir.replace('{cruiseID}', worker.cruise_id)}/*")
             else:
                 # Lowering-level exclusions
                 for lowering in lowerings:
                     filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
-                    exclude_filterlist.append(f"{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                    exclude_filterlist.append(f"/{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
         except Exception as err:
             logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, err)
@@ -176,12 +176,12 @@ def build_exclude_filterlist(worker):
 
             if cruise_or_lowering == '0':
                 # Cruise-level exclusion
-                exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', worker.cruise_id)}/*")
+                exclude_filterlist.append(f"/{dest_dir.replace('{cruiseID}', worker.cruise_id)}/*")
             else:
                 # Lowering-level exclusions
                 for lowering in lowerings:
                     filter_path = dest_dir.replace('{cruiseID}', worker.cruise_id).replace('{loweringID}', lowering)
-                    exclude_filterlist.append(f"{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                    exclude_filterlist.append(f"/{os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
         except Exception as err:
             logging.warning("Could not retrieve extra directory %s: %s", ed_id, err)
