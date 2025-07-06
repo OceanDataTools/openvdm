@@ -412,6 +412,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.cruise_data_transfer = None
         self.shipboard_data_warehouse_config = None
 
+        self.cruise_dir = None
+
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
     def on_job_execute(self, current_job):
@@ -458,6 +460,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+
+        self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
         return super().on_job_execute(current_job)
 
