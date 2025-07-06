@@ -90,7 +90,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _get_filetype(raw_path, processing_script_filename):
+        logging.debug(json.dumps(processing_script_filename, indent=2))
         cmd = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_path]
+        logging.debug(' '.join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr
 
@@ -98,6 +100,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def _process_file(raw_path, processing_script_filename):
         cmd = [PYTHON_BINARY, processing_script_filename, raw_path]
+        logging.debug(' '.join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr, cmd
 
@@ -122,8 +125,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         json_path = os.path.join(self.data_dashboard_dir, json_filename)
         return raw_path, json_path
 
-    def _build_processing_filename(self):
-        processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), self.collection_system_transfer['name'].lower() + self.ovdm.get_plugin_suffix())
+    def _build_processing_filename(self, cfg=None):
+
+        cst_cfg = cfg or self.collection_system_transfer
+
+        processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), cst_cfg['name'].lower() + self.ovdm.get_plugin_suffix())
         logging.debug("Processing Script Filename: %s", processing_script_filename)
 
         return processing_script_filename if os.path.isfile(processing_script_filename) else None
@@ -419,7 +425,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     logging.info("Processing files")
     worker.send_job_status(current_job, 15, 100)
 
-    new_manifest_entries, remove_manifest_entries = worker._process_filelist(current_job, filelist, job_results, 15, 90)
+    new_manifest_entries, remove_manifest_entries = worker._process_filelist(current_job, filelist, processing_script_filename, job_results, 15, 90)
 
     logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
     worker.send_job_status(current_job, 9, 10)
@@ -520,6 +526,8 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         }
     }
 
+    manifest_entries = []
+
     logging.info("Rebuilding data dashboard")
     worker.send_job_status(current_job, 1, 100)
 
@@ -542,7 +550,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         logging.info('Processing data from: %s', collection_system_transfer['name'])
         worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
-        processing_script_filename = worker._build_processing_filename()
+        processing_script_filename = worker._build_processing_filename(cfg=collection_system_transfer)
 
         if processing_script_filename is None:
             reason = f"Processing script not found: {processing_script_filename}"
@@ -551,7 +559,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
 
         if collection_system_transfer['cruiseOrLowering'] == "0":
             collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, collection_system_transfer['destDir'])
-            filelist = build_filelist(collection_system_transfer_input_dir.get('include', []))
+            filelist = build_filelist(collection_system_transfer_input_dir).get('include', [])
             filelist = [os.path.join(collection_system_transfer['destDir'], filename) for filename in filelist]
 
         else:
@@ -568,12 +576,14 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
 
         start = 80 * progress_factor + 10
         end = 80 * int(float(collection_system_transfer_index + 1) / float(collection_system_transfer_count) * 100) + 10
-        new_manifest_entries, _ = worker._process_filelist(current_job, filelist, job_results, start, end)
+        new_manifest_entries, _ = worker._process_filelist(current_job, filelist, processing_script_filename, job_results, start, end)
+        logging.debug(new_manifest_entries)
+        manifest_entries.extend(new_manifest_entries)
 
     logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
     worker.send_job_status(current_job, 9, 10)
 
-    output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, new_manifest_entries)
+    output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, manifest_entries)
 
     if not output_results['verdict']:
         logging.error("Error updating manifest file %s", worker.data_dashboard_manifest_file_path)
@@ -597,7 +607,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
     worker.send_job_status(current_job, 99, 100)
 
     data_dashboard_dest_dir = worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir']
-    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(worker.data_dashboard_dir.get('include', []))]# might need to remove cruise_dir from begining of filepaths
+    job_results['files']['updated'] = [os.path.join(data_dashboard_dest_dir, filepath) for filepath in build_filelist(worker.data_dashboard_dir).get('include', [])]# might need to remove cruise_dir from begining of filepaths
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
