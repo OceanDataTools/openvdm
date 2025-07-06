@@ -553,9 +553,9 @@ def task_run_cruise_data_transfer(worker, current_job):
     worker.send_job_status(current_job, 1, 10)
     results = test_cdt_destination(cdt_cfg)
 
-    if results['parts'][-1]['result'] == "Fail": # Final Verdict
+    if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
     logging.debug("Destination test passed")
