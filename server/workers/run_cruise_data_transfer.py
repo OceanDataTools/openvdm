@@ -462,19 +462,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return super().on_job_execute(current_job)
 
     def on_job_exception(self, current_job, exc_info):
-        logging.error("Job: %s, %s transfer failed at: %s", current_job.handle,
-                      self.cruise_data_transfer['name'], time.strftime("%D %T", time.gmtime()))
+        """
+        Function run whenever the current job has an exception
+        """
 
-        self.send_job_data(current_job, json.dumps([{
-            "partName": "Worker crashed", "result": "Fail", "reason": "Unknown"
-        }]))
-        self.ovdm.set_error_cruise_data_transfer(
-            self.cruise_data_transfer['cruiseDataTransferID'], 'Worker crashed'
-        )
+        logging.error("Job: %s, transfer failed at: %s", current_job.handle,
+                      time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("Exception: %s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
+        logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
+
+        if cdt_id:
+            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
