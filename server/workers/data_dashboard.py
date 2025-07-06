@@ -377,7 +377,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     processing_script_filename = worker._build_processing_filename()
 
     if processing_script_filename is None:
-        reason = f"Processing script not found: {processing_script_filename}"
+        reason = f"Processing script not found for: {worker.collection_system_transfer['name']}"
         logging.warning(reason)
         job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
@@ -528,9 +528,8 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
         processing_script_filename = worker._build_processing_filename(cfg=collection_system_transfer)
-
         if processing_script_filename is None:
-            reason = f"Processing script not found: {processing_script_filename}"
+            reason = f"Processing script not found for: {collection_system_transfer['name']}"
             logging.warning(reason)
             continue
 
