@@ -39,23 +39,6 @@ CUSTOM_TASKS = [
     }
 ]
 
-# def build_filelist(source_dir):
-#     """
-#     return list of files in the source directory
-#     """
-
-#     source_dir = source_dir.rstrip('/') or '/'
-
-#     logging.debug("sourceDir: %s", source_dir)
-
-#     return_files = []
-#     for root, _, filenames in os.walk(source_dir):
-#         for filename in filenames:
-#             return_files.append(os.path.join(root, filename))
-
-#     return_files = [filename.replace(source_dir + '/', '', 1) for filename in return_files]
-#     return return_files
-
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """
@@ -90,9 +73,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _get_filetype(raw_path, processing_script_filename):
-        logging.debug(json.dumps(processing_script_filename, indent=2))
         cmd = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_path]
-        logging.debug(' '.join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr
 
@@ -100,7 +81,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def _process_file(raw_path, processing_script_filename):
         cmd = [PYTHON_BINARY, processing_script_filename, raw_path]
-        logging.debug(' '.join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr, cmd
 
@@ -128,10 +108,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     def _build_processing_filename(self, cfg=None):
 
         cst_cfg = cfg or self.collection_system_transfer
-
         processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), cst_cfg['name'].lower() + self.ovdm.get_plugin_suffix())
-        logging.debug("Processing Script Filename: %s", processing_script_filename)
-
         return processing_script_filename if os.path.isfile(processing_script_filename) else None
 
     def _process_filelist(self, current_job, filelist, processing_script_filename, job_results, start=0, end=100):
@@ -635,13 +612,10 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     # global new_worker
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT
