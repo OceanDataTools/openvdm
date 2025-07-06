@@ -311,6 +311,7 @@ def transfer_to_destination(worker, current_job):
 
     cdt_cfg = worker.cruise_data_transfer
     transfer_type = get_transfer_type(cdt_cfg['transferType'])
+    source_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
 
     if not transfer_type:
         logging.error("Unknown Transfer Type")
@@ -361,7 +362,7 @@ def transfer_to_destination(worker, current_job):
         elif transfer_type == 'rsync':
             extra_args = [f"--password-file={password_file}"]
 
-        dry_cmd = build_rsync_command(dry_flags, extra_args, worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, exclude_file)
+        dry_cmd = build_rsync_command(dry_flags, extra_args, source_dir, dest_dir, exclude_file)
         if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
             dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
@@ -381,7 +382,7 @@ def transfer_to_destination(worker, current_job):
             # === REAL TRANSFER ===
             real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
-            real_cmd = build_rsync_command(real_flags, extra_args, worker.cruise_dir, dest_dir, exclude_file)
+            real_cmd = build_rsync_command(real_flags, extra_args, source_dir, dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
