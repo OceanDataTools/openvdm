@@ -97,13 +97,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if finalize:
             cruise_config['cruiseFinalizedOn'] = cruise_config['configCreatedOn']
         elif os.path.isfile(cruise_config_file_path):
-            logging.info("Reading existing configuration file")
+            logging.debug("Reading existing configuration file")
             try:
                 with open(cruise_config_file_path, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
                     cruise_config['cruiseFinalizedOn'] = existing_data.get('cruiseFinalizedOn')
-            except OSError as err:
-                logging.debug("Error reading config: %s", err)
+            except OSError as exc:
+                logging.debug("Error reading config: %s", exc)
                 return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
         def scrub_transfers(transfer_list):
@@ -178,8 +178,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = set_owner_group_permissions(self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], logfile_filepath)
 
         if not results['verdict']:
-            logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
-            return {'verdict': False, "reason": f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"}
+            reason = f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"
+            logging.error(reason)
+            return {'verdict': False, "reason": reason}
 
         with temporary_directory() as tmpdir:    # Create temp directory
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -226,8 +227,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             results = set_owner_group_permissions(self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], logfile_filepath)
 
             if not results['verdict']:
-                logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
-                return {'verdict': False, "reason": f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"}
+                reason = f"Error setting ownership/permissions for transfer logfile: {logfile_filename}"
+                logging.error(reason)
+                return {'verdict': False, "reason": reason}
 
             self.update_md5_summary(files)
             self.send_job_status(current_job, int((end_status - start_status) * 90/100) + start_status, 100)
@@ -483,7 +485,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
 
-    logging.info("Queuing Collection System Transfers")
+    logging.info("Queuing Collection System Transfers jobs")
     worker.send_job_status(current_job, 2, 10)
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
@@ -608,13 +610,10 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     # global new_worker
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT
