@@ -8,9 +8,9 @@ lowering and finalizing the current lowering.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -56,13 +56,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_logfile_dirpath(self):
         """
-        build the path to save transfer logfiles
+        Build the path to save transfer logfiles
         """
 
         return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
     def update_md5_summary(self, files):
+        """
+        Submit an UPDATE_MD5_SUMMARY job to Gearman that adds the list of
+        files to the MD5 manifest.
+        """
+
         gm_data = {
             'cruiseID': self.cruise_id,
             'files': {
@@ -251,6 +256,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
@@ -416,13 +422,10 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     # global new_worker
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT

@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
-  CREATED:  2015-01-01
- REVISION:  2025-04-12
+  VERSION:  2.11
+  CREATED:  2017-09-30
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -435,12 +435,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT

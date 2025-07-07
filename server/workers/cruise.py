@@ -58,7 +58,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def build_logfile_dirpath(self):
         """
-        build the path to save transfer logfiles
+        Build the path to save transfer logfiles
         """
 
         return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
@@ -66,7 +66,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def update_md5_summary(self, files):
         """
-        submit list of files to be processed and added to the MD5 summary file
+        Submit list of files to be processed and added to the MD5 summary file
         """
 
         gm_data = {
@@ -86,7 +86,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def export_cruise_config(self, finalize=False):
         """
-        export the current cruise configuration to file.
+        Export the current cruise configuration to file.
         if 'finalize' is true, mark the config as finalized.
         """
 
@@ -139,7 +139,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def transfer_publicdata_dir(self, current_job, start_status, end_status):
         """
-        transfer the contents of the PublicData share to the cruise data directory
+        Transfer the contents of the PublicData share to the cruise data directory
         """
 
         source_dir = self.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
@@ -333,7 +333,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def stop_task(self):
         """
-        stop the current job
+        Stop the current job
         """
 
         self.stop = True
@@ -342,7 +342,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def quit_worker(self):
         """
-        quit the worker
+        Quit the worker
         """
 
         self.stop = True
@@ -353,7 +353,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
 
         return self.on_job_complete(current_job, json.dumps({
@@ -544,7 +544,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
 def task_rsync_publicdata_to_cruise_data(worker, current_job):
     """
-    sync the contents of the PublicData share to the from_PublicData extra directory
+    Sync the contents of the PublicData share to the from_PublicData extra directory
     """
 
     job_results = {'parts':[]}
@@ -566,7 +566,7 @@ def task_rsync_publicdata_to_cruise_data(worker, current_job):
 
 def task_export_cruise_config(worker, current_job):
     """
-    export the OpenVDM configuration to file
+    Export the OpenVDM configuration to file
     """
 
     job_results = {'parts':[]}

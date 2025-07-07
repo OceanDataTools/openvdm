@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -107,6 +107,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_md5_summary(self, hashes):
+        """
+        Builds a new/updated MD5 summary file
+        """
+
         sorted_hashes = sorted(hashes, key=lambda entry: entry['filename'])
 
         try:
@@ -124,7 +128,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_md5_summary_md5(self):
         """
-        Build the md5 hash for the md5 summary file
+        Build the md5 hash file for the md5 summary file
         """
 
         try:
@@ -253,8 +257,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
@@ -510,12 +515,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT

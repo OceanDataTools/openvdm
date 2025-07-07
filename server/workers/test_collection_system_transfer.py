@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles testing collection system transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -53,6 +53,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def keyword_replace(self, s):
+        """
+        Simple keyword replace function
+        """
+
         if not isinstance(s, str):
             return None
 
@@ -247,8 +251,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
@@ -256,8 +261,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def _ignore_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as ignored
+        Shortcut for completing the current job as ignored
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}]
         }))

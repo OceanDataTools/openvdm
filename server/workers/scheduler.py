@@ -17,9 +17,9 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
-  CREATED:  2015-01-01
- REVISION:  2025-04-12
+  VERSION:  2.11
+  CREATED:  2017-09-30
+ REVISION:  2025-07-06
 """
 
 import os
@@ -39,7 +39,10 @@ from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASKS_NAMES
 from server.workers.run_ship_to_shore_transfer import TASK_NAMES as S2ST_TASKS_NAMES
 
-def scheduler(ovdm, interval=None):
+def scheduler(interval=None):
+    """
+    Schedule transfers to occur at the defined interval
+    """
 
     ovdm = OpenVDM()
     interval = interval or ovdm.get_transfer_interval()

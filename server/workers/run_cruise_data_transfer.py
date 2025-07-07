@@ -8,9 +8,9 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -60,6 +60,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Build exclude filter for the transfer
         """
+
         exclude_filterlist = []
 
         wh_cfg = self.shipboard_data_warehouse_config
@@ -128,7 +129,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def run_transfer_command(self, current_job, command, file_count):
         """
-        run the rsync command and return the list of new/updated files
+        Run the rsync command and return the list of new/updated files
         """
 
         # if there are no files to transfer, then don't
@@ -205,6 +206,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             cmd += [source_dir, dest_dir.rstrip('/')+'/']
             return cmd
 
+
         def _build_exclude_file(exclude_list, filepath):
             try:
                 with open(filepath, mode='w', encoding="utf-8") as f:
@@ -215,6 +217,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return False
 
             return True
+
 
         with temporary_directory() as tmpdir:
             exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
@@ -297,6 +300,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
+        """
+        Function run when a new job arrives
+        """
+
         logging.debug("Received job: %s", current_job)
         self.stop = False
 
@@ -345,6 +352,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         return super().on_job_execute(current_job)
 
+
     def on_job_exception(self, current_job, exc_info):
         """
         Function run when the current job has an exception
@@ -368,7 +376,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         return super().on_job_exception(current_job, exc_info)
 
+
     def on_job_complete(self, current_job, job_result):
+        """
+        Function run when the current job completes
+        """
+
         results_obj = json.loads(job_result)
 
         final_part = results_obj['parts'][-1] if results_obj['parts'] else None
@@ -389,21 +402,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         return super().send_job_complete(current_job, job_result)
 
+
     def stop_task(self):
+        """
+        Function to stop the current job
+        """
+
         self.stop = True
         logging.warning("Stopping current task...")
 
+
     def quit_worker(self):
+        """
+        Function to quit the worker
+        """
+
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
 
-    # --- Helper Methods ---
 
+    # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
             'files': {'new': [], 'updated': [], 'exclude': []}
@@ -411,8 +435,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
     def _ignore_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as ignored
+        Shortcut for completing the current job as ignored
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}],
             'files': {'new': [], 'updated': [], 'exclude': []}
@@ -500,12 +525,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT

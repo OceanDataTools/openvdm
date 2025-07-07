@@ -64,7 +64,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def get_custom_task(current_job):
         """
-        fetch task metadata
+        Fetch task metadata
         """
 
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
@@ -73,6 +73,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _get_filetype(raw_path, processing_script_filename):
+        """
+        Use processing script to retrieve the file data type
+        """
+
         cmd = [PYTHON_BINARY, processing_script_filename, '--dataType', raw_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr
@@ -80,6 +84,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _process_file(raw_path, processing_script_filename):
+        """
+        Use processing script to retrieve the file data dashboard object
+        """
+
         cmd = [PYTHON_BINARY, processing_script_filename, raw_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr, cmd
@@ -87,6 +95,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _add_manifest_entry(entries, dd_type, json_path, raw_path, base_dir):
+        """
+        Add an entry to the new data_dashboard manifest
+        """
+
         rel_json = json_path.replace(base_dir + '/', '')
         rel_raw = raw_path.replace(base_dir + '/', '')
         entries.append({"type": dd_type, "dd_json": rel_json, "raw_data": rel_raw})
@@ -94,24 +106,39 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def _remove_manifest_entry(entries, json_path, raw_path, base_dir):
+        """
+        Add an entry to the remove data_dashboard manifest
+        """
+
         rel_json = json_path.replace(base_dir + '/', '')
         rel_raw = raw_path.replace(base_dir + '/', '')
         entries.append({"dd_json": rel_json, "raw_data": rel_raw})
 
 
     def _build_paths(self, filename):
+        """
+        Build file paths for a data_dashboard manifest entry
+        """
+
         json_filename = os.path.splitext(filename)[0] + '.json'
         raw_path = os.path.join(self.cruise_dir, filename)
         json_path = os.path.join(self.data_dashboard_dir, json_filename)
         return raw_path, json_path
 
     def _build_processing_filename(self, cfg=None):
+        """
+        Build the processing script filename and verify it exists
+        """
 
         cst_cfg = cfg or self.collection_system_transfer
         processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), cst_cfg['name'].lower() + self.ovdm.get_plugin_suffix())
         return processing_script_filename if os.path.isfile(processing_script_filename) else None
 
     def _process_filelist(self, current_job, filelist, processing_script_filename, job_results, start=0, end=100):
+        """
+        Process a list of files and return a list of new and removed manifest
+        entries
+        """
 
         base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
         new_manifest_entries = []
@@ -120,7 +147,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         file_count = len(filelist)
         file_index = 0
 
-        # Main Loop
         for filename in filelist:
             if self.stop:
                 break
@@ -345,8 +371,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))

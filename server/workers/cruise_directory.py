@@ -69,7 +69,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     @staticmethod
     def _get_custom_task(current_job):
         """
-        fetch task metadata
+        Fetch task metadata
         """
 
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
@@ -77,7 +77,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def keyword_replace(self, s):
         """
-        find/replace function used to build directory names containing wildcards
+        Find/replace function used to build directory names containing wildcards
         """
 
         if not isinstance(s, str):
@@ -92,7 +92,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_dest_dir(self, dest_dir):
         """
-        replace any wildcards in the provided directory
+        Replace any wildcards in the provided directory
         """
 
         return self.keyword_replace(dest_dir) if dest_dir else None
@@ -100,7 +100,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def build_directorylist(self):
         """
-        build list of directories to created as part of creating the new cruise
+        Build list of directories to created as part of creating the new cruise
         """
 
         return_directories = []
@@ -254,8 +254,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
@@ -437,9 +438,9 @@ def task_rebuild_cruise_directory(worker, current_job):
     return json.dumps(job_results)
 
 
-# -------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
-# -------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Handle Cruise data directory related tasks')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
@@ -458,8 +459,6 @@ if __name__ == "__main__":
     LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    logging.debug("Creating Worker...")
 
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)

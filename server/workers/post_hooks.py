@@ -10,9 +10,9 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
-  CREATED:  2016-02-09
- REVISION:  2025-04-12
+  VERSION:  2.11
+  CREATED:  2015-02-09
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -73,29 +73,6 @@ CUSTOM_TASKS = [
 ]
 
 
-def run_command(command):
-    """
-    Run the commands in the command_list
-    """
-
-    try:
-        logging.info("Executing: %s", ' '.join(command['command']))
-        proc = subprocess.run(command['command'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-
-        if len(proc.stdout) > 0:
-            logging.debug("stdout: %s", proc.stdout)
-
-        if len(proc.stderr) > 0:
-            logging.debug("stderr: %s", proc.stderr)
-
-    except Exception as err:
-        logging.error("Error executing the %s command: %s", command['name'], ' '.join(command['command']))
-        logging.debug(str(err))
-        return {"verdict": False, "reason": f"Error executing the {command['name']} command: {' '.join(command['command'])}"}
-
-    return {"verdict": True}
-
-
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """
     Class for the current Gearman worker
@@ -122,6 +99,30 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+
+
+    @staticmethod
+    def _run_command(command):
+        """
+        Run the commands in the command_list
+        """
+
+        try:
+            logging.info("Executing: %s", ' '.join(command['command']))
+            proc = subprocess.run(command['command'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+            if len(proc.stdout) > 0:
+                logging.debug("stdout: %s", proc.stdout)
+
+            if len(proc.stderr) > 0:
+                logging.debug("stderr: %s", proc.stderr)
+
+        except Exception as err:
+            logging.error("Error executing the %s command: %s", command['name'], ' '.join(command['command']))
+            logging.debug(str(err))
+            return {"verdict": False, "reason": f"Error executing the {command['name']} command: {' '.join(command['command'])}"}
+
+        return {"verdict": True}
 
 
     def _build_commands(self, command_list, cst_cfg=None):
@@ -308,8 +309,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     # --- Helper Methods ---
     def _fail_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as failed
+        Shortcut for completing the current job as failed
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
             'files': {'new': [], 'updated': [], 'exclude': []}
@@ -318,8 +320,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     def _ignore_job(self, current_job, part_name, reason):
         """
-        shortcut for completing the current job as ignored
+        Shortcut for completing the current job as ignored
         """
+
         return self.on_job_complete(current_job, json.dumps({
             'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}],
             'files': {'new': [], 'updated': [], 'exclude': []}
@@ -357,7 +360,7 @@ def task_post_hook(worker, current_job):
     reasons = []
 
     for command in output_results['commandList']:
-        output_results = run_command(command)
+        output_results = worker._run_command(command)
 
         if not output_results['verdict']:
             reasons.append(output_results['reason'])
@@ -394,12 +397,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    logging.debug("Creating Worker...")
-
     new_worker = OVDMGearmanWorker()
     new_worker.set_client_id(__file__)
 
-    logging.debug("Defining Signal Handlers...")
     def sigquit_handler(_signo, _stack_frame):
         """
         Signal Handler for QUIT

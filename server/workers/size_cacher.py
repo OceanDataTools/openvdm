@@ -13,9 +13,9 @@ ARGUMENTS: --interval <interval> The minimum interval in second between director
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2017-09-30
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -31,6 +31,11 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 def size_cacher(interval):
+    """
+    Calculate the sizes of the cruise and lowering directories at the defined
+    interval
+    """
+
     ovdm = OpenVDM()
 
     while True:
