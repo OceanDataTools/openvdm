@@ -108,7 +108,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         try:
-            logging.info("Executing: %s", ' '.join(command['command']))
+            logging.debug("Command: %s", ' '.join(command['command']))
             proc = subprocess.run(command['command'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
 
             if len(proc.stdout) > 0:
@@ -117,10 +117,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             if len(proc.stderr) > 0:
                 logging.debug("stderr: %s", proc.stderr)
 
-        except Exception as err:
-            logging.error("Error executing the %s command: %s", command['name'], ' '.join(command['command']))
-            logging.debug(str(err))
-            return {"verdict": False, "reason": f"Error executing the {command['name']} command: {' '.join(command['command'])}"}
+        except Exception as exc:
+            reason = f"Error executing {command['name']}: {' '.join(command['command'])}"
+            logging.error(reason)
+            logging.debug(str(exc))
+            return {"verdict": False, "reason": reason}
 
         return {"verdict": True}
 
@@ -129,6 +130,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         Process the provided command_list to replace any wildcard strings
         """
+
         if not command_list:
             return None
 
@@ -270,10 +272,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -336,11 +338,8 @@ def task_post_hook(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info("Starting Task")
-    worker.send_job_status(current_job, 1, 10)
-
     logging.info("Retrieving Commands")
-    worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 1, 10)
 
     output_results = worker.get_command_list()
 
@@ -355,12 +354,16 @@ def task_post_hook(worker, current_job):
     job_results['parts'].append({"partName": "Get Commands", "result": "Pass"})
 
     logging.info("Running Commands")
-    worker.send_job_status(current_job, 3, 10)
+    worker.send_job_status(current_job, 2, 10)
 
     reasons = []
 
-    for command in output_results['commandList']:
-        output_results = worker._run_command(command)
+    cmd_length = len(output_results['commandList'])
+    for idx, cmd in enumerate(output_results['commandList']):
+        worker.send_job_status(current_job, int(80 * (idx+1)/cmd_length) + 20, 100)
+
+        logging.info("Executing: %s", ' '.join(cmd['name']))
+        output_results = worker._run_command(cmd)
 
         if not output_results['verdict']:
             reasons.append(output_results['reason'])
@@ -371,7 +374,6 @@ def task_post_hook(worker, current_job):
         job_results['parts'].append({"partName": "Running Commands", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
-
     return json.dumps(job_results)
 
 

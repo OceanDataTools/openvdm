@@ -76,7 +76,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             ])
 
             for lowering in lowerings:
-                logging.debug(json.dumps(lowering, indent=2))
                 exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, self.ovdm.get_lowering_config_fn())}")
 
         # Handle excluded collection systems
@@ -97,8 +96,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
                         exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
-            except Exception as err:
-                logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, err)
+            except Exception as exc:
+                logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, str(exc))
 
         # Handle excluded extra directories
         ex_ed_ids = cdt_cfg.get('excludedExtraDirectories', '').split(',') if cdt_cfg.get('excludedExtraDirectories') else []
@@ -118,12 +117,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
                         exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
-            except Exception as err:
-                logging.warning("Could not retrieve extra directory %s: %s", ed_id, err)
+            except Exception as exc:
+                logging.warning("Could not retrieve extra directory %s: %s", ed_id, str(exc))
 
         exclude_filterlist = [ self.cruise_id + path_filter for path_filter in exclude_filterlist ]
 
-        logging.debug("Exclude filters: %s", json.dumps(exclude_filterlist, indent=2))
         return exclude_filterlist
 
 
@@ -212,8 +210,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 with open(filepath, mode='w', encoding="utf-8") as f:
                     f.write('\n'.join(exclude_list))
                     f.write('\0')
-            except IOError as e:
-                logging.error("Error writing exclude file: %s", e)
+            except IOError as exc:
+                logging.error("Error writing exclude file: %s", str(exc))
                 return False
 
             return True
@@ -221,7 +219,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         with temporary_directory() as tmpdir:
             exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
+
             exclude_list = self.build_exclude_filterlist()
+            logging.debug("Exclude filters: %s", json.dumps(exclude_list, indent=2))
+
             if not _build_exclude_file(exclude_list, exclude_file):
                 return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
@@ -316,15 +317,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             if not self.cruise_data_transfer:
                 self.cruise_data_transfer = {
-                    'name': "Unknown Transfer"
+                    'name': "UNKNOWN"
                 }
 
                 return self._fail_job(current_job, "Located Cruise Data Transfer Data",
                                       "Could not find configuration data for cruise data transfer")
-
-            if self.cruise_data_transfer['status'] == "1":
-                logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
-                return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
         except Exception:
             logging.exception("Failed to retrieve cruise data transfer config")
@@ -335,6 +332,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
         ))
+
+        # verify the transfer is NOT already in-progress
+        if self.cruise_data_transfer['status'] == "1":
+            logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
+            return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
         logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
@@ -382,23 +384,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run when the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
+        parts = results.get('parts', [])
+        final_verdict = parts[-1] if parts else None
+        cdt_id = self.collection_system_transfer.get('cruiseDataTransferID')
 
-        final_part = results_obj['parts'][-1] if results_obj['parts'] else None
-
-        if final_part:
-            if final_part['result'] == "Fail" and final_part['partName'] != "Located Cruise Data Transfer Data":
-                self.ovdm.set_error_cruise_data_transfer(
-                    self.cruise_data_transfer['cruiseDataTransferID'], final_part['reason']
-                )
-            elif final_part['result'] == "Pass":
-                self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
-        else:
-            self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer['cruiseDataTransferID'])
-
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s transfer completed at: %s", current_job.handle,
                      time.strftime("%D %T", time.gmtime()))
+
+        if not cdt_id:
+            return super().send_job_complete(current_job, job_result)
+
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', "undefined")
+            self.ovdm.set_error_cruise_data_transfer(cdt_id, reason)
+            return super().send_job_complete(current_job, job_result)
+
+        # Always set idle at the end if not failed
+        self.ovdm.set_idle_cruise_data_transfer(cdt_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -466,6 +470,7 @@ def task_run_cruise_data_transfer(worker, current_job):
 
     logging.info("Testing destination")
     worker.send_job_status(current_job, 1, 10)
+
     results = test_cdt_destination(cdt_cfg)
 
     if results[-1]['result'] == "Fail": # Final Verdict
@@ -473,11 +478,11 @@ def task_run_cruise_data_transfer(worker, current_job):
         job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Destination test passed")
     job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
 
     logging.info("Transferring files")
     worker.send_job_status(current_job, 2, 10)
+
     results = worker.transfer_to_destination(current_job)
 
     if not results['verdict']:
@@ -485,7 +490,6 @@ def task_run_cruise_data_transfer(worker, current_job):
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Transfer completed successfully")
     job_results['files'] = results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
 
@@ -497,9 +501,6 @@ def task_run_cruise_data_transfer(worker, current_job):
         logging.debug("%s file(s) intentionally skipped", len(job_results['files']['exclude']))
 
     worker.send_job_status(current_job, 10, 10)
-
-    time.sleep(2)
-
     return json.dumps(job_results)
 
 

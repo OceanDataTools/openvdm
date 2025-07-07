@@ -95,8 +95,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 while chunk := f.read(BUF_SIZE):
                     file_hash.update(chunk)
             return file_hash.hexdigest()  # to get a printable str instead of bytes
-        except Exception as err:
-            raise err
+        except Exception as exc:
+            raise exc
 
 
     def build_md5_hashes(self, current_job, filelist):
@@ -127,9 +127,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 else:
                     hashes.append({'hash': self.hash_file(filepath), 'filename': filename})
 
-            except Exception as err:
+            except Exception as exc:
                 logging.error("Could not generate md5 hash for file: %s", filename)
-                logging.debug(str(err))
+                logging.debug(str(exc))
 
             self.send_job_status(current_job, int(60 * idx / len(filelist)) + 20, 100) # 80-20
 
@@ -150,8 +150,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                     md5_summary_file.write(filehash['hash'] + ' ' + filehash['filename'] + '\n')
 
         except IOError:
-            logging.error("Error updating MD5 Summary file: %s", self.md5_summary_filepath)
-            return {"verdict": False, "reason": f"Error updating MD5 Summary file: {self.md5_summary_filepath}"}
+            reason = f"Error updating MD5 Summary file: {self.md5_summary_filepath}"
+            logging.error(reason)
+            return {"verdict": False, "reason": reason}
 
         return {"verdict": True}
 
@@ -166,8 +167,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 md5_summary_md5_file.write(self.hash_file(self.md5_summary_filepath))
 
         except IOError:
-            logging.error("Error Saving MD5 Summary MD5 file: %s", self.md5_summary_md5_filepath)
-            return {"verdict": False, "reason": f"Error Saving MD5 Summary MD5 file: {self.md5_summary_md5_filepath}"}
+            reason = f"Error Saving MD5 Summary MD5 file: {self.md5_summary_md5_filepath}"
+            logging.error(reason)
+            return {"verdict": False, "reason": reason}
 
         return {"verdict": True}
 
@@ -248,10 +250,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -303,7 +305,7 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
     job_results = {'parts':[]}
     payload_obj = json.loads(current_job.data)
 
-    logging.debug("Building filelist")
+    logging.info("Building filelist")
     worker.send_job_status(current_job, 1, 10)
 
     filelist = []
@@ -321,14 +323,14 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
         filelist.extend(new_files)
         filelist.extend(updated_files)
 
-    logging.debug("Building hashes")
+    logging.info("Building MD5 hashes")
     worker.send_job_status(current_job, 2, 10)
 
     new_hashes = worker.build_md5_hashes(current_job, filelist)
 
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
-    logging.debug("Processing existing MD5 summary file")
+    logging.info("Processing existing MD5 summary file")
     worker.send_job_status(current_job, 8, 10)
 
     hashes = []
@@ -339,12 +341,12 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
                 for line in f if ' ' in line
             ]
     except IOError:
-        msg = f"Error Reading pre-existing MD5 Summary file: {worker.md5_summary_filepath}"
-        logging.error(msg)
+        reason = f"Error Reading pre-existing MD5 Summary file: {worker.md5_summary_filepath}"
+        logging.error(reason)
         job_results['parts'].append({
             "partName": "Reading pre-existing MD5 Summary file",
             "result": "Fail",
-            "reason": msg
+            "reason": reason
         })
         return json.dumps(job_results)
 
@@ -381,7 +383,7 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
         if count > 0:
             logging.debug("%s row(s) %s", count, label)
 
-    logging.debug("Building MD5 Summary file")
+    logging.info("Building MD5 Summary file")
     worker.send_job_status(current_job, 9, 10)
 
     output_results = worker.build_md5_summary(hashes)
@@ -400,7 +402,7 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
 
     job_results['parts'].append({"partName": "Set MD5 Summary file ownership/permissions", "result": "Pass"})
 
-    logging.debug("Building MD5 Summary MD5 file")
+    logging.info("Building MD5 Summary MD5 file")
     worker.send_job_status(current_job, 95, 100)
 
     output_results = worker.build_md5_summary_md5()
@@ -430,20 +432,18 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
 
     job_results = {'parts':[]}
 
-    logging.info("Rebuild MD5 Summary")
     worker.send_job_status(current_job, 1, 10)
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-    if os.path.exists(worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
-    else:
+    logging.debug("Pre-tasks checks")
+    if not os.path.exists(worker.cruise_dir):
         logging.error("Cruise directory not found")
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to locate the cruise directory: " + worker.cruise_dir})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
+
     logging.info("Building filelist")
+    worker.send_job_status(current_job, 15, 100)
     exclude_set = {
         worker.shipboard_data_warehouse_config['md5SummaryFn'],
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
@@ -461,9 +461,9 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
 
     job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
 
+    logging.info("Building hashes")
     worker.send_job_status(current_job, 2, 10)
 
-    logging.info("Building hashes")
     new_hashes = worker.build_md5_hashes(current_job, filtered_filelist)
     logging.debug("Hashes: %s", json.dumps(new_hashes, indent=2))
 
@@ -474,7 +474,7 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
     logging.info("Building MD5 Summary file")
-    worker.send_job_status(current_job, 80, 100)
+    worker.send_job_status(current_job, 8, 10)
 
     sorted_hashes = sorted(new_hashes, key=lambda hashes: hashes['filename'])
     try:
@@ -487,37 +487,38 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Pass"})
 
     except IOError:
-        logging.error("Error saving MD5 Summary file: %s", worker.md5_summary_filepath)
-        job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Fail", "reason": "Error saving MD5 Summary file: " + worker.md5_summary_filepath})
+        reason = f"Error saving MD5 Summary file: {worker.md5_summary_filepath}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.md5_summary_filepath)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set MD5 Summary file ownership/permissions", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set MD5 Summary file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
-    worker.send_job_status(current_job, 95, 100)
+    job_results['parts'].append({"partName": "Set MD5 Summary file ownership/permissions", "result": "Pass"})
 
     logging.info("Building MD5 Summary MD5 file")
+    worker.send_job_status(current_job, 95, 100)
 
     output_results = worker.build_md5_summary_md5()
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Writing MD5 Summary MD5 file", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         job_results['parts'].append({"partName": "Writing MD5 Summary MD5 file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Writing MD5 Summary MD5 file", "result": "Pass"})
+
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.md5_summary_md5_filepath)
 
-    if output_results['verdict']:
-        job_results['parts'].append({"partName": "Set MD5 Summary MD5 file ownership/permissions", "result": "Pass"})
-    else:
+    if not output_results['verdict']:
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set MD5 Summary MD5 file ownership/permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Set MD5 Summary MD5 file ownership/permissions", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)

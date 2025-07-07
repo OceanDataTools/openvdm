@@ -117,8 +117,8 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
 
         try:
             file_mod_time = datetime.strptime(f"{mdate} {mtime}", "%Y/%m/%d %H:%M:%S")
-        except ValueError as e:
-            logging.warning("Could not parse date/time from line: %s (%s)", line, e)
+        except ValueError as exc:
+            logging.warning("Could not parse date/time from line: %s (%s)", line, str(exc))
             return None
 
         file_mod_time_seconds = (file_mod_time - epoch).total_seconds()
@@ -377,13 +377,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if cst_cfg.get('skipEmptyDirs') == '1':
                 command.insert(2, '-m')
 
-            logging.info("File list Command: %s", ' '.join(command))
+            logging.debug("File list Command: %s", ' '.join(command))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
 
         total_files = len(filepaths)
-        logging.info("Discovered %d files", total_files)
+        logging.debug("Discovered %d files", total_files)
 
         # Batch and process
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
@@ -409,7 +409,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # Optional staleness check
         staleness = cst_cfg.get('staleness')
         if staleness and staleness != '0':
-            logging.info("Checking staleness (wait %ss)...", staleness)
+            logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
             if transfer_type in ['local', 'smb']:
@@ -436,8 +436,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                         if return_files['filesize'][idx] != size:
                             del return_files['filesize'][idx]
                             del return_files['include'][idx]
-                    except Exception as err:
-                        logging.warning("Staleness check error: %s", err)
+                    except Exception as exc:
+                        logging.warning("Staleness check error: %s", str(exc))
 
         # Format final output
         del return_files['filesize']
@@ -477,8 +477,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         transfer_type = get_transfer_type(cst_cfg['transferType'])
 
         if not transfer_type:
-            logging.error("Unknown Transfer Type")
-            return {'verdict': False, 'reason': 'Unknown Transfer Type'}
+            reason = 'Unknown Transfer Type'
+            logging.error(reason)
+            return {'verdict': False, 'reason': reason}
 
         source_dir = self.source_dir
         dest_dir = self.dest_dir
@@ -603,8 +604,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
 
-        logging.debug(self.collection_system_transfer)
-
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
@@ -705,8 +704,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         """
 
         results = json.loads(job_result)
-        job_parts = results.get('parts', [])
-        final_verdict = job_parts[-1] if job_parts else None
+        parts = results.get('parts', [])
+        final_verdict = parts[-1] if parts else None
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
@@ -819,6 +818,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     logging.info("Testing source")
     worker.send_job_status(current_job, 1, 10)
+
     results = test_cst_source(cst_cfg, worker.source_dir)
 
     if results[-1]['result'] == "Fail": # Final Verdict
@@ -826,11 +826,11 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         job_results['parts'].append({"partName": "Source Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Source test passed")
     job_results['parts'].append({"partName": "Source Test", "result": "Pass"})
 
     logging.info("Testing destination")
     worker.send_job_status(current_job, 15, 100)
+
     results = worker.test_destination_dir()
 
     if results[-1]['result'] == "Fail": # Final Verdict
@@ -838,11 +838,11 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         job_results['parts'].append({"partName": "Destination Test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
-    logging.debug("Destination test passed")
     job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
 
     logging.info("Transferring files")
     worker.send_job_status(current_job, 2, 10)
+
     results = worker.transfer_from_source(current_job)
 
     if not results['verdict']:
@@ -850,7 +850,6 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
-    logging.info("Transfer completed successfully")
     job_results['files'] = results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
 
@@ -863,10 +862,10 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     if job_results['files'].get('deleted') and len(job_results['files']['deleted']) > 0:
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
-    worker.send_job_status(current_job, 9, 10)
-
     if job_results['files']['new'] or job_results['files']['updated']:
         logging.info("Setting file permissions")
+        worker.send_job_status(current_job, 9, 10)
+
         results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
 
         if not results['verdict']:
@@ -883,11 +882,11 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             }
         }
 
+        logging.info("Writing transfer logfile")
+        worker.send_job_status(current_job, 93, 10)
         results = output_json_data_to_file(os.path.join(worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-        if results['verdict']:
-            job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
-        else:
+        if not results['verdict']:
             logging.error("Error writing transfer logfile: %s", logfile_filename)
             job_results['parts'].append({"partName": "Write transfer logfile", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
@@ -898,6 +897,9 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             job_results['parts'].append({"partName": "Set OpenVDM config file ownership/permissions", "result": "Fail", "reason": results['reason']})
             return json.dumps(job_results)
 
+        job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
+
+    logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 95, 100)
 
     logfile_filename = cst_cfg['name'] + '_Exclude.log'
@@ -908,9 +910,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     }
     results = output_json_data_to_file(os.path.join(worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
-    if results['verdict']:
-        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
-    else:
+    if not results['verdict']:
         logging.error("Error writing transfer logfile: %s", results['reason'])
         job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
@@ -922,10 +922,9 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         job_results['parts'].append({"partName": "Set transfer logfile ownership/permissions", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
+    job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
+
     worker.send_job_status(current_job, 10, 10)
-
-    time.sleep(2)
-
     return json.dumps(job_results)
 
 

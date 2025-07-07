@@ -28,6 +28,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
+from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
@@ -96,18 +97,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if finalize:
             lowering_config['loweringFinalizedOn'] = lowering_config['configCreatedOn']
         elif os.path.isfile(lowering_config_filepath):
-            logging.info("Reading existing configuration file")
+            logging.debug("Reading existing configuration file")
             try:
                 with open(lowering_config_filepath, mode='r', encoding='utf-8') as f:
                     existing_data = json.load(f)
                     lowering_config['loweringFinalizedOn'] = existing_data.get('loweringFinalizedOn')
-            except OSError as err:
-                logging.debug(str("Error reading config: %s", err))
-                return {'verdict': False, 'reason': "Unable to read existing configuration file"}
+            except OSError as exc:
+                reason = f"Unable to read configuration file: {lowering_config_fn}"
+                logging.error("%s: %s", str(exc))
+                return {'verdict': False, 'reason': reason}
 
         logging.debug(json.dumps(lowering_config))
 
-        def scrub_transfers(transfer_list):
+        def _scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
                 allowed_keys = ['name', 'longName', 'destDir']
@@ -115,7 +117,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                     if key not in allowed_keys:
                         transfer.pop(key)
 
-        scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
+        _scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
 
         results = output_json_data_to_file(lowering_config_filepath, lowering_config)
         if not results['verdict']:
@@ -215,10 +217,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -269,7 +271,7 @@ def task_setup_new_lowering(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info('Setting up new lowering')
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
@@ -277,7 +279,7 @@ def task_setup_new_lowering(worker, current_job):
     logging.info("Creating lowering data directory")
     worker.send_job_status(current_job, 2, 10)
 
-    completed_job_request = gm_client.submit_job("createLoweringDirectory", current_job.data)
+    completed_job_request = gm_client.submit_job(LOWERING_DIR_TASK_NAMES['CREATE_LOWERING_DIRECTORY'], current_job.data)
 
     results = json.loads(completed_job_request.result)
 
@@ -289,7 +291,7 @@ def task_setup_new_lowering(worker, current_job):
     job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Pass"})
 
 
-    logging.info("Exporting Lowering Configuration")
+    logging.info("Exporting lowering configuration")
     worker.send_job_status(current_job, 5, 10)
 
     output_results = worker.export_lowering_config()
@@ -300,12 +302,12 @@ def task_setup_new_lowering(worker, current_job):
 
     job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
-    logging.info("Update Lowering Size")
+    logging.info("Updating lowering size")
     worker.send_job_status(current_job, 9, 10)
 
     lowering_size_proc = subprocess.run(['du','-sb', os.path.join(worker.cruise_dir, worker.lowering_dir)], capture_output=True, text=True, check=False)
     if lowering_size_proc.returncode == 0:
-        logging.info("Lowering Size: %s", lowering_size_proc.stdout.split()[0])
+        logging.debug("Lowering Size: %s", lowering_size_proc.stdout.split()[0])
         worker.ovdm.set_lowering_size(lowering_size_proc.stdout.split()[0])
     else:
         worker.ovdm.set_lowering_size("0")
@@ -320,18 +322,20 @@ def task_finalize_current_lowering(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info("Finalizing current lowering")
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     full_lowering_dir = os.path.join(worker.cruise_dir, worker.lowering_dir)
 
     if not os.path.exists(full_lowering_dir):
-        job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Fail", "reason": f"lowering directory: {full_lowering_dir} could not be found"})
+        reason = f"Lowering directory does not exist: {worker.lowering_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Pass"})
 
-    logging.info("Queuing Collection System Transfers")
+    logging.info("Queuing collection system transfers jobs")
     worker.send_job_status(current_job, 2, 10)
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
@@ -363,7 +367,7 @@ def task_finalize_current_lowering(worker, current_job):
 
     job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
 
-    logging.info("Exporting Lowering Configuration")
+    logging.info("Exporting lowering configuration")
     worker.send_job_status(current_job, 9, 10)
 
     output_results = worker.export_lowering_config(finalize=True)
@@ -385,7 +389,7 @@ def task_export_lowering_config(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info("Exporting Lowering Configuration")
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     output_results = worker.export_lowering_config()

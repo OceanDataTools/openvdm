@@ -81,9 +81,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to clear Gearman Jobs from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_plugin_dir(self):
@@ -121,9 +121,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return req.text == 'true'
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve 'showLoweringComponents' flag from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_config(self):
@@ -138,9 +138,9 @@ class OpenVDM():
             return_obj = json.loads(req.text)
             return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise configuration from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_config(self):
@@ -155,9 +155,9 @@ class OpenVDM():
             return_obj = json.loads(req.text)
             return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowering configuration from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_gearman_server(self):
@@ -196,9 +196,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('md5FilesizeLimit')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve MD5 filesize limit from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_md5_filesize_limit_status(self):
@@ -212,9 +212,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('md5FilesizeLimitStatus')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve MD5 filesize limit status from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_md5_summary_fn(self):
@@ -228,9 +228,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('md5SummaryFn')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve MD5 summary filename from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_md5_summary_md5_fn(self):
@@ -244,9 +244,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('md5SummaryMd5Fn')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve MD5 summary MD5 filename from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_tasks_for_hook(self, hook_name):
@@ -292,9 +292,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('cruiseID')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve CruiseID from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_size(self):
@@ -307,9 +307,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise size from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_start_date(self):
@@ -323,9 +323,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('cruiseStartDate')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise start date from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_end_date(self):
@@ -339,9 +339,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('cruiseEndDate')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise end date from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_config_fn(self):
@@ -355,9 +355,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('cruiseConfigFn')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise config filename from OpenVDM API")
-            raise err
+            raise exc
 
     def get_cruisedata_url(self):
         """
@@ -370,9 +370,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return self.config['siteRoot'].rstrip('/') + return_obj.get('cruiseDataURLPath')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise data URL from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruisedata_path(self):
@@ -386,9 +386,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('dataWarehouseBaseDir')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve data warehouse base directory from OpenVDM API")
-            raise err
+            raise exc
 
     def get_cruises(self):
         """
@@ -400,9 +400,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruises from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_logfile_purge_timedelta_str(self):
@@ -416,9 +416,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('logfilePurgeInterval') or None
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve LogfilePurgeInterval from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_id(self):
@@ -432,9 +432,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('loweringID') or None
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve LoweringID from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_size(self):
@@ -447,9 +447,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowering size from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_start_date(self):
@@ -463,9 +463,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('loweringStartDate')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowering start date from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_end_date(self):
@@ -479,9 +479,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('loweringEndDate')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowering end date from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowering_config_fn(self):
@@ -495,9 +495,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('loweringConfigFn')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowering config filename from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_lowerings(self):
@@ -510,9 +510,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve lowerings from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_extra_directory(self, extra_directory_id):
@@ -526,9 +526,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve extra directory: %s from OpenVDM API", extra_directory_id)
-            raise err
+            raise exc
 
 
     def get_extra_directory_by_name(self, extra_directory_name):
@@ -549,9 +549,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve extra directories from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_active_extra_directories(self, cruise=True, lowering=True):
@@ -571,9 +571,9 @@ class OpenVDM():
             if not lowering:
                 return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "1", return_obj))
             return return_obj
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve active extra directories from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_required_extra_directory(self, extra_directory_id):
@@ -587,9 +587,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
-            raise err
+            raise exc
 
 
     def get_required_extra_directory_by_name(self, extra_directory_name):
@@ -610,9 +610,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve required extra directories from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_shipboard_data_warehouse_config(self):
@@ -625,9 +625,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve shipboard data warehouse configuration from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_ship_to_shore_bw_limit_status(self):
@@ -641,9 +641,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('shipToShoreBWLimitStatus') == "On"
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve ship-to-shore bandwidth limit status from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_ship_to_shore_transfer(self, ship_to_shore_transfer_id):
@@ -657,9 +657,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve ship-to-shore transfer: %s from OpenVDM API", ship_to_shore_transfer_id)
-            raise err
+            raise exc
 
 
     def get_ship_to_shore_transfers(self):
@@ -672,9 +672,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve ship-to-shore transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_required_ship_to_shore_transfers(self):
@@ -687,9 +687,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve required ship-to-shore transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_system_status(self):
@@ -703,9 +703,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('systemStatus')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve system status from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_tasks(self):
@@ -718,9 +718,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve tasks from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_active_tasks(self):
@@ -733,9 +733,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve active tasks from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_task(self, task_id):
@@ -749,9 +749,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve task: %s from OpenVDM API", task_id)
-            raise err
+            raise exc
 
 
     def get_task_by_name(self, task_name):
@@ -765,9 +765,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next((t for t in return_obj if t['name'] == task_name), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve task: %s from OpenVDM API", task_name)
-            raise err
+            raise exc
 
 
     def get_collection_system_transfers(self):
@@ -780,9 +780,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve collection system transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_active_collection_system_transfers(self, cruise=True, lowering=True):
@@ -802,9 +802,9 @@ class OpenVDM():
             if not lowering:
                 return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "1", return_obj))
             return return_obj
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve active collection system transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_collection_system_transfer(self, collection_system_transfer_id):
@@ -818,9 +818,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve collection system transfer: %s from OpenVDM API", collection_system_transfer_id)
-            raise err
+            raise exc
 
 
     def get_collection_system_transfer_by_name(self, collection_system_transfer_name):
@@ -841,9 +841,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise data transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_required_cruise_data_transfers(self):
@@ -856,9 +856,9 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return json.loads(req.text)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve required cruise data transfers from OpenVDM API")
-            raise err
+            raise exc
 
 
     def get_cruise_data_transfer(self, cruise_data_transfer_id):
@@ -872,9 +872,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve cruise data transfer: %s from OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):
@@ -888,9 +888,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve required cruise data transfer: %s from OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def get_cruise_data_transfer_by_name(self, cruise_data_transfer_name):
@@ -920,9 +920,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return return_obj.get('dataDashboardManifestFn')
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to retrieve data dashboard manifest filename from OpenVDM API")
-            raise err
+            raise exc
 
 
     def send_msg(self, message_title, message_body=''):
@@ -935,9 +935,9 @@ class OpenVDM():
         try:
             payload = {'messageTitle': message_title, 'messageBody':message_body}
             requests.post(url, data=payload, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to send message: \"%s: %s\" with OpenVDM API", message_title, message_body)
-            raise err
+            raise exc
 
 
     def clear_error_collection_system_transfer(self, collection_system_transfer_id, job_status):
@@ -954,9 +954,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to clear error status for collection system transfer: %s with OpenVDM API", collection_system_transfer_id)
-            raise err
+            raise exc
 
 
     def clear_error_cruise_data_transfer(self, cruise_data_transfer_id, job_status):
@@ -972,9 +972,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to clear error status for cruise data transfer: %s with OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def clear_error_task(self, task_id):
@@ -1005,9 +1005,9 @@ class OpenVDM():
         try:
             requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
-            raise err
+            raise exc
 
 
     def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason=''):
@@ -1027,9 +1027,9 @@ class OpenVDM():
         try:
             requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set test status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
-            raise err
+            raise exc
 
 
     def set_error_cruise_data_transfer(self, cruise_data_transfer_id, reason=''):
@@ -1049,9 +1049,9 @@ class OpenVDM():
         try:
             requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason=''):
@@ -1071,9 +1071,9 @@ class OpenVDM():
         try:
             requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def set_error_task(self, task_id, reason=''):
@@ -1092,9 +1092,9 @@ class OpenVDM():
         try:
             requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set error status of task: %s with OpenVDM API", task_id)
-            raise err
+            raise exc
 
 
     def set_idle_collection_system_transfer(self, collection_system_transfer_id):
@@ -1106,9 +1106,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set collection system transfer: %s to idle with OpenVDM API", collection_system_transfer_id)
-            raise err
+            raise exc
 
 
     def set_idle_cruise_data_transfer(self, cruise_data_transfer_id):
@@ -1121,9 +1121,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set cruise data transfer: %s to idle with OpenVDM API", cruise_data_transfer_id)
-            raise err
+            raise exc
 
 
     def set_idle_task(self, task_id):
@@ -1135,9 +1135,9 @@ class OpenVDM():
 
         try:
             requests.get(url, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set task: %s to idle with OpenVDM API", task_id)
-            raise err
+            raise exc
 
 
     def set_running_collection_system_transfer(self, collection_system_transfer_id, job_pid, job_handle):
@@ -1160,9 +1160,9 @@ class OpenVDM():
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set collection system transfer: %s to running with OpenVDM API", collection_system_transfer.get('name'))
-            raise err
+            raise exc
 
 
     def set_running_collection_system_transfer_test(self, collection_system_transfer_id, job_pid, job_handle):
@@ -1201,9 +1201,9 @@ class OpenVDM():
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set cruise data transfer: %s to running with OpenVDM API", cruise_data_transfer.get('name'))
-            raise err
+            raise exc
 
 
     def set_running_cruise_data_transfer_test(self, cruise_data_transfer_id, job_pid, job_handle):
@@ -1240,9 +1240,9 @@ class OpenVDM():
 
             # Add to gearman job tracker
             self.track_gearman_job(task.get('longName', 'Unknown Task????'), job_pid, job_handle)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set task: %s to running with OpenVDM API", task.get('longName', 'Unknown Task????'))
-            raise err
+            raise exc
 
 
     def track_gearman_job(self, job_name, job_pid, job_handle):
@@ -1255,9 +1255,9 @@ class OpenVDM():
 
         try:
             requests.post(url, data=payload, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to add new gearman task tracking with OpenVDM API, Task: %s", job_name)
-            raise err
+            raise exc
 
 
     def set_cruise_size(self, size_in_bytes=None):
@@ -1270,9 +1270,9 @@ class OpenVDM():
 
         try:
             requests.post(url, data=payload, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set cruise size with OpenVDM API")
-            raise err
+            raise exc
 
 
     def set_lowering_size(self, size_in_bytes=None):
@@ -1285,6 +1285,6 @@ class OpenVDM():
 
         try:
             requests.post(url, data=payload, timeout=TIMEOUT)
-        except Exception as err:
+        except Exception as exc:
             logging.error("Unable to set lowering size with OpenVDM API")
-            raise err
+            raise exc

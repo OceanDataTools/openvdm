@@ -30,7 +30,10 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
+from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
+from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAMES
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
+
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
@@ -103,7 +106,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     existing_data = json.load(f)
                     cruise_config['cruiseFinalizedOn'] = existing_data.get('cruiseFinalizedOn')
             except OSError as exc:
-                logging.debug("Error reading config: %s", exc)
+                logging.debug("Error reading config: %s", str(exc))
                 return {'verdict': False, 'reason': "Unable to read existing configuration file"}
 
         def scrub_transfers(transfer_list):
@@ -316,10 +319,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -370,13 +373,13 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
     job_results = {'parts':[]}
 
-    logging.info('Setting up new cruise')
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
 
     logging.info("Set ownership/permissions for the CruiseData directory")
-    completed_job_request = gm_client.submit_job("setCruiseDataDirectoryPermissions", current_job.data)
+    completed_job_request = gm_client.submit_job(CRUISE_DIR_TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], current_job.data)
     results = json.loads(completed_job_request.result)
 
     if results['parts'][-1]['result'] == "Fail": # Final Verdict
@@ -389,7 +392,7 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
     logging.info("Creating cruise data directory")
     worker.send_job_status(current_job, 2, 10)
 
-    completed_job_request = gm_client.submit_job("createCruiseDirectory", current_job.data)
+    completed_job_request = gm_client.submit_job(CRUISE_DIR_TASK_NAMES['CREATE_CRUISE_DIRECTORY'], current_job.data)
 
     results = json.loads(completed_job_request.result)
 
@@ -403,7 +406,7 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
     logging.info("Creating MD5 summary files")
     worker.send_job_status(current_job, 5, 10)
 
-    completed_job_request = gm_client.submit_job("rebuildMD5Summary", current_job.data)
+    completed_job_request = gm_client.submit_job(MD5_TASK_NAMES['REBUILD_MD5_SUMMARY'], current_job.data)
 
     results = json.loads(completed_job_request.result)
 
@@ -414,7 +417,7 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
     job_results['parts'].append({"partName": "Create MD5 summary files", "result": "Pass"})
 
-    logging.info("Exporting Cruise Configuration")
+    logging.info("Exporting cruise configuration")
     worker.send_job_status(current_job, 6, 10)
 
     output_results = worker.export_cruise_config()
@@ -428,7 +431,7 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
     logging.info("Creating data dashboard directory structure and manifest file")
     worker.send_job_status(current_job, 7, 10)
 
-    completed_job_request = gm_client.submit_job("rebuildDataDashboard", current_job.data)
+    completed_job_request = gm_client.submit_job(DATA_DASHBOARD_TASK_NAMES['REBUILD_DATA_DASHBOARD'], current_job.data)
 
     results = json.loads(completed_job_request.result)
 
@@ -452,7 +455,7 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
         job_results['parts'].append({"partName": "Clear out PublicData directory", "result": "Pass"})
 
-    logging.info("Update Cruise Size")
+    logging.info("Updating cruise size")
     worker.send_job_status(current_job, 9, 10)
 
     cruise_size_proc = subprocess.run(['du','-sb', worker.cruise_dir], capture_output=True, text=True, check=False)
@@ -465,7 +468,6 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
     worker.ovdm.set_lowering_size("0")
 
     worker.send_job_status(current_job, 10, 10)
-
     return json.dumps(job_results)
 
 
@@ -476,16 +478,18 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     job_results = {'parts':[]}
 
-    logging.info("Finalizing current cruise")
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": f"Cruise directory: {worker.cruise_dir} could not be found"})
+        reason = f"Cruise directory does not exist: {worker.cruise_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
 
-    logging.info("Queuing Collection System Transfers jobs")
+    logging.info("Queuing collection system transfers jobs")
     worker.send_job_status(current_job, 2, 10)
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
@@ -529,7 +533,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
 
-    logging.info("Exporting OpenVDM Configuration")
+    logging.info("Exporting cruise configuration")
     worker.send_job_status(current_job, 9, 10)
 
     output_results = worker.export_cruise_config(finalize=True)
@@ -573,7 +577,7 @@ def task_export_cruise_config(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info("Exporting Cruise Configuration")
+    logging.info("Exporting cruise configuration")
     worker.send_job_status(current_job, 1, 10)
 
     output_results = worker.export_cruise_config()

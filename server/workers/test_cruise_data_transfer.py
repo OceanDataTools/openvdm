@@ -76,7 +76,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.cruise_data_transfer.update(cdt_cfg)
 
         elif not cdt_cfg:
-
             return self._fail_job(current_job, "Locate Cruise Data Transfer Data",
                                   "Could not find cruise data transfer config to use for connection test")
 
@@ -146,8 +145,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         results = json.loads(job_result)
-        job_parts = results.get('parts', [])
-        final_verdict = job_parts[-1] if len(job_parts) else None
+        parts = results.get('parts', [])
+        final_verdict = parts[-1] if len(parts) else None
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
@@ -222,15 +221,14 @@ def task_test_cruise_data_transfer(worker, current_job):
         worker.ovdm.set_running_cruise_data_transfer_test(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Test cruise directory")
-    worker.send_job_status(current_job, 1, 4)
+    worker.send_job_status(current_job, 33, 100)
 
     job_results['parts'] = worker.test_cruise_dir(current_job)
 
     logging.info("Test destination")
-    worker.send_job_status(current_job, 2, 4)
+    worker.send_job_status(current_job, 66, 100)
 
     job_results['parts'].extend(test_cdt_destination(cdt_cfg))
-    worker.send_job_status(current_job, 3, 4)
 
     for test in job_results['parts']:
         if test['result'] == "Fail":
@@ -239,8 +237,7 @@ def task_test_cruise_data_transfer(worker, current_job):
 
     job_results['parts'].extend([{"partName": "Final Verdict", "result": "Pass"}])
 
-    worker.send_job_status(current_job, 3, 4)
-
+    worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
 
 

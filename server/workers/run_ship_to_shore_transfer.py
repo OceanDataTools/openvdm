@@ -210,9 +210,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             return list(filter(lambda transfer: transfer['name'] == 'SSDW', self.ovdm.get_required_cruise_data_transfers()))[0]
-        except Exception as err:
+        except Exception as exc:
             logging.error("Could not find SSDW transfer configuration")
-            logging.debug(str(err))
+            logging.debug(str(exc))
         return None
 
     def on_job_execute(self, current_job):

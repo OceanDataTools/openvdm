@@ -215,10 +215,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -269,11 +269,10 @@ def task_create_cruise_directory(worker, current_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+    logging.info("Start of task")
+    worker.send_job_status(current_job, 1, 10)
 
     logging.debug("Pre-tasks checks")
-    worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']):
         job_results['parts'].append({"partName": "Verify Base Directory exists", "result": "Fail", "reason": f"Failed to find base directory: {worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']}"})
@@ -299,14 +298,15 @@ def task_create_cruise_directory(worker, current_job):
 
     job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
-    logging.info("Creating cruise directories")
+    logging.info("Creating directories")
     worker.send_job_status(current_job, 5, 10)
 
     output_results = create_directories(directorylist)
 
     if not output_results['verdict']:
-        logging.error("Failed to create any/all of the lowering data directory structure")
+        logging.error("Failed to create any/all of the cruise data directory structure")
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
 
@@ -322,7 +322,7 @@ def task_create_cruise_directory(worker, current_job):
 
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
-    logging.info("Setting ownership/permissions for cruise data directory")
+    logging.info("Setting ownership/permissions for cruise directory")
     worker.send_job_status(current_job, 8, 10)
 
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.cruise_dir)
@@ -344,9 +344,7 @@ def task_set_cruisedata_directory_permissions(worker, current_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     if worker.ovdm.show_only_current_cruise_dir() is True:
@@ -386,9 +384,7 @@ def task_rebuild_cruise_directory(worker, current_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.cruise_dir):

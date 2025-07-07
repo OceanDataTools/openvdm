@@ -330,10 +330,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -438,15 +438,17 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
         }
     }
 
-    logging.info("Updating data dashboard")
-    worker.send_job_status(current_job, 1, 100)
+    logging.info("Start of task")
+    worker.send_job_status(current_job, 1, 10)
 
     payload_obj = json.loads(current_job.data)
+    logging.debug(json.dumps(payload_obj, indent=2))
+
     logging.debug('Collection System Transfer: %s', worker.collection_system_transfer['name'])
 
     base_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
 
-    logging.info("Verifying plugin file exists")
+    logging.info("Verifying plugin exists")
     worker.send_job_status(current_job, 5, 100)
 
     processing_script_filename = worker._build_processing_filename()
@@ -479,7 +481,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
 
     new_manifest_entries, remove_manifest_entries = worker._process_filelist(current_job, filelist, processing_script_filename, job_results, 15, 90)
 
-    logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
+    logging.info("Updating manifest file: %s", worker.data_dashboard_manifest_file_path)
     worker.send_job_status(current_job, 9, 10)
 
     if len(new_manifest_entries) == 0 and len(remove_manifest_entries) == 0:
@@ -498,9 +500,9 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     except IOError:
         logging.warning("Error reading manifest file: %s", worker.data_dashboard_manifest_file_path)
         existing_entries = []
-    except Exception as err:
+    except Exception as exc:
         reason = f"Error reading dashboard manifest file: {worker.data_dashboard_manifest_file_path}"
-        logging.error("%s: %s", reason, str(err))
+        logging.error("%s: %s", reason, str(exc))
         job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 

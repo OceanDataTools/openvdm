@@ -116,9 +116,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run when the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s, Killing PID %s completed at: %s", current_job.handle,
                      self.job_pid, time.strftime("%D %T", time.gmtime()))
 
@@ -172,20 +172,18 @@ def task_stop_job(worker, current_job):
         return worker._fail_job(current_job, "Valid OpenVDM Job", f"Unknown job type: {job_type}")
 
     job_results['parts'].append({"partName": "Valid OpenVDM Job", "result": "Pass"})
-    logging.debug("Quitting job: %s", job_pid)
+
+    logging.info("Quitting job: %s", job_pid)
 
     try:
         os.kill(int(job_pid), signal.SIGQUIT)
-    except OSError as err:
-        if err.errno == 3:
+    except OSError as exc:
+        if exc.errno == 3:
             logging.warning("Process does not exist: PID %s", job_pid)
         else:
-            logging.error("Error killing PID %s: %s", job_pid, err)
-            job_results['parts'].append({
-                "partName": "Stopped Job",
-                "result": "Fail",
-                "reason": f"Error killing PID: {job_pid} --> {err}"
-            })
+            reason = f"Error killing PID: {job_pid} --> {exc}"
+            logging.error(reason)
+            job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": reason})
 
     finally:
         actions = {

@@ -54,8 +54,8 @@ def check_darwin(cfg):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
-    except subprocess.SubprocessError as e:
-        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(e))
+    except subprocess.SubprocessError as exc:
+        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(exc))
         return False
 
 
@@ -89,8 +89,8 @@ def detect_smb_version(cfg):
                 return '1.0'
         return '2.1'
 
-    except subprocess.SubprocessError as e:
-        logging.error("SMB version detection failed: %s", str(e))
+    except subprocess.SubprocessError as exc:
+        logging.error("SMB version detection failed: %s", str(exc))
         return None
 
 
@@ -116,8 +116,8 @@ def mount_smb_share(cfg, mntpoint, smb_version):
         subprocess.run(cmd, check=True)
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
         return True
-    except subprocess.CalledProcessError as e:
-        logging.error("Failed to mount SMB share: %s.  Are you running as root?", str(e))
+    except subprocess.CalledProcessError as exc:
+        logging.error("Failed to mount SMB share: %s.  Are you running as root?", str(exc))
 
         # Try to unmount in case of partial mount
         subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -161,8 +161,8 @@ def test_rsync_connection(server, user, password_file=None):
             logging.error("rsync connection test failed: %s", proc.stderr.strip())
             return False
         return True
-    except Exception as e:
-        logging.error("rsync connection test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("rsync connection test failed: %s", str(exc))
         return False
 
 
@@ -193,8 +193,8 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         if proc.returncode not in [0, 24]:
             logging.error("rsync write test failed: %s", proc.stderr.strip())
             return False
-    except Exception as e:
-        logging.error("rsync write test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("rsync write test failed: %s", str(exc))
         return False
 
     # This code was an attempt to cleanup/delete the write_test.txt file
@@ -206,8 +206,8 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     #    if proc.returncode not in [0, 24]:
     #        logging.warning("rsync failed: %s", proc.stderr.strip())
     #        return False
-    #except Exception as e:
-    #    logging.error("rsync write test failed: %s", str(e))
+    #except Exception as exc:
+    #    logging.error("rsync write test failed: %s", str(exc))
     #    return False
 
     return True
@@ -240,8 +240,8 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             return False
-    except Exception as e:
-        logging.error("SSH connection test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("SSH connection test failed: %s", str(exc))
         return False
     return True
 
@@ -258,8 +258,8 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             return False
-    except Exception as e:
-        logging.error("SSH destination test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("SSH destination test failed: %s", str(exc))
         return False
     return True
 
@@ -276,8 +276,8 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             return False
-    except Exception as e:
-        logging.error("SSH write test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("SSH write test failed: %s", str(exc))
         return False
 
     cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
@@ -287,8 +287,8 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             return False
-    except Exception as e:
-        logging.error("SSH write test failed: %s", str(e))
+    except Exception as exc:
+        logging.error("SSH write test failed: %s", str(exc))
         return False
 
     return True

@@ -441,9 +441,9 @@ def lockdown_directory(base_dir, exempt_dirs=[]):
 
     try:
         dir_contents = [os.path.join(base_dir, f) for f in os.listdir(base_dir)]
-    except OSError as e:
+    except OSError as exc:
         reason = f"Failed to list contents of directory {base_dir}"
-        logging.error("%s: %s", reason, e)
+        logging.error("%s: %s", reason, str(exc))
         reasons.append(reason)
         return {'verdict': False, 'reason': '\n'.join(reasons)}
 

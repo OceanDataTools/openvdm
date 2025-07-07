@@ -30,20 +30,20 @@ from server.lib.file_utils import create_directories, set_owner_group_permission
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
-    'CREATE_CRUISE_DIRECTORY': 'createCruiseDirectory',
-    'REBUILD_CRUISE_DIRECTORY': 'rebuildCruiseDirectory',
-    'SET_CRUISEDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
+    'CREATE_LOWERING_DIRECTORY': 'createCruiseDirectory',
+    'REBUILD_LOWERING_DIRECTORY': 'rebuildCruiseDirectory',
+    'SET_LOWERINGDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
 }
 
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
+        "name": TASK_NAMES['CREATE_LOWERING_DIRECTORY'],
         "longName": "Creating Lowering Directory",
     },
     {
         "taskID": "0",
-        "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
+        "name": TASK_NAMES['SET_LOWERINGDATA_PERMISSIONS'],
         "longName": "Setting Lowering Data Directory Permissions",
     }
 
@@ -203,10 +203,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         parts = results.get('parts', [])
-        last_part = parts[-1] if parts else None
+        final_verdict = parts[-1] if parts else None
 
-        if last_part and last_part.get('result') == "Fail":
-            reason = last_part.get('reason', 'Unknown failure')
+        if final_verdict and final_verdict.get('result') == "Fail":
+            reason = final_verdict.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
@@ -257,12 +257,10 @@ def task_create_lowering_directory(worker, current_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-    logging.debug("Pre-tasks checks")
+    logging.info("Creating lowering directory")
     worker.send_job_status(current_job, 1, 10)
 
+    logging.debug("Pre-tasks checks")
     if not os.path.exists(worker.cruise_dir):
         job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": f"Cruise directory {worker.cruise_dir} does not exists"})
         return json.dumps(job_results)
@@ -281,7 +279,7 @@ def task_create_lowering_directory(worker, current_job):
 
     job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Pass"})
 
-    logging.debug("Build directory list")
+    logging.debug("Building directory list")
     worker.send_job_status(current_job, 2, 10)
 
     directorylist = worker.build_directorylist()
@@ -289,7 +287,7 @@ def task_create_lowering_directory(worker, current_job):
 
     job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
-    logging.debug("Create lowering directories")
+    logging.debug("Creating lowering directories")
     worker.send_job_status(current_job, 5, 10)
 
     output_results = create_directories(directorylist)
@@ -300,7 +298,7 @@ def task_create_lowering_directory(worker, current_job):
 
     job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
 
-    logging.debug("Set lowering directory ownership/permissions")
+    logging.debug("Setting lowering directory ownership/permissions")
     worker.send_job_status(current_job, 8, 10)
 
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.lowering_full_dir)
@@ -315,26 +313,33 @@ def task_create_lowering_directory(worker, current_job):
     return json.dumps(job_results)
 
 
-def task_set_lowering_data_directory_permissions(worker, current_job):
+def task_set_loweringdata_directory_permissions(worker, current_job):
     """
     Set the permissions for the specified lowering ID
     """
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
-    if os.path.isdir(worker.lowering_base_dir):
-        logging.info("Set ownership and read/write permissions for lowering base directory within current cruise data directory")
-        worker.send_job_status(current_job, 5, 10)
+    if not os.path.isdir(worker.lowering_base_dir):
+        reason = f'Lowering base directory {worker.lowering_base_dir} does not exist'
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify lowering base directory exists", "result": "Fail", "reason": reason})
+        return json.dumps(job_results)
 
-        set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.lowering_base_dir)
-        job_results['parts'].append({"partName": "Set Directory Permissions for lowering data directories", "result": "Pass"})
+    logging.info("Setting ownership/permissions for lowering base directory")
+    worker.send_job_status(current_job, 5, 10)
 
-    job_results['parts'].append({"partName": "Set Directory Permissions for lowering data directories", "result": "Pass"})
+    output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.lowering_base_dir)
+
+    if not output_results['verdict']:
+        job_results['parts'].append({"partName": "Set lowering base directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Set lowering base directory ownership/permissions", "result": "Pass"})
+
     worker.send_job_status(current_job, 10, 10)
 
     return json.dumps(job_results)
@@ -347,19 +352,20 @@ def task_rebuild_lowering_directory(worker, current_job):
 
     job_results = {'parts':[]}
 
-    payload_obj = json.loads(current_job.data)
-    logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
-
-    logging.info("Pre-task checks")
+    logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
+    logging.debug("Pre-task checks")
+
     if not os.path.exists(worker.lowering_full_dir):
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": "Unable to find lowering directory: " + worker.lowering_dir})
+        reason = f"Unable to find lowering directory: {worker.lowering_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
 
-    logging.info("Build directory list")
+    logging.info("Building directory list")
     worker.send_job_status(current_job, 2, 10)
 
     directorylist = worker.build_directorylist()
@@ -367,18 +373,19 @@ def task_rebuild_lowering_directory(worker, current_job):
     job_results['parts'].append({"partName": "Build Directory List", "result": "Pass"})
 
     if len(directorylist) > 0:
-        logging.info("Create directories")
+        logging.info("Creating directories")
         worker.send_job_status(current_job, 5, 10)
 
         output_results = create_directories(directorylist)
 
-        if output_results['verdict']:
-            job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
-        else:
+        if not output_results['verdict']:
             logging.error("Unable to create any/all of the lowering data directory structure")
             job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
+            return json.dumps(job_results)
 
-    logging.info("Set directory ownership/permissions")
+        job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
+
+    logging.info("Setting directory ownership/permissions")
     worker.send_job_status(current_job, 7, 10)
 
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.lowering_full_dir)
@@ -386,6 +393,7 @@ def task_rebuild_lowering_directory(worker, current_job):
     if not output_results['verdict']:
         logging.error("Failed to set directory ownership")
         job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Set Directory ownership/permissions", "result": "Pass"})
 
@@ -439,14 +447,14 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: %s", TASK_NAMES['CREATE_CRUISE_DIRECTORY'])
-    new_worker.register_task(TASK_NAMES['CREATE_CRUISE_DIRECTORY'], task_create_lowering_directory)
+    logging.info("\tTask: %s", TASK_NAMES['CREATE_LOWERING_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['CREATE_LOWERING_DIRECTORY'], task_create_lowering_directory)
 
-    logging.info("\tTask: %s", TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'])
-    new_worker.register_task(TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], task_set_lowering_data_directory_permissions)
+    logging.info("\tTask: %s", TASK_NAMES['SET_LOWERINGDATA_PERMISSIONS'])
+    new_worker.register_task(TASK_NAMES['SET_LOWERINGDATA_PERMISSIONS'], task_set_loweringdata_directory_permissions)
 
-    logging.info("\tTask: %s", TASK_NAMES['REBUILD_CRUISE_DIRECTORY'])
-    new_worker.register_task(TASK_NAMES['REBUILD_CRUISE_DIRECTORY'], task_rebuild_lowering_directory)
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_LOWERING_DIRECTORY'])
+    new_worker.register_task(TASK_NAMES['REBUILD_LOWERING_DIRECTORY'], task_rebuild_lowering_directory)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

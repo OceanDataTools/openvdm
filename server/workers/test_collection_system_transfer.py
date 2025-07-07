@@ -207,8 +207,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         results = json.loads(job_result)
-        job_parts = results.get('parts', [])
-        final_verdict = job_parts[-1] if len(job_parts) else None
+        parts = results.get('parts', [])
+        final_verdict = parts[-1] if len(parts) else None
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
@@ -274,24 +274,23 @@ def task_test_collection_system_transfer(worker, current_job):
     Run connection tests for a collection system transfer
     """
 
-    cst_cfg = worker.collection_system_transfer
-
     job_results = {'parts':[]}
+
+    cst_cfg = worker.collection_system_transfer
 
     if 'collectionSystemTransferID' in cst_cfg:
         logging.debug("Setting transfer test status to 'Running'")
         worker.ovdm.set_running_collection_system_transfer_test(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing Source")
-    worker.send_job_status(current_job, 1, 4)
+    worker.send_job_status(current_job, 33, 100)
 
     job_results['parts'].extend(test_cst_source(cst_cfg, worker.source_dir))
-    worker.send_job_status(current_job, 2, 4)
 
     if cst_cfg['enable'] == '1':
         logging.info("Testing Destination")
+        worker.send_job_status(current_job, 66, 100)
         job_results['parts'].extend(worker.test_destination_dir())
-        worker.send_job_status(current_job, 3, 4)
 
     for test in job_results['parts']:
         if test['result'] == "Fail":
@@ -300,8 +299,7 @@ def task_test_collection_system_transfer(worker, current_job):
 
     job_results['parts'].extend([{"partName": "Final Verdict", "result": "Pass"}])
 
-    worker.send_job_status(current_job, 4, 4)
-
+    worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
 
 
