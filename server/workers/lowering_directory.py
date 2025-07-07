@@ -30,9 +30,9 @@ from server.lib.file_utils import create_directories, set_owner_group_permission
 from server.lib.openvdm import OpenVDM
 
 TASK_NAMES = {
-    'CREATE_LOWERING_DIRECTORY': 'createCruiseDirectory',
-    'REBUILD_LOWERING_DIRECTORY': 'rebuildCruiseDirectory',
-    'SET_LOWERINGDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
+    'CREATE_LOWERING_DIRECTORY': 'createLoweringDirectory',
+    'REBUILD_LOWERING_DIRECTORY': 'rebuildLoweringDirectory',
+    'SET_LOWERINGDATA_PERMISSIONS': 'setLoweringDataDirectoryPermissions'
 }
 
 CUSTOM_TASKS = [
