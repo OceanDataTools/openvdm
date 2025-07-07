@@ -31,10 +31,15 @@ from server.lib.openvdm import OpenVDM
 
 PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
+TASK_NAMES = {
+    'UPDATE_DATA_DASHBOARD': 'updateDataDashboard',
+    'REBUILD_DATA_DASHBOARD': 'rebuildDataDashboard'
+}
+
 CUSTOM_TASKS = [
     {
         "taskID": "0",
-        "name": "updateDataDashboard",
+        "name": TASK_NAMES['UPDATE_DATA_DASHBOARD'],
         "longName": "Updating Data Dashboard",
     }
 ]
@@ -184,9 +189,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
             try:
                 out_obj = json.loads(output)
-            except Exception as err:
+            except Exception as exc:
                 logging.error("Error parsing JSON output from file: %s", filename)
-                logging.debug(str(err))
+                logging.debug(str(exc))
                 job_results['parts'].append({"partName": f"Parsing JSON output from file {filename}", "result": "Fail", "reason": f"Error parsing JSON output from file: {filename}"})
                 continue
 
@@ -196,7 +201,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 self.ovdm.send_msg("Datafile Parsing error", msg)
                 continue
 
-            if 'error' in out_obj:
+            if out_obj.get('error'):
                 logging.error("Datafile Parsing error: %s", out_obj['error'])
                 self.ovdm.send_msg("Datafile Parsing error", out_obj['error'])
                 continue
@@ -282,17 +287,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when the current job has an exception
         """
 
-        logging.error("Job: %s (%s) failed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
-
-        self.send_job_data(current_job, json.dumps([{"partName": "Worker crashed", "result": "Fail", "reason": "Unknown, contact Webb :-)"}]))
-        if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], "Worker crashed")
-        else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', 'Worker crashed')
+        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(exc_type, fname, exc_tb.tb_lineno)
+
+        self.send_job_data(current_job, json.dumps(
+            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+        ))
+
+        if int(self.task['taskID']) > 0:
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+        else:
+            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -301,52 +310,88 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when the current job completes
         """
 
-        results_obj = json.loads(job_result)
+        results = json.loads(job_result)
 
-        logging.debug("Preparing subsequent Gearman jobs")
-
-        job_data = {
-            'cruiseID': self.cruise_id,
-            'loweringID': self.lowering_id,
-            'files': results_obj['files']
-        }
-
-        if current_job.task == 'updateDataDashboard':
-
+        if current_job.task in (TASK_NAMES['UPDATE_DATA_DASHBOARD'], TASK_NAMES['REBUILD_DATA_DASHBOARD']):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            payload_obj = json.loads(current_job.data)
-            job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
+            job_data = {
+                'cruiseID': self.cruise_id,
+                'loweringID': self.lowering_id,
+                'files': results['files']
+            }
+
+            if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
+                payload_obj = json.loads(current_job.data)
+                job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
 
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        elif current_job.task == 'rebuildDataDashboard':
+        parts = results.get('parts', [])
+        last_part = parts[-1] if parts else None
 
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-            for task in self.ovdm.get_tasks_for_hook(current_job.task):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-        if len(results_obj['parts']) > 0:
-            if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
-                else:
-                    self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
-            else:
-                if int(self.task['taskID']) > 0:
-                    self.ovdm.set_idle_task(self.task['taskID'])
-        else:
+        if last_part and last_part.get('result') == "Fail":
+            reason = last_part.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
-                self.ovdm.set_idle_task(self.task['taskID'])
+                self.ovdm.set_error_task(self.task['taskID'], reason)
+            else:
+                self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
+        else:
+            self.ovdm.set_idle_task(self.task['taskID'])
 
-        logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.debug("Job Results: %s", json.dumps(results, indent=2))
+        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
 
         return super().send_job_complete(current_job, job_result)
+
+        # results_obj = json.loads(job_result)
+
+        # logging.debug("Preparing subsequent Gearman jobs")
+
+        # job_data = {
+        #     'cruiseID': self.cruise_id,
+        #     'loweringID': self.lowering_id,
+        #     'files': results_obj['files']
+        # }
+
+        # if current_job.task == 'updateDataDashboard':
+
+        #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+        #     payload_obj = json.loads(current_job.data)
+        #     job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
+
+        #     for task in self.ovdm.get_tasks_for_hook(current_job.task):
+        #         logging.info("Adding post task: %s", task)
+        #         gm_client.submit_job(task, json.dumps(job_data), background=True)
+
+        # elif current_job.task == 'rebuildDataDashboard':
+
+        #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+        #     for task in self.ovdm.get_tasks_for_hook(current_job.task):
+        #         logging.info("Adding post task: %s", task)
+        #         gm_client.submit_job(task, json.dumps(job_data), background=True)
+
+        # if len(results_obj['parts']) > 0:
+        #     if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
+        #         if int(self.task['taskID']) > 0:
+        #             self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
+        #         else:
+        #             self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
+        #     else:
+        #         if int(self.task['taskID']) > 0:
+        #             self.ovdm.set_idle_task(self.task['taskID'])
+        # else:
+        #     if int(self.task['taskID']) > 0:
+        #         self.ovdm.set_idle_task(self.task['taskID'])
+
+        # logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
+        # logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
+
+        # return super().send_job_complete(current_job, job_result)
 
 
     def stop_task(self):
@@ -393,10 +438,13 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
         }
     }
 
-    payload_obj = json.loads(current_job.data)
-    base_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
+    logging.info("Updating data dashboard")
+    worker.send_job_status(current_job, 1, 100)
 
-    logging.info('Collection System Transfer: %s', worker.collection_system_transfer['name'])
+    payload_obj = json.loads(current_job.data)
+    logging.debug('Collection System Transfer: %s', worker.collection_system_transfer['name'])
+
+    base_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
 
     logging.info("Verifying plugin file exists")
     worker.send_job_status(current_job, 5, 100)
@@ -411,7 +459,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
 
     job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Pass"})
 
-    logging.info("Build filelist for processing")
+    logging.info("Building list of files to process")
     worker.send_job_status(current_job, 10, 100)
 
     #build filelist
@@ -551,15 +599,17 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         collection_system_transfer_index += 1
 
         progress_factor = int(float(collection_system_transfer_index) / float(collection_system_transfer_count) * 100)
-        logging.info('Processing data from: %s', collection_system_transfer['name'])
+        logging.info('Collection System: %s', collection_system_transfer['name'])
         worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
+        logging.info(" - Verifying plugin file exists")
         processing_script_filename = worker._build_processing_filename(cfg=collection_system_transfer)
         if processing_script_filename is None:
             reason = f"Processing script not found for: {collection_system_transfer['name']}"
             logging.warning(reason)
             continue
 
+        logging.info(" - Building list of files to process")
         if collection_system_transfer['cruiseOrLowering'] == "0":
             collection_system_transfer_input_dir = os.path.join(worker.cruise_dir, collection_system_transfer['destDir'])
             filelist = build_filelist(collection_system_transfer_input_dir).get('include', [])
@@ -577,6 +627,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
 
         logging.debug("FileList: %s", json.dumps(filelist, indent=2))
 
+        logging.info(" - Processing files")
         start = 80 * progress_factor + 10
         end = 80 * int(float(collection_system_transfer_index + 1) / float(collection_system_transfer_count) * 100) + 10
         new_manifest_entries, _ = worker._process_filelist(current_job, filelist, processing_script_filename, job_results, start, end)
@@ -667,11 +718,11 @@ if __name__ == "__main__":
 
     logging.info("Registering worker tasks...")
 
-    logging.info("\tTask: updateDataDashboard")
-    new_worker.register_task("updateDataDashboard", task_update_data_dashboard)
+    logging.info("\tTask: %s", TASK_NAMES['UPDATE_DATA_DASHBOARD'])
+    new_worker.register_task(TASK_NAMES['UPDATE_DATA_DASHBOARD'], task_update_data_dashboard)
 
-    logging.info("\tTask: rebuildDataDashboard")
-    new_worker.register_task("rebuildDataDashboard", task_rebuild_data_dashboard)
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_DATA_DASHBOARD'])
+    new_worker.register_task(TASK_NAMES['REBUILD_DATA_DASHBOARD'], task_rebuild_data_dashboard)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
