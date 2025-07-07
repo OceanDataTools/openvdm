@@ -318,7 +318,7 @@ def task_create_cruise_directory(worker, current_job):
 
         if not output_results['verdict']:
             job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Fail", "reason": output_results['reason']})
-        return json.dumps(job_results)
+            return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Clear CruiseData Directory Read Permissions", "result": "Pass"})
 
