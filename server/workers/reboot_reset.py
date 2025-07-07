@@ -7,9 +7,9 @@ DESCRIPTION:  This program resets OVDM state information in the database.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2015-06-22
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -23,31 +23,12 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 
-# -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
-# -------------------------------------------------------------------------------------
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Handle resetting OpenVDM database after an unscheduled system reboot')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+def reboot_reset():
+    """
+    Set all tasks and transfer to idle.
+    """
 
     openVDM = OpenVDM()
-
-    time.sleep(5)
 
     logging.info("Setting all tasks to idle.")
     tasks = openVDM.get_tasks()
@@ -75,3 +56,31 @@ if __name__ == "__main__":
     openVDM.clear_gearman_jobs_from_db()
 
     logging.info("Done!")
+
+
+# -------------------------------------------------------------------------------------
+# Required python code for running the script as a stand-alone utility
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Handle resetting OpenVDM database after an unscheduled system reboot')
+    parser.add_argument('-v', '--verbosity', dest='verbosity',
+                        default=0, action='count',
+                        help='Increase output verbosity')
+
+    parsed_args = parser.parse_args()
+
+    ############################
+    # Set up logging before we do any other argument parsing (so that we
+    # can log problems with argument parsing).
+
+    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+    logging.basicConfig(format=LOGGING_FORMAT)
+
+    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
+    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+
+    # Wait a period of time to allow processes to settle out
+    time.sleep(5)
+
+    reboot_reset()
