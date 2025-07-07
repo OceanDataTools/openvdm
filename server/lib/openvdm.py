@@ -15,13 +15,13 @@ DESCRIPTION:  OpenVDM python module
 import datetime
 import json
 import logging
-import sys
 from os.path import dirname, realpath, join
 import requests
 
-sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-
-from server.lib import read_config
+try:
+    from yaml import load, YAMLError, FullLoader
+except ModuleNotFoundError:
+    pass
 
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
@@ -34,7 +34,42 @@ class OpenVDM():
 
     def __init__(self, config_file = DEFAULT_CONFIG_FILE):
 
-        self.config = read_config.read_config(config_file)
+        self.config = self.read_config(config_file)
+
+
+    @staticmethod
+    def read_config(filename):
+        """Read the passed text/stream assuming it's a valid OpenVDM configuration
+        file
+        """
+
+        def _parse_yaml(source):
+            """Read the passed text/stream assuming it's YAML or JSON (a subset of
+            YAML) and try to parse it into a Python dict.
+            """
+
+            try:
+                return load(source, Loader=FullLoader)
+            except NameError as name_error:
+                raise ImportError('No YAML module available. Please ensure that '
+                                  'PyYAML or equivalent is installed (e.g. via '
+                                  '"pip3 install PyYAML"') from name_error
+            except YAMLError as exc:
+                logging.error("Unable to parse configuration file: %s", source)
+                raise exc
+            except Exception as exc: # handle other exceptions such as attribute errors
+                raise exc
+
+
+
+        try:
+            with open(filename, mode='r', encoding="utf-8") as file:
+                return _parse_yaml(file)
+        except IOError as exc:
+            logging.error("Unable to open configuration file: %s", filename)
+            raise exc
+        except Exception as exc: # handle other exceptions such as attribute errors
+            raise exc
 
 
     def clear_gearman_jobs_from_db(self):
@@ -61,7 +96,7 @@ class OpenVDM():
 
     def get_plugin_suffix(self):
         """
-        Return the plugin suffix.
+        Return the plugin filename suffix.
         """
 
         return self.config['plugins']['pluginSuffix']
@@ -69,8 +104,8 @@ class OpenVDM():
 
     def show_only_current_cruise_dir(self):
         """
-        Return whether OpenVDM is configured to only show the current cruise data
-        directory.
+        Return whether OpenVDM is configured to show ONLY the current cruise
+        data directory.
         """
 
         return self.config['showOnlyCurrentCruiseDir']
@@ -110,7 +145,7 @@ class OpenVDM():
 
     def get_lowering_config(self):
         """
-        Return the configuration for the current lowering
+        Return the current lowering configuration
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfig'
@@ -144,7 +179,7 @@ class OpenVDM():
     def get_transfer_public_data(self):
         """
         Return whether to transfer the contents of PublicData to the cruise
-        data directory
+        data directory when finalizing the cruise
         """
 
         return self.config['transferPubicData']
@@ -168,7 +203,7 @@ class OpenVDM():
 
     def get_md5_filesize_limit_status(self):
         """
-        Return whether the MD5 filesize limit should be applied
+        Return whether the MD5 filesize limit is enabled
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getMD5FilesizeLimitStatus'
@@ -216,13 +251,16 @@ class OpenVDM():
 
     def get_tasks_for_hook(self, hook_name):
         """
-        Return the tasks associated with the given hook
+        Return the tasks associated with the given hook name
         """
 
         return self.config['hooks'].get(hook_name, [])
 
 
     def get_post_hook_commands(self, post_hook_name):
+        """
+        Return the command list for the specified post hook name
+        """
 
         post_hook_commands = self.config.get('postHookCommands', {})
         return post_hook_commands.get(post_hook_name)
@@ -261,7 +299,7 @@ class OpenVDM():
 
     def get_cruise_size(self):
         """
-        Return the filesize for the current cruise
+        Return the size for the current cruise data directory
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseSize'
@@ -323,7 +361,7 @@ class OpenVDM():
 
     def get_cruisedata_url(self):
         """
-        Return the cruise config filename
+        Return the URL to CruiseData
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getCruiseDataURLPath'
@@ -339,7 +377,7 @@ class OpenVDM():
 
     def get_cruisedata_path(self):
         """
-        Return the cruise config filename
+        Return the path to CruiseData
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getDataWarehouseBaseDir'
@@ -401,7 +439,7 @@ class OpenVDM():
 
     def get_lowering_size(self):
         """
-        Return the size of the current lowering
+        Return the size of the current lowering directory
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getLoweringSize'
@@ -479,7 +517,7 @@ class OpenVDM():
 
     def get_extra_directory(self, extra_directory_id):
         """
-        Return the extra directory configuration based on the extra_directory_id
+        Return the extra directory configuration based on id
         """
 
         url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectory/' + extra_directory_id
@@ -495,7 +533,7 @@ class OpenVDM():
 
     def get_extra_directory_by_name(self, extra_directory_name):
         """
-        Return the extra directory configuration based on the extra_directory_name
+        Return the extra directory configuration based on name
         """
 
         return next((d for d in self.get_extra_directories() if d['name'] == extra_directory_name), None)
@@ -518,7 +556,9 @@ class OpenVDM():
 
     def get_active_extra_directories(self, cruise=True, lowering=True):
         """
-        Return all active extra directory configurations
+        Return all active extra directory configurations.  By default this
+        returns cruise and lowerings focused directories.  Use the cruise and
+        lowering argument to file the list.
         """
 
         url = self.config['siteRoot'] + 'api/extraDirectories/getActiveExtraDirectories'
@@ -538,7 +578,7 @@ class OpenVDM():
 
     def get_required_extra_directory(self, extra_directory_id):
         """
-        Return the required extra directory configuration based on the extra_directory_id
+        Return the required extra directory configuration based on id
         """
 
         url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
@@ -554,7 +594,7 @@ class OpenVDM():
 
     def get_required_extra_directory_by_name(self, extra_directory_name):
         """
-        Return the required extra directory configuration based on the extra_directory_name
+        Return the required extra directory configuration based on name
         """
 
         return next((d for d in self.get_required_extra_directories() if d['name'] == extra_directory_name), None)
@@ -608,7 +648,7 @@ class OpenVDM():
 
     def get_ship_to_shore_transfer(self, ship_to_shore_transfer_id):
         """
-        Return the ship-to-shore configuration based on the ship_to_shore_transfer_id
+        Return the ship-to-shore configuration based on id
         """
 
         url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfer/' + ship_to_shore_transfer_id
@@ -654,7 +694,7 @@ class OpenVDM():
 
     def get_system_status(self):
         """
-        Return the system status
+        Return system status
         """
 
         url = self.config['siteRoot'] + 'api/warehouse/getSystemStatus'
@@ -670,7 +710,7 @@ class OpenVDM():
 
     def get_tasks(self):
         """
-        Return the list of all available tasks
+        Return list of all available tasks
         """
 
         url = self.config['siteRoot'] + 'api/tasks/getTasks'
@@ -685,7 +725,7 @@ class OpenVDM():
 
     def get_active_tasks(self):
         """
-        Return the list of all currently active tasks
+        Return list of all currently active tasks
         """
 
         url = self.config['siteRoot'] + 'api/tasks/getActiveTasks'
@@ -700,7 +740,7 @@ class OpenVDM():
 
     def get_task(self, task_id):
         """
-        Return a task based on the task_id
+        Return a task based on the id
         """
 
         url = self.config['siteRoot'] + 'api/tasks/getTask/' + task_id
@@ -716,7 +756,7 @@ class OpenVDM():
 
     def get_task_by_name(self, task_name):
         """
-        Return a task based on the task_name
+        Return a task based on the name
         """
 
         url = self.config['siteRoot'] + 'api/tasks/getTasks'
@@ -747,7 +787,9 @@ class OpenVDM():
 
     def get_active_collection_system_transfers(self, cruise=True, lowering=True):
         """
-        Return all active collection system transfer configurations
+        Return all active collection system transfer configurations. By default
+        this returns cruise and lowerings focused directories.  Use the cruise
+        and lowering argument to file the list.
         """
 
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers'
@@ -767,7 +809,7 @@ class OpenVDM():
 
     def get_collection_system_transfer(self, collection_system_transfer_id):
         """
-        Return the collection system transfer configuration based on the collection_system_transfer_id
+        Return the collection system transfer configuration based on id
         """
 
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfer/' + collection_system_transfer_id
@@ -783,7 +825,7 @@ class OpenVDM():
 
     def get_collection_system_transfer_by_name(self, collection_system_transfer_name):
         """
-        Return the collection system transfer configuration based on the collection_system_transfer_name
+        Return the collection system transfer configuration based on name
         """
 
         return next((d for d in self.get_collection_system_transfers() if d['name'] == collection_system_transfer_name), None)
@@ -821,7 +863,7 @@ class OpenVDM():
 
     def get_cruise_data_transfer(self, cruise_data_transfer_id):
         """
-        Return the cruise data transfer based on the cruise_data_transfer_id
+        Return the cruise data transfer based on id
         """
 
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getCruiseDataTransfer/' + cruise_data_transfer_id
@@ -837,7 +879,7 @@ class OpenVDM():
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):
         """
-        Return the required cruise data transfer based on the cruise_data_transfer_id
+        Return the required cruise data transfer based on id
         """
 
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfer/' + cruise_data_transfer_id
@@ -853,7 +895,7 @@ class OpenVDM():
 
     def get_cruise_data_transfer_by_name(self, cruise_data_transfer_name):
         """
-        Return the cruise data transfer based on the cruise_data_transfer_name
+        Return the cruise data transfer based on name
         """
 
         return next((d for d in self.get_cruise_data_transfers() if d['name'] == cruise_data_transfer_name), None)
@@ -861,7 +903,7 @@ class OpenVDM():
 
     def get_required_cruise_data_transfer_by_name(self, cruise_data_transfer_name):
         """
-        Return the required cruise data transfer based on the cruise_data_transfer_name
+        Return the required cruise data transfer based on name
         """
 
         return next((d for d in self.get_required_cruise_data_transfers() if d['name'] == cruise_data_transfer_name), None)
@@ -900,7 +942,8 @@ class OpenVDM():
 
     def clear_error_collection_system_transfer(self, collection_system_transfer_id, job_status):
         """
-        Clear the status flag for the collection system transfer specified by the collection_system_transfer_id
+        Clear the status flag for the collection system transfer specified by
+        id
         """
 
         if job_status != "3":
@@ -918,16 +961,15 @@ class OpenVDM():
 
     def clear_error_cruise_data_transfer(self, cruise_data_transfer_id, job_status):
         """
-        Clear the status flag for the cruise data transfer specified by the cruise_data_transfer_id
+        Clear the status flag for the cruise data transfer specified by id
         """
 
+        # Ignore request if transfer does not have a error status
         if job_status != "3":
             return
 
-        # Clear Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
 
-        logging.info("Clear Error")
         try:
             requests.get(url, timeout=TIMEOUT)
         except Exception as err:
@@ -937,7 +979,7 @@ class OpenVDM():
 
     def clear_error_task(self, task_id):
         """
-        Clear the status flag for the task specified by the task_id
+        Clear the status flag for the task specified by id
         """
 
         task = self.get_task(task_id)
@@ -948,7 +990,8 @@ class OpenVDM():
 
     def set_error_collection_system_transfer(self, collection_system_transfer_id, reason=''):
         """
-        Set the status flag to error for the collection system transfer specified by the collection_system_transfer_id
+        Set the status flag to error for the collection system transfer
+        specified by id
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -957,7 +1000,6 @@ class OpenVDM():
 
         title = f"{collection_system_transfer.get('name')} Data Transfer failed"
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
@@ -970,7 +1012,8 @@ class OpenVDM():
 
     def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason=''):
         """
-        Set the status flag to error for the cruise data transfer specified by the collection_system_transfer_id
+        Set the status flag to error for the cruise data transfer specified by
+        id
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -979,7 +1022,6 @@ class OpenVDM():
 
         title = f"{collection_system_transfer.get('name')} Connection test failed"
 
-        # Set Error for current tranfer test in DB via API
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
@@ -992,7 +1034,8 @@ class OpenVDM():
 
     def set_error_cruise_data_transfer(self, cruise_data_transfer_id, reason=''):
         """
-        Set the status flag to error for the cruise data transfer specified by the cruise_data_transfer_id
+        Set the status flag to error for the cruise data transfer specified by
+        id
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1001,7 +1044,6 @@ class OpenVDM():
 
         title = f"{cruise_data_transfer.get('name')} Data Transfer failed"
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
 
         try:
@@ -1014,7 +1056,8 @@ class OpenVDM():
 
     def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason=''):
         """
-        Set the status flag to error for the cruise data transfer specified by the cruise_data_transfer_id
+        Set the status flag to error for the cruise data transfer specified by
+        id
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1023,7 +1066,6 @@ class OpenVDM():
 
         title = f"{cruise_data_transfer.get('name')} Connection test failed"
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
 
         try:
@@ -1036,7 +1078,7 @@ class OpenVDM():
 
     def set_error_task(self, task_id, reason=''):
         """
-        Set the status flag to error for the task specified by the task_id
+        Set the status flag to error for the task specified by id
         """
 
         task = self.get_task(task_id)
@@ -1045,7 +1087,6 @@ class OpenVDM():
 
         title = f"{task.get('name')} failed"
 
-        # Set Error for current task in DB via API
         url = self.config['siteRoot'] + 'api/tasks/setErrorTask/' + task_id
 
         try:
@@ -1058,10 +1099,9 @@ class OpenVDM():
 
     def set_idle_collection_system_transfer(self, collection_system_transfer_id):
         """
-        Set the status flag to idle for the collection system transfer specified by the collection_system_transfer_id
+        Set the status flag to idle for the collection system transfer by id
         """
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setIdleCollectionSystemTransfer/' + collection_system_transfer_id
 
         try:
@@ -1073,13 +1113,12 @@ class OpenVDM():
 
     def set_idle_cruise_data_transfer(self, cruise_data_transfer_id):
         """
-        Set the status flag to idle for the cruise data transfer specified by the cruise_data_transfer_id
+        Set the status flag to idle for the cruise data transfer specified by
+        id
         """
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
 
-        logging.info("Set Idle")
         try:
             requests.get(url, timeout=TIMEOUT)
         except Exception as err:
@@ -1089,10 +1128,9 @@ class OpenVDM():
 
     def set_idle_task(self, task_id):
         """
-        Set the status flag to idle for the task specified by the task_id
+        Set the status flag to idle for the task specified by id
         """
 
-        # Set Idle for the tasks in DB via API
         url = self.config['siteRoot'] + 'api/tasks/setIdleTask/' + task_id
 
         try:
@@ -1104,7 +1142,8 @@ class OpenVDM():
 
     def set_running_collection_system_transfer(self, collection_system_transfer_id, job_pid, job_handle):
         """
-        Set the status flag to running for the collection system transfer specified by the collection_system_transfer_id
+        Set the status flag to running for the collection system transfer
+        specified by id
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1128,7 +1167,8 @@ class OpenVDM():
 
     def set_running_collection_system_transfer_test(self, collection_system_transfer_id, job_pid, job_handle):
         """
-        Set the status flag to running for the collection system transfer specified by the collection_system_transfer_id
+        Set the status flag to running for the collection system transfer
+        specified by id
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1143,7 +1183,8 @@ class OpenVDM():
 
     def set_running_cruise_data_transfer(self, cruise_data_transfer_id, job_pid, job_handle):
         """
-        Set the status flag to running for the cruise data transfer specified by the cruise_data_transfer_id
+        Set the status flag to running for the cruise data transfer specified
+        by id
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1167,7 +1208,8 @@ class OpenVDM():
 
     def set_running_cruise_data_transfer_test(self, cruise_data_transfer_id, job_pid, job_handle):
         """
-        Set the status flag to running for the cruise data transfer specified by the cruise_data_transfer_id
+        Set the status flag to running for the cruise data transfer specified
+        by id
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1182,7 +1224,7 @@ class OpenVDM():
 
     def set_running_task(self, task_id, job_pid, job_handle):
         """
-        Set the status flag to running for the task specified by the task_id
+        Set the status flag to running for the task specified by id
         """
 
         task = self.get_task(task_id)
@@ -1208,7 +1250,6 @@ class OpenVDM():
         Track a gearman task within OpenVDM
         """
 
-        # Add Job to DB via API
         url = self.config['siteRoot'] + 'api/gearman/newJob/' + job_handle
         payload = {'jobName': job_name, 'jobPid': job_pid}
 
@@ -1224,7 +1265,6 @@ class OpenVDM():
         Set the filesize for the current cruise
         """
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/warehouse/setCruiseSize'
         payload = {'bytes': size_in_bytes}
 
@@ -1240,7 +1280,6 @@ class OpenVDM():
         Set the filesize for the current lowering
         """
 
-        # Set Error for current tranfer in DB via API
         url = self.config['siteRoot'] + 'api/warehouse/setLoweringSize'
         payload = {'bytes': size_in_bytes}
 
