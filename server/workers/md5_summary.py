@@ -20,6 +20,7 @@ import os
 import signal
 import sys
 import time
+import hashlib
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -27,7 +28,8 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
-from server.lib.md5_util import hash_file
+
+BUF_SIZE = 65536  # read files in 64kb chunks
 
 TASK_NAMES = {
     'REBUILD_MD5_SUMMARY': 'rebuildMD5Summary',
@@ -41,6 +43,7 @@ CUSTOM_TASKS = [
         "longName": "Updating MD5 Summary",
     }
 ]
+
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """
@@ -68,6 +71,33 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
+    @staticmethod
+    def hash_file(filepath):
+        """
+        Build the md5 hash for the given file
+        """
+
+        def _hashlib_md5():
+            """
+            Function that returns a newer md5 hashlib but will revert to older
+            version if needed.
+            """
+
+            try:
+                return hashlib.md5(usedforsecurity=False)
+            except TypeError:
+                # usedforsecurity is not supported
+                return hashlib.md5()
+
+        try:
+            with open(filepath, mode='rb') as f:
+                file_hash = _hashlib_md5()
+                while chunk := f.read(BUF_SIZE):
+                    file_hash.update(chunk)
+            return file_hash.hexdigest()  # to get a printable str instead of bytes
+        except Exception as err:
+            raise err
+
 
     def build_md5_hashes(self, current_job, filelist):
         """
@@ -90,12 +120,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             try:
                 if filesize_limit_status == 'On' and filesize_limit != '0':
                     if os.stat(filepath).st_size < int(filesize_limit) * 1000000:
-                        hashes.append({'hash': hash_file(filepath), 'filename': filename})
+                        hashes.append({'hash': self.hash_file(filepath), 'filename': filename})
                     else:
                         hashes.append({'hash': '********************************', 'filename': filename})
 
                 else:
-                    hashes.append({'hash': hash_file(filepath), 'filename': filename})
+                    hashes.append({'hash': self.hash_file(filepath), 'filename': filename})
 
             except Exception as err:
                 logging.error("Could not generate md5 hash for file: %s", filename)
@@ -133,7 +163,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         try:
             with open(self.md5_summary_md5_filepath, mode='w', encoding="utf-8") as md5_summary_md5_file:
-                md5_summary_md5_file.write(hash_file(self.md5_summary_filepath))
+                md5_summary_md5_file.write(self.hash_file(self.md5_summary_filepath))
 
         except IOError:
             logging.error("Error Saving MD5 Summary MD5 file: %s", self.md5_summary_md5_filepath)

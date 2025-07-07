@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Utilities for working with geojson and kml files.
+"""
+FILE:  condense_ranges.py
+
+DESCRIPTION:  Utilities for working with geojson and kml files.
+
+     BUGS:
+    NOTES:
+   AUTHOR:  Webb Pinner
+  VERSION:  2.11
+  CREATED:  2024-06-01
 """
 
 import json
@@ -49,9 +58,9 @@ def combine_geojson_files(input_files, prefix, device_name):
                 returned_geojson_obj['features'][0]['properties']['coordTimes'] += geojson_obj['visualizerData'][0]['features'][0]['properties']['coordTimes']
 
         # If the file cannot be processed return false.
-        except Exception as err:
+        except Exception as exc:
             logging.error("ERROR: Could not proccess file: %s", file)
-            logging.debug(str(err))
+            logging.debug(str(exc))
             return None
 
     # If processing is successful, return the (geo)json object

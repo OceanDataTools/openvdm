@@ -414,10 +414,10 @@ class OpenVDMCSVParser(OpenVDMParser):
             if self.stop_dt is not None:
                 logging.debug("  stop_dt: %s", self.stop_dt)
                 data_frame = data_frame[(data_frame['date_time'] <= self.stop_dt)]
-        except Exception as err:
+        except Exception as exc:
             logging.error("Could not crop data")
-            logging.error(str(err))
-            raise err
+            logging.error(str(exc))
+            raise exc
 
         return data_frame
 
@@ -430,10 +430,10 @@ class OpenVDMCSVParser(OpenVDMParser):
 
         try:
             resample_df = data_frame.resample(resample_interval, label='right', closed='right').mean()
-        except Exception as err:
+        except Exception as exc:
             logging.error("Could not resample data")
-            logging.error(str(err))
-            raise err
+            logging.error(str(exc))
+            raise exc
 
         # reset index
         return resample_df.reset_index()
@@ -449,10 +449,10 @@ class OpenVDMCSVParser(OpenVDMParser):
             try:
                 decimals = pd.Series(precision.values(), index=precision.keys())
                 return data_frame.round(decimals)
-            except Exception as err:
+            except Exception as exc:
                 logging.error("Could not round data")
-                logging.error(str(err))
-                raise err
+                logging.error(str(exc))
+                raise exc
         return data_frame
 
 

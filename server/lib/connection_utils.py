@@ -7,9 +7,9 @@ DESCRIPTION:  utilities used to connect with remote systems
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2025-07-05
- REVISION:
+ REVISION:  2025-07-07
 """
 
 import os
@@ -22,6 +22,9 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
 
 def get_transfer_type(transfer_type):
+    """
+    Return a human-readable transfer type
+    """
 
     if transfer_type == "1": # Local directory
         return 'local'
@@ -39,7 +42,10 @@ def get_transfer_type(transfer_type):
 
 
 def check_darwin(cfg):
-    # Detect if Darwin (MacOS)
+    """
+    Return true if server is MacOS (Darwin)
+    """
+
     cmd = ['ssh', f"{cfg['sshUser']}@{cfg['sshServer']}", "uname -s"]
     if cfg['sshUseKey'] == '0':
         cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
@@ -54,6 +60,10 @@ def check_darwin(cfg):
 
 
 def detect_smb_version(cfg):
+    """
+    Return the SMB version used on the remote server
+    """
+
     if cfg.get('smbUser') == 'guest':
         cmd = [
             'smbclient', '-L', cfg['smbServer'],
@@ -85,6 +95,9 @@ def detect_smb_version(cfg):
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
+    """
+    Mount the SMB Share to the mntpoint
+    """
 
     # Logic handles if cfg is a cst or cdt
     read_write = 'rw' if cfg.get('removeSourceFiles', '1') == '1' else 'ro'
@@ -112,6 +125,11 @@ def mount_smb_share(cfg, mntpoint, smb_version):
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
+    """
+    Build the cmd array for a rsync command.  The cmd array will be passed to
+    subprocess
+    """
+
     cmd = ['rsync'] + flags
     if extra_args is not None:
         cmd += extra_args
@@ -124,6 +142,10 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
 
 
 def test_rsync_connection(server, user, password_file=None):
+    """
+    Test the connection to a rsync server
+    """
+
     flags = ['--no-motd', '--contimeout=5']
     extra_args = None
 
@@ -136,7 +158,7 @@ def test_rsync_connection(server, user, password_file=None):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode not in [0, 24]:
-            logging.warning("rsync failed: %s", proc.stderr.strip())
+            logging.error("rsync connection test failed: %s", proc.stderr.strip())
             return False
         return True
     except Exception as e:
@@ -145,6 +167,12 @@ def test_rsync_connection(server, user, password_file=None):
 
 
 def test_rsync_write_access(server, user, tmpdir, password_file=None):
+    """
+    Verify the transfer has write access to the rsync server.  This is done via
+    a write_test.txt file.  Currently there is no way to delete this file after
+    completing the test.
+    """
+
     flags = ['--no-motd', '--contimeout=5']
 
     if password_file is not None:
@@ -163,7 +191,7 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode not in [0, 24]:
-            logging.warning("rsync failed: %s", proc.stderr.strip())
+            logging.error("rsync write test failed: %s", proc.stderr.strip())
             return False
     except Exception as e:
         logging.error("rsync write test failed: %s", str(e))
@@ -186,6 +214,10 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
 
 
 def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
+    """
+    Build the cmd array for a ssh command.  The cmd array will be passed to
+    subprocess
+    """
 
     if (passwd is None or len(passwd) == 0) and use_pubkey is False:
         raise ValueError("Must specify either a passwd or use_pubkey")
@@ -197,6 +229,9 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
+    """
+    Test the connection to a ssh server
+    """
 
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
 
@@ -212,6 +247,10 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
 
 
 def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
+    """
+    Verify the presence of a directort on the ssh server
+    """
+
     cmd = build_ssh_command(None, user, server, f'ls "{remote_dir}"', passwd, use_pubkey)
 
     logging.debug("test_ssh_destination cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
@@ -226,6 +265,10 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
+    """
+    Verify write access to the directory on the remote ssh server.
+    """
+
     cmd = build_ssh_command(None, user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
     logging.debug("test_ssh_write_access cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
@@ -252,6 +295,10 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
+    """
+    Build the relevant rsync options for the given transfer
+    """
+
     transfer_type = get_transfer_type(cfg['transferType'])
 
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
@@ -284,6 +331,9 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
 
 
 def test_cst_source(cst_cfg, source_dir):
+    """
+    Test the connection to the collection system transfer
+    """
 
     results = []
 
@@ -469,6 +519,9 @@ def test_cst_source(cst_cfg, source_dir):
         return results
 
 def test_cdt_destination(cdt_cfg):
+    """
+    Test the connection to the cruise data transfer
+    """
 
     results = []
 
@@ -529,8 +582,8 @@ def test_cdt_destination(cdt_cfg):
             smb_version = detect_smb_version(cdt_cfg)
 
             if not smb_version:
-                logging.error("unable to connect to SMB server")
                 reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+                logging.error(reason)
                 results.extend([
                     {"partName": "SMB server", "result": "Fail", "reason": reason},
                     {"partName": "SMB share", "result": "Fail", "reason": reason},
@@ -544,7 +597,8 @@ def test_cdt_destination(cdt_cfg):
 
             mnt_success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
             if not mnt_success:
-                reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+                reason = f"Could not connect to SMB share: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+                logging.error(reason)
                 results.extend([
                     {"partName": "SMB share", "result": "Fail", "reason": reason},
                     {"partName": "Destination directory", "result": "Fail", "reason": reason},
@@ -559,6 +613,7 @@ def test_cdt_destination(cdt_cfg):
             dest_dir_exists = os.path.isdir(smb_dest_dir)
             if not dest_dir_exists:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on SMB share"
+                logging.error(reason)
                 results.extend([
                     {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
@@ -569,7 +624,8 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
             if not test_write_access(smb_dest_dir):
-                reason = f"Unable to write to: {cdt_cfg['destDir']} on SMB share"
+                reason = f"Write test failed to: {cdt_cfg['destDir']} on SMB share"
+                logging.error(reason)
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
