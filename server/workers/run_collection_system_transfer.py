@@ -515,6 +515,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             else:
                 password_file = None
 
+            # Adjustments for SSH
             if transfer_type == 'ssh':
                 is_darwin = check_darwin(cst_cfg)
 
@@ -522,16 +523,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             filelist_result = self.build_cst_filelist(prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
 
             if not filelist_result['verdict']:
-                if mntpoint:
-                    subprocess.call(['umount', mntpoint])
                 return {'verdict': False, 'reason': filelist_result.get('reason', 'Unknown'), 'files': []}
 
             files = filelist_result['files']
 
             # Write file list
             if not build_include_file(files['include'], include_file):
-                if mntpoint:
-                    subprocess.call(['umount', mntpoint])
                 return {'verdict': False, 'reason': 'Error writing file list', 'files': []}
 
             # Build rsync command
@@ -874,6 +871,9 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
+        logging.info("Writing transfer logfile")
+        worker.send_job_status(current_job, 93, 10)
+
         logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
             'files': {
@@ -882,8 +882,6 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             }
         }
 
-        logging.info("Writing transfer logfile")
-        worker.send_job_status(current_job, 93, 10)
         results = output_json_data_to_file(os.path.join(worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
 
         if not results['verdict']:
