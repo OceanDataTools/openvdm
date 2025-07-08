@@ -437,6 +437,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             'files': {'new': [], 'updated': [], 'exclude': []}
         }))
 
+
     def _ignore_job(self, current_job, part_name, reason):
         """
         Shortcut for completing the current job as ignored
@@ -466,7 +467,7 @@ def task_run_cruise_data_transfer(worker, current_job):
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    worker.ovdm.set_running_cruise_data_transfer(worker.cruise_data_transfer['cruiseDataTransferID'], os.getpid(), current_job.handle)
+    worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing destination")
     worker.send_job_status(current_job, 1, 10)
