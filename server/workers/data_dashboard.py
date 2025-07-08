@@ -266,7 +266,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
 
-        if current_job.task == 'updateDataDashboard' and not self.collection_system_transfer: # doesn't exists
+        if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD'] and not self.collection_system_transfer: # doesn't exists
             return self.on_job_complete(current_job, json.dumps({
                 'parts':[{
                     "partName": "Retrieve Collection System Tranfer Data",
@@ -356,7 +356,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         #     'files': results_obj['files']
         # }
 
-        # if current_job.task == 'updateDataDashboard':
+        # if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
 
         #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
@@ -367,7 +367,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         #         logging.info("Adding post task: %s", task)
         #         gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        # elif current_job.task == 'rebuildDataDashboard':
+        # elif current_job.task == TASK_NAMES['REBUILD_DATA_DASHBOARD']:
 
         #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
