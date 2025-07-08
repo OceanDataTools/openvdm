@@ -30,6 +30,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
+from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
 from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAMES
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
@@ -505,12 +506,12 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
     for collection_system_transfer in collection_system_transfers:
-        logging.debug("Queuing runCollectionSystemTransfer job for %s", collection_system_transfer['name'])
+        logging.debug("Queuing %s job for %s", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
         gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
 
-        collection_system_transfer_jobs.append( {"task": "runCollectionSystemTransfer", "data": json.dumps(gm_data)} )
+        collection_system_transfer_jobs.append( {"task": RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
 
-    logging.info("Submitting runCollectionSystemTransfer jobs")
+    logging.info("Submitting %s jobs", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     worker.send_job_status(current_job, 3, 10)
 
     submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
