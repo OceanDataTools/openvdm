@@ -202,7 +202,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if int(self.task['taskID']) > 0:
             self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
         else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -388,7 +388,9 @@ def task_rebuild_cruise_directory(worker, current_job):
     worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to locate the cruise directory: " + worker.cruise_dir})
+        reason = f"Unable to locate the cruise directory: {worker.cruise_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})

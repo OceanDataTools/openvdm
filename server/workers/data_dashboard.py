@@ -104,8 +104,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Add an entry to the new data_dashboard manifest
         """
 
-        rel_json = json_path.replace(base_dir + '/', '')
-        rel_raw = raw_path.replace(base_dir + '/', '')
+        rel_json = json_path.replace(f'{base_dir}/', '')
+        rel_raw = raw_path.replace(f'{base_dir}/', '')
         entries.append({"type": dd_type, "dd_json": rel_json, "raw_data": rel_raw})
 
 
@@ -115,8 +115,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Add an entry to the remove data_dashboard manifest
         """
 
-        rel_json = json_path.replace(base_dir + '/', '')
-        rel_raw = raw_path.replace(base_dir + '/', '')
+        rel_json = json_path.replace(f'{base_dir}/', '')
+        rel_raw = raw_path.replace(f'{base_dir}/', '')
         entries.append({"dd_json": rel_json, "raw_data": rel_raw})
 
 
@@ -125,7 +125,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Build file paths for a data_dashboard manifest entry
         """
 
-        json_filename = os.path.splitext(filename)[0] + '.json'
+        json_filename = f'{os.path.splitext(filename)[0]}.json'
         raw_path = os.path.join(self.cruise_dir, filename)
         json_path = os.path.join(self.data_dashboard_dir, json_filename)
         return raw_path, json_path
@@ -136,7 +136,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         cst_cfg = cfg or self.collection_system_transfer
-        processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), cst_cfg['name'].lower() + self.ovdm.get_plugin_suffix())
+        processing_script_filename = os.path.join(self.ovdm.get_plugin_dir(), f"{cst_cfg['name'].lower()}{self.ovdm.get_plugin_suffix()}")
         return processing_script_filename if os.path.isfile(processing_script_filename) else None
 
     def _process_filelist(self, current_job, filelist, processing_script_filename, job_results, start=0, end=100):
@@ -300,7 +300,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if int(self.task['taskID']) > 0:
             self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
         else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -380,7 +380,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         #         if int(self.task['taskID']) > 0:
         #             self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
         #         else:
-        #             self.ovdm.send_msg(self.task['longName'] + ' failed', results_obj['parts'][-1]['reason'])
+        #             self.ovdm.send_msg(f"{self.task['longName']} failed", results_obj['parts'][-1]['reason'])
         #     else:
         #         if int(self.task['taskID']) > 0:
         #             self.ovdm.set_idle_task(self.task['taskID'])
@@ -586,8 +586,9 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
     worker.send_job_status(current_job, 1, 100)
 
     if not os.path.exists(worker.data_dashboard_dir):
-        logging.error("Data dashboard directory not found: %s", worker.data_dashboard_dir)
-        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": "Unable to locate the data dashboard directory: " + worker.data_dashboard_dir})
+        reason = f"Data dashboard directory not found: {worker.data_dashboard_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Pass"})
@@ -601,7 +602,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         collection_system_transfer_index += 1
 
         progress_factor = int(float(collection_system_transfer_index) / float(collection_system_transfer_count) * 100)
-        logging.info('Collection System: %s', collection_system_transfer['name'])
+        logging.info(f"Collection System: {collection_system_transfer['name']}")
         worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
         logging.info(" - Verifying plugin file exists")

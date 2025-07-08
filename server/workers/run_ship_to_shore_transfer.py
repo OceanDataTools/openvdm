@@ -53,12 +53,12 @@ def build_filelist(worker):
             if ship_to_shore_transfer['priority'] == str(priority) and ship_to_shore_transfer['enable'] == '1':
                 if not ship_to_shore_transfer['collectionSystem'] == "0":
                     collection_system = worker.ovdm.get_collection_system_transfer(ship_to_shore_transfer['collectionSystem'])
-                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + collection_system['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    raw_filters['includeFilter'] += [f"*/{worker.cruise_id}/{collection_system['destDir']}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
                 elif not ship_to_shore_transfer['extraDirectory'] == "0":
                     extra_directory = worker.ovdm.get_extra_directory(ship_to_shore_transfer['extraDirectory'])
-                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + extra_directory['destDir'] + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    raw_filters['includeFilter'] += [f"*/{worker.cruise_id}/{extra_directory['destDir']}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
                 else:
-                    raw_filters['includeFilter'] += ['*/' + worker.cruise_id + '/' + ship_to_shore_filter for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
+                    raw_filters['includeFilter'] += [f"*/{worker.cruise_id}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
 
     logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
@@ -74,7 +74,7 @@ def build_filelist(worker):
                 if fnmatch.fnmatch(os.path.join(root, filename), include_filter):
                     return_files['include'].append(os.path.join(root, filename))
 
-    return_files['include'] = [filename.replace(cruise_dir + '/', '', 1) for filename in return_files['include']]
+    return_files['include'] = [filename.replace(f'{cruise_dir}/', '', 1) for filename in return_files['include']]
 
     logging.debug("Returned Files: %s", json.dumps(return_files, indent=2))
 
@@ -139,9 +139,11 @@ def transfer_ssh_dest_dir(worker, current_job):
         # Cleanup
         shutil.rmtree(tmpdir)
 
-        return {'verdict': False, 'reason': 'Error Saving temporary ssh exclude filelist file: ' + ssh_includelist_filepath, 'files':[]}
+        reason = f"Error Saving temporary ssh exclude filelist file: {ssh_includelist_filepath}"
+        logging.error(reason)
+        return {'verdict': False, 'reason': reason, 'files':[]}
 
-    command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], worker.cruise_data_transfer['sshUser'] + '@' + worker.cruise_data_transfer['sshServer'] + ':' + dest_dir]
+    command = ['rsync', '-trim', '--files-from=' + ssh_includelist_filepath, '-e', 'ssh', worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], f"{worker.cruise_data_transfer['sshUser']}@{worker.cruise_data_transfer['sshServer']}:{dest_dir}"]
 
     if worker.cruise_data_transfer['bandwidthLimit'] != '0':
         command.insert(2, f'--bwlimit={worker.cruise_data_transfer["bandwidthLimit"]}')
@@ -381,9 +383,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     if job_results['files']['new'] or job_results['files']['updated']:
 
         logging.debug("Building logfiles")
-
-        logfile_filename = worker.cruise_data_transfer['name'] + '_' + worker.transfer_start_date + '.log'
-
+        logfile_filename = f"{worker.cruise_data_transfer['name']}_{worker.transfer_start_date}.log"
         log_contents = {
             'files': {
                 'new': job_results['files']['new'],

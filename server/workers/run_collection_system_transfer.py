@@ -359,7 +359,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         else:
             command = ['rsync', '-r']
             if transfer_type == 'rsync':
-                command += ['--password-file=' + rsync_password_filepath, '--no-motd',
+                command += [f'--password-file={rsync_password_filepath}', '--no-motd',
                             f"rsync://{cst_cfg['rsyncUser']}@"
                             f"{cst_cfg['rsyncServer']}"
                             f"{self.source_dir}/"]
@@ -654,16 +654,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
                 cruise_end = self.ovdm.get_cruise_end_date()
-                self.data_end_date = cruise_end + ":59" if cruise_end else "9999/12/31 23:59:59"
+                self.data_end_date = f"{cruise_end}:59" if cruise_end else "9999/12/31 23:59:59"
             else:
                 logging.debug("Using lowering Time bounds")
                 self.data_start_date = self.ovdm.get_lowering_start_date() or "1970/01/01 00:00"
                 lowering_end = self.ovdm.get_lowering_end_date()
-                self.data_end_date = lowering_end + ":59" if lowering_end else "9999/12/31 23:59:59"
+                self.data_end_date = f"{lowering_end}:59" if lowering_end else "9999/12/31 23:59:59"
 
             if self.collection_system_transfer['staleness'] != "0":
                 staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
-                data_end_dt = datetime.strptime(self.data_end_date + "+0000", "%Y/%m/%d %H:%M:%S" + '%z')
+                data_end_dt = datetime.strptime(f"{self.data_end_date}+0000", "%Y/%m/%d %H:%M:%S%z")
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
 
@@ -874,7 +874,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
         job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
-        logfile_filename = cst_cfg['name'] + '_' + worker.transfer_start_date + '.log'
+        logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
             'files': {
                 'new': job_results['files']['new'],
@@ -902,7 +902,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 95, 100)
 
-    logfile_filename = cst_cfg['name'] + '_Exclude.log'
+    logfile_filename = f"{cst_cfg['name']}_Exclude.log"
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']

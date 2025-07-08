@@ -37,7 +37,7 @@ def combine_geojson_files(input_files, prefix, device_name):
                     "coordinates":[]
                 },
                 "properties": {
-                    "name": prefix + '_' + device_name,
+                    "name": f'{prefix}_{device_name}',
                     "coordTimes":[]
                 }
             }
@@ -80,7 +80,7 @@ def convert_to_kml(geojson_obj):
     kml.set('xmlns:atom','http://www.w3.org/2005/Atom')
     document = SubElement(kml, 'Document')
     name = SubElement(document, 'name')
-    name.text = geojson_obj['features'][0]['properties']['name'] + "_Trackline.kml"
+    name.text = f"{geojson_obj['features'][0]['properties']['name']}_Trackline.kml"
     placemark = SubElement(document, 'Placemark')
     name2 = SubElement(placemark, 'name')
     name2.text = "path1"
@@ -92,9 +92,9 @@ def convert_to_kml(geojson_obj):
     coordinates_text = ''
 
     for coordinate in geojson_obj['features'][0]['geometry']['coordinates']:
-        coordinates_text += str(coordinate[0]) + ',' + str(coordinate[1]) + ',0 '
+        coordinates_text += f'{coordinate[0]},{coordinate[1]},0 '
 
     coordinates_text = coordinates_text.rstrip(' ')
     coordinates.text = coordinates_text
 
-    return '<?xml version="1.0" encoding="utf-8"?>' + tostring(kml).decode('utf8')
+    return f'<?xml version="1.0" encoding="utf-8"?>{tostring(kml).decode("utf8")}'

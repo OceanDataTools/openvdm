@@ -475,7 +475,7 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success = test_rsync_connection(cst_cfg['rsyncServer'] + source_dir, cst_cfg['rsyncUser'], password_file)
+            contest_success = test_rsync_connection(f"{cst_cfg['rsyncServer']}{source_dir}", cst_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
                 results.extend([
@@ -663,7 +663,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success = test_rsync_connection(cdt_cfg['rsyncServer'] + cdt_cfg['destDir'], cdt_cfg['rsyncUser'], password_file)
+            contest_success = test_rsync_connection(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find source directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 results.extend([
@@ -674,7 +674,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Destination directory", "result": "Pass"})
 
-            contest_success = test_rsync_write_access(cdt_cfg['rsyncServer'] + cdt_cfg['destDir'], cdt_cfg['rsyncUser'], tmpdir, password_file)
+            contest_success = test_rsync_write_access(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], tmpdir, password_file)
             if not contest_success:
                 reason = f"Unable to write to: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 results.extend([

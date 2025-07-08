@@ -147,7 +147,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             with open(self.md5_summary_filepath, mode='w', encoding="utf-8") as md5_summary_file:
 
                 for filehash in sorted_hashes:
-                    md5_summary_file.write(filehash['hash'] + ' ' + filehash['filename'] + '\n')
+                    md5_summary_file.write(f"{filehash['hash']} {filehash['filename']}\n")
 
         except IOError:
             reason = f"Error updating MD5 Summary file: {self.md5_summary_filepath}"
@@ -237,7 +237,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if int(self.task['taskID']) > 0:
             self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
         else:
-            self.ovdm.send_msg(self.task['longName'] + ' failed', f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -436,8 +436,9 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
 
     logging.debug("Pre-tasks checks")
     if not os.path.exists(worker.cruise_dir):
-        logging.error("Cruise directory not found")
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": "Unable to locate the cruise directory: " + worker.cruise_dir})
+        reason = f"Unable to locate the cruise directory: {worker.cruise_dir}"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
@@ -449,7 +450,7 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    exclude_transfer_logs = worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'] + '/'
+    exclude_transfer_logs = f"{worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir']}/"
 
     filelist = build_filelist(worker.cruise_dir).get('include', [])
     filtered_filelist = [
@@ -482,7 +483,7 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         with open(worker.md5_summary_filepath, mode='w', encoding='utf-8') as md5_summary_file:
 
             for filehash in sorted_hashes:
-                md5_summary_file.write(filehash['hash'] + ' ' + filehash['filename'] + '\n')
+                md5_summary_file.write(f"{filehash['hash']} {filehash['filename']}\n")
 
         job_results['parts'].append({"partName": "Writing MD5 Summary file", "result": "Pass"})
 

@@ -77,7 +77,7 @@ class OpenVDM():
         Clear the current Gearman job request queue.
         """
 
-        url = self.config['siteRoot'] + 'api/gearman/clearAllJobsFromDB'
+        url = f"{self.config['siteRoot']}api/gearman/clearAllJobsFromDB"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -116,7 +116,7 @@ class OpenVDM():
         Return whether OpenVDM should show lowering-related components
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getShowLoweringComponents'
+        url = f"{self.config['siteRoot']}api/warehouse/getShowLoweringComponents"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -131,7 +131,7 @@ class OpenVDM():
         Return the current cruise configuration
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfig'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseConfig"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -148,7 +148,7 @@ class OpenVDM():
         Return the current lowering configuration
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfig'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringConfig"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -190,7 +190,7 @@ class OpenVDM():
         Return the MD5 filesize limit
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getMD5FilesizeLimit'
+        url = f"{self.config['siteRoot']}api/warehouse/getMD5FilesizeLimit"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -206,7 +206,7 @@ class OpenVDM():
         Return whether the MD5 filesize limit is enabled
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getMD5FilesizeLimitStatus'
+        url = f"{self.config['siteRoot']}api/warehouse/getMD5FilesizeLimitStatus"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -222,7 +222,7 @@ class OpenVDM():
         Return the MD5 summary filename
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryFn'
+        url = f"{self.config['siteRoot']}api/warehouse/getMD5SummaryFn"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -238,7 +238,7 @@ class OpenVDM():
         Return the MD5 summary MD5 filename
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getMD5SummaryMD5Fn'
+        url = f"{self.config['siteRoot']}api/warehouse/getMD5SummaryMD5Fn"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -286,7 +286,7 @@ class OpenVDM():
         Return the current cruise id
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseID'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseID"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -302,7 +302,7 @@ class OpenVDM():
         Return the size for the current cruise data directory
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseSize'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseSize"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -317,7 +317,7 @@ class OpenVDM():
         Return the start date for the current criuse
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseStartDate'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseStartDate"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -333,7 +333,7 @@ class OpenVDM():
         Return the end date for the current criuse
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseEndDate'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseEndDate"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -349,7 +349,7 @@ class OpenVDM():
         Return the cruise config filename
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseConfigFn'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseConfigFn"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -364,12 +364,12 @@ class OpenVDM():
         Return the URL to CruiseData
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruiseDataURLPath'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruiseDataURLPath"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return self.config['siteRoot'].rstrip('/') + return_obj.get('cruiseDataURLPath')
+            return f"{self.config['siteRoot'].rstrip('/')}{return_obj.get('cruiseDataURLPath')}"
         except Exception as exc:
             logging.error("Unable to retrieve cruise data URL from OpenVDM API")
             raise exc
@@ -380,7 +380,7 @@ class OpenVDM():
         Return the path to CruiseData
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getDataWarehouseBaseDir'
+        url = f"{self.config['siteRoot']}api/warehouse/getDataWarehouseBaseDir"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -395,7 +395,7 @@ class OpenVDM():
         Return a list of cruises stored on the data warehouse
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getCruises'
+        url = f"{self.config['siteRoot']}api/warehouse/getCruises"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -410,7 +410,7 @@ class OpenVDM():
         Return the logfile purge interval
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLogfilePurgeInterval'
+        url = f"{self.config['siteRoot']}api/warehouse/getLogfilePurgeInterval"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -426,7 +426,7 @@ class OpenVDM():
         Return the current lowering id
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringID'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringID"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -442,7 +442,7 @@ class OpenVDM():
         Return the size of the current lowering directory
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringSize'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringSize"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -457,7 +457,7 @@ class OpenVDM():
         Return the start date for the current lowering
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringStartDate'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringStartDate"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -473,7 +473,7 @@ class OpenVDM():
         Return the end date for the current lowering
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringEndDate'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringEndDate"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -489,7 +489,7 @@ class OpenVDM():
         Return the lowering config filename
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLoweringConfigFn'
+        url = f"{self.config['siteRoot']}api/warehouse/getLoweringConfigFn"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -505,7 +505,7 @@ class OpenVDM():
         Return the lowerings found for the current cruise
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getLowerings'
+        url = f"{self.config['siteRoot']}api/warehouse/getLowerings"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -520,7 +520,7 @@ class OpenVDM():
         Return the extra directory configuration based on id
         """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectory/' + extra_directory_id
+        url = f"{self.config['siteRoot']}api/extraDirectories/getExtraDirectory/{extra_directory_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -544,7 +544,7 @@ class OpenVDM():
         Return all extra directory configurations
         """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getExtraDirectories'
+        url = f"{self.config['siteRoot']}api/extraDirectories/getExtraDirectories"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -561,7 +561,7 @@ class OpenVDM():
         lowering argument to file the list.
         """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getActiveExtraDirectories'
+        url = f"{self.config['siteRoot']}api/extraDirectories/getActiveExtraDirectories"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -581,7 +581,7 @@ class OpenVDM():
         Return the required extra directory configuration based on id
         """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectory/' + extra_directory_id
+        url = f"{self.config['siteRoot']}api/extraDirectories/getRequiredExtraDirectory/{extra_directory_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -605,7 +605,7 @@ class OpenVDM():
         Return all required extra directories
         """
 
-        url = self.config['siteRoot'] + 'api/extraDirectories/getRequiredExtraDirectories'
+        url = f"{self.config['siteRoot']}api/extraDirectories/getRequiredExtraDirectories"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -620,7 +620,7 @@ class OpenVDM():
         Return the shipboard data warehouse configuration
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getShipboardDataWarehouseConfig'
+        url = f"{self.config['siteRoot']}api/warehouse/getShipboardDataWarehouseConfig"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -635,7 +635,7 @@ class OpenVDM():
         Return the ship-to-shore transfer bandwidth limit
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getShipToShoreBWLimitStatus'
+        url = f"{self.config['siteRoot']}api/warehouse/getShipToShoreBWLimitStatus"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -651,7 +651,7 @@ class OpenVDM():
         Return the ship-to-shore configuration based on id
         """
 
-        url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfer/' + ship_to_shore_transfer_id
+        url = f"{self.config['siteRoot']}api/shipToShoreTransfers/getShipToShoreTransfer/{ship_to_shore_transfer_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -667,7 +667,7 @@ class OpenVDM():
         Return all ship-to-shore configurations
         """
 
-        url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getShipToShoreTransfers'
+        url = f"{self.config['siteRoot']}api/shipToShoreTransfers/getShipToShoreTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -682,7 +682,7 @@ class OpenVDM():
         Return all required ship-to-shore configurations
         """
 
-        url = self.config['siteRoot'] + 'api/shipToShoreTransfers/getRequiredShipToShoreTransfers'
+        url = f"{self.config['siteRoot']}api/shipToShoreTransfers/getRequiredShipToShoreTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -697,7 +697,7 @@ class OpenVDM():
         Return system status
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getSystemStatus'
+        url = f"{self.config['siteRoot']}api/warehouse/getSystemStatus"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -713,7 +713,7 @@ class OpenVDM():
         Return list of all available tasks
         """
 
-        url = self.config['siteRoot'] + 'api/tasks/getTasks'
+        url = f"{self.config['siteRoot']}api/tasks/getTasks"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -728,7 +728,7 @@ class OpenVDM():
         Return list of all currently active tasks
         """
 
-        url = self.config['siteRoot'] + 'api/tasks/getActiveTasks'
+        url = f"{self.config['siteRoot']}api/tasks/getActiveTasks"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -743,7 +743,7 @@ class OpenVDM():
         Return a task based on the id
         """
 
-        url = self.config['siteRoot'] + 'api/tasks/getTask/' + task_id
+        url = f"{self.config['siteRoot']}api/tasks/getTask/{task_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -759,7 +759,7 @@ class OpenVDM():
         Return a task based on the name
         """
 
-        url = self.config['siteRoot'] + 'api/tasks/getTasks'
+        url = f"{self.config['siteRoot']}api/tasks/getTasks"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -775,7 +775,7 @@ class OpenVDM():
         Return all collection system transfer configurations
         """
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfers'
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -792,7 +792,7 @@ class OpenVDM():
         and lowering argument to file the list.
         """
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers'
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getActiveCollectionSystemTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -812,7 +812,7 @@ class OpenVDM():
         Return the collection system transfer configuration based on id
         """
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/getCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -836,7 +836,7 @@ class OpenVDM():
         Return all cruise data transfers
         """
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getCruiseDataTransfers'
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -851,7 +851,7 @@ class OpenVDM():
         Return all requried cruise data transfers
         """
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfers'
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfers"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -866,7 +866,7 @@ class OpenVDM():
         Return the cruise data transfer based on id
         """
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -882,7 +882,7 @@ class OpenVDM():
         Return the required cruise data transfer based on id
         """
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -914,7 +914,7 @@ class OpenVDM():
         Return the data dashboard manifest filename
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/getDataDashboardManifestFn'
+        url = f"{self.config['siteRoot']}api/warehouse/getDataDashboardManifestFn"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)
@@ -930,7 +930,7 @@ class OpenVDM():
         Send a message to OpenVDM
         """
 
-        url = self.config['siteRoot'] + 'api/messages/newMessage'
+        url = f"{self.config['siteRoot']}api/messages/newMessage"
 
         try:
             payload = {'messageTitle': message_title, 'messageBody':message_body}
@@ -950,7 +950,7 @@ class OpenVDM():
             return
 
         # Clear Error for current tranfer in DB via API
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setIdleCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -968,7 +968,7 @@ class OpenVDM():
         if job_status != "3":
             return
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1000,7 +1000,7 @@ class OpenVDM():
 
         title = f"{collection_system_transfer.get('name')} Data Transfer failed"
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1022,7 +1022,7 @@ class OpenVDM():
 
         title = f"{collection_system_transfer.get('name')} Connection test failed"
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setErrorCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1044,7 +1044,7 @@ class OpenVDM():
 
         title = f"{cruise_data_transfer.get('name')} Data Transfer failed"
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1066,7 +1066,7 @@ class OpenVDM():
 
         title = f"{cruise_data_transfer.get('name')} Connection test failed"
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setErrorCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1085,9 +1085,9 @@ class OpenVDM():
         if not task:
             raise ValueError("Invalid task id: %s", task_id)
 
-        title = f"{task.get('name')} failed"
+        title = f"{task.get('longName')} failed"
 
-        url = self.config['siteRoot'] + 'api/tasks/setErrorTask/' + task_id
+        url = f"{self.config['siteRoot']}api/tasks/setErrorTask/{task_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1102,7 +1102,7 @@ class OpenVDM():
         Set the status flag to idle for the collection system transfer by id
         """
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setIdleCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1117,7 +1117,7 @@ class OpenVDM():
         id
         """
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1131,7 +1131,7 @@ class OpenVDM():
         Set the status flag to idle for the task specified by id
         """
 
-        url = self.config['siteRoot'] + 'api/tasks/setIdleTask/' + task_id
+        url = f"{self.config['siteRoot']}api/tasks/setIdleTask/{task_id}"
 
         try:
             requests.get(url, timeout=TIMEOUT)
@@ -1152,7 +1152,7 @@ class OpenVDM():
 
         msg = f"Transfer for {collection_system_transfer.get('name')}"
 
-        url = self.config['siteRoot'] + 'api/collectionSystemTransfers/setRunningCollectionSystemTransfer/' + collection_system_transfer_id
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setRunningCollectionSystemTransfer/{collection_system_transfer_id}"
         payload = {'jobPid': job_pid}
 
         try:
@@ -1193,7 +1193,7 @@ class OpenVDM():
 
         msg = f"Transfer for {cruise_data_transfer.get('name')}"
 
-        url = self.config['siteRoot'] + 'api/cruiseDataTransfers/setRunningCruiseDataTransfer/' + cruise_data_transfer_id
+        url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setRunningCruiseDataTransfer/{cruise_data_transfer_id}"
         payload = {'jobPid': job_pid}
 
         try:
@@ -1232,7 +1232,7 @@ class OpenVDM():
             raise ValueError("Invalid task id: %s", task_id)
 
         # Set Running for the tasks in DB via API
-        url = self.config['siteRoot'] + 'api/tasks/setRunningTask/' + task_id
+        url = f"{self.config['siteRoot']}api/tasks/setRunningTask/{task_id}"
         payload = {'jobPid': job_pid}
 
         try:
@@ -1250,7 +1250,7 @@ class OpenVDM():
         Track a gearman task within OpenVDM
         """
 
-        url = self.config['siteRoot'] + 'api/gearman/newJob/' + job_handle
+        url = f"{self.config['siteRoot']}api/gearman/newJob/{job_handle}"
         payload = {'jobName': job_name, 'jobPid': job_pid}
 
         try:
@@ -1265,7 +1265,7 @@ class OpenVDM():
         Set the filesize for the current cruise
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/setCruiseSize'
+        url = f"{self.config['siteRoot']}api/warehouse/setCruiseSize"
         payload = {'bytes': size_in_bytes}
 
         try:
@@ -1280,7 +1280,7 @@ class OpenVDM():
         Set the filesize for the current lowering
         """
 
-        url = self.config['siteRoot'] + 'api/warehouse/setLoweringSize'
+        url = f"{self.config['siteRoot']}api/warehouse/setLoweringSize"
         payload = {'bytes': size_in_bytes}
 
         try:
