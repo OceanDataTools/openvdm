@@ -382,7 +382,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
-        cdt_id = self.collection_system_transfer.get('cruiseDataTransferID')
+        cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job: %s transfer completed at: %s", current_job.handle,
