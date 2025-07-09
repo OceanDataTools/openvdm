@@ -91,31 +91,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.debug('shipToShoreTransfers: %s', json.dumps(transfers, indent=2))
 
-        proc_filters = []
-
         for priority in map(str, range(1, 6)):
             for t in transfers:
+
+                #filters transfers
                 if t['priority'] != priority or t['enable'] != '1':
                     continue
 
+                # replace {cruiseID}
                 raw_filters = _build_filters(t)
-                logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
                 base_path = f"*/{self.cruise_id}"
 
+                #if transfer is from a cst
                 if t['collectionSystem'] != "0":
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
                     if cs['cruiseOrLowering'] == '1':
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{cs['destDir']}"
+
+                #if transfer is from an ed
                 elif t['extraDirectory'] != "0":
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
                     if ed['cruiseOrLowering'] == '1':
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{ed['destDir']}"
+
+                #if neither
                 else:
                     path_prefix = base_path
 
+                #iexpand filters that have "loweringID" in path
                 expanded_filters = []
                 for flt in raw_filters:
                     if "{loweringID}" in flt:
@@ -125,9 +131,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     else:
                         expanded_filters.append(flt)
 
+                logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
                 logging.debug("Expanded Filters: %s", json.dumps(expanded_filters, indent=2))
 
-                proc_filters.extend(f"{path_prefix}/{f}" for f in expanded_filters)
+                # add prefix
+                proc_filters = (f"{path_prefix}/{f}" for f in expanded_filters)
 
         logging.debug("Processed Filters: %s", json.dumps(proc_filters, indent=2))
 
