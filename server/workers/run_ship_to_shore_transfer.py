@@ -63,7 +63,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the list of files for the ship-to-shore transfer
         """
 
-        def _build_filters(transfer):
+        def _keyword_replace_and_split(raw_filter):
             """
             Replace any wildcards in the provided filters
             """
@@ -79,10 +79,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 #'{loweringID}': self.lowering_id or '{loweringID}'
             }
 
-            raw = transfer.get('includeFilter', '')
-            expanded = _expand_placeholders(raw, context)
-
-            return expanded.split(',')
+            return _expand_placeholders(raw_filter, context).split(',')
 
         transfers = (
             self.ovdm.get_ship_to_shore_transfers()
@@ -91,6 +88,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.debug('shipToShoreTransfers: %s', json.dumps(transfers, indent=2))
 
+        proc_filters = []
         for priority in map(str, range(1, 6)):
             for t in transfers:
 
@@ -99,7 +97,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     continue
 
                 # replace {cruiseID}
-                raw_filters = _build_filters(t)
+                raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
+                logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
                 base_path = f"*/{self.cruise_id}"
 
@@ -121,21 +120,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 else:
                     path_prefix = base_path
 
+                rare_filters = (f"{path_prefix}/{f}" for f in raw_filters)
+                logging.debug("Rare Filters: %s", json.dumps(rare_filters, indent=2))
+
                 #iexpand filters that have "loweringID" in path
-                expanded_filters = []
                 for flt in raw_filters:
                     if "{loweringID}" in flt:
-                        expanded_filters.extend(
+                        proc_filters.extend(
                             flt.replace("{loweringID}", lid) for lid in self.lowerings
                         )
                     else:
-                        expanded_filters.append(flt)
-
-                logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
-                logging.debug("Expanded Filters: %s", json.dumps(expanded_filters, indent=2))
-
-                # add prefix
-                proc_filters = (f"{path_prefix}/{f}" for f in expanded_filters)
+                        proc_filters.append(flt)
 
         logging.debug("Processed Filters: %s", json.dumps(proc_filters, indent=2))
 
