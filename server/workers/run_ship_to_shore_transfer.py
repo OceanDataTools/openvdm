@@ -28,7 +28,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, is_rsync_patial_file, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_options, check_darwin, test_cdt_destination
 from server.lib.openvdm import OpenVDM
 
@@ -134,6 +134,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         for root, _, files in os.walk(self.cruise_dir):
             for f in files:
                 full_path = os.path.join(root, f)
+                if not is_ascii(full_path):
+                    return ("exclude", full_path, None)
+
+                if is_rsync_patial_file(full_path):
+                    return None
+
                 if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
                     return_files['include'].append(f'{full_path}')
 
@@ -504,6 +510,31 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
             return json.dumps(job_results)
 
         job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
+
+    logging.info("Writing exclude logfile")
+    worker.send_job_status(current_job, 95, 100)
+
+    logfile_filename = f"{cdt_cfg['name']}_Exclude.log"
+    logfile_contents = {
+        'files': {
+            'exclude': job_results['files']['exclude']
+        }
+    }
+    results = output_json_data_to_file(os.path.join(worker.build_logfile_dirpath(), logfile_filename), logfile_contents['files'])
+
+    if not results['verdict']:
+        logging.error("Error writing transfer logfile: %s", results['reason'])
+        job_results['parts'].append({"partName": "Write exclude logfile", "result": "Fail", "reason": results['reason']})
+        return json.dumps(job_results)
+
+    results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], os.path.join(worker.build_logfile_dirpath(), logfile_filename))
+
+    if not results['verdict']:
+        logging.error("Error setting ownership/permissions for transfer logfile: %s", logfile_filename)
+        job_results['parts'].append({"partName": "Set transfer logfile ownership/permissions", "result": "Fail", "reason": results['reason']})
+        return json.dumps(job_results)
+
+    job_results['parts'].append({"partName": "Write exclude logfile", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
