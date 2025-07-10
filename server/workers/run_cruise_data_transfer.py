@@ -60,7 +60,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build exclude filter for the transfer
         """
 
-        exclude_filterlist = [".*.??????"]
+        exclude_filterlist = []
 
         wh_cfg = self.shipboard_data_warehouse_config
         cdt_cfg = self.cruise_data_transfer
@@ -254,11 +254,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # === DRY RUN ===
             dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
-            extra_args = []
+            extra_args = ['--exclude=".*.??????"']
             if transfer_type == 'ssh':
-                extra_args = ['-e', 'ssh']
+                extra_args += ['-e', 'ssh']
             elif transfer_type == 'rsync':
-                extra_args = [f"--password-file={password_file}"]
+                extra_args += [f"--password-file={password_file}"]
 
             dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
