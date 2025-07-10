@@ -69,13 +69,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         # Exclude OVDM-related files if flag is set
         if cdt_cfg.get('includeOVDMFiles') == '0':
             exclude_filterlist.extend([
-                f"/{wh_cfg['cruiseConfigFn']}",
-                f"/{wh_cfg['md5SummaryFn']}",
-                f"/{wh_cfg['md5SummaryMd5Fn']}"
+                f"{wh_cfg['cruiseConfigFn']}",
+                f"{wh_cfg['md5SummaryFn']}",
+                f"{wh_cfg['md5SummaryMd5Fn']}"
             ])
 
             for lowering in lowerings:
-                exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, self.ovdm.get_lowering_config_fn())}")
+                exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, self.ovdm.get_lowering_config_fn())}")
 
         # Handle excluded collection systems
         ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
@@ -88,12 +88,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 if cruise_or_lowering == '0':
                     # Cruise-level exclusion
-                    exclude_filterlist.append(f"/{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
+                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
                 else:
                     # Lowering-level exclusions
                     for lowering in lowerings:
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
-                        exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
             except Exception as exc:
                 logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, str(exc))
@@ -109,17 +109,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 if cruise_or_lowering == '0':
                     # Cruise-level exclusion
-                    exclude_filterlist.append(f"/{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
+                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
                 else:
                     # Lowering-level exclusions
                     for lowering in lowerings:
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
-                        exclude_filterlist.append(f"/{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
 
             except Exception as exc:
                 logging.warning("Could not retrieve extra directory %s: %s", ed_id, str(exc))
 
-        exclude_filterlist = [ self.cruise_id + path_filter for path_filter in exclude_filterlist ]
+        exclude_filterlist = [ f'{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
 
         return exclude_filterlist
 
