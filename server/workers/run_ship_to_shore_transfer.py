@@ -135,10 +135,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             for f in files:
                 full_path = os.path.join(root, f)
                 if not is_ascii(full_path):
-                    return ("exclude", full_path, None)
+                    return_files['exclude'].append(f'{full_path}')
+                    continue
 
                 if is_rsync_patial_file(full_path):
-                    return None
+                    continue
 
                 if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
                     return_files['include'].append(f'{full_path}')
