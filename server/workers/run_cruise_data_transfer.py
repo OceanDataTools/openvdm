@@ -120,6 +120,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.warning("Could not retrieve extra directory %s: %s", ed_id, str(exc))
 
         exclude_filterlist = [ f'{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
+        exclude_filterlist.append('.*.??????')
 
         return exclude_filterlist
 
@@ -254,7 +255,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # === DRY RUN ===
             dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
-            extra_args = ['--exclude=".*.??????"']
+            extra_args = []
             if transfer_type == 'ssh':
                 extra_args += ['-e', 'ssh']
             elif transfer_type == 'rsync':
