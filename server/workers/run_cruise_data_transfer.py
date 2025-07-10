@@ -27,7 +27,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
 from server.lib.openvdm import OpenVDM
 
@@ -59,6 +59,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Build exclude filter for the transfer
         """
+
+        #exclude non-ascii filenames
+        def _find_non_ascii_files(source_dir):
+            non_ascii_files = []
+            for root, dirs, files in os.walk(source_dir):
+                for name in files:
+                    if not is_ascii(name):
+                        full_path = os.path.join(root, name)
+                        non_ascii_files.append(os.path.relpath(full_path, source_dir))
+            return non_ascii_files
 
         exclude_filterlist = []
 
@@ -119,6 +129,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             except Exception as exc:
                 logging.warning("Could not retrieve extra directory %s: %s", ed_id, str(exc))
 
+        exclude_filterlist.extend(_find_non_ascii_files(self.cruise_dir))
         exclude_filterlist = [ f'{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
         exclude_filterlist.append('.*.??????')
 
