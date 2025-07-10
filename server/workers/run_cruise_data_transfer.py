@@ -61,7 +61,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build exclude filter for the transfer
         """
 
-        exclude_filterlist = []
+        exclude_filterlist = [
+            '*.*.XXXXXX'
+        ]
 
         wh_cfg = self.shipboard_data_warehouse_config
         cdt_cfg = self.cruise_data_transfer
