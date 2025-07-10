@@ -379,16 +379,16 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
     gm_client = python3_gearman.GearmanClient([worker.ovdm.get_gearman_server()])
 
-    logging.info("Set ownership/permissions for the CruiseData directory")
-    completed_job_request = gm_client.submit_job(CRUISE_DIR_TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], current_job.data)
-    results = json.loads(completed_job_request.result)
+    # logging.info("Set ownership/permissions for the CruiseData directory")
+    # completed_job_request = gm_client.submit_job(CRUISE_DIR_TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'], current_job.data)
+    # results = json.loads(completed_job_request.result)
 
-    if results['parts'][-1]['result'] == "Fail": # Final Verdict
-        logging.error("Failed to lockdown the CruiseData directory")
-        job_results['parts'].append({"partName": "Set ownership/permissions for CruiseData directory", "result": "Fail", "reason": results['parts'][-1]['reason']})
-        return json.dumps(job_results)
+    # if results['parts'][-1]['result'] == "Fail": # Final Verdict
+    #     logging.error("Failed to lockdown the CruiseData directory")
+    #     job_results['parts'].append({"partName": "Set ownership/permissions for CruiseData directory", "result": "Fail", "reason": results['parts'][-1]['reason']})
+    #     return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Set ownership/permissions for CruiseData directory", "result": "Pass"})
+    # job_results['parts'].append({"partName": "Set ownership/permissions for CruiseData directory", "result": "Pass"})
 
     logging.info("Creating cruise data directory")
     worker.send_job_status(current_job, 2, 10)
