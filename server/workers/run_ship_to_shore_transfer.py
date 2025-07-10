@@ -135,7 +135,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             for f in files:
                 full_path = os.path.join(root, f)
                 if not is_ascii(full_path):
-                    return_files['exclude'].append(f'{full_path}')
+                    return_files['exclude'].append(f'{os.path.relpath(full_path, self.cruise_dir)}')
                     continue
 
                 if is_rsync_patial_file(full_path):
