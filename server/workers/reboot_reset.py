@@ -22,7 +22,6 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
-
 def reboot_reset():
     """
     Set all tasks and transfer to idle.

@@ -48,7 +48,6 @@ CUSTOM_TASKS = [
     }
 ]
 
-
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """
     Class for the current Gearman worker

@@ -37,7 +37,6 @@ TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }
 
-
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
     Gearman worker for OpenVDM-based cruise data transfers.

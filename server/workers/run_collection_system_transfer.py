@@ -42,7 +42,6 @@ TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
-
 def process_batch(batch, filters, data_start_time, data_end_time):
     """
     Process a batch of file paths
