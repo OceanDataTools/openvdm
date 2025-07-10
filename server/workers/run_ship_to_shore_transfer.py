@@ -86,8 +86,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             + self.ovdm.get_required_ship_to_shore_transfers()
         )
 
-        logging.debug('shipToShoreTransfers: %s', json.dumps(transfers, indent=2))
-
         proc_filters = []
         for priority in map(str, range(1, 6)):
             for t in transfers:
@@ -98,9 +96,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 # replace {cruiseID}
                 raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
-                logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
-                base_path = '*' #f"{self.cruise_id}"
+                base_path = '*'
 
                 #if transfer is from a cst
                 if t['collectionSystem'] != "0":
@@ -121,7 +118,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     path_prefix = base_path
 
                 rare_filters = [f"{path_prefix}/{f}" for f in raw_filters]
-                logging.debug("Rare Filters: %s", json.dumps(rare_filters, indent=2))
 
                 #expand filters that have "loweringID" in path
                 for flt in rare_filters:
@@ -132,7 +128,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     else:
                         proc_filters.append(flt)
 
-        logging.debug("Processed Filters: %s", json.dumps(proc_filters, indent=2))
+        logging.debug("File Filters: %s", json.dumps(proc_filters, indent=2))
 
         return_files = {'include': [], 'new': [], 'updated': [], 'exclude': []}
         for root, _, files in os.walk(self.cruise_dir):
@@ -145,48 +141,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             f.replace(self.cruise_dir, self.cruise_id, 1) for f in return_files['include']
         ]
 
-        logging.debug("Returned Files: %s", json.dumps(return_files, indent=2))
+        logging.debug("Matched Files: %s", json.dumps(return_files['include'], indent=2))
 
         return {'verdict': True, 'files': return_files}
-
-
-        # logging.debug("Building filters")
-        # raw_filters = {'includeFilter':[]}
-        # ship_to_shore_transfers = self.ovdm.get_ship_to_shore_transfers() + self.ovdm.get_required_ship_to_shore_transfers()
-
-        # logging.debug('shipToShoreTransfers: %s', json.dumps(ship_to_shore_transfers, indent=2))
-
-        # for priority in range(1, 6):
-        #     for ship_to_shore_transfer in ship_to_shore_transfers:
-        #         if ship_to_shore_transfer['priority'] == str(priority) and ship_to_shore_transfer['enable'] == '1':
-        #             if not ship_to_shore_transfer['collectionSystem'] == "0":
-        #                 collection_system = self.ovdm.get_collection_system_transfer(ship_to_shore_transfer['collectionSystem'])
-        #                 raw_filters['includeFilter'] += [f"*/{self.cruise_id}/{collection_system['destDir']}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
-        #             elif not ship_to_shore_transfer['extraDirectory'] == "0":
-        #                 extra_directory = self.ovdm.get_extra_directory(ship_to_shore_transfer['extraDirectory'])
-        #                 raw_filters['includeFilter'] += [f"*/{self.cruise_id}/{extra_directory['destDir']}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
-        #             else:
-        #                 raw_filters['includeFilter'] += [f"*/{self.cruise_id}/{ship_to_shore_filter}" for ship_to_shore_filter in ship_to_shore_transfer['includeFilter'].split(',')]
-
-        # logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
-
-        # proc_filters = build_filters(self, raw_filters)
-        # logging.debug("Processed Filters: %s", json.dumps(raw_filters, indent=2))
-
-        # cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-
-        # return_files = {'include':[], 'new':[], 'updated':[], 'exclude':[]}
-        # for root, _, filenames in os.walk(cruise_dir):
-        #     for filename in filenames:
-        #         for include_filter in proc_filters['includeFilter']:
-        #             if fnmatch.fnmatch(os.path.join(root, filename), include_filter):
-        #                 return_files['include'].append(os.path.join(root, filename))
-
-        # return_files['include'] = [filename.replace(f'{cruise_dir}/', '', 1) for filename in return_files['include']]
-
-        # logging.debug("Returned Files: %s", json.dumps(return_files, indent=2))
-
-        # return { 'verdict': True, 'files': return_files }
 
 
     def build_logfile_dirpath(self):
@@ -194,9 +151,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the path for saving the transfer logfile
         """
 
-        cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
-
-        return os.path.join(cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
 
 
     def run_transfer_command(self, current_job, command, file_count):
@@ -274,8 +229,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         def _build_include_file(include_list, filepath):
             try:
                 with open(filepath, mode='w', encoding="utf-8") as f:
-                    logging.debug('\n'.join(include_list))
-                    logging.debug('\0')
                     f.write('\n'.join(include_list))
                     f.write('\0')
             except IOError as exc:
@@ -297,7 +250,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return {'verdict': False, 'reason': results.get('reason', 'Unknown')}
 
             files = results['files']
-            logging.debug("files: %s", json.dumps(files, indent=2))
 
             if not _build_include_file(files['include'], include_file):
                 return {'verdict': False, 'reason': 'Failed to write include file'}
@@ -309,7 +261,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             if cdt_cfg.get('sshUseKey') == '0':
                 cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
 
-            logging.debug('Transfer Command: %s', ' '.join(cmd))
             files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             return {'verdict': True, 'files': files}
 
@@ -323,7 +274,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("Payload: %s", current_job.data)
+            logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
 
             self.cruise_data_transfer = self.ovdm.get_required_cruise_data_transfer_by_name("SSDW")
 
@@ -490,10 +441,11 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     }
 
     logging.debug("Setting transfer status to 'Running'")
+    worker.send_job_status(current_job, 1, 10)
     worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing configuration")
-    worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 15, 100)
 
     results = test_cdt_destination(cdt_cfg)
 
