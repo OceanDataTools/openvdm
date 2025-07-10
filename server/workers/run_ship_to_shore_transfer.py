@@ -100,7 +100,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
                 logging.debug("Raw Filters: %s", json.dumps(raw_filters, indent=2))
 
-                base_path = f"*/{self.cruise_id}"
+                base_path = '*' #f"{self.cruise_id}"
 
                 #if transfer is from a cst
                 if t['collectionSystem'] != "0":
@@ -120,11 +120,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 else:
                     path_prefix = base_path
 
-                rare_filters = (f"{path_prefix}/{f}" for f in raw_filters)
+                rare_filters = [f"{path_prefix}/{f}" for f in raw_filters]
                 logging.debug("Rare Filters: %s", json.dumps(rare_filters, indent=2))
 
-                #iexpand filters that have "loweringID" in path
-                for flt in raw_filters:
+                #expand filters that have "loweringID" in path
+                for flt in rare_filters:
                     if "{loweringID}" in flt:
                         proc_filters.extend(
                             flt.replace("{loweringID}", lid) for lid in self.lowerings
@@ -139,10 +139,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             for f in files:
                 full_path = os.path.join(root, f)
                 if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
-                    return_files['include'].append(full_path)
+                    return_files['include'].append(f'{full_path}')
 
         return_files['include'] = [
-            f.replace(f'{self.cruise_dir}/', '', 1) for f in return_files['include']
+            f.replace(self.cruise_dir, self.cruise_id, 1) for f in return_files['include']
         ]
 
         logging.debug("Returned Files: %s", json.dumps(return_files, indent=2))
@@ -305,7 +305,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
             extra_args = ['-e', 'ssh']
 
-            cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, include_file)
+            cmd = _build_rsync_command(real_flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
             if cdt_cfg.get('sshUseKey') == '0':
                 cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
 
