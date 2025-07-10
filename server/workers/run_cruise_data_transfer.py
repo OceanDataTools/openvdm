@@ -61,7 +61,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         exclude_filterlist = [
-            '*.*.XXXXXX'
+            '*.*.??????'
         ]
 
         wh_cfg = self.shipboard_data_warehouse_config
