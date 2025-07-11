@@ -19,7 +19,6 @@ import logging
 import os
 import signal
 import sys
-import time
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -73,8 +72,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run when a new job arrives
         """
 
-        logging.debug("Received job: %s", current_job)
-
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", current_job.data)
@@ -87,7 +84,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.job_pid = payload_obj.get('pid')
         self.job_info = self._get_job_info()
 
-        logging.info("Job: %s, Killing PID: %s failed at: %s", current_job.handle, self.job_pid, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Started: %s, Killing PID: %s", current_job.handle, self.job_pid)
 
         return super().on_job_execute(current_job)
 
@@ -97,8 +94,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run when the current job has an exception
         """
 
-        logging.error("Job: %s, failed at: %s", current_job.handle,
-              time.strftime("%D %T", time.gmtime()))
+        logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -119,8 +115,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
-        logging.info("Job: %s, Killing PID %s completed at: %s", current_job.handle,
-                     self.job_pid, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Completed: %s, Killed PID: %s", current_job.handle, self.job_pid)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -168,12 +163,13 @@ def task_stop_job(worker, current_job):
     job_results = {'parts': [{"partName": "Retrieve Job Info", "result": "Pass"}]}
 
     if job_type == "unknown":
-        logging.error("Unknown job type: %s", job_type)
-        return worker._fail_job(current_job, "Valid OpenVDM Job", f"Unknown job type: {job_type}")
+        reason = f"Unknown job type: {job_type}"
+        logging.error(reason)
+        return json.dumps({
+            'parts': [{"partName": 'Verify OpenVDM Job', "result": "Fail", "reason": reason}]
+        })
 
-    job_results['parts'].append({"partName": "Valid OpenVDM Job", "result": "Pass"})
-
-    logging.info("Quitting job: %s", job_pid)
+    job_results['parts'].append({"partName": "Verify OpenVDM Job", "result": "Pass"})
 
     try:
         os.kill(int(job_pid), signal.SIGQUIT)

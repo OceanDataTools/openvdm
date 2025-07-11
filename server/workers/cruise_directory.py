@@ -20,7 +20,6 @@ import logging
 import os
 import signal
 import sys
-import time
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -151,7 +150,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when a new job arrives
         """
 
-        logging.debug("current_job: %s", current_job)
         self.stop = False
 
         try:
@@ -172,7 +170,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if int(self.task['taskID']) > 0:
             self.ovdm.set_running_task(self.task['taskID'], os.getpid(), current_job.handle)
 
-        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Started: %s", current_job.handle)
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
@@ -188,7 +186,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when the current job has an exception
         """
 
-        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -226,7 +224,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             self.ovdm.set_idle_task(self.task['taskID'])
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
-        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Completed: %s", current_job.handle)
 
         return super().send_job_complete(current_job, job_result)
 

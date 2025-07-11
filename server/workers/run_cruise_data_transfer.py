@@ -315,8 +315,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
         Function run when a new job arrives
         """
-
-        logging.debug("Received job: %s", current_job)
         self.stop = False
 
         try:
@@ -349,7 +347,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
-        logging.info("Job: %s, transfer started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Started: %s", current_job.handle)
 
         self.system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.cruise_data_transfer.update(payload_obj['cruiseDataTransfer'])
@@ -371,8 +369,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Function run when the current job has an exception
         """
 
-        logging.error("Job: %s, transfer failed at: %s", current_job.handle,
-                      time.strftime("%D %T", time.gmtime()))
+        logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -401,8 +398,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
-        logging.info("Job: %s transfer completed at: %s", current_job.handle,
-                     time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Completed: %s ", current_job.handle)
 
         if not cdt_id:
             return super().send_job_complete(current_job, job_result)

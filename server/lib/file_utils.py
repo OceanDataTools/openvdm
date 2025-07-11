@@ -451,7 +451,7 @@ def lockdown_directory(base_dir, exempt_dirs=[]):
         try:
             os.chmod(file, 0o600)
         except (OSError, PermissionError) as exc:
-            reason = f"Could not change permissions for file {file}"
+            reason = f"Unable to set permissions for file {file}"
             logging.warning("%s: %s", reason, str(exc))
             reasons.append(reason)
 
@@ -461,7 +461,7 @@ def lockdown_directory(base_dir, exempt_dirs=[]):
         try:
             os.chmod(directory, 0o700)
         except (OSError, PermissionError) as exc:
-            reason = f"Could not change permissions for directory {directory}"
+            reason = f"Unable to set permissions for directory {directory}"
             logging.warning("%s: %s", reason, str(exc))
             reasons.append(reason)
 

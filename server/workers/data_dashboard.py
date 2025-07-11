@@ -20,7 +20,6 @@ import os
 import sys
 import signal
 import subprocess
-import time
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -228,7 +227,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when a new job arrives
         """
 
-        logging.debug("current_job: %s", current_job)
         self.stop = False
 
         try:
@@ -254,7 +252,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         else:
             self.ovdm.track_gearman_job(self.task['longName'], os.getpid(), current_job.handle)
 
-        logging.info("Job: %s started at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Started: %s", current_job.handle)
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_id = payload_obj['cruiseID'] if 'cruiseID' in payload_obj else self.ovdm.get_cruise_id()
@@ -286,7 +284,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when the current job has an exception
         """
 
-        logging.error("Job: %s failed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -343,56 +341,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             self.ovdm.set_idle_task(self.task['taskID'])
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
-        logging.info("Job: %s completed at: %s", current_job.handle, time.strftime("%D %T", time.gmtime()))
+        logging.info("Job Completed: %s", current_job.handle)
 
         return super().send_job_complete(current_job, job_result)
-
-        # results_obj = json.loads(job_result)
-
-        # logging.debug("Preparing subsequent Gearman jobs")
-
-        # job_data = {
-        #     'cruiseID': self.cruise_id,
-        #     'loweringID': self.lowering_id,
-        #     'files': results_obj['files']
-        # }
-
-        # if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
-
-        #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-        #     payload_obj = json.loads(current_job.data)
-        #     job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
-
-        #     for task in self.ovdm.get_tasks_for_hook(current_job.task):
-        #         logging.info("Adding post task: %s", task)
-        #         gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-        # elif current_job.task == TASK_NAMES['REBUILD_DATA_DASHBOARD']:
-
-        #     gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-
-        #     for task in self.ovdm.get_tasks_for_hook(current_job.task):
-        #         logging.info("Adding post task: %s", task)
-        #         gm_client.submit_job(task, json.dumps(job_data), background=True)
-
-        # if len(results_obj['parts']) > 0:
-        #     if results_obj['parts'][-1]['result'] == "Fail": # Final Verdict
-        #         if int(self.task['taskID']) > 0:
-        #             self.ovdm.set_error_task(self.task['taskID'], results_obj['parts'][-1]['reason'])
-        #         else:
-        #             self.ovdm.send_msg(f"{self.task['longName']} failed", results_obj['parts'][-1]['reason'])
-        #     else:
-        #         if int(self.task['taskID']) > 0:
-        #             self.ovdm.set_idle_task(self.task['taskID'])
-        # else:
-        #     if int(self.task['taskID']) > 0:
-        #         self.ovdm.set_idle_task(self.task['taskID'])
-
-        # logging.debug("Job Results: %s", json.dumps(results_obj, indent=2))
-        # logging.info("Job: %s (%s) completed at: %s", self.task['longName'], current_job.handle, time.strftime("%D %T", time.gmtime()))
-
-        # return super().send_job_complete(current_job, job_result)
 
 
     def stop_task(self):
