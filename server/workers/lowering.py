@@ -164,7 +164,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
         if not self.lowering_id:
-            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is not defined")
+            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
 
         self.lowering_start_date = payload_obj.get('loweringStartDate', self.ovdm.get_lowering_start_date())
         self.lowering_end_date = payload_obj.get('loweringEndDate', self.ovdm.get_lowering_end_date())
@@ -369,7 +369,7 @@ def task_finalize_current_lowering(worker, current_job):
     time.sleep(1)
     gm_client.wait_until_jobs_completed(submitted_job_request)
 
-    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
+    job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Pass"})
 
     logging.info("Exporting lowering configuration")
     worker.send_job_status(current_job, 9, 10)

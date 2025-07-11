@@ -458,10 +458,10 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")
-        job_results['parts'].append({"partName": "Connection Test", "result": "Fail", "reason": results[-1]['reason']})
+        job_results['parts'].append({"partName": "Connection test", "result": "Fail", "reason": results[-1]['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
+    job_results['parts'].append({"partName": "Destination test", "result": "Pass"})
 
     logging.info("Transferring files")
     worker.send_job_status(current_job, 2, 10)
@@ -470,11 +470,11 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
 
     if not results['verdict']:
         logging.error("Transfer of remote files failed: %s", results['reason'])
-        job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
+        job_results['parts'].append({"partName": "Transfer files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
     job_results['files'] = results['files']
-    job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
+    job_results['parts'].append({"partName": "Transfer files", "result": "Pass"})
 
     if len(job_results['files']['new']) > 0:
         logging.debug("%s file(s) added", len(job_results['files']['new']))

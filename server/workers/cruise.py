@@ -150,7 +150,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         from_publicdata_dir = self.ovdm.get_required_extra_directory_by_name('From_PublicData')['destDir']
         dest_dir = os.path.join(self.cruise_dir, from_publicdata_dir)
 
-        logging.debug("Verify PublicData Directory exists")
+        logging.debug("Verify PublicData directory exists")
         if not os.path.exists(source_dir):
             return {'verdict': False, "reason": f"PublicData directory: {source_dir} could not be found"}
 
@@ -519,7 +519,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     time.sleep(1)
     gm_client.wait_until_jobs_completed(submitted_job_request)
 
-    job_results['parts'].append({"partName": "Run Collection System Transfers jobs", "result": "Pass"})
+    job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Pass"})
 
     if worker.ovdm.get_transfer_public_data():
         logging.debug("Transferring public data files to cruise data directory")

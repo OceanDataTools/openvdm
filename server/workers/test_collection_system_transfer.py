@@ -104,11 +104,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         dest_dir_exists = os.path.isdir(self.dest_dir)
         if not dest_dir_exists:
             reason = f"Unable to find destination directory: {self.dest_dir}"
-            results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
+            results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
 
             return results
 
-        results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+        results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
         return results
 
@@ -136,14 +136,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
             if self.collection_system_transfer is None:
-                return self._fail_job(current_job, "Locate Collection System Transfer Data",
+                return self._fail_job(current_job, "Locate collection system transfer Data",
                                       "Could not find collection system transfer config to use for connection test")
 
             self.collection_system_transfer.update(cst_cfg)
 
         elif not cst_cfg:
 
-            return self._fail_job(current_job, "Locate Collection System Transfer Data",
+            return self._fail_job(current_job, "Locate collection system transfer Data",
                                   "Could not find collection system transfer config to use for connection test")
 
         else:
@@ -164,9 +164,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.lowering_id = None
 
         if self.collection_system_transfer['cruiseOrLowering'] == '1' and self.lowering_id is None:
-            reason = "Lowering ID is not defined"
-            return self._fail_job(current_job, "Verify lowering ID",
-                                    "Lowering ID is not defined")
+            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 

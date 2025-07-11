@@ -40,7 +40,7 @@ CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": TASK_NAMES['UPDATE_MD5_SUMMARY'],
-        "longName": "Updating MD5 Summary",
+        "longName": "Updating MD5 summary",
     }
 ]
 
@@ -166,7 +166,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 md5_summary_md5_file.write(self.hash_file(self.md5_summary_filepath))
 
         except IOError:
-            reason = f"Error Saving MD5 Summary MD5 file: {self.md5_summary_md5_filepath}"
+            reason = f"Error saving MD5 Summary MD5 file: {self.md5_summary_md5_filepath}"
             logging.error(reason)
             return {"verdict": False, "reason": reason}
 
@@ -340,7 +340,7 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
                 for line in f if ' ' in line
             ]
     except IOError:
-        reason = f"Error Reading pre-existing MD5 Summary file: {worker.md5_summary_filepath}"
+        reason = f"Error reading pre-existing MD5 Summary file: {worker.md5_summary_filepath}"
         logging.error(reason)
         job_results['parts'].append({
             "partName": "Reading pre-existing MD5 Summary file",

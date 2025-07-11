@@ -40,7 +40,7 @@ CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": TASK_NAMES['UPDATE_DATA_DASHBOARD'],
-        "longName": "Updating Data Dashboard",
+        "longName": "Updating data dashboard",
     }
 ]
 
@@ -196,23 +196,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
             if not out_obj:
                 msg = f"Parser returned no output. Parsing command: {' '.join(cmd)}"
-                logging.error("Datafile Parsing error: %s", msg)
-                self.ovdm.send_msg("Datafile Parsing error", msg)
+                logging.error("Datafile parsing error: %s", msg)
+                self.ovdm.send_msg("Datafile parsing error", msg)
                 continue
 
             if out_obj.get('error'):
-                logging.error("Datafile Parsing error: %s", out_obj['error'])
-                self.ovdm.send_msg("Datafile Parsing error", out_obj['error'])
+                logging.error("Datafile parsing error: %s", out_obj['error'])
+                self.ovdm.send_msg("Datafile parsing error", out_obj['error'])
                 continue
 
             result = output_json_data_to_file(json_path, out_obj)
             if result['verdict']:
-                job_results['parts'].append({"partName": f"Writing DashboardData file: {filename}", "result": "Pass"})
+                job_results['parts'].append({"partName": f"Writing dashboard data file: {filename}", "result": "Pass"})
             else:
-                msg = f"Error Writing DashboardData file: {filename}. Reason: {result['reason']}"
+                msg = f"Error writing dashboard data file: {filename}. Reason: {result['reason']}"
                 logging.error("Data Dashboard Processing failed: %s", msg)
                 self.ovdm.send_msg("Data Dashboard Processing failed", msg)
-                job_results['parts'].append({"partName": f"Writing Dashboard file: {filename}", "result": "Fail", "reason": result['reason']})
+                job_results['parts'].append({"partName": f"Writing dashboard file: {filename}", "result": "Fail", "reason": result['reason']})
                 continue
 
             self._add_manifest_entry(new_manifest_entries, dd_type, json_path, raw_path, base_dir)
@@ -455,12 +455,12 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     processing_script_filename = worker._build_processing_filename()
 
     if processing_script_filename is None:
-        reason = f"Processing script not found for: {worker.collection_system_transfer['name']}"
+        reason = f"Plugin not found for: {worker.collection_system_transfer['name']}"
         logging.warning(reason)
-        job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": "Verify data dashboard plugin", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Dashboard Processing File Located", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify data dashboard plugin", "result": "Pass"})
 
     logging.info("Building list of files to process")
     worker.send_job_status(current_job, 10, 100)
@@ -472,10 +472,10 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     if len(filelist) == 0:
         reason = "No new or updated files to process"
         logging.warning(reason)
-        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Ignore", "reason": reason})
+        job_results['parts'].append({"partName": "Retrieve file list", "result": "Ignore", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Pass"})
+    job_results['parts'].append({"partName": "Retrieve file list", "result": "Pass"})
 
     logging.info("Processing files")
     worker.send_job_status(current_job, 15, 100)
@@ -488,7 +488,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     if len(new_manifest_entries) == 0 and len(remove_manifest_entries) == 0:
         reason = "No new, updated or obsolete entries to process"
         logging.warning(reason)
-        job_results['parts'].append({"partName": "Retrieve Filelist", "result": "Ignore", "reason": reason})
+        job_results['parts'].append({"partName": "Retrieve file list", "result": "Ignore", "reason": reason})
         return(json.dumps(job_results))
 
     rows_removed = 0
@@ -497,14 +497,14 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     try:
         with open(worker.data_dashboard_manifest_file_path, 'r', encoding='utf-8') as f:
             existing_entries = json.load(f)
-        job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Pass"})
+        job_results['parts'].append({"partName": "Reading pre-existing manifest file", "result": "Pass"})
     except IOError:
         logging.warning("Error reading manifest file: %s", worker.data_dashboard_manifest_file_path)
         existing_entries = []
     except Exception as exc:
         reason = f"Error reading dashboard manifest file: {worker.data_dashboard_manifest_file_path}"
         logging.error("%s: %s", reason, str(exc))
-        job_results['parts'].append({"partName": "Reading pre-existing Dashboard manifest file", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": "Reading pre-existing manifest file", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     # Remove entries
@@ -544,10 +544,10 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     result = output_json_data_to_file(worker.data_dashboard_manifest_file_path, existing_entries)
     if not result['verdict']:
         logging.error("Error writing manifest file: %s", worker.data_dashboard_manifest_file_path)
-        job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Fail", "reason": result['reason']})
+        job_results['parts'].append({"partName": "Writing dashboard manifest file", "result": "Fail", "reason": result['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Writing Dashboard manifest file", "result": "Pass"})
+    job_results['parts'].append({"partName": "Writing dashboard manifest file", "result": "Pass"})
 
     manifest_filename = worker.shipboard_data_warehouse_config['dataDashboardManifestFn']
     manifest_relpath = os.path.join(worker.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'], manifest_filename)
@@ -589,10 +589,10 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
     if not os.path.exists(worker.data_dashboard_dir):
         reason = f"Data dashboard directory not found: {worker.data_dashboard_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": "Verify Data dashboard directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Data Dashboard Directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify Data dashboard directory exists", "result": "Pass"})
 
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers()
 
@@ -629,7 +629,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
                 lowering_filelist = build_filelist(collection_system_transfer_input_dir).get('include', [])
                 filelist.extend([os.path.join(lowering_base_dir, lowering, collection_system_transfer['destDir'], filename) for filename in lowering_filelist])
 
-        logging.debug("FileList: %s", json.dumps(filelist, indent=2))
+        logging.debug("File list: %s", json.dumps(filelist, indent=2))
 
         logging.info(" - Processing files")
         start = 80 * progress_factor + 10
@@ -638,7 +638,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         logging.debug(new_manifest_entries)
         manifest_entries.extend(new_manifest_entries)
 
-    logging.info("Updating Manifest file: %s", worker.data_dashboard_manifest_file_path)
+    logging.info("Updating manifest file: %s", worker.data_dashboard_manifest_file_path)
     worker.send_job_status(current_job, 9, 10)
 
     output_results = output_json_data_to_file(worker.data_dashboard_manifest_file_path, manifest_entries)
@@ -656,7 +656,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
 
     if not output_results['verdict']:
-        logging.error("Error Setting file/directory ownership/permissions")
+        logging.error("Error setting file/directory ownership/permissions")
         job_results['parts'].append({"partName": "Setting file/directory ownership", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 

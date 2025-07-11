@@ -39,12 +39,12 @@ CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": TASK_NAMES['CREATE_LOWERING_DIRECTORY'],
-        "longName": "Creating Lowering Directory",
+        "longName": "Creating lowering directory",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['SET_LOWERINGDATA_PERMISSIONS'],
-        "longName": "Setting Lowering Data Directory Permissions",
+        "longName": "Setting lowering data directory permissions",
     }
 
 ]
@@ -161,7 +161,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
         if not self.lowering_id:
-            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is not defined")
+            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
@@ -262,22 +262,22 @@ def task_create_lowering_directory(worker, current_job):
 
     logging.debug("Pre-tasks checks")
     if not os.path.exists(worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": f"Cruise directory {worker.cruise_dir} does not exists"})
+        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": f"Cruise directory {worker.cruise_dir} does not exists"})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
 
     if not os.path.exists(worker.lowering_base_dir):
-        job_results['parts'].append({"partName": "Verify Lowering Base Directory exists", "result": "Fail", "reason": f"Lowering base directory {worker.lowering_base_dir} does not exists"})
+        job_results['parts'].append({"partName": "Verify lowering base directory exists", "result": "Fail", "reason": f"Lowering base directory {worker.lowering_base_dir} does not exists"})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Lowering Base Directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify lowering base directory exists", "result": "Pass"})
 
     if os.path.exists(worker.lowering_full_dir):
-        job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Fail", "reason": f"Lowering directory {worker.lowering_full_dir} already exists"})
+        job_results['parts'].append({"partName": "Verify lowering directory does not exists", "result": "Fail", "reason": f"Lowering directory {worker.lowering_full_dir} already exists"})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Lowering Directory does not exists", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify lowering directory does not exists", "result": "Pass"})
 
     logging.debug("Building directory list")
     worker.send_job_status(current_job, 2, 10)
@@ -360,10 +360,10 @@ def task_rebuild_lowering_directory(worker, current_job):
     if not os.path.exists(worker.lowering_full_dir):
         reason = f"Unable to find lowering directory: {worker.lowering_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Lowering Directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Pass"})
 
     logging.info("Building directory list")
     worker.send_job_status(current_job, 2, 10)
@@ -405,7 +405,7 @@ def task_rebuild_lowering_directory(worker, current_job):
 # Required python code for running the script as a stand-alone utility
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Handle Lowering data directory related tasks')
+    parser = argparse.ArgumentParser(description='Handle lowering data directory related tasks')
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')

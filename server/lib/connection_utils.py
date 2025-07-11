@@ -367,7 +367,7 @@ def test_cst_source(cst_cfg, source_dir):
 
             if cst_cfg['localDirIsMountPoint'] == '1':
                 if not os.path.ismount(source_dir):
-                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the Data Warehouse"}])
+                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the data warehouse"}])
 
                     if cst_cfg['removeSourceFiles'] == '1':
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])

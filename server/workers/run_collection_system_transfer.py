@@ -458,11 +458,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         dest_dir_exists = os.path.isdir(self.dest_dir)
         if not dest_dir_exists:
             reason = f"Unable to find destination directory: {self.dest_dir}"
-            results.extend([{"partName": "Destination Directory", "result": "Fail", "reason": reason}])
+            results.extend([{"partName": "Verify destination directory", "result": "Fail", "reason": reason}])
 
             return results
 
-        results.extend([{"partName": "Destination Directory", "result": "Pass"}])
+        results.extend([{"partName": "Verify destination directory", "result": "Pass"}])
 
         return results
 
@@ -476,7 +476,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         transfer_type = get_transfer_type(cst_cfg['transferType'])
 
         if not transfer_type:
-            reason = 'Unknown Transfer Type'
+            reason = 'Unknown transfer type'
             logging.error(reason)
             return {'verdict': False, 'reason': reason}
 
@@ -592,13 +592,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     'name': "UNKNOWN"
                 }
 
-                return self._fail_job(current_job, "Located Collection System Transfer Data",
-                                      "Could not find collection system transfer config to use for transferring files")
+                return self._fail_job(current_job, "Retrieve collection system transfer",
+                                      "Could not retrieve collection system transfer for transferring files")
 
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
-            return self._fail_job(current_job, "Retrieve Collection System Transfer Data", reason)
+            return self._fail_job(current_job, "Retrieve collection system transfer data", reason)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -608,7 +608,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # verify the transfer is NOT already in-progress
         if self.collection_system_transfer['status'] == "1":
             logging.info("Transfer already in-progress")
-            return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
+            return self._ignore_job(current_job, "Transfer in-Progress", "Transfer is already in-progress")
 
         start_time = time.gmtime()
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", start_time)
@@ -632,7 +632,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         # fail if lowering ID is required but not found
         if (self.collection_system_transfer.get('cruiseOrLowering') == '1'  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
             return self._fail_job(current_job, "Verify lowering ID",
-                                    "Lowering ID is not defined")
+                                    "Lowering ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 
