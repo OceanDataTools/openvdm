@@ -363,7 +363,7 @@ def task_post_hook(worker, current_job):
     for idx, cmd in enumerate(output_results['commandList']):
         worker.send_job_status(current_job, int(80 * (idx+1)/cmd_length) + 20, 100)
 
-        logging.info("Executing: %s", ' '.join(cmd['name']))
+        logging.info("Executing: %s", cmd['name'])
         output_results = worker._run_command(cmd)
 
         if not output_results['verdict']:
