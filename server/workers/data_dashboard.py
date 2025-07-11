@@ -553,8 +553,9 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
 
         collection_system_transfer_index += 1
 
-        progress_factor = int(float(collection_system_transfer_index) / float(collection_system_transfer_count) * 100)
+        progress_factor = collection_system_transfer_index/collection_system_transfer_count
         logging.info(f"Collection System: {collection_system_transfer['name']}")
+
         worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
 
         logging.info(" - Verifying plugin file exists")
@@ -583,8 +584,8 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         logging.debug("File list: %s", json.dumps(filelist, indent=2))
 
         logging.info(" - Processing files")
-        start = 80 * progress_factor + 10
-        end = 80 * int(float(collection_system_transfer_index + 1) / float(collection_system_transfer_count) * 100) + 10
+        start = int(80 * progress_factor + 10)
+        end = int(80 * (collection_system_transfer_index + 1) / collection_system_transfer_count + 10)
         new_manifest_entries, _ = worker._process_filelist(current_job, filelist, processing_script_filename, job_results, start, end)
         logging.debug(new_manifest_entries)
         manifest_entries.extend(new_manifest_entries)
