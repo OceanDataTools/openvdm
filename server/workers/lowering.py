@@ -164,7 +164,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
         if not self.lowering_id:
-            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID not found")
+            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is not defined")
 
         self.lowering_start_date = payload_obj.get('loweringStartDate', self.ovdm.get_lowering_start_date())
         self.lowering_end_date = payload_obj.get('loweringEndDate', self.ovdm.get_lowering_end_date())

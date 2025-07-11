@@ -165,7 +165,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         if self.collection_system_transfer['cruiseOrLowering'] == '1' and self.lowering_id is None:
             reason = "Lowering ID is not defined"
-            return self._fail_job(current_job, "Validate Lowering ID",
+            return self._fail_job(current_job, "Verify lowering ID",
                                     "Lowering ID is not defined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()

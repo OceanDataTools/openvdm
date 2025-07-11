@@ -631,7 +631,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # fail if lowering ID is required but not found
         if (self.collection_system_transfer.get('cruiseOrLowering') == '1'  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
-            return self._fail_job(current_job, "Validate Lowering ID",
+            return self._fail_job(current_job, "Verify lowering ID",
                                     "Lowering ID is not defined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
