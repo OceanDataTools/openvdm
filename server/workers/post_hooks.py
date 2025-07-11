@@ -43,32 +43,32 @@ CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
-        "longName": "Post Collection System Transfer",
+        "longName": "Post collection system transfer",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'],
-        "longName": "Post Data Dashboard Processing",
+        "longName": "Post data dashboard processing",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_CREATE_CRUISE_HOOK'],
-        "longName": "Post Setup New Cruise",
+        "longName": "Post setup new cruise",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_CREATE_LOWERING_HOOK'],
-        "longName": "Post Setup New Lowering",
+        "longName": "Post setup new lowering",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
-        "longName": "Post Finalize Current Cruise",
+        "longName": "Post finalize current cruise",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
-        "longName": "Post Finalize Current Lowering",
+        "longName": "Post finalize current lowering",
     }
 ]
 
@@ -314,8 +314,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         return self.on_job_complete(current_job, json.dumps({
-            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}],
-            'files': {'new': [], 'updated': [], 'exclude': []}
+            'parts': [{"partName": part_name, "result": "Fail", "reason": reason}]
         }))
 
 
@@ -325,8 +324,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         return self.on_job_complete(current_job, json.dumps({
-            'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}],
-            'files': {'new': [], 'updated': [], 'exclude': []}
+            'parts': [{"partName": part_name, "result": "Ignore", "reason": reason}]
         }))
 
 
@@ -337,22 +335,26 @@ def task_post_hook(worker, current_job):
 
     job_results = {'parts':[]}
 
-    logging.info("Retrieving Commands")
+    logging.info("Retrieving commands")
     worker.send_job_status(current_job, 1, 10)
 
     output_results = worker.get_command_list()
 
     if not output_results['verdict']:
-        return worker._fail_job(current_job, 'Get Command list', output_results['reason'])
+        return json.dumps({
+            'parts': [{"partName": 'Get command list', "result": "Fail", "reason": output_results['reason']}]
+        })
 
-    logging.debug("Command List: %s", json.dumps(output_results['commandList'], indent=2))
+    logging.debug("Command list: %s", json.dumps(output_results['commandList'], indent=2))
 
     if not output_results['commandList']:
-        return worker._ignore_job(current_job, 'Running commands', 'No commands found')
+        return json.dumps({
+            'parts': [{"partName": 'Running commands', "result": "Fail", "reason": "No commands found"}]
+        })
 
     job_results['parts'].append({"partName": "Get Commands", "result": "Pass"})
 
-    logging.info("Running Commands")
+    logging.info("Running commands")
     worker.send_job_status(current_job, 2, 10)
 
     reasons = []
@@ -368,9 +370,9 @@ def task_post_hook(worker, current_job):
             reasons.append(output_results['reason'])
 
     if len(reasons) > 0:
-        job_results['parts'].append({"partName": "Running Commands", "result": "Fail", "reason": '\n'.join(reasons)})
+        job_results['parts'].append({"partName": "Running commands", "result": "Fail", "reason": '\n'.join(reasons)})
     else:
-        job_results['parts'].append({"partName": "Running Commands", "result": "Pass"})
+        job_results['parts'].append({"partName": "Running commands", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
