@@ -811,6 +811,8 @@ class OpenVDM():
         """
         Return the collection system transfer configuration based on id
         """
+        if collection_system_transfer_id is None:
+            return None
 
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfer/{collection_system_transfer_id}"
 
