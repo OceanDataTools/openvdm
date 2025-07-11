@@ -311,7 +311,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         results = json.loads(job_result)
 
-        if current_job.task in (TASK_NAMES['UPDATE_DATA_DASHBOARD'], TASK_NAMES['REBUILD_DATA_DASHBOARD']):
+        if current_job.task in (TASK_NAMES['UPDATE_DATA_DASHBOARD']):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
             job_data = {
@@ -327,6 +327,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
+
+        # TODO Section to run POST_DATA_DASHBOARD for every CST
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
