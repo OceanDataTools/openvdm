@@ -349,7 +349,7 @@ def task_post_hook(worker, current_job):
 
     if not output_results['commandList']:
         return json.dumps({
-            'parts': [{"partName": 'Running commands', "result": "Fail", "reason": "No commands found"}]
+            'parts': [{"partName": 'Running commands', "result": "Ignore", "reason": "No commands found"}]
         })
 
     job_results['parts'].append({"partName": "Get Commands", "result": "Pass"})
