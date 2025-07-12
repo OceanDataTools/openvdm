@@ -55,7 +55,7 @@ def build_filelist(source_dir):
     return return_files
 
 
-def clear_directory(directory):
+def clear_directory(directory, delete_root=False):
     """
     Deletes all empty sub-directorties within the specified directory
     """
@@ -65,10 +65,10 @@ def clear_directory(directory):
     # Clear out PublicData
     for root, dirs, files in os.walk(directory + '/', topdown=False):
         for dir_name in dirs:
-            result = clear_directory(realpath(os.path.join(root, dir_name)))
+            result = clear_directory(realpath(os.path.join(root, dir_name)), True)
             if not result['verdict']:
                 reasons.extend(result['reasons'].split('\n'))
-        if not dirs and not files:
+        if not dirs and not files and delete_root:
             try:
                 logging.debug("Deleting %s", root)
                 os.rmdir(root)
