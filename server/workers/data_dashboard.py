@@ -307,26 +307,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when the current job completes
         """
 
+        payload_obj = json.loads(current_job.data)
         results = json.loads(job_result)
 
-        if current_job.task in (TASK_NAMES['UPDATE_DATA_DASHBOARD']):
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+        job_data = {
+            'cruiseID': self.cruise_id,
+            'loweringID': self.lowering_id,
+            'files': results['files']
+        }
 
-            job_data = {
-                'cruiseID': self.cruise_id,
-                'loweringID': self.lowering_id,
-                'files': results['files']
-            }
+        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
-                payload_obj = json.loads(current_job.data)
-                job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
+        if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
+            job_data['collectionSystemTransferID'] = payload_obj['collectionSystemTransferID']
 
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
-        # TODO Section to run POST_DATA_DASHBOARD for every CST
+        elif current_job.task == TASK_NAMES['REBUILD_DATA_DASHBOARD']:
+
+            for cs_cfg in self.ovdm.get_active_collection_system_transfers():
+                job_data['collectionSystemTransferID'] = cs_cfg['collectionSystemTransferID']
+
+                for task in self.ovdm.get_tasks_for_hook(TASK_NAMES['UPDATE_DATA_DASHBOARD']):
+                    logging.info("Adding post task: %s", task)
+                    gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
