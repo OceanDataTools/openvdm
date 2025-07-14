@@ -157,7 +157,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -620,7 +620,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
