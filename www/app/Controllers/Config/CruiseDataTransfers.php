@@ -483,8 +483,7 @@ class CruiseDataTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
-            
-                $data['testCruiseDataTransferName'] = $gmData['cruiseDataTransfer']->name;     
+                $data['testCruiseDataTransferName'] = $longName;     
             }
         }
 
@@ -909,7 +908,7 @@ class CruiseDataTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
-//                $data['testCruiseDataTransferName'] = $gmData['cruiseDataTransfer']->name;      
+                $data['testCruiseDataTransferName'] = $longName;      
             }
 
             #additional data needed for view
@@ -991,7 +990,7 @@ class CruiseDataTransfers extends Controller {
         $data['filter'] = $_GET['filter'] ?? '';
 
         #additional data needed for view
-        $data['testCruiseDataTransferName'] = $gmData['cruiseDataTransfer']->longName;
+        $data['testCruiseDataTransferName'] = $cruiseDataTransfer->longName;
 
         View::rendertemplate('header',$data);
         View::render('Config/cruiseDataTransfers',$data);
