@@ -1163,6 +1163,7 @@ class CollectionSystemTransfers extends Controller {
 
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
+        $data['showLoweringComponents'] = $warehouseModel->getShowLoweringComponents();
         $data['javascript'] = array('collectionSystemTransfers');
         $data['filter'] = $_GET['filter'] ?? '';
 
