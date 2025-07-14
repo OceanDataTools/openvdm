@@ -71,13 +71,22 @@ $(function () {
         }
     }
 
+    function setCustomRemoveSourceField(staleness, transferType) {
+        if(staleness == "0" || transferType == "2"){
+            $(".removeSource").hide();
+        } else {
+            $(".removeSource").show();
+        }
+    }
     
     setTransferTypeFields($('input[name=transferType]:checked').val());
     setSSHUseKeyField($('input[name=sshUseKey]:checked').val())
     setCustomStalenessField($('input[name=staleness]:checked').val())
+    setCustomRemoveSourceField($('input[name=staleness]:checked').val(),$('input[name=transferType]:checked').val())
     
     $('input[name=transferType]').change(function () {
         setTransferTypeFields($(this).val());
+        setCustomRemoveSourceField($('input[name=staleness]').val(),$(this).val())
     });
 
     $('input[name=sshUseKey]').change(function () {
@@ -86,5 +95,8 @@ $(function () {
     
     $('input[name=staleness]').change(function () {
         setCustomStalenessField($(this).val());
-    });
+        setCustomRemoveSourceField($(this).val(),$('input[name=transferType]').val())
+    })
+
+
 });
