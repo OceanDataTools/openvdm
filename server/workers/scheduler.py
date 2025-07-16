@@ -120,7 +120,7 @@ def scheduler(interval=None):
                 time.sleep(2)
                 break
 
-        delay = parsed_args.interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
+        delay = interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)
         time.sleep(delay)
 
