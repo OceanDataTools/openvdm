@@ -69,7 +69,7 @@ class GeoTIFFParser(OpenVDMParser):
 
             collection_system_dir = directoryname.replace(os.path.join(data_warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id), '').lstrip('/')
             self.output_dir = os.path.join(data_warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id, dashboard_data_dir, collection_system_dir)
-            self.tile_dir = cruise_id + '/' + dashboard_data_dir + '/' + collection_system_dir + '/' + label
+            self.tile_dir = f'{cruise_id}/{dashboard_data_dir}/{collection_system_dir}/{label}'
 
         elif self.output_dir is None:
             self.output_dir = directoryname
@@ -84,7 +84,7 @@ class GeoTIFFParser(OpenVDMParser):
         # Create temp directory
         tmpdir = tempfile.mkdtemp()
 
-        ll_filepath = os.path.join(tmpdir, label + "_LL.tif")
+        ll_filepath = os.path.join(tmpdir, f'{label}_LL.tif')
         vrt_filepath = os.path.join(tmpdir, 'temp.vrt')
 
         t_srs_options = "+proj=latlong +datum=WGS84"
@@ -127,7 +127,7 @@ class GeoTIFFParser(OpenVDMParser):
         visualizer_data_obj = {
             "label": label,
             "tileDirectory": self.tile_dir,
-            "mapBounds":str(minx) + "," + str(miny) + "," + str(maxx) + "," + str(maxy)
+            "mapBounds":f'{minx},{miny},{maxx},{maxy}'
         }
         self.add_visualization_data(visualizer_data_obj)
 

@@ -69,7 +69,7 @@ class GeoTIFFParser(OpenVDMParser):
         label = os.path.splitext(filename)[0]
 
         params = {
-            'url': self.cruisedata_url + filepath.replace(self.cruisedata_path, '')
+            'url': f"{self.cruisedata_url}{filepath.replace(self.cruisedata_path, '')}"
         }
 
         url = f'{self.titiler_url}/cog/bounds'

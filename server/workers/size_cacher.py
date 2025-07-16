@@ -13,9 +13,9 @@ ARGUMENTS: --interval <interval> The minimum interval in second between director
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.10
+  VERSION:  2.11
   CREATED:  2017-09-30
- REVISION:  2025-04-12
+ REVISION:  2025-07-06
 """
 
 import argparse
@@ -29,6 +29,56 @@ from os.path import dirname, realpath, join, isdir
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+
+def size_cacher(interval):
+    """
+    Calculate the sizes of the cruise and lowering directories at the defined
+    interval
+    """
+
+    ovdm = OpenVDM()
+
+    while True:
+        start_t = datetime.datetime.utcnow()
+
+        warehouse_config = ovdm.get_shipboard_data_warehouse_config()
+        cruise_id = ovdm.get_cruise_id()
+        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
+
+        lowering_id = ovdm.get_lowering_id() if ovdm.get_show_lowering_components() else None
+        lowering_dir = join(cruise_dir, warehouse_config['loweringDataBaseDir'], lowering_id) if lowering_id else None
+
+        logging.debug("Cruise Directory: %s", cruise_dir)
+        logging.debug("Lowering Directory: %s", lowering_dir)
+
+        def get_dir_size(path):
+            if isdir(path):
+                logging.debug("Calculating size for: %s", path)
+                proc = subprocess.run(['du', '-sb', path], capture_output=True, text=True)
+                if proc.returncode == 0:
+                    return proc.stdout.split()[0]
+            return None
+
+        cruise_size = get_dir_size(cruise_dir)
+        lowering_size = get_dir_size(lowering_dir) if lowering_dir else None
+
+        ovdm.set_cruise_size(cruise_size)
+        ovdm.set_lowering_size(lowering_size)
+
+        if cruise_size:
+            logging.info("Cruise Size: %s", cruise_size)
+        if lowering_size:
+            logging.info("Lowering Size: %s", lowering_size)
+
+        elapsed = (datetime.datetime.utcnow() - start_t).total_seconds()
+        delay = interval - elapsed
+
+        logging.debug("Elapsed Time: %.2f seconds", elapsed)
+
+        if delay > 0:
+            logging.info("Sleeping for %.2f seconds", delay)
+            time.sleep(delay)
+
 
 if __name__ == "__main__":
 
@@ -51,46 +101,4 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm = OpenVDM()
-
-    while True:
-
-        start_t = datetime.datetime.utcnow()
-
-        warehouse_config = ovdm.get_shipboard_data_warehouse_config()
-        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], ovdm.get_cruise_id())
-
-        lowering_id = ovdm.get_lowering_id() if ovdm.get_show_lowering_components() else None
-        lowering_dir = join(cruise_dir, warehouse_config['loweringDataBaseDir'], lowering_id) if lowering_id else None
-
-        logging.debug("Cruise Directory: %s", cruise_dir)
-        logging.debug("Lowering Directory: %s", lowering_dir)
-
-        if isdir(cruise_dir):
-            logging.debug("Calculating Cruise Size...")
-            cruise_size_proc = subprocess.run(['du','-sb', cruise_dir], capture_output=True, text=True, check=False)
-            if cruise_size_proc.returncode == 0:
-                logging.info("Cruise Size: %s", cruise_size_proc.stdout.split()[0])
-                ovdm.set_cruise_size(cruise_size_proc.stdout.split()[0])
-
-            if lowering_dir and isdir(lowering_dir):
-                logging.debug("Calculating Lowering Size...")
-                loweringSizeProc = subprocess.run(['du','-sb', lowering_dir], capture_output=True, text=True, check=False)
-                if loweringSizeProc.returncode == 0:
-                    logging.info("Lowering Size: %s", loweringSizeProc.stdout.split()[0])
-                    ovdm.set_lowering_size(loweringSizeProc.stdout.split()[0])
-
-        else:
-            ovdm.set_cruise_size()
-            ovdm.set_lowering_size()
-
-        end_t = datetime.datetime.utcnow()
-
-        elapse_t = end_t - start_t
-        logging.debug("Total Seconds: %s", elapse_t.total_seconds())
-
-        if (elapse_t.total_seconds()) >= parsed_args.interval:
-            continue
-
-        logging.info("Calculating size again in %s seconds", parsed_args.interval - elapse_t.total_seconds())
-        time.sleep(parsed_args.interval - elapse_t.total_seconds())
+    size_cacher(parsed_args.interval)

@@ -106,7 +106,7 @@ class TransferLogs extends Model {
     }
     
     public function getShipToShoreLogFilenames($count = 0) {
-        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*.log");
+        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*Z.log");
         if (is_array($files) && sizeof($files) > $count) {
             array_splice($files, 0, sizeof($files)-$count);
         }
@@ -114,7 +114,7 @@ class TransferLogs extends Model {
     }
     
     public function getShipToShoreLogsSummary($count = 0) {
-        $fileList = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*.log");
+        $fileList = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*Z.log");
 	array_multisort(array_map('filemtime', $files = $fileList), SORT_ASC, $files);
 	// var_dump($files);
 	if (is_array($files) && sizeof($files) > $count) {

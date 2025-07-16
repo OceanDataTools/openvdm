@@ -150,7 +150,7 @@ class ROVOpenRVDASPlugin(OpenVDMPlugin):
         """
 
         try:
-            url = self.sealog_server_url + '/api/v1/lowerings?lowering_id=' + lowering_id
+            url = f"{self.sealog_server_url}/api/v1/lowerings?lowering_id={lowering_id}"
             req = requests.get(url, headers={"authorization": self.sealog_jwt}, timeout=5)
             lowering = json.loads(req.text)[0]
             return lowering
