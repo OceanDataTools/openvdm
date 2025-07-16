@@ -414,7 +414,7 @@ def task_update_data_dashboard(worker, current_job): # pylint: disable=too-many-
     if processing_script_filename is None:
         reason = f"Plugin not found for: {worker.collection_system_transfer['name']}"
         logging.warning(reason)
-        job_results['parts'].append({"partName": "Verify data dashboard plugin", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": "Verify data dashboard plugin", "result": "Ignore", "reason": reason})
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Verify data dashboard plugin", "result": "Pass"})
