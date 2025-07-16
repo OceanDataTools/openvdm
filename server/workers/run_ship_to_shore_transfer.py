@@ -44,13 +44,15 @@ def process_batch(batch, filters):
     Process a batch of file paths
     """
 
+    logging.debug("process_batch, filters %s", filters)
+
     def _process_filepath(filepath, filters):
         """
         Process a file path to determine if it should be included or excluded from
         the data transfer
         """
 
-        logging.debug(filepath)
+        logging.debug("_process_filepath %s", filepath)
         try:
             if os.path.islink(filepath):
                 return None
@@ -75,6 +77,8 @@ def process_batch(batch, filters):
         result = _process_filepath(filepath, filters)
         if result:
             results.append(result)
+
+    logging.debug("process_batch, results %s", results)
     return results
 
 
@@ -168,7 +172,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     else:
                         proc_filters.append(flt)
 
-        logging.debug("File Filters: %s", json.dumps(proc_filters, indent=2))
+        logging.debug("build_filelist, proc_filters: %s", json.dumps(proc_filters, indent=2))
 
         filepaths = []
         total_files = len(filepaths)
@@ -177,7 +181,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 filepaths.append(os.path.join(root, filename))
 
 
-        logging.debug("Filepaths: \n%s", json.dumps(filepaths, indent=2))
+        logging.debug("build_filelist, filepaths: \n%s", json.dumps(filepaths, indent=2))
+
         # Batch and process
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
@@ -188,7 +193,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             for future in as_completed(futures):
                 result = future.result()
-                logging.debug(json.dumps(result, indent=2))
+                logging.debug("build_filelist, futures result, %s", json.dumps(result, indent=2))
                 if result:
                     for item in result:
                         if item[0] == 'include':
@@ -219,6 +224,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         # logging.debug("Matched Files: %s", json.dumps(return_files['include'], indent=2))
 
+        logging.debug("build_filelist, return_files, %s", json.dumps(return_files, indent=2))
         return {'verdict': True, 'files': return_files}
 
 
