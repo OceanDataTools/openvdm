@@ -23,6 +23,7 @@ import sys
 import signal
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from os.path import dirname, realpath
 from random import randint
 import python3_gearman
@@ -37,6 +38,44 @@ TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 TASK_NAMES = {
     'RUN_SHIP_TO_SHORE_TRANSFER': 'runShipToShoreTransfer'
 }
+
+def process_batch(batch, filters):
+    """
+    Process a batch of file paths
+    """
+
+    def _process_filepath(filepath, filters):
+        """
+        Process a file path to determine if it should be included or excluded from
+        the data transfer
+        """
+
+        try:
+            if os.path.islink(filepath):
+                return None
+
+            if not is_ascii(filepath):
+                return ("exclude", filepath)
+
+            if is_rsync_patial_file(filepath):
+                return None
+
+            if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
+                return ("include", filepath)
+
+            return ("exclude", filepath)
+
+        except FileNotFoundError:
+            return None
+
+    results = []
+
+    for filepath in batch:
+        result = _process_filepath(filepath, filters)
+        if result:
+            results.append(result)
+    return results
+
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """
@@ -130,25 +169,51 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.debug("File Filters: %s", json.dumps(proc_filters, indent=2))
 
+        filepaths = []
+        total_files = len(filepaths)
+        for root, _, filenames in os.walk(self.cruise_dir):
+            for filename in filenames:
+                filepaths.append(os.path.join(root, filename))
+
+        # Batch and process
+        batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
+
         return_files = {'include': [], 'new': [], 'updated': [], 'exclude': []}
-        for root, _, files in os.walk(self.cruise_dir):
-            for f in files:
-                full_path = os.path.join(root, f)
-                if not is_ascii(full_path):
-                    return_files['exclude'].append(f'{os.path.relpath(full_path, self.cruise_dir)}')
-                    continue
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(process_batch, batch, proc_filters)
+                       for batch in batches]
 
-                if is_rsync_patial_file(full_path):
-                    continue
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    for item in result:
+                        if item[0] == 'include':
+                            return_files['include'].append(item[1])
+                        elif item[0] == 'exclude':
+                            return_files['exclude'].append(item[1])
 
-                if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
-                    return_files['include'].append(f'{full_path}')
+        base_len = len(self.cruise_dir.rstrip(os.sep)) + 1
+        return_files['include'] = [f[base_len:] for f in return_files['include']]
+        return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
 
-        return_files['include'] = [
-            f.replace(self.cruise_dir, self.cruise_id, 1) for f in return_files['include']
-        ]
+        # for root, _, files in os.walk(self.cruise_dir):
+        #     for f in files:
+        #         full_path = os.path.join(root, f)
+        #         if not is_ascii(full_path):
+        #             return_files['exclude'].append(f'{os.path.relpath(full_path, self.cruise_dir)}')
+        #             continue
 
-        logging.debug("Matched Files: %s", json.dumps(return_files['include'], indent=2))
+        #         if is_rsync_patial_file(full_path):
+        #             continue
+
+        #         if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
+        #             return_files['include'].append(f'{full_path}')
+
+        # return_files['include'] = [
+        #     f.replace(self.cruise_dir, self.cruise_id, 1) for f in return_files['include']
+        # ]
+
+        # logging.debug("Matched Files: %s", json.dumps(return_files['include'], indent=2))
 
         return {'verdict': True, 'files': return_files}
 
@@ -250,7 +315,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
 
-            # Build filelist (from local, SMB mount, etc.)
             results = self.build_filelist(is_darwin)
 
             if not results['verdict']:
