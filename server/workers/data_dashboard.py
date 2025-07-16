@@ -562,7 +562,7 @@ def task_rebuild_data_dashboard(worker, current_job): # pylint: disable=too-many
         progress_factor = collection_system_transfer_index/collection_system_transfer_count
         logging.info(f"Collection System: {collection_system_transfer['name']}")
 
-        worker.send_job_status(current_job, 80 * progress_factor + 10, 100)
+        worker.send_job_status(current_job, int(80 * progress_factor) + 10, 100)
 
         logging.info(" - Verifying plugin file exists")
         processing_script_filename = worker._build_processing_filename(cfg=collection_system_transfer)
