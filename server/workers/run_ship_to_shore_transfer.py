@@ -50,6 +50,7 @@ def process_batch(batch, filters):
         the data transfer
         """
 
+        logging.debug(filepath)
         try:
             if os.path.islink(filepath):
                 return None
@@ -175,6 +176,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             for filename in filenames:
                 filepaths.append(os.path.join(root, filename))
 
+
+        logging.debug("Filepaths: \n%s", json.dumps(filepaths, indent=2))
         # Batch and process
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
@@ -185,6 +188,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             for future in as_completed(futures):
                 result = future.result()
+                logging.debug(json.dumps(result, indent=2))
                 if result:
                     for item in result:
                         if item[0] == 'include':
@@ -316,6 +320,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
 
             results = self.build_filelist(is_darwin)
+            logging.warning(json.dumps(results))
 
             if not results['verdict']:
                 return {'verdict': False, 'reason': results.get('reason', 'Unknown')}
