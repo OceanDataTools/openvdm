@@ -327,6 +327,10 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
         if cfg.get('removeSourceFiles', '0') == '1':
             flags.insert(2, '--remove-source-files')
 
+        # Logic handles if cfg is a cst or cdt
+        if cfg.get('syncToDest', '0') == '1':
+            flags.insert(2, '--delete')
+
     return flags
 
 
