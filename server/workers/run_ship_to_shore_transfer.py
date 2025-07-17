@@ -317,7 +317,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return {'verdict': False, 'reason': 'Failed to write include file'}
 
             real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
-            extra_args = ['-e', 'ssh', '--delete-excluded']
+            extra_args = ['-e', 'ssh']
 
             cmd = _build_rsync_command(real_flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
             if cdt_cfg.get('sshUseKey') == '0':
