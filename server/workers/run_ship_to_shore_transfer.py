@@ -64,8 +64,6 @@ def process_batch(batch, filters):
                 for pattern in patterns:
                     if fnmatch.fnmatch(filepath, pattern):
                         return ("include", filepath, priority)
-            #if any(fnmatch.fnmatch(filepath, p) for p in filters):
-            #    return ("include", filepath)
 
         except FileNotFoundError:
             return None
@@ -77,7 +75,6 @@ def process_batch(batch, filters):
         if result:
             results.append(result)
 
-    logging.debug("process_batch, results %s", results)
     return results
 
 
