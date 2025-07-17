@@ -142,7 +142,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # replace {cruiseID}
                 raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
 
-                rare_dirs = []
                 base_path = self.cruise_dir
 
                 #if transfer is from a cst
@@ -165,8 +164,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 rare_filters = [f"{path_prefix}/{f}" for f in raw_filters]
 
-                logging.warning("%s", json.dumps(proc_dirs, indent=2))
-
                 for flt in rare_filters:
                     if "{loweringID}" in flt:
                         proc_filters[priority].extend(
@@ -174,8 +171,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                         )
                     else:
                         proc_filters[priority].append(flt)
-        
-        logging.warning("%s", json.dumps(return_files))
 
         logging.debug("build_filelist, proc_filters: %s", json.dumps(proc_filters, indent=2))
 
@@ -199,7 +194,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                             return_files['include'].append((item[1], int(item[2])))
                         elif item[0] == 'exclude':
                             return_files['exclude'].append(item[1])
-        
+
 
 
         return_files['include'].sort(key=lambda x: x[1])
@@ -330,6 +325,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             return {'verdict': True, 'files': files}
+
 
     def on_job_execute(self, current_job):
         """
