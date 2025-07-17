@@ -44,15 +44,12 @@ def process_batch(batch, filters):
     Process a batch of file paths
     """
 
-    logging.debug("process_batch, filters %s", filters)
-
     def _process_filepath(filepath, filters):
         """
         Process a file path to determine if it should be included or excluded from
         the data transfer
         """
 
-        logging.debug("_process_filepath %s", filepath)
         try:
             if os.path.islink(filepath):
                 return None
@@ -63,10 +60,12 @@ def process_batch(batch, filters):
             if is_rsync_patial_file(filepath):
                 return None
 
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
-                return ("include", filepath)
-
-            return ("exclude", filepath)
+            for priority, patterns in filters.items():
+                for pattern in patterns:
+                    if fnmatch.fnmatch(filepath, pattern):
+                        return ("include", filepath, priority)
+            #if any(fnmatch.fnmatch(filepath, p) for p in filters):
+            #    return ("include", filepath)
 
         except FileNotFoundError:
             return None
@@ -102,7 +101,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
-    def build_filelist(self, is_darwin, batch_size=500, max_workers=16):
+    def build_filelist(self, is_darwin, batch_size=10, max_workers=16):
         """
         Build the list of files for the ship-to-shore transfer
         """
@@ -126,11 +125,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return _expand_placeholders(raw_filter, context).split(',')
 
         transfers = (
-            self.ovdm.get_ship_to_shore_transfers()
-            + self.ovdm.get_required_ship_to_shore_transfers()
+            self.ovdm.get_required_ship_to_shore_transfers()
+            + self.ovdm.get_ship_to_shore_transfers()
         )
 
-        proc_filters = []
+        return_files = {'include': [], 'new': [], 'updated': [], 'exclude': []}
+
+        proc_filters = {'1':[],'2':[],'3':[],'4':[],'5':[]}
         for priority in map(str, range(1, 6)):
             for t in transfers:
 
@@ -141,7 +142,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # replace {cruiseID}
                 raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
 
-                base_path = '*'
+                rare_dirs = []
+                base_path = self.cruise_dir
 
                 #if transfer is from a cst
                 if t['collectionSystem'] != "0":
@@ -163,66 +165,49 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 rare_filters = [f"{path_prefix}/{f}" for f in raw_filters]
 
-                #expand filters that have "loweringID" in path
+                logging.warning("%s", json.dumps(proc_dirs, indent=2))
+
                 for flt in rare_filters:
                     if "{loweringID}" in flt:
-                        proc_filters.extend(
+                        proc_filters[priority].extend(
                             flt.replace("{loweringID}", lid) for lid in self.lowerings
                         )
                     else:
-                        proc_filters.append(flt)
+                        proc_filters[priority].append(flt)
+        
+        logging.warning("%s", json.dumps(return_files))
 
         logging.debug("build_filelist, proc_filters: %s", json.dumps(proc_filters, indent=2))
 
         filepaths = []
-        total_files = len(filepaths)
         for root, _, filenames in os.walk(self.cruise_dir):
             for filename in filenames:
                 filepaths.append(os.path.join(root, filename))
 
-
-        logging.debug("build_filelist, filepaths: \n%s", json.dumps(filepaths, indent=2))
-
         # Batch and process
+        total_files = len(filepaths)
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
-        return_files = {'include': [], 'new': [], 'updated': [], 'exclude': []}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(process_batch, batch, proc_filters)
                        for batch in batches]
-
             for future in as_completed(futures):
                 result = future.result()
-                logging.debug("build_filelist, futures result, %s", json.dumps(result, indent=2))
                 if result:
                     for item in result:
                         if item[0] == 'include':
-                            return_files['include'].append(item[1])
+                            return_files['include'].append((item[1], int(item[2])))
                         elif item[0] == 'exclude':
                             return_files['exclude'].append(item[1])
+        
+
+
+        return_files['include'].sort(key=lambda x: x[1])
+        return_files['include'] = [filepath for filepath, _ in return_files['include']]
 
         base_len = len(self.cruise_dir.rstrip(os.sep)) + 1
         return_files['include'] = [f[base_len:] for f in return_files['include']]
         return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
-
-        # for root, _, files in os.walk(self.cruise_dir):
-        #     for f in files:
-        #         full_path = os.path.join(root, f)
-        #         if not is_ascii(full_path):
-        #             return_files['exclude'].append(f'{os.path.relpath(full_path, self.cruise_dir)}')
-        #             continue
-
-        #         if is_rsync_patial_file(full_path):
-        #             continue
-
-        #         if any(fnmatch.fnmatch(full_path, flt) for flt in proc_filters):
-        #             return_files['include'].append(f'{full_path}')
-
-        # return_files['include'] = [
-        #     f.replace(self.cruise_dir, self.cruise_id, 1) for f in return_files['include']
-        # ]
-
-        # logging.debug("Matched Files: %s", json.dumps(return_files['include'], indent=2))
 
         logging.debug("build_filelist, return_files, %s", json.dumps(return_files, indent=2))
         return {'verdict': True, 'files': return_files}
@@ -251,13 +236,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         # file_index = 0
         new_files = []
         updated_files = []
+        deleted_files = []
         last_percent_reported = -1
 
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         while proc.poll() is None:
 
             for line in proc.stdout:
-
                 if self.stop:
                     logging.debug("Stopping")
                     proc.terminate()
@@ -272,7 +257,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     new_files.append(line.split(' ', 1)[1].rstrip('\n'))
                 elif line.startswith(('>f.', '<f.')):
                     updated_files.append(line.split(' ', 1)[1].rstrip('\n'))
-
+                elif line.startswith('*deleting'):
+                    deleted_files.append(line.split(' ', 1)[1].rstrip('\n'))
                 # Extract progress from `to-chk=` lines
                 match = TO_CHK_RE.search(line)
                 if match:
@@ -286,7 +272,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                             self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
                             last_percent_reported = percent
 
-        return new_files, updated_files
+        return new_files, updated_files, deleted_files
 
 
     def transfer_to_destination(self, current_job):
@@ -305,7 +291,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             if include_file_path is not None:
                 cmd.append(f"--files-from={include_file_path}")
 
-            cmd += [source_dir, dest_dir.rstrip('/')+'/']
+            cmd += [source_dir.rstrip('/')+'/', dest_dir.rstrip('/')+'/']
             return cmd
 
         def _build_include_file(include_list, filepath):
@@ -326,24 +312,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
 
             results = self.build_filelist(is_darwin)
-            logging.warning(json.dumps(results))
 
             if not results['verdict']:
                 return {'verdict': False, 'reason': results.get('reason', 'Unknown')}
 
             files = results['files']
 
-            if not _build_include_file(files['include'], include_file):
+            if not _build_include_file([f'{self.cruise_id}/{filepath}' for filepath in files['include']], include_file):
                 return {'verdict': False, 'reason': 'Failed to write include file'}
 
             real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
-            extra_args = ['-e', 'ssh']
+            extra_args = ['-e', 'ssh', '--delete-excluded']
 
             cmd = _build_rsync_command(real_flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
             if cdt_cfg.get('sshUseKey') == '0':
                 cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
 
-            files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+            files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             return {'verdict': True, 'files': files}
 
     def on_job_execute(self, current_job):
@@ -439,7 +424,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
-        logging.debug(self.cruise_data_transfer)
 
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
