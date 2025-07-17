@@ -143,6 +143,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 raw_filters = _keyword_replace_and_split(t.get('includeFilter', ''))
 
                 base_path = self.cruise_dir
+                rare_filters = []
 
                 #if transfer is from a cst
                 if t['collectionSystem'] != "0":
@@ -150,19 +151,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     if cs['cruiseOrLowering'] == '1':
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{cs['destDir']}"
+                    rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if transfer is from an ed
-                elif t['extraDirectory'] != "0":
+                if t['extraDirectory'] != "0":
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
                     if ed['cruiseOrLowering'] == '1':
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{ed['destDir']}"
+                    rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if neither
-                else:
+                if t['collectionSystem'] == "0" and t['extraDirectory'] == "0":
                     path_prefix = base_path
-
-                rare_filters = [f"{path_prefix}/{f}" for f in raw_filters]
+                    rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 for flt in rare_filters:
                     if "{loweringID}" in flt:
