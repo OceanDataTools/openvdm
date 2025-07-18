@@ -123,11 +123,14 @@ Router::any('dataDashboard/dataQualityShowDataTypeStats/(:any)', '\Controllers\D
 //API-related routes
 Router::any('api/warehouse/getCruiseConfig', 'Controllers\Api\Warehouse@getCruiseConfig');
 Router::any('api/warehouse/getCruiseID', 'Controllers\Api\Warehouse@getCruiseID');
+Router::any('api/warehouse/getCruiseName', 'Controllers\Api\Warehouse@getCruiseName');
 Router::any('api/warehouse/getCruiseSize', 'Controllers\Api\Warehouse@getCruiseSize');
 Router::any('api/warehouse/getCruiseStartDate', 'Controllers\Api\Warehouse@getCruiseStartDate');
 Router::any('api/warehouse/getCruiseEndDate', 'Controllers\Api\Warehouse@getCruiseEndDate');
 Router::any('api/warehouse/getCruiseStartPort', 'Controllers\Api\Warehouse@getCruiseStartPort');
 Router::any('api/warehouse/getCruiseEndPort', 'Controllers\Api\Warehouse@getCruiseEndPort');
+Router::any('api/warehouse/getCruisePI', 'Controllers\Api\Warehouse@getCruisePI');
+Router::any('api/warehouse/getCruiseLocation', 'Controllers\Api\Warehouse@getCruiseLocation');
 Router::any('api/warehouse/getCruiseFinalizedDate', 'Controllers\Api\Warehouse@getCruiseFinalizedDate');
 Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
 Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');

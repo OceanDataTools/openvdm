@@ -128,6 +128,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         del cruise_config['cruiseDataTransfersConfig']
         del cruise_config['shipToShoreTransfersConfig']
 
+        # Remove empty keys
+        cruise_config = {k: v for k, v in cruise_config.items() if v not in ("", None)}
+
         results = output_json_data_to_file(cruise_config_file_path, cruise_config)
         if not results['verdict']:
             return {'verdict': False, 'reason': results['reason']}

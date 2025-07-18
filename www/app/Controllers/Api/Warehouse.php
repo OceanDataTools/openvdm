@@ -104,6 +104,13 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
     
+    // getCruiseName - return the current cruise ID.
+    public function getCruiseName() {
+
+        $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
+        echo json_encode($response);
+    }
+
     // getCruiseDates - return the current cruise start/end dates.
     public function getCruiseDates() {
 
@@ -145,6 +152,20 @@ class Warehouse extends Controller {
     public function getCruiseEndPort() {
 
         $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
+        echo json_encode($response);
+    }
+
+    // getCruisePI - return the current cruise PI.
+    public function getCruisePI() {
+
+        $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
+        echo json_encode($response);
+    }
+
+    // getCruiseName - return the current cruise Location.
+    public function getCruiseLocation() {
+
+        $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         echo json_encode($response);
     }
 
@@ -305,10 +326,13 @@ class Warehouse extends Controller {
         $shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();        
         
         $response['cruiseID'] = $this->_warehouseModel->getCruiseID();
+        $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
+        $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
+        $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         $response['warehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getCruiseOnlyCollectionSystemTransfers();
         $response['extraDirectoriesConfig'] = $extraDirectoriesModel->getExtraDirectoriesConfig();
