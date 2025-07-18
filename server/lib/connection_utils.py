@@ -356,11 +356,11 @@ def test_cst_source(cst_cfg, source_dir):
         if transfer_type == 'local':
             source_dir_exists = os.path.isdir(source_dir)
             if not source_dir_exists:
-                reason = f"Unable to find source directory: {source_dir} on the Data Warehouse"
+                reason = f"Unable to find source directory: {source_dir} on the data warehouse"
                 results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
                 if cst_cfg['localDirIsMountPoint'] == '1':
-                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
 
                 if cst_cfg['removeSourceFiles'] == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -370,15 +370,16 @@ def test_cst_source(cst_cfg, source_dir):
             results.extend([{"partName": "Source directory", "result": "Pass"}])
 
             if cst_cfg['localDirIsMountPoint'] == '1':
-                if not os.path.ismount(source_dir):
-                    results.extend([{"partName": "Source directory is a mountpoint", "result": "Fail", "reason": f"Source directory: {source_dir} is not a mountpoint on the data warehouse"}])
+                mnt_dir = os.sep + os.path.join(*source_dir.strip(os.sep).split(os.sep)[:2])
+                if not os.path.ismount(mnt_dir):
+                    results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
 
                     if cst_cfg['removeSourceFiles'] == '1':
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
-                results.extend([{"partName": "Source directory is a mountpoint", "result": "Pass"}])
+                results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
 
             if cst_cfg['removeSourceFiles'] == '1':
                 if not test_write_access(source_dir):
@@ -545,11 +546,11 @@ def test_cdt_destination(cdt_cfg):
         if transfer_type == 'local':
             dest_dir_exists = os.path.isdir(cdt_cfg['destDir'])
             if not dest_dir_exists:
-                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Data Warehouse"
+                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the data warehouse"
                 results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
 
                 if cdt_cfg['localDirIsMountPoint'] == '1':
-                    results.extend([{"partName": "Destination directory is a mountpoint", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
 
                 results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
@@ -558,17 +559,18 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
             if cdt_cfg['localDirIsMountPoint'] == '1':
-                if not os.path.ismount(cdt_cfg['destDir']):
+                mnt_dir = os.sep + os.path.join(*cdt_cfg['destDir'].strip(os.sep).split(os.sep)[:2])
+                if not os.path.ismount(mnt_dir):
                     results.extend([{
-                        "partName": "Destination directory is a mountpoint",
+                        "partName": "Destination directory is a mount point",
                         "result": "Fail",
-                        "reason": f"Destination directory: {cdt_cfg['destDir']} is not a mountpoint on the Data Warehouse"
+                        "reason": f"{mnt_dir} is not a mount point on the data warehouse"
                     }])
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
-                results.extend([{"partName": "Destination directory is a mountpoint", "result": "Pass"}])
+                results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
 
             if not test_write_access(cdt_cfg['destDir']):
                 reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
