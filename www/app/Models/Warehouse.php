@@ -123,7 +123,6 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
 
-
     public function getCruiseLocation(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
         return $row[0]->value;
