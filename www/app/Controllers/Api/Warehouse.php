@@ -326,10 +326,13 @@ class Warehouse extends Controller {
         $shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();        
         
         $response['cruiseID'] = $this->_warehouseModel->getCruiseID();
+        $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
+        $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
+        $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         $response['warehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getCruiseOnlyCollectionSystemTransfers();
         $response['extraDirectoriesConfig'] = $extraDirectoriesModel->getExtraDirectoriesConfig();
