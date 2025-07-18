@@ -507,7 +507,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # Build password file
                 try:
                     with open(password_file, 'w', encoding='utf-8') as f:
-                        f.write(self.collection_system_transfer['rsyncPass'])
+                        f.write(cst_cfg['rsyncPass'])
                     os.chmod(password_file, 0o600)
                 except IOError:
                     return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
@@ -534,12 +534,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if transfer_type == 'local':
                 source_path = source_dir if source_dir == '/' else source_dir.rstrip('/')
             elif transfer_type == 'rsync':
-                source_path = f"rsync://{self.collection_system_transfer['rsyncUser']}@" \
-                              f"{self.collection_system_transfer['rsyncServer']}" \
+                source_path = f"rsync://{cst_cfg['rsyncUser']}@" \
+                              f"{cst_cfg['rsyncServer']}" \
                               f"{source_dir}"
             elif transfer_type == 'ssh':
-                user = self.collection_system_transfer['sshUser']
-                host = self.collection_system_transfer['sshServer']
+                user = cst_cfg['sshUser']
+                host = cst_cfg['sshServer']
                 source_path = f"{user}@{host}:{source_dir}"
             elif transfer_type == 'smb':
                 source_path = os.path.join(mntpoint, source_dir.lstrip('/').rstrip('/'))
