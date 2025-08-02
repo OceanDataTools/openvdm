@@ -75,7 +75,7 @@ use Helpers\Form;
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>

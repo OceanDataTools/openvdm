@@ -7,7 +7,7 @@ rsort($data['loweringIDs']);
         <div class="row">
             <div class="col-lg-12">
                 <div class="pull-right">
-                    <form  class="form-inline">                            
+                    <form  class="form-inline">
                         <div class="form-group">
                             <label for="lowering_sel"><?php echo LOWERING_NAME; ?>:</label>
                             <select class="form-control inline" id="lowering_sel" onchange="window.location.href = window.location.href.split('?')[0] + '?loweringID=' + this[selectedIndex].value">
@@ -51,13 +51,13 @@ rsort($data['loweringIDs']);
         }
 ?>
                                     <div class="panel-heading"><?php echo $data['placeholders'][$i]['heading'];?><?php echo ($data['placeholders'][$i]['plotType'] == 'chart'? '<i id="' . $data['placeholders'][$i]['id'] . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i>': ''); ?>
-                                    </div>                  
+                                    </div>
                                     <div class="panel-body">
                                         <div class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount > 0? $loadingImage: 'No Data Found.'); ?></div>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">
-                                            <form>                                            
+                                            <form>
 <?php
         for($j = 0; $j < sizeof($data['placeholders'][$i]['dataArray']); $j++){
             // echo '<pre>'; print_r($data['placeholders'][$i]['dataArray'][$j]); echo '</pre>';
@@ -67,7 +67,7 @@ rsort($data['loweringIDs']);
 
             $dataFiles = array_values($dataFiles);
             // echo '<pre>'; print_r($dataFiles); echo '</pre>';
-?>                                     
+?>
                                                 <div class="row">
                                                     <div class="col-lg-12"><strong><?php echo $dataFiles[0]['type']; ?></strong><?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0 && sizeof($dataFiles) > 0? '<div class="pull-right"><div class="btn btn-xs btn-default selectAll" >Select All</div> <div class="btn btn-xs btn-default clearAll" >Clear All</div></div>': ''); ?></div>
 <?php
@@ -79,7 +79,7 @@ rsort($data['loweringIDs']);
                                                     </div></br>
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                     <div class='col-lg-4 col-sm-6'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -88,7 +88,7 @@ rsort($data['loweringIDs']);
                     }
                 } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'tms')===0) {
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                     <div class='col-lg-4 col-sm-6'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -100,7 +100,7 @@ rsort($data['loweringIDs']);
                                                     <div class="form-group">
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                         <div class='col-lg-4 col-sm-6'>
                                                             <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                             <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -115,7 +115,7 @@ rsort($data['loweringIDs']);
                                                     <div class="form-group">
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                         <div class='col-lg-4 col-sm-6'>
                                                             <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                             <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -130,7 +130,7 @@ rsort($data['loweringIDs']);
                                                     <div class="form-group">
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                         <div class='col-lg-4 col-sm-6'>
                                                             <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                             <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -145,7 +145,7 @@ rsort($data['loweringIDs']);
                                                     <div class="form-group">
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
-?>                              
+?>
                                                         <div class='col-lg-4 col-sm-6'>
                                                             <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $dataFiles[$k]['type'];?>" type="radio" value="<?php echo $dataFiles[$k]['dd_json'];?>"  <?php echo ($k === sizeof($dataFiles)-1? 'checked' : '');   ?>> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                             <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>

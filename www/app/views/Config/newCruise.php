@@ -136,11 +136,11 @@ use Helpers\Form;
                                         <td>Ship-to-Shore Transfers</td><td style='width:20px; text-align:center'><?php echo $data['shipToShoreTransfersEnable'] === '1' ? Form::submit(array('name'=>'disableSSDW', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'enableSSDW', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
                                     </tr>
                                 </table>
-                                
+
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Create')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>

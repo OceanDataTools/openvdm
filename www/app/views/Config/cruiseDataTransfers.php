@@ -51,9 +51,9 @@ use Helpers\Session;
                     <tr>
                         <td class="name"><?php echo $row->longName; ?></td>
                         <td class="action">
-                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/edit/<?php echo $row->cruiseDataTransferID; ?>'>Edit</a> / 
-                            <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> / 
-                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> / 
+                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/edit/<?php echo $row->cruiseDataTransferID; ?>'>Edit</a> /
+                            <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> /
+                            <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> /
 <?php
             if($row->status === "1") {
 ?>

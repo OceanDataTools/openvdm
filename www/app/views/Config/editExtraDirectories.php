@@ -46,12 +46,12 @@ use Helpers\FormCustom;
 ?>
                             </div>
                         </div>
-                        <div class="row">    
+                        <div class="row">
                             <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config/extraDirectories" class="btn btn-danger">Cancel</a>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>
