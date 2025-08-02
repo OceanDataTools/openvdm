@@ -13,7 +13,6 @@ DESCRIPTION:  utilities for dealing with local files/directories
 """
 
 import os
-import re
 import json
 import time
 import fnmatch
@@ -25,8 +24,9 @@ import subprocess
 from contextlib import contextmanager
 from pwd import getpwnam
 from datetime import timedelta
+from typing import List, Optional
 
-rsync_partial_file_re = re.compile(r'(^\..+\.[\w]{6}$)')
+default_ignore_patterns = ["**/@eaDir", "**/.DS_Store", "**/Thumbs.db", "**/.*.??????"]
 
 def is_ascii(s):
     """
@@ -40,18 +40,15 @@ def is_ascii(s):
         return False
 
 
-def is_rsync_patial_file(filename):
+def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bool:
     """
-    Check to see if the filename is a rsync partial file.
+    Returns True if the filepath matches any of the provided glob-style patterns.
     """
 
-    # file_match = False if re.match(rsync_partial_file_re, filename) is None else True
-    file_match = re.match(rsync_partial_file_re, filename) is not None
+    filepath = os.path.normpath(filepath)
+    patterns = patterns or default_ignore_patterns
 
-    if file_match:
-        logging.warning("Ignoring %s. It's an rsync partial file", filename)
-
-    return file_match
+    return any(fnmatch.fnmatch(filepath, pattern) for pattern in patterns)
 
 
 def build_filelist(source_dir):
@@ -64,13 +61,17 @@ def build_filelist(source_dir):
     for root, _, files in os.walk(source_dir):
 
         for filename in files:
-            if is_rsync_patial_file(filename):
+            fullpath = os.path.join(root, filename)
+
+            if os.path.islink(fullpath):
                 continue
 
-            full_path = os.path.join(root, filename)
-            rel_path = os.path.relpath(full_path, source_dir)
+            if is_default_ignore(fullpath):
+                continue
 
-            if not os.path.islink(full_path) and is_ascii(full_path):
+            rel_path = os.path.relpath(fullpath, source_dir)
+
+            if is_ascii(fullpath):
                 return_files['include'].append(rel_path)
             else:
                 return_files['exclude'].append(rel_path)

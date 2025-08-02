@@ -32,7 +32,7 @@ import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import build_include_file, is_ascii, is_rsync_patial_file, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
@@ -57,6 +57,9 @@ def process_batch(batch, filters, data_start_time, data_end_time):
             if os.path.islink(filepath):
                 return None
 
+            if is_default_ignore(filepath):
+                return None
+
             stat = os.stat(filepath)
             mod_time = stat.st_mtime
             size = stat.st_size
@@ -66,9 +69,6 @@ def process_batch(batch, filters, data_start_time, data_end_time):
 
             if not is_ascii(filepath):
                 return ("exclude", filepath, None)
-
-            if is_rsync_patial_file(filepath):
-                return None
 
             if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
                 return None
@@ -114,6 +114,9 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
         if not file_or_dir.startswith('-'):
             return None
 
+        if is_default_ignore(filepath):
+                return None
+
         try:
             file_mod_time = datetime.strptime(f"{mdate} {mtime}", "%Y/%m/%d %H:%M:%S")
         except ValueError as exc:
@@ -126,9 +129,6 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
 
         if not is_ascii(filepath):
             return ('exclude', filepath, None)
-
-        if is_rsync_patial_file(filepath):
-            return None
 
         if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
             return None

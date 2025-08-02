@@ -27,7 +27,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
 from server.lib.openvdm import OpenVDM
 
@@ -131,7 +131,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exclude_filterlist.extend(_find_non_ascii_files(self.cruise_dir))
         exclude_filterlist = [ f'{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
-        exclude_filterlist.append('.*.??????')
+        exclude_filterlist.extend(default_ignore_patterns)  # rsync partial files, Synology files, .DS_Store, etc
 
         return exclude_filterlist
 

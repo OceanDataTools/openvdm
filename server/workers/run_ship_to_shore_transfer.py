@@ -29,7 +29,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, is_rsync_patial_file, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import build_rsync_options, check_darwin, test_cdt_destination
 from server.lib.openvdm import OpenVDM
 
@@ -54,11 +54,11 @@ def process_batch(batch, filters):
             if os.path.islink(filepath):
                 return None
 
+            if is_default_ignore(filepath):
+                return None
+
             if not is_ascii(filepath):
                 return ("exclude", filepath)
-
-            if is_rsync_patial_file(filepath):
-                return None
 
             for priority, patterns in filters.items():
                 for pattern in patterns:
