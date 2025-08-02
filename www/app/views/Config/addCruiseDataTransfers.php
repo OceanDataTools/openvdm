@@ -47,7 +47,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
                                 <div class="form-group"><label>Include OpenVDM generated files?</label><?php echo FormCustom::radioInline($data['includeOVDMFilesOptions'], $_POST['includeOVDMFiles']); ?></div>
                                 <div class="form-group"><label>Skip empty directories (-m)?</label><?php echo FormCustom::radioInline($data['skipEmptyDirsOptions'], $_POST['skipEmptyDirs']); ?></div>
                                 <div class="form-group"><label>Skip empty files (--min-size=0)?</label><?php echo FormCustom::radioInline($data['skipEmptyFilesOptions'], $_POST['skipEmptyFiles']); ?></div>
-                                <div class="form-group"><label>Sync with destination directory (--delete)?</label><?php echo FormCustom::radioInline($data['syncToDestOptions'], $_POST['syncToDest']); ?></div>
+                                <div class="form-group"><label>Sync with source directory (--delete)?</label><?php echo FormCustom::radioInline($data['syncToDestOptions'], $_POST['syncToDest']); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $_POST['bandwidthLimit'], 'size'=>'7', 'length'=>'8')); ?></label></div>
                                 <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions']); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=> $_POST['destDir'])); ?></div>
@@ -79,7 +79,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
-?>  
+?>
                                     </div>
                                 </div>
 <?php
@@ -105,7 +105,7 @@ if(!isset($_POST['excludedExtraDirectories'])) {
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
-?>  
+?>
                                     </div>
                                 </div>
 <?php
@@ -116,13 +116,13 @@ if(!isset($_POST['excludedExtraDirectories'])) {
 ?>
                             </div>
                         </div>
-                        <div class="row">    
+                        <div class="row">
                             <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Add')); ?>
                                 <a href="<?php echo DIR; ?>config/cruiseDataTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>
