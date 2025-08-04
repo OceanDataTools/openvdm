@@ -26,7 +26,14 @@ from pwd import getpwnam
 from datetime import timedelta
 from typing import List, Optional
 
-default_ignore_patterns = ["**/@eaDir", "**/.DS_Store", "**/Thumbs.db", "**/.*.??????"]
+default_ignore_patterns = [
+    "**/@eaDir",
+    "**/.DS_Store",
+    "**/._*",
+    "**/Thumbs.db",
+    "**/desktop.ini",
+    "**/.*.??????"
+]
 
 def is_ascii(s):
     """
