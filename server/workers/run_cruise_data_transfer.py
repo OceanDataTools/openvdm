@@ -394,17 +394,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         results = json.loads(job_result)
         parts = results.get('parts', [])
-        final_verdict = parts[-1] if parts else None
+        final_part = parts[-1] if parts else {}
+        final_verdict = final_part.get("result", None)
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s ", current_job.handle)
 
-        if not cdt_id:
+        if not cdt_id or not final_verdict or final_verdict == "Ignore":
             return super().send_job_complete(current_job, job_result)
 
-        if final_verdict and final_verdict.get('result') == "Fail":
-            reason = final_verdict.get('reason', "undefined")
+        if final_verdict == "Fail":
+            reason = final_part.get('reason', "undefined")
             self.ovdm.set_error_cruise_data_transfer(cdt_id, reason)
             return super().send_job_complete(current_job, job_result)
 

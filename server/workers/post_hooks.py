@@ -266,12 +266,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         results = json.loads(job_result)
-
         parts = results.get('parts', [])
-        final_verdict = parts[-1] if parts else None
+        final_part = parts[-1] if parts else {}
+        final_verdict = final_part.get("result", None)
 
-        if final_verdict and final_verdict.get('result') == "Fail":
-            reason = final_verdict.get('reason', 'Unknown failure')
+        if not final_verdict or final_verdict == "Ignore":
+            return super.on_job_complete(current_job, job_result)
+
+        if final_verdict == "Fail":
+            reason = final_part.get('reason', 'Unknown failure')
             if int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
