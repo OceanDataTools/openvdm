@@ -855,7 +855,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     if job_results['files']['new'] or job_results['files']['updated']:
-        if worker.shipboard_data_warehouse_config['localDirIsMountPoint'] == '0':
+        if cst_cfg['localDirIsMountPoint'] == '0':
             logging.info("Setting file permissions")
             worker.send_job_status(current_job, 9, 10)
 
