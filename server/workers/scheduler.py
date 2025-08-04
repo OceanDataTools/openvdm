@@ -82,6 +82,10 @@ def scheduler(interval=None):
         # schedule collection_system_transfers
         collection_system_transfers = ovdm.get_active_collection_system_transfers()
         for collection_system_transfer in collection_system_transfers:
+
+            if collection_system_transfer['status'] == "1":
+                continue
+
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
 
             gmData = {
@@ -96,6 +100,10 @@ def scheduler(interval=None):
         # schedule cruise_data_transfers
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
+
+            if cruise_data_transfer['status'] == "1":
+                continue
+
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
 
             gmData = {
@@ -110,7 +118,7 @@ def scheduler(interval=None):
         # schedule ship-to-shore transfer
         required_cruise_data_transfers = ovdm.get_required_cruise_data_transfers()
         for required_cruise_data_transfer in required_cruise_data_transfers:
-            if required_cruise_data_transfer['name'] == 'SSDW':
+            if required_cruise_data_transfer['name'] == 'SSDW' and required_cruise_data_transfer['enable'] != "1":
                 logging.info("Submitting cruise data transfer job for: %s", required_cruise_data_transfer['longName'])
 
                 gmData = {
