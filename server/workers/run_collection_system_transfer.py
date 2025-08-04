@@ -357,6 +357,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     filepaths.append(os.path.join(root, filename))
         else:
             command = ['rsync', '-r']
+            if cst_cfg.get('skipEmptyFiles') == '1':
+                command.append('--min-size=1')
+
+            if cst_cfg.get('skipEmptyDirs') == '1':
+                command.append('-m')
+
             if transfer_type == 'rsync':
                 command += [f'--password-file={rsync_password_filepath}', '--no-motd',
                             f"rsync://{cst_cfg['rsyncUser']}@"
@@ -371,12 +377,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if cst_cfg.get('sshUseKey') == '0':
                     command = ['sshpass', '-p', cst_cfg['sshPass']] + command
 
-            if cst_cfg.get('skipEmptyFiles') == '1':
-                command.insert(2, '--min-size=1')
-            if cst_cfg.get('skipEmptyDirs') == '1':
-                command.insert(2, '-m')
-
-            logging.debug("File list Command: %s", ' '.join(command))
+            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg["sshPass"]}', '-p ****'))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]

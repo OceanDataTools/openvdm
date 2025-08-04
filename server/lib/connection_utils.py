@@ -50,7 +50,7 @@ def check_darwin(cfg):
     if cfg['sshUseKey'] == '0':
         cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
 
-    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'{cfg["sshPass"]}', '****'))
+    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg["sshPass"]}', '-p ****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
