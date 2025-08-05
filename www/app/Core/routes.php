@@ -161,6 +161,7 @@ Router::post('api/warehouse/setLoweringSize', 'Controllers\Api\Warehouse@setLowe
 
 Router::any('api/collectionSystemTransfers/getCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getCollectionSystemTransfers');
 Router::any('api/collectionSystemTransfers/getActiveCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getActiveCollectionSystemTransfers');
+Router::any('api/collectionSystemTransfers/getActiveCollectionSystemTransfers/(:any)', 'Controllers\Api\CollectionSystemTransfers@getActiveCollectionSystemTransfers');
 Router::any('api/collectionSystemTransfers/getCruiseOnlyCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getCruiseOnlyCollectionSystemTransfers');
 Router::any('api/collectionSystemTransfers/getLoweringOnlyCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getLoweringOnlyCollectionSystemTransfers');
 Router::any('api/collectionSystemTransfers/getCollectionSystemTransfer/(:num)', 'Controllers\Api\CollectionSystemTransfers@getCollectionSystemTransfer');

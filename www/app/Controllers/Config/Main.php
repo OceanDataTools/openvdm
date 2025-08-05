@@ -315,7 +315,7 @@ class Main extends Controller {
         $data['javascript'] = array('main_config');
         $data['tasks'] = $this->_tasksModel->getActiveTasks();
         $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
+        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
 
@@ -348,7 +348,7 @@ class Main extends Controller {
         $data['javascript'] = array('main_config');
         $data['tasks'] = $this->_tasksModel->getActiveTasks();
         $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
+        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
 
@@ -486,7 +486,7 @@ class Main extends Controller {
                 $data['cruiseID'] = $this->_warehouseModel->getCruiseID();                                                           
                 $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
                 $data['tasks'] = $this->_tasksModel->getActiveTasks();
-                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
+                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
                 $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
                 $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
                 
@@ -615,7 +615,7 @@ class Main extends Controller {
                 $data['javascript'] = array('main_config');
                 $data['loweringID'] = $this->_warehouseModel->getLoweringID();
                 $data['tasks'] = $this->_tasksModel->getActiveTasks();
-                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
+                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
                 
                 $data['jobName'] = 'Setup New ' . LOWERING_NAME;
 
