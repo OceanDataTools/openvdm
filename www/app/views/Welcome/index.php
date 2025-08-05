@@ -169,7 +169,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
             <div class="panel panel-default">
                 <div class="panel-heading">Collection System Transfer Status</div>
                 <div class="panel-body">
-                    <div class="list-group" id="collectionSystemTransferStatusList">
+                    <div class="list-group mb-0" id="collectionSystemTransferStatusList">
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
