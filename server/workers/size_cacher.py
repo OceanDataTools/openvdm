@@ -36,28 +36,43 @@ def size_cacher(interval):
     interval
     """
 
+    def loop_delay(start_dt, interval_s):
+        elapsed = (datetime.datetime.utcnow() - start_dt).total_seconds()
+        delay = interval_s - elapsed
+        logging.debug("Elapsed Time: %.2f seconds", elapsed)
+
+        if delay > 0:
+            logging.info("Sleeping for %.2f seconds", delay)
+            time.sleep(delay)
+
+    def get_dir_size(path):
+        if isdir(path):
+            logging.debug("Calculating size for: %s", path)
+            proc = subprocess.run(['du', '-sb', path], capture_output=True, text=True)
+            if proc.returncode == 0:
+                return proc.stdout.split()[0]
+        return None
+
     ovdm = OpenVDM()
 
     while True:
-        start_t = datetime.datetime.utcnow()
+        start = datetime.datetime.utcnow()
 
-        warehouse_config = ovdm.get_shipboard_data_warehouse_config()
-        cruise_id = ovdm.get_cruise_id()
+        try:
+            warehouse_config = ovdm.get_shipboard_data_warehouse_config()
+            cruise_id = ovdm.get_cruise_id()
+            lowering_id = ovdm.get_lowering_id() if ovdm.get_show_lowering_components() else None
+        except Exception as e:
+            logging.error("Unable to retrieve data from OpenVDM API: %s", e)
+
+            loop_delay(start, interval)
+            continue
+
         cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
-
-        lowering_id = ovdm.get_lowering_id() if ovdm.get_show_lowering_components() else None
         lowering_dir = join(cruise_dir, warehouse_config['loweringDataBaseDir'], lowering_id) if lowering_id else None
 
         logging.debug("Cruise Directory: %s", cruise_dir)
         logging.debug("Lowering Directory: %s", lowering_dir)
-
-        def get_dir_size(path):
-            if isdir(path):
-                logging.debug("Calculating size for: %s", path)
-                proc = subprocess.run(['du', '-sb', path], capture_output=True, text=True)
-                if proc.returncode == 0:
-                    return proc.stdout.split()[0]
-            return None
 
         cruise_size = get_dir_size(cruise_dir)
         lowering_size = get_dir_size(lowering_dir) if lowering_dir else None
@@ -70,14 +85,7 @@ def size_cacher(interval):
         if lowering_size:
             logging.info("Lowering Size: %s", lowering_size)
 
-        elapsed = (datetime.datetime.utcnow() - start_t).total_seconds()
-        delay = interval - elapsed
-
-        logging.debug("Elapsed Time: %.2f seconds", elapsed)
-
-        if delay > 0:
-            logging.info("Sleeping for %.2f seconds", delay)
-            time.sleep(delay)
+        loop_delay(start, interval)
 
 
 if __name__ == "__main__":
