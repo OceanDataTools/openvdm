@@ -785,14 +785,14 @@ class OpenVDM():
             raise exc
 
 
-    def get_active_collection_system_transfers(self, cruise=True, lowering=True):
+    def get_active_collection_system_transfers(self, sort='name', cruise=True, lowering=True):
         """
         Return all active collection system transfer configurations. By default
         this returns cruise and lowerings focused directories.  Use the cruise
         and lowering argument to file the list.
         """
 
-        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getActiveCollectionSystemTransfers"
+        url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getActiveCollectionSystemTransfers/{sort}"
 
         try:
             req = requests.get(url, timeout=TIMEOUT)

@@ -80,7 +80,7 @@ def scheduler(interval=None):
             continue
 
         # schedule collection_system_transfers
-        collection_system_transfers = ovdm.get_active_collection_system_transfers()
+        collection_system_transfers = ovdm.get_active_collection_system_transfers('longName')
         for collection_system_transfer in collection_system_transfers:
 
             if collection_system_transfer['status'] == "1":
