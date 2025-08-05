@@ -271,7 +271,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         final_verdict = final_part.get("result", None)
 
         if not final_verdict or final_verdict == "Ignore":
-            return super.on_job_complete(current_job, job_result)
+            return super.send_job_complete(current_job, job_result)
 
         if final_verdict == "Fail":
             reason = final_part.get('reason', 'Unknown failure')
