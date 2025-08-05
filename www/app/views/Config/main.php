@@ -62,7 +62,7 @@ $_warehouseModel = new \Models\Warehouse();
             <div class="panel panel-default">
                 <div class="panel-heading">Maintenance Tasks</div>
                 <div class="panel-body">
-                    <div class="list-group" id="taskStatusList">
+                    <div class="list-group mb-0" id="taskStatusList">
 <?php
     if($data['tasks']){
         foreach($data['tasks'] as $row){
@@ -96,7 +96,7 @@ $_warehouseModel = new \Models\Warehouse();
             <div class="panel panel-default">
                 <div class="panel-heading">Collection System Transfer Status</div>
                 <div class="panel-body">
-                    <div class="list-group" id="collectionSystemTransferStatusList">
+                    <div class="list-group mb-0" id="collectionSystemTransferStatusList">
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
@@ -163,7 +163,7 @@ $_warehouseModel = new \Models\Warehouse();
     }
 ?>
                     </div>
-                    <div class="list-group" id="optionalCruiseDataTransfers">
+                    <div class="list-group mb-0" id="optionalCruiseDataTransfers">
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){

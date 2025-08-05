@@ -236,7 +236,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     }
 ?>
                     </div>
-                    <div class="list-group" id="optionalCruiseDataTransfers">
+                    <div class="list-group mb-0" id="optionalCruiseDataTransfers">
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){
