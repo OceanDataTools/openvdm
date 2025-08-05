@@ -50,8 +50,8 @@ class CollectionSystemTransfers extends Controller {
         echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfers());
     }
     
-    public function getActiveCollectionSystemTransfers(){
-        echo json_encode($this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers());
+    public function getActiveCollectionSystemTransfers($sortField = 'name'){
+        echo json_encode($this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers($sortField));
     }
 
     public function getCruiseOnlyCollectionSystemTransfers(){

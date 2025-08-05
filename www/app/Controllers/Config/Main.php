@@ -32,7 +32,7 @@ class Main extends Controller {
         $data['title'] = 'Configuration';
         $data['javascript'] = array('main_config');
         $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
+        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
         $data['cruiseFinalizedOn'] = $this->_warehouseModel->getCruiseFinalizedDate()['cruiseFinalizedOn'];
