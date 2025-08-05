@@ -36,6 +36,8 @@ def size_cacher(interval):
     interval
     """
 
+    ovdm = OpenVDM()
+
     def loop_delay(start_dt, interval_s):
         elapsed = (datetime.datetime.utcnow() - start_dt).total_seconds()
         delay = interval_s - elapsed
@@ -45,15 +47,32 @@ def size_cacher(interval):
             logging.info("Sleeping for %.2f seconds", delay)
             time.sleep(delay)
 
+
     def get_dir_size(path):
-        if isdir(path):
-            logging.debug("Calculating size for: %s", path)
-            proc = subprocess.run(['du', '-sb', path], capture_output=True, text=True)
+        if not isdir(path):
+            logging.warning("Path is not a directory or does not exist: %s", path)
+            return None
+
+        logging.debug("Calculating size for: %s", path)
+
+        try:
+            proc = subprocess.run(
+                ['du', '-sb', path],
+                capture_output=True,
+                text=True,
+                check=False  # we'll handle non-zero return codes manually
+            )
+
             if proc.returncode == 0:
                 return proc.stdout.split()[0]
-        return None
+            else:
+                logging.error("Failed to get size of %s. Error: %s", path, proc.stderr.strip())
+                return None
 
-    ovdm = OpenVDM()
+        except Exception as e:
+            logging.exception("Exception while calculating size for %s: %s", path, e)
+            return None
+
 
     while True:
         start = datetime.datetime.utcnow()
