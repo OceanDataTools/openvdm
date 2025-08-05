@@ -59,18 +59,23 @@ def size_cacher(interval):
             proc = subprocess.run(
                 ['du', '-sb', path],
                 capture_output=True,
-                text=True,
-                check=False  # we'll handle non-zero return codes manually
+                text=True
             )
 
             if proc.returncode == 0:
                 return proc.stdout.split()[0]
             else:
-                logging.error("Failed to get size of %s. Error: %s", path, proc.stderr.strip())
+                logging.warning("du failed (some files may have disappeared): %s", proc.stderr.strip())
+                # attempt to parse partial output anyway
+                if proc.stdout:
+                    try:
+                        return proc.stdout.split()[0]
+                    except Exception:
+                        pass
                 return None
 
         except Exception as e:
-            logging.exception("Exception while calculating size for %s: %s", path, e)
+            logging.exception("Exception while running du on %s: %s", path, e)
             return None
 
 
