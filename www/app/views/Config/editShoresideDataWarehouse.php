@@ -70,6 +70,7 @@ use Helpers\FormCustom;
             <p>The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p>The <strong>Server Password</strong> is the username on the SSDW with read/write permission to the files/folders in the <?php echo CRUISE_NAME; ?> Data Directories (i.e. "shipTech").</p>
             <p>The <strong><?php echo CRUISE_NAME; ?> Data Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SSDW (i.e. "/mnt/data/Shoreside").</p>
+            <p>Starting with v2.11 OpenVDM is transitioning from rsync to rclone for ship-to-shore transfers.  Use the format of "{rclone_remote}:{destination_directory}" to instruct OpenVDM to use rclone for ship-to-shore transfers. Currently only GCS and SFTP remote types are supported.  Example GCS: "ship-to-shore-gcs:shoreside_bucket/" Example SFTP: "ship-to-shore-sftp:/data/shoreside"  The rclone remotes must be setup via "rclone config" prior to use.</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>
