@@ -10,7 +10,7 @@ DESCRIPTION:  Gearman worker that handles testing cruise data transfer
    AUTHOR:  Webb Pinner
   VERSION:  2.11
   CREATED:  2015-01-01
- REVISION:  2025-07-06
+ REVISION:  2025-08-08
 """
 
 import argparse
@@ -25,7 +25,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connection_utils import test_cdt_destination
+from server.lib.connection_utils import test_cdt_destination, test_cdt_rclone_destination
 
 TASK_NAMES = {
     'TEST_CRUISE_DATA_TRANSFER': 'testCruiseDataTransfer'
@@ -224,7 +224,10 @@ def task_test_cruise_data_transfer(worker, current_job):
     logging.info("Test destination")
     worker.send_job_status(current_job, 66, 100)
 
-    job_results['parts'].extend(test_cdt_destination(cdt_cfg))
+    if ':' in cdt_cfg['destDir']:
+        job_results['parts'].extend(test_cdt_rclone_destination(cdt_cfg))
+    else:
+        job_results['parts'].extend(test_cdt_destination(cdt_cfg))
 
     for test in job_results['parts']:
         if test['result'] == "Fail":

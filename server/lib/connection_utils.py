@@ -9,13 +9,16 @@ DESCRIPTION:  utilities used to connect with remote systems
    AUTHOR:  Webb Pinner
   VERSION:  2.11
   CREATED:  2025-07-05
- REVISION:  2025-07-07
+ REVISION:  2025-08-08
 """
 
 import os
 import sys
+import uuid
 import logging
+import tempfile
 import subprocess
+import configparser
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -39,6 +42,26 @@ def get_transfer_type(transfer_type):
         return 'ssh'
 
     return None
+
+
+def get_rclone_remote_type(remote_name, config_path=None):
+        # Default rclone config path
+        if config_path is None:
+            config_path = os.path.expanduser("~/.config/rclone/rclone.conf")
+
+        if not os.path.isfile(config_path):
+            logging.error("rclone config file %s not found", config_path)
+            return None
+
+        config = configparser.ConfigParser()
+        config.read(config_path)
+
+        if remote_name in config.sections():
+            remote_section = config[remote_name]
+        else:
+            remote_section = {}
+
+        return remote_section.get('type')
 
 
 def check_darwin(cfg):
@@ -292,6 +315,35 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
         return False
 
     return True
+
+
+def build_rclone_options(cfg, mode='dry-run'):
+    """
+    Build the relevant rsync options for the given transfer
+    """
+
+    remote_name, _ = cfg['destDir'].split(':',1)
+    remote_type = get_rclone_remote_type(remote_name)
+
+    flags = ["--progress"]
+    copy_sync = "sync" if cfg.get('syncToDest', '0') == '1' else "copy"
+
+    #if cfg.get('skipEmptyFiles') == '1':
+    #    flags.extend(['--min-size', '1B'])
+
+    if cfg.get('skipEmptyDirs') == '0':
+        flags.append('--create-empty-src-dirs')
+
+    if mode == 'dry-run':
+        flags.append('--dry-run')
+
+    if remote_type == 'google cloud storage':
+        flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
+
+    if cfg.get('bandwidthLimit') not in (None, '0'):
+        flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}M" ])
+
+    return copy_sync, flags
 
 
 def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
@@ -737,3 +789,130 @@ def test_cdt_destination(cdt_cfg):
             results.extend([{"partName": "Write test", "result": "Pass"}])
 
         return results
+
+def test_cdt_rclone_destination(cfg):
+
+    def _gcs_bucket_exists(remote_path):
+        try:
+            subprocess.run(
+                ["rclone", "lsd", remote_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True
+            )
+            return True
+        except subprocess.CalledProcessError:
+            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
+            return False
+
+    def _verify_write_access(remote_path, bucket=False):
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file.write(b"rclone write test")
+        temp_file.close()
+
+        # Create a unique name to avoid conflicts
+        remote_test_path = f"{remote_path.rstrip('/')}/.rclone-write-test-{uuid.uuid4().hex}.txt"
+        cmd = ["rclone", "copyto", temp_file.name, remote_test_path]
+
+        if bucket:
+            cmd += ["--gcs-bucket-policy-only", "--local-no-set-modtime"]
+
+        try:
+            # Attempt to copy the file to the bucket
+            subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+
+            # Attempt to delete the test file from the bucket
+            subprocess.run(
+                ["rclone", "deletefile", remote_test_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+
+            return True
+        except subprocess.CalledProcessError:
+            #logging.exception(str(e))
+            return False
+        finally:
+            os.remove(temp_file.name)
+
+    def _verify_sftp_destination(remote_path):
+        try:
+            subprocess.run(
+                ["rclone", "lsf", remote_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True
+            )
+            return True
+        except subprocess.CalledProcessError:
+            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
+            return False
+
+    results = []
+    remote_name, remote_path = cfg['destDir'].split(':')
+    remote_type = get_rclone_remote_type(remote_name)
+
+    if remote_type is None:
+        reason = "rclone remote does not exist or rclone config file not found"
+        results.extend([
+            {"partName": "Rclone remote config", "result": "Fail", "reason": reason}
+        ])
+
+        return results
+
+    results.append({"partName": "Rclone remote config", "result": "Pass"})
+
+    if remote_type == 'google cloud storage':
+        bucket_name, dest_dir = remote_path.split('/',1)
+        if not _gcs_bucket_exists(f"{remote_name}:{bucket_name}"):
+            reason = f"GCS bucket {bucket_name} does not exist"
+            results.extend([
+                {"partName": "Verify GCS bucket", "result": "Fail", "reason": reason},
+                {"partName": "Write test", "result": "Fail", "reason": reason}
+            ])
+
+            return results
+
+        results.append({"partName": "Verify GCS bucket", "result": "Pass"})
+
+        if not _verify_write_access(f"{remote_name}:{remote_path}", True):
+            reason = f"No write access to {remote_name}:{remote_path}"
+            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+
+            return results
+
+        results.append({"partName": "Write test", "result": "Pass"})
+
+    if remote_type == 'sftp':
+        _, dest_dir = remote_path.split('/',1)
+        if not _verify_sftp_destination(cfg['destDir']):
+            reason = f"Destination directory {dest_dir} does not exist"
+            results.extend([
+                {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                {"partName": "Write test", "result": "Fail", "reason": reason}
+            ])
+
+            return results
+
+        results.append({"partName": "Destination directory", "result": "Pass"})
+
+        if not _verify_write_access(cfg['destDir']):
+            reason = f"No write access to {cfg['destDir']}"
+            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+
+            return results
+
+        results.append({"partName": "Write test", "result": "Pass"})
+
+    return results
+
