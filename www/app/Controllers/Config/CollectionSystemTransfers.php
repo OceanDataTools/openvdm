@@ -157,7 +157,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -582,8 +582,7 @@ class CollectionSystemTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCollectionSystemTransfer", json_encode($gmData)), true);
-            
-                $data['testCollectionSystemTransferName'] = $gmData['collectionSystemTransfer']->name;
+                $data['testCollectionSystemTransferName'] = $longName;
             }
         }
 
@@ -620,7 +619,7 @@ class CollectionSystemTransfers extends Controller {
             $sourceDir = $_POST['sourceDir'];
             $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
             $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0")? $_POST['removeSourceFiles']: "0";
+            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
             $useStartDate = $_POST['useStartDate'];
             $skipEmptyDirs = $_POST['skipEmptyDirs'];
             $skipEmptyFiles = $_POST['skipEmptyFiles'];
@@ -1079,9 +1078,7 @@ class CollectionSystemTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCollectionSystemTransfer", json_encode($gmData)), true);
-                // $data['testCollectionSystemTransferName'] = $gmData['collectionSystemTransfer']->name;      
-
-
+                $data['testCollectionSystemTransferName'] = $longName;      
             }
 
             #additional data needed for view
@@ -1144,7 +1141,7 @@ class CollectionSystemTransfers extends Controller {
     }
     
     public function test($id) {
-        
+        $_warehouseModel = new \Models\Warehouse(); 
         $collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
         $gmData = array(
             'collectionSystemTransfer' => array(
@@ -1163,11 +1160,12 @@ class CollectionSystemTransfers extends Controller {
 
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
+        $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
         $data['javascript'] = array('collectionSystemTransfers');
         $data['filter'] = $_GET['filter'] ?? '';
 
         #additional data needed for view
-        $data['testCollectionSystemTransferName'] = $gmData['collectionSystemTransfer']->name;
+        $data['testCollectionSystemTransferName'] = $collectionSystemTransfer->longName;
 
         View::rendertemplate('header',$data);
         View::render('Config/collectionSystemTransfers',$data);

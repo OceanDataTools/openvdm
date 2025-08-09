@@ -32,7 +32,7 @@ use Helpers\Form;
                 <div class="panel-body">
                     <?php echo Form::open(array('role'=>'form', 'method'=>'post')); ?>
                         <div class="row">
-                            <div class="col-lg-12">
+                            <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> ID</label>
 <?php
@@ -53,6 +53,26 @@ use Helpers\Form;
     }
 ?>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Name</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseName', 'value'=>$data['cruiseName'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> PI</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruisePI', 'value'=>$data['cruisePI'])); ?>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Location</label>
+                                    <?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'cruiseLocation', 'value'=>$data['cruiseLocation'])); ?>
                                 </div>
                             </div>
                         </div>
@@ -109,7 +129,7 @@ use Helpers\Form;
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>

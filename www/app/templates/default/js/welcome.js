@@ -8,7 +8,7 @@ $(function () {
     }
     
     function updateCollectionSystemTransferStatusList(collectionSystemTransferStatusList) {
-        var collectionSystemTransferStatusURL = siteRoot + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers';
+        var collectionSystemTransferStatusURL = siteRoot + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers/longName';
         $.getJSON(collectionSystemTransferStatusURL, function (data, status) {
             if (status === 'success' && data !== null) {
                 var output = '';

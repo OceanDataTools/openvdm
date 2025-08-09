@@ -48,9 +48,9 @@ use Helpers\Session;
                 <a id="runStop" class="btn btn-sm btn-danger" href="<?php echo DIR; ?>config/shipToShoreTransfers/stop">Stop Ship-to-Shore Transfer</a>
 <?php
     } else {
-?>   
+?>
                 <a id="runStop" class="btn btn-sm btn-success" href="<?php echo DIR; ?>config/shipToShoreTransfers/run">Run Ship-to-Shore Transfer</a>
-<?php        
+<?php
     }
 ?>
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/shipToShoreTransfers/add">
@@ -74,7 +74,7 @@ use Helpers\Session;
                     <tr>
                         <td class="name"><?php echo $row->longName; ?></td>
                         <td class="action">
-                            <a href='<?php echo DIR; ?>config/shipToShoreTransfers/edit/<?php echo $row->shipToShoreTransferID; ?>'>Edit</a> / 
+                            <a href='<?php echo DIR; ?>config/shipToShoreTransfers/edit/<?php echo $row->shipToShoreTransferID; ?>'>Edit</a> /
                             <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Ship-to-Shore Transfer" data-delete-url="<?php echo DIR; ?>config/shipToShoreTransfers/delete/<?php echo $row->shipToShoreTransferID; ?>">Delete</a>
                         </td>
                         <td style='text-align:center'>

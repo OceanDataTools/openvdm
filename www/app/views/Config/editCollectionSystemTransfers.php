@@ -45,7 +45,7 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group"><label>Ignore Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'ignoreFilter', 'value'=> $data['row'][0]->ignoreFilter)); ?></div>
                                 <div class="form-group"><label>Skip files being actively written to?</label><?php echo FormCustom::radioInline($data['stalenessOptions'], $data['row'][0]->staleness); ?></div>
                                 <div class="form-group staleness"><label>Time to wait when checking for active writes (seconds)?</label> <?php echo Form::input( array('name'=>'customStaleness', 'value'=> ($data['row'][0]->staleness != "0")? $data['row'][0]->staleness : "5", 'size'=>'7', 'length'=>'8')); ?></div>
-                                <div class="form-group staleness"><label>Remove source files after copy (--remove-source-files)?</label> <?php echo FormCustom::radioInline($data['removeSourceFilesOptions'], $data['row'][0]->removeSourceFiles); ?></div>
+                                <div class="form-group removeSource"><label>Remove source files after copy (--remove-source-files)?</label> <?php echo FormCustom::radioInline($data['removeSourceFilesOptions'], $data['row'][0]->removeSourceFiles); ?></div>
                                 <div class="form-group"><label>Skip files create/modified outside of cruise start/stop times?</label><?php echo FormCustom::radioInline($data['useStartDateOptions'], $data['row'][0]->useStartDate); ?></div>
                                 <div class="form-group"><label>Skip empty directories (-m)?</label><?php echo FormCustom::radioInline($data['skipEmptyDirsOptions'], $data['row'][0]->skipEmptyDirs); ?></div>
                                 <div class="form-group"><label>Skip empty files (--min-size=0)?</label><?php echo FormCustom::radioInline($data['skipEmptyFilesOptions'], $data['row'][0]->skipEmptyFiles); ?></div>
@@ -74,13 +74,13 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'value'=> $data['row'][0]->sshPass, 'type'=>'password')); ?></div>
                             </div>
                         </div>
-                        <div class="row">    
+                        <div class="row">
                             <div class="col-lg-12">
                                 <?php echo Form::submit( array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config/collectionSystemTransfers<?php echo $data['filter'] ? '?filter='.$data['filter'] : '';?>" class="btn btn-danger">Cancel</a>
                                 <?php echo Form::submit( array( 'name'=>'inlineTest', 'class'=>'btn btn-primary pull-right', 'value'=>'Test Setup')); ?>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close();?>
                 </div>
             </div>
@@ -136,7 +136,8 @@ $_warehouseModel = new \Models\Warehouse();
                     <li><strong>{mm}</strong> is the shorthand for a 2-number month</li>
                     <li><strong>{DD}</strong> is the shorthand for a 2-number day</li>
                     <li><strong>{HH}</strong> is the shorthand for a 2-number hour</li>
-                    <li><strong>{MM}</strong> is the shorthand for a 2-number minute</li>                    
+                    <li><strong>{MM}</strong> is the shorthand for a 2-number minute</li>
+                    <li><strong>{SS}</strong> is the shorthand for a 2-number second</li>
                 </ul>
             </p>
         </div>

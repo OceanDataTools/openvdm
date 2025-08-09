@@ -42,7 +42,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
                                 <div class="form-group"><label>Include OpenVDM generated files?</label><?php echo FormCustom::radioInline($data['includeOVDMFilesOptions'], $data['row'][0]->includeOVDMFiles); ?></div>
                                 <div class="form-group"><label>Skip empty directories (-m)?</label><?php echo FormCustom::radioInline($data['skipEmptyDirsOptions'], $data['row'][0]->skipEmptyDirs); ?></div>
                                 <div class="form-group"><label>Skip empty files (--min-size=0)?</label><?php echo FormCustom::radioInline($data['skipEmptyFilesOptions'], $data['row'][0]->skipEmptyFiles); ?></div>
-                                <div class="form-group"><label>Sync with destination directory (--delete)?</label><?php echo FormCustom::radioInline($data['syncToDestOptions'], $data['row'][0]->syncToDest); ?></div>
+                                <div class="form-group"><label>Sync with source directory (--delete)?</label><?php echo FormCustom::radioInline($data['syncToDestOptions'], $data['row'][0]->syncToDest); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $data['row'][0]->bandwidthLimit, 'size'=>'7', 'length'=>'8')); ?></label></div>
                                 <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $data['row'][0]->transferType); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=> $data['row'][0]->destDir)); ?></div>
@@ -74,7 +74,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
-?>  
+?>
                                     </div>
                                 </div>
 <?php
@@ -101,7 +101,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
                                         <?php echo $value->longName;?></label></br>
 <?php
         }
-?>  
+?>
                                     </div>
                                 </div>
 <?php
@@ -110,7 +110,7 @@ $data['row'][0]->excludedExtraDirectories = explode(',', $data['row'][0]->exclud
                                 <input type="hidden" name="excludedExtraDirectories[]" value="0">
 <?php
     }
-?>  
+?>
                             </div>
                         </div>
                         <div class="row">

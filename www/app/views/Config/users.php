@@ -43,7 +43,7 @@ use Helpers\Session;
 <?php
             if (strcmp(Session::get('userID'), $row->userID) !== 0 ) {
 ?>
-                        / 
+                        /
                         <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="User" data-delete-url="<?php echo DIR; ?>config/users/delete/<?php echo $row->userID; ?>">Delete</a>
 <?php
             }
@@ -58,7 +58,7 @@ use Helpers\Session;
             <a class="btn btn-sm btn-primary" href="<?php echo DIR; ?>config/users/add">Add New User</a>
        </div>
     </div>
-       
+
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="Delete Confirmation" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">

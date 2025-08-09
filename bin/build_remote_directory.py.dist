@@ -52,7 +52,7 @@ DESCRIPTION:
     BUGS:
    NOTES:
   AUTHOR:  Webb Pinner
- VERSION:  2.10
+ VERSION:  2.11
  CREATED:  2020-11-19
 REVISION:  2025-04-12
 """
@@ -69,7 +69,7 @@ import subprocess
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
+from server.lib.file_utils import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
 TEMPLATE_DIRECTORY = '/opt/openvdm/template_directory'

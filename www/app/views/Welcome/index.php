@@ -24,7 +24,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
             <div class="panel panel-default">
                 <div class="panel-heading">Incorrect Filenames Detected</div>
                 <div class="panel-body" id="filenameErrors">
-<?php 
+<?php
     $noErrors = True;
     if( is_array($data['filenameErrors']) && sizeof($data['filenameErrors']) > 0) {
 ?>
@@ -61,7 +61,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 
     if($noErrors) {
 ?>
-                    <h5>No Filename Errors Detected</h5>               
+                    <h5>No Filename Errors Detected</h5>
 <?php
     }
 ?>
@@ -73,7 +73,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
     if($data['shipboardTransfers']) {
         $itemNum = 0;
-    
+
 	for($i = 0; $i < count($data['shipboardTransfers']); $i++ ) {
 ?>
                     <h5><?php echo $data['shipboardTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipboardTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
@@ -108,7 +108,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
         }
     } else {
 ?>
-                    <h5>No Recent Shipboard Transfers Have Occured</h5>               
+                    <h5>No Recent Shipboard Transfers Have Occured</h5>
 <?php
     }
 ?>
@@ -120,7 +120,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
     if($data['shipToShoreTransfers']) {
         $itemNum = 0;
-        
+
         for($i = 0; $i < count($data['shipToShoreTransfers']); $i++ ) {
 ?>
                     <h5><?php echo $data['shipToShoreTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipToShoreTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
@@ -154,11 +154,11 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
             $itemNum++;
         }
 ?>
-                
+
 <?php
     } else {
 ?>
-                    <h5>No Recent Ship-to-Shore Transfers Have Occured</h5>   
+                    <h5>No Recent Ship-to-Shore Transfers Have Occured</h5>
 <?php
     }
 ?>
@@ -169,7 +169,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
             <div class="panel panel-default">
                 <div class="panel-heading">Collection System Transfer Status</div>
                 <div class="panel-body">
-                    <div class="list-group" id="collectionSystemTransferStatusList">
+                    <div class="list-group mb-0" id="collectionSystemTransferStatusList">
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
@@ -236,7 +236,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     }
 ?>
                     </div>
-                    <div class="list-group" id="optionalCruiseDataTransfers">
+                    <div class="list-group mb-0" id="optionalCruiseDataTransfers">
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){

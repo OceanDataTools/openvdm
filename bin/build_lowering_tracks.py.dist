@@ -48,7 +48,7 @@ DESCRIPTION:
     BUGS:
    NOTES:
   AUTHOR:  Webb Pinner
- VERSION:  2.10
+ VERSION:  2.11
  CREATED:  2016-03-06
 REVISION:  2025-04-12
 """
@@ -63,8 +63,7 @@ import sys
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.set_owner_group_permissions import set_owner_group_permissions
-from server.lib.output_json_data_to_file import output_json_data_to_file
+from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
 from server.lib.geojson_utils import convert_to_kml, combine_geojson_files
 from server.lib.openvdm import OpenVDM
 

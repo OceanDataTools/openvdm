@@ -61,7 +61,7 @@ use Helpers\Session;
                             <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/extraDirectories/disable/<?php echo $row->extraDirectoryID; ?>'>On</a>
 <?php
             }
-?>                               
+?>
                         </td>
                     </tr>
 <?php

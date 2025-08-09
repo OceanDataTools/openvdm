@@ -14,16 +14,40 @@ class CollectionSystemTransfers extends Model {
         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers ORDER BY ".$sort );
     }
 
-    public function getActiveCollectionSystemTransfers(){
+    // public function getActiveCollectionSystemTransfers(){
 
+    //     $_warehouseModel = new \Models\Warehouse();
+    //     if ($_warehouseModel->getShowLoweringComponents()) {
+    //         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE enable = :enable ORDER BY name", array(':enable' => 1));
+    //     }
+    //     return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE cruiseOrLowering = :cruiseOrLowering AND enable = :enable ORDER BY name", array(':cruiseOrLowering' => 0, ':enable' => 1));
+
+    // }
+
+    public function getActiveCollectionSystemTransfers($sortField = 'name') {
         $_warehouseModel = new \Models\Warehouse();
-        if ($_warehouseModel->getShowLoweringComponents()) {
-            return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE enable = :enable ORDER BY name", array(':enable' => 1));
-        }
-        return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE cruiseOrLowering = :cruiseOrLowering AND enable = :enable ORDER BY name", array(':cruiseOrLowering' => 0, ':enable' => 1));
 
+        // Allowlist of sortable columns to avoid SQL injection
+        $allowedSortFields = ['name', 'longName', 'id']; // Add others as needed
+
+        // Fallback to default if not valid
+        if (!in_array($sortField, $allowedSortFields, true)) {
+            $sortField = 'name';
+        }
+
+        $query = "SELECT * FROM " . PREFIX . "CollectionSystemTransfers WHERE enable = :enable";
+        $params = [':enable' => 1];
+
+        if (!$_warehouseModel->getShowLoweringComponents()) {
+            $query .= " AND cruiseOrLowering = :cruiseOrLowering";
+            $params[':cruiseOrLowering'] = 0;
+        }
+
+        $query .= " ORDER BY $sortField";
+
+        return $this->db->select($query, $params);
     }
-    
+
     public function getCruiseOnlyCollectionSystemTransfers(){
         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE cruiseOrLowering = :cruiseOrLowering ORDER BY name", array(':cruiseOrLowering' => 0));
     }

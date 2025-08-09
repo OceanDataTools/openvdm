@@ -36,12 +36,12 @@ use Helpers\Form;
                                 <div class="form-group"><label>URL</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'url', 'value'=>$d_POST['url'])); ?></div>
                             </div>
                         </div>
-                        <div class="row">    
+                        <div class="row">
                             <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Add')); ?>
                                 <a href="<?php echo DIR; ?>config/system" class="btn btn-danger">Cancel</a>
                             </div>
-                        </div>    
+                        </div>
                     <?php echo Form::close(); ?>
                 </div>
             </div>

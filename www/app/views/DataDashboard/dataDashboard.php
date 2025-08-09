@@ -23,7 +23,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                     <li class="<?php echo ($data['page']==='position'? 'active': ''); ?>"><a id="position" href="#position" data-toggle="tab">Position</a></li>
                     <li class="<?php echo ($data['page']==='weather'? 'active': ''); ?>"><a id="weather" href="#weather" data-toggle="tab">Weather</a></li>
                     <li class="<?php echo ($data['page']==='soundVelocity'? 'active': ''); ?>"><a id="soundVelocity" href="#soundVelocity" data-toggle="tab">Sound Velocity</a></li>
-                    <li class=""><a id="dataQuality" href="#dataQuality" data-toggle="tab">Data Quality</a></li> 
+                    <li class=""><a id="dataQuality" href="#dataQuality" data-toggle="tab">Data Quality</a></li>
                 </ul>
             </div>
         </div>
@@ -48,17 +48,17 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
 ?>
                                 <div class="panel-heading">
                                     <?php echo $data['placeholders'][$i]->heading;?><?php echo ($data['placeholders'][$i]->plotType == 'chart'? '<i id="' . $data['placeholders'][$i]->id . '_reset-zoom-btn" class="reset-zoom-btn pull-right btn btn-sm btn-default fa fa-rotate-left"></i><i id="' . $data['placeholders'][$i]->id . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i>': ''); ?>
-                                </div>                  
+                                </div>
                                 <div class="panel-body">
                                     <<?php echo (strcmp($data['placeholders'][$i]->plotType, 'map') === 0? 'div': 'canvas'); ?> class="<?php echo $data['placeholders'][$i]->plotType; ?>" id="<?php echo $data['placeholders'][$i]->id;?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]->plotType, 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount > 0? $loadingImage: 'No Data Found.'); ?>
                                     </<?php echo (strcmp($data['placeholders'][$i]->plotType, 'map') === 0? 'div': 'canvas'); ?>>
                                 </div>
                                 <div class="panel-footer">
                                     <div class="objectList" id="<?php echo $data['placeholders'][$i]->id;?>_objectList-placeholder">
-                                        <form>                                            
+                                        <form>
 <?php
         for($j = 0; $j < sizeof($data['placeholders'][$i]->dataTypes); $j++){
-?>                                     
+?>
                                             <div class="row">
                                                 <div class="col-lg-12"><strong><?php echo $data['placeholders'][$i]->dataFiles[$j][0]['type']; ?></strong></div>
 <?php
@@ -70,7 +70,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                                                 </div></br>
 <?php
                     for($k = sizeof($data['placeholders'][$i]->dataFiles[$j])-1; $k >= 0; $k--){
-?>                              
+?>
                                                 <div class='col-lg-4 col-sm-6'>
                                                     <input class='<?php echo $data['placeholders'][$i]->dataTypes[$j]; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]->dataFiles[$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']));?>
                                                     <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -79,7 +79,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                     }
                 } else if(strcmp($data['placeholders'][$i]->dataTypes[$j], 'tms')===0) {
                     for($k = sizeof($data['placeholders'][$i]->dataFiles[$j])-1; $k >= 0; $k--){
-?>                              
+?>
                                                 <div class='col-lg-4 col-sm-6'>
                                                     <input class='<?php echo $data['placeholders'][$i]->dataTypes[$j]; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]->dataFiles[$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']));?>
                                                     <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
@@ -91,7 +91,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                                                 <div class="form-group">
 <?php
                     for($k = sizeof($data['placeholders'][$i]->dataFiles[$j])-1; $k >= 0; $k--){
-?>                              
+?>
                                                     <div class='col-lg-4 col-sm-6'>
                                                         <input class='<?php echo $data['placeholders'][$i]->dataTypes[$j]; ?>-radio' name="<?php echo $data['placeholders'][$i]->dataFiles[$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]->dataFiles[$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]->dataFiles[$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]->dataFiles[$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>

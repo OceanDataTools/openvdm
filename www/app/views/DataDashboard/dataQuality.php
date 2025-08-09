@@ -34,7 +34,7 @@
                                             <td>
 <?php
                 if ($data['dataObjectsQualityTests'][$i][$j][$k]->results === "Passed"){
-?>                                
+?>
                                                 <div class="text-center"><i class="fa fa-check text-success"></i></div>
 <?php
                 } elseif ($data['dataObjectsQualityTests'][$i][$j][$k]->results === "Warning"){
@@ -46,7 +46,7 @@
                                                 <div class="text-center"><i class="fa fa-times text-danger"></i></div>
 <?php
                 }
-?>                                                                                                         
+?>
                                             </td>
 <?php
             }
@@ -67,7 +67,7 @@
                                         </tr>
 <?php
         }
-                                                                           
+
 ?>
                                         <tr>
                                             <td class="text-right" colspan=<?php echo sizeof($data['dataObjectsQualityTests'][$i][0])+2;?>>
@@ -138,9 +138,9 @@
         } elseif (strcmp($data['stats'][$i]->statType, 'rowValidity') === 0){
             echo 'Valid rows: ' . round(floatval($data['stats'][$i]->statValue[0])/(floatval($data['stats'][$i]->statValue[0]) + floatval($data['stats'][$i]->statValue[1])) * 100,4) . '%';
         }
-            
+
 ?>
-                            
+
                             </td>
                         </tr>
 <?php
