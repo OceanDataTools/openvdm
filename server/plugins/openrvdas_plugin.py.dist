@@ -39,7 +39,7 @@ from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.dbs_parser       import DBSParser
 from server.plugins.parsers.dpt_parser       import DPTParser
 # from server.plugins.parsers.flowrate_parser  import FlowrateParser
-from server.plugins.parsers.fluoro_parser    import FluoroParser
+# from server.plugins.parsers.fluoro_parser    import FluoroParser
 from server.plugins.parsers.gga_parser       import GGAParser
 # from server.plugins.parsers.ggk_parser       import GGKParser
 # from server.plugins.parsers.gll_parser       import GLLParser
@@ -78,8 +78,8 @@ fileTypeFilters = [
     {"data_type":"em712-dpt",        "regex": "*/" + cruiseID + "_em712_dpt-*.txt",       "parser": "DPT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"flowrate-aft",     "regex": "*/" + cruiseID + "_flowrate_aft-*.txt",    "parser": "Flowrate",  'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"flowrate-fwd",     "regex": "*/" + cruiseID + "_flowrate_fwd-*.txt",    "parser": "Flowrate",  'parser_options':{'skip_header':True,'use_openvdm_api':True}},
-    {"data_type":"fluoro_1",         "regex": "*/" + cruiseID + "_fluorometer_1-*.txt",   "parser": "Fluoro",    'parser_options':{'skip_header':True,'use_openvdm_api':True}},
-    {"data_type":"fluoro_2",         "regex": "*/" + cruiseID + "_fluorometer_2-*.txt",   "parser": "Fluoro",    'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    # {"data_type":"fluoro_1",         "regex": "*/" + cruiseID + "_fluorometer_1-*.txt",   "parser": "Fluoro",    'parser_options':{'skip_header':True,'use_openvdm_api':True}},
+    # {"data_type":"fluoro_2",         "regex": "*/" + cruiseID + "_fluorometer_2-*.txt",   "parser": "Fluoro",    'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     {"data_type":"gyro1-hdt",        "regex": "*/" + cruiseID + "_gyro_1_hdt-*.txt",      "parser": "HDT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     # {"data_type":"gyro1-rot",        "regex": "*/" + cruiseID + "_gyro_1_rot-*.txt",     "parser": "ROT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
     {"data_type":"gyro2-hdt",        "regex": "*/" + cruiseID + "_gyro_2_hdt-*.txt",      "parser": "HDT",       'parser_options':{'skip_header':True,'use_openvdm_api':True}},
@@ -149,8 +149,8 @@ class OpeRVDASPlugin(OpenVDMPlugin):
         if file_type_filter['parser'] == "Flowrate":
             return FlowrateParser(**file_type_filter['parser_options'])
 
-        if file_type_filter['parser'] == "Fluoro":
-            return FluoroParser(**file_type_filter['parser_options'])
+        # if file_type_filter['parser'] == "Fluoro":
+        #     return FluoroParser(**file_type_filter['parser_options'])
 
         if file_type_filter['parser'] == "GGA":
             return GGAParser(**file_type_filter['parser_options'])
