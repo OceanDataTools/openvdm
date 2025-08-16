@@ -49,7 +49,7 @@ class ShipToShoreTransfers extends Model {
     }
     
     public function disableShipToShoreTransfer($id){
-        $data = array('enable' => 0, 'status' => 4); 
+        $data = array('enable' => 0); 
         $where = array('shipToShoreTransferID' => $id);
         $this->db->update(PREFIX."ShipToShoreTransfers",$data, $where);
     }
