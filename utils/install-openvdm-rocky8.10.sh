@@ -192,8 +192,8 @@ function install_packages {
     dnf -y install cifs-utils curl gcc gdal gearmand git httpd gdal-devel \
     libgearman-devel geos-devel libjpeg-devel make mysql-server nodejs npm \
     openssh-server policycoreutils-python-utils proj proj-devel \
-    python3.11-mod_wsgi python3-pyproj rsync samba samba-client samba-common \
-    setroubleshoot sshpass supervisor zlib-devel
+    python3.11-mod_wsgi python3-pyproj rclone rsync samba samba-client \
+    samba-common setroubleshoot sshpass supervisor zlib-devel
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
         python3 -m pip install Pillow MapProxy --quiet

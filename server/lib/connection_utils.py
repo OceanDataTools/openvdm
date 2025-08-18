@@ -50,18 +50,14 @@ def get_rclone_remote_type(remote_name, config_path=None):
             config_path = os.path.expanduser("~/.config/rclone/rclone.conf")
 
         if not os.path.isfile(config_path):
-            logging.error("rclone config file %s not found", config_path)
-            return None
+            logging.error("rclone config file %s not found.  assuming local", config_path)
+            return "local"
 
         config = configparser.ConfigParser()
         config.read(config_path)
 
-        if remote_name in config.sections():
-            remote_section = config[remote_name]
-        else:
-            remote_section = {}
-
-        return remote_section.get('type')
+        remote_section = config[remote_name] if remote_name in config else {}
+        return remote_section.get('type', 'local')
 
 
 def check_darwin(cfg):
@@ -220,19 +216,6 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", str(exc))
         return False
 
-    # This code was an attempt to cleanup/delete the write_test.txt file
-    #cmd = build_rsync_command(flags, ['-r', '--delete', '--include="write_test.txt"', '--exclude="*"'], '/dev/null/', f'rsync://{user}@{server}', None)
-
-    #logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
-    #try:
-    #    proc = subprocess.run(cmd, capture_output=True, text=True)
-    #    if proc.returncode not in [0, 24]:
-    #        logging.warning("rsync failed: %s", proc.stderr.strip())
-    #        return False
-    #except Exception as exc:
-    #    logging.error("rsync write test failed: %s", str(exc))
-    #    return False
-
     return True
 
 
@@ -317,13 +300,52 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     return True
 
 
+def build_rclone_config_for_ssh(cfg, rclone_config):
+    ssh_config_path = os.path.expanduser("~/.ssh/config")
+    identity_file = os.path.expanduser("~/.ssh/id_rsa")
+    target_host = cfg["sshServer"]
+
+    if os.path.exists(ssh_config_path):
+        with open(ssh_config_path) as f:
+            found_host = False
+            for line in f:
+                line = line.strip()
+                if line.startswith("Host "):
+                    hosts = line.split()[1:]
+                    found_host = target_host in hosts
+                elif found_host and line.startswith("IdentityFile"):
+                    identity_file = line.split(maxsplit=1)[1]
+                    break
+
+    # Build rclone config section
+    out = configparser.ConfigParser()
+    out[target_host] = {
+        "type": "sftp",
+        "host": target_host,
+        "user": cfg["sshUser"],
+        "key_file": identity_file,
+    }
+
+    # Print for debugging
+    logging.debug(f"[{target_host}]")
+    for k, v in out[target_host].items():
+        logging.debug(f"{k} = {v}")
+
+    # Write config, overwriting existing file
+    with open(rclone_config, "w") as f:
+        out.write(f)
+
+
 def build_rclone_options(cfg, mode='dry-run'):
     """
     Build the relevant rsync options for the given transfer
     """
 
-    remote_name, _ = cfg['destDir'].split(':',1)
-    remote_type = get_rclone_remote_type(remote_name)
+    if ':' in cfg['destDir']:
+        remote_name, _ = cfg['destDir'].split(':',1)
+        remote_type = get_rclone_remote_type(remote_name)
+    else:
+        remote_type = 'local'
 
     flags = ["--progress"]
     copy_sync = "sync" if cfg.get('syncToDest', '0') == '1' else "copy"
@@ -341,7 +363,7 @@ def build_rclone_options(cfg, mode='dry-run'):
         flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
 
     if cfg.get('bandwidthLimit') not in (None, '0'):
-        flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}M" ])
+        flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
 
     return copy_sync, flags
 
@@ -384,6 +406,85 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
             flags.insert(2, '--delete')
 
     return flags
+
+
+def test_local_destination(dest_dir, is_mountpoint='0'):
+    results = []
+
+    dest_dir_exists = os.path.isdir(dest_dir)
+
+    if not dest_dir_exists:
+        reason = f"Unable to find destination directory: {dest_dir} on the data warehouse"
+        results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
+
+        if is_mountpoint == '1':
+            results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
+
+        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+        return results
+
+    results.extend([{"partName": "Destination directory", "result": "Pass"}])
+
+    if is_mountpoint == '1':
+        mnt_dir = os.sep + os.path.join(*dest_dir.strip(os.sep).split(os.sep)[:2])
+        if not os.path.ismount(mnt_dir):
+            results.extend([{
+                "partName": "Destination directory is a mount point",
+                "result": "Fail",
+                "reason": f"{mnt_dir} is not a mount point on the data warehouse"
+            }])
+            results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+            return results
+
+        results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
+
+    if not test_write_access(dest_dir):
+        reason = f"Unable to delete source files from: {dest_dir} on SMB share"
+        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+        return results
+
+    results.extend([{"partName": "Write test", "result": "Pass"}])
+    return results
+
+
+def test_smb_destination(cdt_cfg, mntpoint, smb_version):
+    results = []
+
+    if not smb_version:
+        reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+        logging.error(reason)
+        results.extend([
+            {"partName": "SMB server", "result": "Fail", "reason": reason},
+            {"partName": "SMB share", "result": "Fail", "reason": reason},
+            {"partName": "Destination directory", "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+
+        return results
+
+    results.extend([{"partName": "SMB server", "result": "Pass"}])
+
+    mnt_success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
+    if not mnt_success:
+        reason = f"Could not connect to SMB share: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+        logging.error(reason)
+        results.extend([
+            {"partName": "SMB share", "result": "Fail", "reason": reason},
+            {"partName": "Destination directory", "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+
+        return results
+
+    results.extend([{"partName": "SMB share", "result": "Pass"}])
+
+    smb_dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
+    results.extend(test_local_destination(smb_dest_dir))
+
+    return results
 
 
 def test_cst_source(cst_cfg, source_dir):
@@ -596,41 +697,10 @@ def test_cdt_destination(cdt_cfg):
 
         # Tests for local
         if transfer_type == 'local':
-            dest_dir_exists = os.path.isdir(cdt_cfg['destDir'])
-            if not dest_dir_exists:
-                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the data warehouse"
-                results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
+            results.extend(test_local_destination(cdt_cfg['destDir'], cdt_cfg['localDirIsMountPoint']))
 
-                if cdt_cfg['localDirIsMountPoint'] == '1':
-                    results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
-
-                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-
+            if results[-1].get('result') == 'Fail':
                 return results
-
-            results.extend([{"partName": "Destination directory", "result": "Pass"}])
-
-            if cdt_cfg['localDirIsMountPoint'] == '1':
-                mnt_dir = os.sep + os.path.join(*cdt_cfg['destDir'].strip(os.sep).split(os.sep)[:2])
-                if not os.path.ismount(mnt_dir):
-                    results.extend([{
-                        "partName": "Destination directory is a mount point",
-                        "result": "Fail",
-                        "reason": f"{mnt_dir} is not a mount point on the data warehouse"
-                    }])
-                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-
-                    return results
-
-                results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
-
-            if not test_write_access(cdt_cfg['destDir']):
-                reason = f"Unable to delete source files from: {cdt_cfg['destDir']} on SMB share"
-                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-
-                return results
-
-            results.extend([{"partName": "Write test", "result": "Pass"}])
 
         # Tests for smb
         if transfer_type == 'smb':
@@ -639,56 +709,9 @@ def test_cdt_destination(cdt_cfg):
             os.mkdir(mntpoint, 0o755)
             smb_version = detect_smb_version(cdt_cfg)
 
-            if not smb_version:
-                reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
-                logging.error(reason)
-                results.extend([
-                    {"partName": "SMB server", "result": "Fail", "reason": reason},
-                    {"partName": "SMB share", "result": "Fail", "reason": reason},
-                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
-                    {"partName": "Write test", "result": "Fail", "reason": reason}
-                ])
-
+            results.extend(test_smb_destination(cdt_cfg, mntpoint, smb_version))
+            if results[-1].get('result') == 'Fail':
                 return results
-
-            results.extend([{"partName": "SMB server", "result": "Pass"}])
-
-            mnt_success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
-            if not mnt_success:
-                reason = f"Could not connect to SMB share: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
-                logging.error(reason)
-                results.extend([
-                    {"partName": "SMB share", "result": "Fail", "reason": reason},
-                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
-                    {"partName": "Write test", "result": "Fail", "reason": reason}
-                ])
-
-                return results
-
-            results.extend([{"partName": "SMB share", "result": "Pass"}])
-
-            smb_dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
-            dest_dir_exists = os.path.isdir(smb_dest_dir)
-            if not dest_dir_exists:
-                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on SMB share"
-                logging.error(reason)
-                results.extend([
-                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
-                    {"partName": "Write test", "result": "Fail", "reason": reason}
-                ])
-
-                return results
-
-            results.extend([{"partName": "Destination directory", "result": "Pass"}])
-
-            if not test_write_access(smb_dest_dir):
-                reason = f"Write test failed to: {cdt_cfg['destDir']} on SMB share"
-                logging.error(reason)
-                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-
-                return results
-
-            results.extend([{"partName": "Write test", "result": "Pass"}])
 
         # Tests for rsync
         if transfer_type == 'rsync':
@@ -859,20 +882,38 @@ def test_cdt_rclone_destination(cfg):
             return False
 
     results = []
-    remote_name, remote_path = cfg['destDir'].split(':')
-    remote_type = get_rclone_remote_type(remote_name)
+    if ':' not in cfg['destDir']:
+        remote_name = None
+        remote_path = cfg['destDir']
+        remote_type = get_transfer_type(cfg)
+    else:
+        remote_name, remote_path = cfg['destDir'].split(':')
+        remote_type = get_rclone_remote_type(remote_name)
 
-    if remote_type is None:
-        reason = "rclone remote does not exist or rclone config file not found"
-        results.extend([
-            {"partName": "Rclone remote config", "result": "Fail", "reason": reason}
-        ])
+        if remote_type is None:
+            reason = "rclone remote does not exist or rclone config file not found"
+            results.extend([
+                {"partName": "Rclone remote config", "result": "Fail", "reason": reason}
+            ])
 
-        return results
+            return results
 
-    results.append({"partName": "Rclone remote config", "result": "Pass"})
+        results.append({"partName": "Rclone remote config", "result": "Pass"})
+
+    if remote_type == 'local':
+        results.extend(test_local_destination(remote_path))
+
+    if remote_type == 'smb':
+        with temporary_directory() as tmpdir:
+            mntpoint = os.path.join(tmpdir, 'mntpoint')
+            os.mkdir(mntpoint, 0o755)
+            smb_version = detect_smb_version(cfg)
+
+            results.extend(test_smb_destination(cfg, mntpoint, smb_version))
 
     if remote_type == 'google cloud storage':
+        if '/' not in remote_path:
+            remote_path += '/'
         bucket_name, dest_dir = remote_path.split('/',1)
         if not _gcs_bucket_exists(f"{remote_name}:{bucket_name}"):
             reason = f"GCS bucket {bucket_name} does not exist"
