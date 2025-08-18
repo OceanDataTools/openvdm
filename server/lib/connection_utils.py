@@ -313,6 +313,38 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     return True
 
 
+def build_rclone_config_for_ssh(cfg, rclone_config):
+    ssh_config = os.path.join(os.path.expanduser("~"), ".ssh", "config")
+    identityFile = os.path.join(os.path.expanduser("~"), ".ssh", "id_rsa")
+
+    target_host = cfg['sshServer']
+    found_host = False
+
+    if os.path.exists(ssh_config):
+        with open(ssh_config) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("Host "):
+                    hosts = line.split()[1:]
+                    found_host = target_host in hosts
+                elif found_host and line.startswith('IdentityFile'):
+                    identityFile = line.split()[1]
+                    break
+
+
+    out = configparser.ConfigParser()
+    section_name = f"remote_{target_host}"
+    out[section_name] = {
+        "type": "sftp",
+        "host": target_host,
+        "user": cfg["sshUser"],
+        "key_file": identityFile,
+    }
+
+    with open(rclone_config, "w") as f:
+        out.write(f)
+
+
 def build_rclone_options(cfg, mode='dry-run'):
     """
     Build the relevant rsync options for the given transfer

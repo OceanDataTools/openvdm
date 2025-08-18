@@ -28,7 +28,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
+from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -352,6 +352,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 )
 
                 files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
+
+            elif transfer_type == 'ssh':
+                rclone_config = os.path.join(tmpdir, 'rclone_config')
+                build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                extra_args = ['--config', rclone_config]
+                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+
+                cmd = _build_rclone_command(copy_sync,
+                    flags,
+                    extra_args,
+                    self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
+                    dest_dir, exclude_file
+                )
+
+                logging.debug(', '.join(cmd))
+
+                # files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
+
+
 
             # === USING RSYNC ===
             else:
