@@ -313,22 +313,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             else:  # local
                 dest_dir = cdt_cfg['destDir']
 
-
-            # === USING RCLONE ===
-            if transfer_type == 'local':
-                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
-
-                cmd = _build_rclone_command(copy_sync,
-                    flags,
-                    None,
-                    self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
-                    dest_dir, exclude_file
-                )
-
-                files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
-                return {'verdict': True, 'files': files}
-
-            # === USING RSYNC ===
             # === DRY RUN ===
             dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
@@ -356,7 +340,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.debug("Nothing to transfer")
                 return {'verdict': True, 'files': files}
 
-            # === REAL TRANSFER ===
+            # === USING RCLONE ===
+            if transfer_type == 'local':
+                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+
+                cmd = _build_rclone_command(copy_sync,
+                    flags,
+                    None,
+                    self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
+                    dest_dir, exclude_file
+                )
+
+                files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+                return {'verdict': True, 'files': files}
+
+            # === USING RSYNC ===
             real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
             real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
