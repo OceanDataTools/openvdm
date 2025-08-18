@@ -28,7 +28,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination
+from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -135,6 +135,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         exclude_filterlist.extend(default_ignore_patterns)  # rsync partial files, Synology files, .DS_Store, etc
 
         return exclude_filterlist
+
+
+    def test_destination(self):
+        """
+        Test the transfer destination
+        """
+        if ':' in self.cruise_data_transfer['destDir']:
+            return test_cdt_rclone_destination(self.cruise_data_transfer)
+
+        return test_cdt_destination(self.cruise_data_transfer)
 
 
     def run_transfer_command(self, current_job, command, file_count):
@@ -322,7 +332,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'rsync':
                 extra_args += [f"--password-file={password_file}"]
 
-            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
+            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, tmpdir if ':' in dest_dir else dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
@@ -363,12 +373,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     flags,
                     extra_args,
                     self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
-                    dest_dir, exclude_file
+                    f'{cdt_cfg["sshServer"]}:{cdt_cfg["destDir"]}', exclude_file
                 )
 
-                logging.debug(', '.join(cmd))
+                logging.debug(' '.join(cmd))
 
-                # files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
+                files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
 
 
 
@@ -383,7 +393,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
-            if transfer_type == 'local' and cdt_cfg.get('localDirIsMountPoint') == '0':
+            if transfer_type == 'local' and ':' not in dest_dir and cdt_cfg.get('localDirIsMountPoint') == '0':
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
                     self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'],
@@ -564,7 +574,7 @@ def task_run_cruise_data_transfer(worker, current_job):
     logging.info("Testing destination")
     worker.send_job_status(current_job, 1, 10)
 
-    results = test_cdt_destination(cdt_cfg)
+    results = worker.test_destination()
 
     if results[-1]['result'] == "Fail": # Final Verdict
         logging.warning("Connection test failed, quitting job")

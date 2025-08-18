@@ -324,22 +324,28 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
         with open(ssh_config) as f:
             for line in f:
                 line = line.strip()
+                print(line)
                 if line.startswith("Host "):
+                    print("found host")
                     hosts = line.split()[1:]
                     found_host = target_host in hosts
                 elif found_host and line.startswith('IdentityFile'):
+                    print("found identityFile")
                     identityFile = line.split()[1]
+                    print(identityFile)
                     break
 
-
     out = configparser.ConfigParser()
-    section_name = f"remote_{target_host}"
-    out[section_name] = {
-        "type": "sftp",
-        "host": target_host,
-        "user": cfg["sshUser"],
-        "key_file": identityFile,
-    }
+    section_name = f"{target_host}"
+    out.add_section(target_host)
+    out.set(section_name, "type", "sftp")
+    out.set(section_name, "host", target_host)
+    out.set(section_name, "user", cfg["sshUser"])
+    out.set(section_name, "key_file", identityFile)
+    
+    print(f"[{section_name}]")
+    for key, value in out[section_name].items():
+        print(f"{key} = {value}")
 
     with open(rclone_config, "w") as f:
         out.write(f)
@@ -921,6 +927,8 @@ def test_cdt_rclone_destination(cfg):
             results.extend(test_smb_destination(cfg, mntpoint, smb_version))
 
     if remote_type == 'google cloud storage':
+        if '/' not in remote_path:
+            remote_path += '/'
         bucket_name, dest_dir = remote_path.split('/',1)
         if not _gcs_bucket_exists(f"{remote_name}:{bucket_name}"):
             reason = f"GCS bucket {bucket_name} does not exist"
