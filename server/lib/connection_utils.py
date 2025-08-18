@@ -340,7 +340,7 @@ def build_rclone_options(cfg, mode='dry-run'):
         flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
 
     if cfg.get('bandwidthLimit') not in (None, '0'):
-        flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}M" ])
+        flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
 
     return copy_sync, flags
 

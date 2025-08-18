@@ -341,7 +341,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return {'verdict': True, 'files': files}
 
             # === USING RCLONE ===
-            if transfer_type == 'local':
+            if transfer_type in ['local','smb']:
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
                 cmd = _build_rclone_command(copy_sync,
@@ -351,17 +351,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     dest_dir, exclude_file
                 )
 
-                files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
-                return {'verdict': True, 'files': files}
+                files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
 
             # === USING RSYNC ===
-            real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
+            else:
+                real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
-            real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
-            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
-                real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
+                real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
+                if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
+                    real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
-            files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
+                files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
             if transfer_type == 'local' and cdt_cfg.get('localDirIsMountPoint') == '0':
