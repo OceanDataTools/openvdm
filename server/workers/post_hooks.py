@@ -10,7 +10,7 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2015-02-09
  REVISION:  2025-07-06
 """

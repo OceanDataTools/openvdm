@@ -7,7 +7,7 @@ DESCRIPTION:  This program resets OVDM state information in the database.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2015-06-22
  REVISION:  2025-07-06
 """

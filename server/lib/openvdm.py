@@ -7,7 +7,7 @@ DESCRIPTION:  OpenVDM python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2016-02-02
  REVISION:  2025-04-12
 """

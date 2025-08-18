@@ -8,7 +8,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2017-09-30
  REVISION:  2025-08-08
 """
