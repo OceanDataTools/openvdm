@@ -147,6 +147,28 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return test_cdt_destination(self.cruise_data_transfer)
 
 
+    def make_cruise_dir(self, dest_dir, extra_args=None):
+        """
+        Run the rsync command and return the list of new/updated files
+        """
+
+        # Build rclone command
+        command = ['rclone', 'mkdir', 'f{dest_dir}/{self.cruise_id}']
+        if extra_args:
+            command.extend(extra_args)
+
+        logging.debug('mkdir Command: %s', ' '.join(command))
+        try:
+
+            # Run the command
+            subprocess.run(command, check=True, capture_output=True, text=True)
+
+            logging.debug("Remote cruise directory created successfully.")
+
+        except subprocess.CalledProcessError as e:
+            logging.error("Error creating directory:", e.stderr)
+
+
     def run_transfer_command(self, current_job, command, file_count):
         """
         Run the rsync command and return the list of new/updated files
@@ -352,13 +374,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             # === USING RCLONE ===
             if transfer_type in ['local','smb']:
+
+                self.make_cruise_dir(dest_dir)
+
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
                 cmd = _build_rclone_command(copy_sync,
                     flags,
                     None,
-                    self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
-                    dest_dir, exclude_file
+                    self.cruise_dir,
+                    os.path.join(dest_dir, self.cruise_id), exclude_file
                 )
 
                 files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
@@ -367,13 +392,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 rclone_config = os.path.join(tmpdir, 'rclone_config')
                 build_rclone_config_for_ssh(cdt_cfg, rclone_config)
                 extra_args = ['--config', rclone_config]
+
+                self.make_cruise_dir(dest_dir, extra_args)
+
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
                 cmd = _build_rclone_command(copy_sync,
                     flags,
                     extra_args,
-                    self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'],
-                    f'{cdt_cfg["sshServer"]}:{cdt_cfg["destDir"]}', exclude_file
+                    self.cruise_dir,
+                    f'{cdt_cfg["sshServer"]}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
                 )
 
                 logging.debug(' '.join(cmd))
