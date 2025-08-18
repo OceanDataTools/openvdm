@@ -318,8 +318,11 @@ def build_rclone_options(cfg, mode='dry-run'):
     Build the relevant rsync options for the given transfer
     """
 
-    remote_name, _ = cfg['destDir'].split(':',1)
-    remote_type = get_rclone_remote_type(remote_name)
+    if ':' in cfg['destDir']:
+        remote_name, _ = cfg['destDir'].split(':',1)
+        remote_type = get_rclone_remote_type(remote_name)
+    else:
+        remote_type = 'local'
 
     flags = ["--progress"]
     copy_sync = "sync" if cfg.get('syncToDest', '0') == '1' else "copy"
@@ -421,7 +424,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
         return results
 
     results.extend([{"partName": "Write test", "result": "Pass"}])
-
+    return results
 
 def test_smb_destination(cdt_cfg, mntpoint, smb_version):
     results = []

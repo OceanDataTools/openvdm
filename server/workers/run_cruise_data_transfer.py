@@ -315,7 +315,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
             # === USING RCLONE ===
-            if transfer_type == 'local' and dest_dir.includes[':']:
+            if transfer_type == 'local':
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
                 cmd = _build_rclone_command(copy_sync,
