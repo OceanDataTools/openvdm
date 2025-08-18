@@ -216,19 +216,6 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", str(exc))
         return False
 
-    # This code was an attempt to cleanup/delete the write_test.txt file
-    #cmd = build_rsync_command(flags, ['-r', '--delete', '--include="write_test.txt"', '--exclude="*"'], '/dev/null/', f'rsync://{user}@{server}', None)
-
-    #logging.debug("test_rsync_write_access cmd: %s", ' '.join(cmd))
-    #try:
-    #    proc = subprocess.run(cmd, capture_output=True, text=True)
-    #    if proc.returncode not in [0, 24]:
-    #        logging.warning("rsync failed: %s", proc.stderr.strip())
-    #        return False
-    #except Exception as exc:
-    #    logging.error("rsync write test failed: %s", str(exc))
-    #    return False
-
     return True
 
 
@@ -314,39 +301,37 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rclone_config_for_ssh(cfg, rclone_config):
-    ssh_config = os.path.join(os.path.expanduser("~"), ".ssh", "config")
-    identityFile = os.path.join(os.path.expanduser("~"), ".ssh", "id_rsa")
+    ssh_config_path = os.path.expanduser("~/.ssh/config")
+    identity_file = os.path.expanduser("~/.ssh/id_rsa")
+    target_host = cfg["sshServer"]
 
-    target_host = cfg['sshServer']
-    found_host = False
-
-    if os.path.exists(ssh_config):
-        with open(ssh_config) as f:
+    if os.path.exists(ssh_config_path):
+        with open(ssh_config_path) as f:
+            found_host = False
             for line in f:
                 line = line.strip()
-                print(line)
                 if line.startswith("Host "):
-                    print("found host")
                     hosts = line.split()[1:]
                     found_host = target_host in hosts
-                elif found_host and line.startswith('IdentityFile'):
-                    print("found identityFile")
-                    identityFile = line.split()[1]
-                    print(identityFile)
+                elif found_host and line.startswith("IdentityFile"):
+                    identity_file = line.split(maxsplit=1)[1]
                     break
 
+    # Build rclone config section
     out = configparser.ConfigParser()
-    section_name = f"{target_host}"
-    out.add_section(target_host)
-    out.set(section_name, "type", "sftp")
-    out.set(section_name, "host", target_host)
-    out.set(section_name, "user", cfg["sshUser"])
-    out.set(section_name, "key_file", identityFile)
-    
-    print(f"[{section_name}]")
-    for key, value in out[section_name].items():
-        print(f"{key} = {value}")
+    out[target_host] = {
+        "type": "sftp",
+        "host": target_host,
+        "user": cfg["sshUser"],
+        "key_file": identity_file,
+    }
 
+    # Print for debugging
+    logging.debug(f"[{target_host}]")
+    for k, v in out[target_host].items():
+        logging.debug(f"{k} = {v}")
+
+    # Write config, overwriting existing file
     with open(rclone_config, "w") as f:
         out.write(f)
 
@@ -464,6 +449,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
     results.extend([{"partName": "Write test", "result": "Pass"}])
     return results
 
+
 def test_smb_destination(cdt_cfg, mntpoint, smb_version):
     results = []
 
@@ -499,7 +485,6 @@ def test_smb_destination(cdt_cfg, mntpoint, smb_version):
     results.extend(test_local_destination(smb_dest_dir))
 
     return results
-
 
 
 def test_cst_source(cst_cfg, source_dir):

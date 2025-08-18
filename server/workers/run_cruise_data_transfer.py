@@ -153,7 +153,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         # Build rclone command
-        command = ['rclone', 'mkdir', 'f{dest_dir}/{self.cruise_id}']
+        command = ['rclone', 'mkdir', f'{dest_dir}/{self.cruise_id}']
         if extra_args:
             command.extend(extra_args)
 
@@ -166,7 +166,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             logging.debug("Remote cruise directory created successfully.")
 
         except subprocess.CalledProcessError as e:
-            logging.error("Error creating directory:", e.stderr)
+            logging.error("Error creating cruise directory: %s", e.stderr)
 
 
     def run_transfer_command(self, current_job, command, file_count):
@@ -200,11 +200,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             match = RCLONE_PROGRESS_RE.search(line)
             if match:
                 percent = int(match.group(1))
-                logging.debug("percent: %s", percent)
+
                 if percent != last_percent:
                     logging.info("Progress Update: %d%%", percent)
                     self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
                     last_percent = percent
+
+            return last_percent
 
         # if there are no files to transfer, then don't
         if file_count == 0:
@@ -407,8 +409,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.debug(' '.join(cmd))
 
                 files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
-
-
 
             # === USING RSYNC ===
             else:
