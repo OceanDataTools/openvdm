@@ -190,7 +190,7 @@ composer install
 
 ## Upgrading from 2.9.
 
-OpenVDM v2.10 added some new server-side functionality updated how javascript and CSS libraries are installed.  These changes will require existing user to perform some additional steps.
+OpenVDM v2.10 added some new server-side functionality and updated how javascript and CSS libraries are installed.  These changes will require existing user to perform some additional steps.
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Make a backup the webUI config file: `./www/app/Core/Config.php`
@@ -215,3 +215,30 @@ pre-commit install
 pre-commit run --all-files
 deactivate
 ```
+
+## Upgrading from 2.10.
+
+OpenVDM v2.11 added some new server-side functionality and updates to javascript and CSS libraries.  These changes will require existing user to perform some additional steps.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Make a backup the webUI config file: `./www/app/Core/Config.php`
+3. Make a new webUI config file using the default template: `cp ./www/app/Core/Config.php.dist ./www/app/Core/Config.php`
+4. Transfer any customizations from the the backup configuration file to the new configuration file.
+5. Make a backup the server config file: `./server/etc/openvdm.yaml`
+6. Make a new server config file using the default template: `cp ./server/etc/openvdm.yaml.dist ./server/etc/openvdm.yaml`
+7. Transfer any customizations from the the backup configuration file to the new configuration file.
+8. Re-install the javascript and css libraries:
+```
+cd <openvdm_root>/www
+bash ./post_composer.sh
+```
+9. Update the python libraries
+```
+cd <openvdm_root>
+source ./venv/bin/activate
+pip install -r requirements.txt
+```
+10. Backup the existing database BEFORE running the schema update script.  To do this run the `bash ./utils/export_openvdm_db.sh` script (you may need to run via sudo) and redirect the output to a file.  In the event there is a problem updating the database the output from this script can be used to restore the database to a known good state.
+11. Start the mysql cli `mysql -p`
+12. Select the OpenVDM database by typing: `use openvdm;` (`openvdm` is the default name of the database)
+13. Run the update script: `source <path to openvdm>/database/openvdm_210_to_211.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
