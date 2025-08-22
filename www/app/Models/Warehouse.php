@@ -539,13 +539,13 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     
-                    return array('cruiseName' => $ovdmConfigJSON['cruiseName']); 
+                    return $ovdmConfigJSON['cruiseName']; 
                 }
             }
-            return array("Error"=>"Could not find cruise config file.");
+            return "Could not find cruise config file.";
 
         } else {
-            return array("Error"=>"Could not find cruise directory.");
+            return "Could not find cruise directory.";
         }
     }
 
@@ -568,13 +568,13 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     
-                    return array('cruisePI' => $ovdmConfigJSON['cruisePI']); 
+                    return $ovdmConfigJSON['cruisePI'];
                 }
             }
-            return array("Error"=>"Could not find cruise config file.");
+            return "Could not find cruise config file.";
 
         } else {
-            return array("Error"=>"Could not find cruise directory.");
+            return "Could not find cruise directory.";
         }
     }
 
@@ -597,13 +597,13 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     
-                    return array('cruiseLocation' => $ovdmConfigJSON['cruiseLocation']); 
+                    return $ovdmConfigJSON['cruiseLocation']; 
                 }
             }
-            return array("Error"=>"Could not find cruise config file.");
+            return "Could not find cruise config file.";
 
         } else {
-            return array("Error"=>"Could not find cruise directory.");
+            return "Could not find cruise directory.";
         }
     }
 
