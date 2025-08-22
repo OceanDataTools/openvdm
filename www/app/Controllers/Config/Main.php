@@ -70,19 +70,22 @@ class Main extends Controller {
             } else {
                 $cruiseID = $this->_warehouseModel->getCruiseID();
             }
+
             $cruiseName = $_POST['cruiseName'];
+            $cruisePI = $_POST['cruisePI'];
+            $cruiseLocation = $_POST['cruiseLocation'];
             
             $cruiseStartDate = $_POST['cruiseStartDate'];
             $cruiseEndDate = $_POST['cruiseEndDate'];
             $cruiseStartPort = $_POST['cruiseStartPort'];
             $cruiseEndPort = $_POST['cruiseEndPort'];
 
-            $cruisePI = $_POST['cruisePI'];
-            $cruiseLocation = $_POST['cruiseLocation'];
 
             if (strcmp($cruiseID, $this->_warehouseModel->getCruiseID()) != 0) {
                 $setLatestLowering = true;
-                $cruiseName = $this->_warehouseModel->getCruiseName();
+                $cruiseName = $this->_warehouseModel->getCruiseName($_POST['cruiseID']);
+                $cruisePI = $this->_warehouseModel->getCruisePI($_POST['cruiseID']);
+                $cruiseLocation = $this->_warehouseModel->getCruiseLocation($_POST['cruiseID']);
                 
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
                 $cruiseStartDate = $cruiseDates['cruiseStartDate'];
@@ -91,9 +94,6 @@ class Main extends Controller {
                 $cruisePorts = $this->_warehouseModel->getCruisePorts($_POST['cruiseID']);
                 $cruiseStartPort = $cruisePorts['cruiseStartPort'];
                 $cruiseEndPort = $cruisePorts['cruiseEndPort'];
-
-                $cruisePI = $this->_warehouseModel->getCruisePI();
-                $cruiseLocation = $this->_warehouseModel->getCruiseLocation();
             }
 
             if($cruiseID == ''){
@@ -114,13 +114,12 @@ class Main extends Controller {
 
                 $this->_warehouseModel->setCruiseID(array('value' => $cruiseID));
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
+                $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
+                $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
                 $this->_warehouseModel->setCruiseEndPort(array('value' => $cruiseEndPort));
-
-                $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
-                $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
 
                 $loweringID = $this->_warehouseModel->getLatestLowering();
 
@@ -160,12 +159,12 @@ class Main extends Controller {
             } else {
                 $data['cruiseID'] = $cruiseID;
                 $data['cruiseName'] = $cruiseName;
-        		$data['cruiseStartDate'] = $cruiseStartDate;
-		        $data['cruiseEndDate'] = $cruiseEndDate;
-                $data['cruiseStartPort'] = $cruiseStartPort;
-                $data['cruiseEndPort'] = $cruiseEndPort;
                 $data['cruisePI'] = $cruisePI;
                 $data['cruiseLocation'] = $cruiseLocation;
+                $data['cruiseStartDate'] = $cruiseStartDate;
+                $data['cruiseEndDate'] = $cruiseEndDate;
+                $data['cruiseStartPort'] = $cruiseStartPort;
+                $data['cruiseEndPort'] = $cruiseEndPort;
             }
         } elseif(isset($_POST)) {
         
@@ -419,24 +418,24 @@ class Main extends Controller {
         $data['javascript'] = array('datetimepicker');
         $data['cruiseID'] = '';
         $data['cruiseName'] = '';
+        $data['cruisePI'] = '';
+        $data['cruiseLocation'] = '';
         $data['cruiseStartDate'] = '';
         $data['cruiseEndDate'] = '';
         $data['cruiseStartPort'] = '';
         $data['cruiseEndPort'] = '';
-        $data['cruisePI'] = '';
-        $data['cruiseLocation'] = '';
 
 //        $error = array();
 
         if(isset($_POST['submit'])){
             $cruiseID = $_POST['cruiseID'];
             $cruiseName = $_POST['cruiseName'];
+            $cruisePI = $_POST['cruisePI'];
+            $cruiseLocation = $_POST['cruiseLocation'];
             $cruiseStartDate = $_POST['cruiseStartDate'];
             $cruiseEndDate = $_POST['cruiseEndDate'];
             $cruiseStartPort = $_POST['cruiseStartPort'];
             $cruiseEndPort = $_POST['cruiseEndPort'];
-            $cruisePI = $_POST['cruisePI'];
-            $cruiseLocation = $_POST['cruiseLocation'];
 
 
             if($cruiseID == ''){
@@ -456,12 +455,12 @@ class Main extends Controller {
                 
                 $this->_warehouseModel->setCruiseID(array('value' => $cruiseID));
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
+                $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
+                $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
                 $this->_warehouseModel->setCruiseEndPort(array('value' => $cruiseEndPort));
-                $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
-                $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 
                 $this->_warehouseModel->setLoweringID(array('value' => ''));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
@@ -501,22 +500,22 @@ class Main extends Controller {
             } else {
                 $data['cruiseID'] = $cruiseID;
                 $data['cruiseName'] = $cruiseName;
+                $data['cruisePI'] = $cruisePI;
+                $data['cruiseLocation'] = $cruiseLocation;
                 $data['cruiseStartDate'] = $cruiseStartDate;
                 $data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
-                $data['cruisePI'] = $cruisePI;
-                $data['cruiseLocation'] = $cruiseLocation;
             }
         } elseif(isset($_POST)) {
             $data['cruiseID'] = $_POST['cruiseID'];
             $data['cruiseName'] = $_POST['cruiseName'];
+            $data['cruisePI'] = $_POST['cruisePI'];
+            $data['cruiseLocation'] = $_POST['cruiseLocation'];
             $data['cruiseStartDate'] = $_POST['cruiseStartDate'];
             $data['cruiseEndDate'] = $_POST['cruiseEndDate'];
             $data['cruiseStartPort'] = $_POST['cruiseStartPort'];
             $data['cruiseEndPort'] = $_POST['cruiseEndPort'];
-            $data['cruisePI'] = $_POST['cruisePI'];
-            $data['cruiseLocation'] = $_POST['cruiseLocation'];
 
 
             if(isset($_POST['hideLoweringComponents'])) {
@@ -688,18 +687,17 @@ class Main extends Controller {
             $roundedTimestamp = ceil($timestamp / (15 * 60)) * (15 * 60);
 
             $loweringEndDate = $this->_warehouseModel->getLoweringEndDate();
-	    
-	    if ($loweringEndDate === "") {
+        
+            if ($loweringEndDate === "") {
                 $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
-            }
-            else {
+            } else {
                 $prev_time = strtotime($loweringEndDate);
-		var_dump($prev_time);
-		var_dump($roundedTimestamp);
-		if ($prev_time > $roundedTimestamp) {
-		    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
-		}
-	    }
+                var_dump($prev_time);
+                var_dump($roundedTimestamp);
+                if ($prev_time > $roundedTimestamp) {
+                    $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
+                }
+            }
         }
 
         $gmData = (object) array();

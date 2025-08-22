@@ -93,10 +93,10 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
     
-    public function getCruiseName(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
-        return $row[0]->value;
-    }
+    // public function getCruiseName(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
+    //     return $row[0]->value;
+    // }
 
     public function getCruiseStartDate(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseStartDate'");
@@ -118,15 +118,15 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
 
-    public function getCruisePI(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
-        return $row[0]->value;
-    }
+    // public function getCruisePI(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
+    //     return $row[0]->value;
+    // }
 
-    public function getCruiseLocation(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
-        return $row[0]->value;
-    }
+    // public function getCruiseLocation(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
+    //     return $row[0]->value;
+    // }
 
     public function getLoweringConfigFn(){
         return LOWERING_CONFIG_FN;
@@ -519,6 +519,92 @@ class Warehouse extends Model {
     
     public function getLatestCruise() {
         return $this->getCruises()[0];
+    }
+
+    public function getCruiseName($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $cruiseID = $this->getCruiseID();
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return array('cruiseName' => $ovdmConfigJSON['cruiseName']); 
+                }
+            }
+            return array("Error"=>"Could not find cruise config file.");
+
+        } else {
+            return array("Error"=>"Could not find cruise directory.");
+        }
+    }
+
+
+    public function getCruisePI($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $cruiseID = $this->getCruiseID();
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return array('cruisePI' => $ovdmConfigJSON['cruisePI']); 
+                }
+            }
+            return array("Error"=>"Could not find cruise config file.");
+
+        } else {
+            return array("Error"=>"Could not find cruise directory.");
+        }
+    }
+
+
+    public function getCruiseLocation($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $cruiseID = $this->getCruiseID();
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return array('cruiseLocation' => $ovdmConfigJSON['cruiseLocation']); 
+                }
+            }
+            return array("Error"=>"Could not find cruise config file.");
+
+        } else {
+            return array("Error"=>"Could not find cruise directory.");
+        }
     }
 
     public function getCruiseDates($cruiseID = '') {
