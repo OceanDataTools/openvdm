@@ -32,7 +32,7 @@ class Warehouse extends Model {
         return $data;
     }
 
-   	public function getCruiseSize() {
+    public function getCruiseSize() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseSize'");
         $data['cruiseSize'] = intval($row[0]->value);
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseSizeUpdated'");
@@ -93,10 +93,10 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
     
-    public function getCruiseName(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
-        return $row[0]->value;
-    }
+    // public function getCruiseName(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
+    //     return $row[0]->value;
+    // }
 
     public function getCruiseStartDate(){
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseStartDate'");
@@ -118,15 +118,15 @@ class Warehouse extends Model {
         return $row[0]->value;
     }
 
-    public function getCruisePI(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
-        return $row[0]->value;
-    }
+    // public function getCruisePI(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
+    //     return $row[0]->value;
+    // }
 
-    public function getCruiseLocation(){
-        $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
-        return $row[0]->value;
-    }
+    // public function getCruiseLocation(){
+    //     $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
+    //     return $row[0]->value;
+    // }
 
     public function getLoweringConfigFn(){
         return LOWERING_CONFIG_FN;
@@ -305,28 +305,6 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
     
-    public function setCruiseStartDate($data){
-	// var_dump($data);    
-	$where = array('name' => 'cruiseStartDate');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-    
-    public function setCruiseEndDate($data){
-        $where = array('name' => 'cruiseEndDate');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-
-    public function setCruiseStartPort($data){
-    // var_dump($data);    
-    $where = array('name' => 'cruiseStartPort');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-    
-    public function setCruiseEndPort($data){
-        $where = array('name' => 'cruiseEndPort');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-
     public function setCruisePI($data){
         $where = array('name' => 'cruisePI');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -337,6 +315,26 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
     
+    public function setCruiseStartDate($data){
+        $where = array('name' => 'cruiseStartDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+    
+    public function setCruiseEndDate($data){
+        $where = array('name' => 'cruiseEndDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
+    public function setCruiseStartPort($data){
+        $where = array('name' => 'cruiseStartPort');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+    
+    public function setCruiseEndPort($data){
+        $where = array('name' => 'cruiseEndPort');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseSize($data){
         $where = array('name' => 'cruiseSize');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -373,7 +371,6 @@ class Warehouse extends Model {
         $where = array('name' => 'loweringSizeUpdated');
         $data = array('value' => gmdate('Y/m/d H:i:s'));
         $this->db->update(PREFIX."CoreVars", $data, $where);
-
     }
 
     public function setDataDashboardManifestFn($data){
@@ -386,7 +383,6 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseIP']), $where);
         $where = array('name' => 'shipboardDataWarehouseUsername');
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseUsername']), $where);
-        
     }
     
     public function setErrorShipboardDataWarehouseStatus(){
@@ -425,9 +421,9 @@ class Warehouse extends Model {
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
 
                                     //Get the the directory that holds the DashboardData
-				                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
+                                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
 
-				                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+                                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
 
                                             if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                                 $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
@@ -443,7 +439,7 @@ class Warehouse extends Model {
                                                 break;
                                             }
                                         }
-				                    }
+                                    }
                                     break;
                                 }
                             }
@@ -519,6 +515,95 @@ class Warehouse extends Model {
     
     public function getLatestCruise() {
         return $this->getCruises()[0];
+    }
+
+    public function getCruiseName($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
+            return $row[0]->value;
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return $ovdmConfigJSON['cruiseName']; 
+                }
+            }
+            return "Could not find cruise config file.";
+
+        } else {
+            return "Could not find cruise directory.";
+        }
+    }
+
+
+    public function getCruisePI($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
+            return $row[0]->value;
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return $ovdmConfigJSON['cruisePI'];
+                }
+            }
+            return "Could not find cruise config file.";
+
+        } else {
+            return "Could not find cruise directory.";
+        }
+    }
+
+
+    public function getCruiseLocation($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ){
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
+            return $row[0]->value;
+        }
+
+        $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
+        #var_dump($cruiseDir);
+        if (is_dir($cruiseDir)) {
+            //Check cruise Directory for ovdmConfig.json
+            $cruiseFileList = scandir($cruiseDir);
+            #var_dump($cruiseList);
+            foreach ($cruiseFileList as $cruiseKey => $cruiseValue){
+                #var_dump($cruiseValue);
+                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))){
+                    #var_dump($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
+                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
+                    
+                    return $ovdmConfigJSON['cruiseLocation']; 
+                }
+            }
+            return "Could not find cruise config file.";
+
+        } else {
+            return "Could not find cruise directory.";
+        }
     }
 
     public function getCruiseDates($cruiseID = '') {
