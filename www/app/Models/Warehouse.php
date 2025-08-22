@@ -519,7 +519,8 @@ class Warehouse extends Model {
 
     public function getCruiseName($cruiseID = '') {
         if (strcmp($cruiseID, '') == 0 ){
-            $cruiseID = $this->getCruiseID();
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseName'");
+            return $row[0]->value;
         }
 
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
@@ -548,7 +549,8 @@ class Warehouse extends Model {
 
     public function getCruisePI($cruiseID = '') {
         if (strcmp($cruiseID, '') == 0 ){
-            $cruiseID = $this->getCruiseID();
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruisePI'");
+            return $row[0]->value;
         }
 
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
@@ -577,7 +579,8 @@ class Warehouse extends Model {
 
     public function getCruiseLocation($cruiseID = '') {
         if (strcmp($cruiseID, '') == 0 ){
-            $cruiseID = $this->getCruiseID();
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseLocation'");
+            return $row[0]->value;
         }
 
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
