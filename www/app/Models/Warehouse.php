@@ -32,7 +32,7 @@ class Warehouse extends Model {
         return $data;
     }
 
-   	public function getCruiseSize() {
+    public function getCruiseSize() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseSize'");
         $data['cruiseSize'] = intval($row[0]->value);
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseSizeUpdated'");
@@ -305,28 +305,6 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
     
-    public function setCruiseStartDate($data){
-	// var_dump($data);    
-	$where = array('name' => 'cruiseStartDate');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-    
-    public function setCruiseEndDate($data){
-        $where = array('name' => 'cruiseEndDate');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-
-    public function setCruiseStartPort($data){
-    // var_dump($data);    
-    $where = array('name' => 'cruiseStartPort');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-    
-    public function setCruiseEndPort($data){
-        $where = array('name' => 'cruiseEndPort');
-        $this->db->update(PREFIX."CoreVars",$data, $where);
-    }
-
     public function setCruisePI($data){
         $where = array('name' => 'cruisePI');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -337,6 +315,26 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
     
+    public function setCruiseStartDate($data){
+        $where = array('name' => 'cruiseStartDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+    
+    public function setCruiseEndDate($data){
+        $where = array('name' => 'cruiseEndDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
+    public function setCruiseStartPort($data){
+        $where = array('name' => 'cruiseStartPort');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+    
+    public function setCruiseEndPort($data){
+        $where = array('name' => 'cruiseEndPort');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseSize($data){
         $where = array('name' => 'cruiseSize');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -373,7 +371,6 @@ class Warehouse extends Model {
         $where = array('name' => 'loweringSizeUpdated');
         $data = array('value' => gmdate('Y/m/d H:i:s'));
         $this->db->update(PREFIX."CoreVars", $data, $where);
-
     }
 
     public function setDataDashboardManifestFn($data){
@@ -386,7 +383,6 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseIP']), $where);
         $where = array('name' => 'shipboardDataWarehouseUsername');
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseUsername']), $where);
-        
     }
     
     public function setErrorShipboardDataWarehouseStatus(){
@@ -425,9 +421,9 @@ class Warehouse extends Model {
                                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
 
                                     //Get the the directory that holds the DashboardData
-				                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
+                                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){
 
-				                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
+                                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
 
                                             if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                                 $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
@@ -443,7 +439,7 @@ class Warehouse extends Model {
                                                 break;
                                             }
                                         }
-				                    }
+                                    }
                                     break;
                                 }
                             }

@@ -51,12 +51,12 @@ class Main extends Controller {
         $data['javascript'] = array('datetimepicker', 'cruiseIDFormHelper');
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
         $data['cruiseName'] = $this->_warehouseModel->getCruiseName();
+        $data['cruisePI'] = $this->_warehouseModel->getCruisePI();
+        $data['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         $data['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $data['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $data['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         $data['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
-        $data['cruisePI'] = $this->_warehouseModel->getCruisePI();
-        $data['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         $data['cruises'] = $this->_warehouseModel->getCruises();
         $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         
