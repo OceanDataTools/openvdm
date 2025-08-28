@@ -117,7 +117,7 @@ class CollectionSystemTransfers extends Model {
     public function enableCollectionSystemTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCollectionSystemTransfer($id);
-        if (strcmp($row[0]->status,'4') === 0) {
+        if (strcmp($row[0]->status,'1') !== 0) {
             $data['status'] = '2';
         }
         $where = array('collectionSystemTransferID' => $id);
@@ -125,11 +125,11 @@ class CollectionSystemTransfers extends Model {
     }
     
     public function disableCollectionSystemTransfer($id){
-        $data = array('enable' => 0); 
-        $row = $this->getCollectionSystemTransfer($id);
-        if (strcmp($row[0]->status,'2') === 0) {
-            $data['status'] = '4';
-        }
+        $data = array('enable' => 0, 'status' => 4);
+        // $row = $this->getCollectionSystemTransfer($id);
+        // if (strcmp($row[0]->status,'2') === 0) {
+        //     $data['status'] = '4';
+        // }
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }

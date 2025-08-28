@@ -119,25 +119,24 @@ class CruiseDataTransfers extends Model {
     }
 
     public function setIdleCruiseDataTransfer($id){
-//        $data = array();
-        $data = array('status' => '2', 'pid' => '0');
+        $data = array();
+        // $data = array('status' => '2', 'pid' => '0');
         $row = $this->getCruiseDataTransfer($id);
-//        if (strcmp($row[0]->enable,'1') === 0) {
-//            $data = array('status' => '2', 'pid' => '0');
-//        } else {
-//            $data = array('status' => '4', 'pid' => '0');
-//        }
+        if (strcmp($row[0]->enable,'1') === 0) {
+            $data = array('status' => '2', 'pid' => '0');
+        } else {
+            $data = array('status' => '4', 'pid' => '0');
+        }
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
     
     public function setOffCruiseDataTransfer($id){
-//        $data = array();
-        $data = array('status' => '4');
+        $data = array();
         $row = $this->getCruiseDataTransfer($id);
-//        if (strcmp($row[0]->status,'2') === 0) {
-//            $data = array('status' => '4');
-//        }
+        if (strcmp($row[0]->status,'2') === 0) {
+            $data['status'] = '4';
+        }
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
@@ -146,19 +145,19 @@ class CruiseDataTransfers extends Model {
     public function enableCruiseDataTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCruiseDataTransfer($id);
-//        if (strcmp($row[0]->status,'4') === 0) {
-//            $data['status'] = '2';
-//        }
+        if (strcmp($row[0]->status,'1') !== 0) {
+            $data['status'] = '2';
+        }
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
     
     public function disableCruiseDataTransfer($id){
-        $data = array('enable' => 0);
-        $row = $this->getCruiseDataTransfer($id);
-//        if (strcmp($row[0]->status,'2') === 0) {
-//            $data['status'] = '4';
-//        }
+        $data = array('enable' => 0, 'status' => 4);
+        // $row = $this->getCruiseDataTransfer($id);
+        // if (strcmp($row[0]->status,'2') === 0) {
+        //     $data['status'] = '4';
+        // }
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
