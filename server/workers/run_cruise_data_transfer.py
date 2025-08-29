@@ -99,12 +99,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 if cruise_or_lowering == '0':
                     # Cruise-level exclusion
-                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
+                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/**")
                 else:
                     # Lowering-level exclusions
                     for lowering in lowerings:
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
-                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/**")
 
             except Exception as exc:
                 logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, str(exc))
@@ -120,18 +120,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 if cruise_or_lowering == '0':
                     # Cruise-level exclusion
-                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/*")
+                    exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/**")
                 else:
                     # Lowering-level exclusions
                     for lowering in lowerings:
                         filter_path = dest_dir.replace('{cruiseID}', self.cruise_id).replace('{loweringID}', lowering)
-                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/*")
+                        exclude_filterlist.append(f"{os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, filter_path)}/**")
 
             except Exception as exc:
                 logging.warning("Could not retrieve extra directory %s: %s", ed_id, str(exc))
 
         exclude_filterlist.extend(_find_non_ascii_files(self.cruise_dir))
-        exclude_filterlist = [ f'{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
+        #exclude_filterlist = [ '{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
         exclude_filterlist.extend(default_ignore_patterns)  # rsync partial files, Synology files, .DS_Store, etc
 
         return exclude_filterlist
@@ -153,7 +153,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         # Build rclone command
-        command = ['rclone', 'mkdir', f'{dest_dir}/{self.cruise_id}']
+        command = ['rclone', 'mkdir', f'{dest_dir.rstrip("/")}/{self.cruise_id}']
         if extra_args:
             command.extend(extra_args)
 
@@ -356,7 +356,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'rsync':
                 extra_args += [f"--password-file={password_file}"]
 
-            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, tmpdir if ':' in dest_dir else dest_dir, exclude_file)
+            dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' and transfer_type != 'rsync' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
+            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
