@@ -118,6 +118,7 @@ def scheduler(interval=None):
         # schedule ship-to-shore transfer
         required_cruise_data_transfers = ovdm.get_required_cruise_data_transfers()
         for required_cruise_data_transfer in required_cruise_data_transfers:
+            logging.debug(required_cruise_data_transfer['name'])
             if required_cruise_data_transfer['name'] == 'SSDW' and required_cruise_data_transfer['enable'] != "1":
                 logging.info("Submitting cruise data transfer job for: %s", required_cruise_data_transfer['longName'])
 
