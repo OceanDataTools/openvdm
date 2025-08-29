@@ -392,10 +392,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             elif transfer_type == 'ssh':
                 rclone_config = os.path.join(tmpdir, 'rclone_config')
-                build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
                 extra_args = ['--config', rclone_config]
 
-                self.make_cruise_dir(dest_dir, extra_args)
+                self.make_cruise_dir(f'{rclone_remote}:{cdt_cfg["destDir"]}', extra_args)
 
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
@@ -403,7 +403,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     flags,
                     extra_args,
                     self.cruise_dir,
-                    f'{cdt_cfg["sshServer"]}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
+                    f'{rclone_remote}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
                 )
 
                 logging.debug(' '.join(cmd))
