@@ -30,7 +30,8 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
-from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
+from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
+from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
 from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAMES
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
@@ -508,12 +509,12 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
     for collection_system_transfer in collection_system_transfers:
-        logging.debug("Queuing %s job for %s", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
+        logging.debug("Queuing %s job for %s", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
         gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
 
-        collection_system_transfer_jobs.append( {"task": RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
+        collection_system_transfer_jobs.append( {"task": CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
 
-    logging.info("Submitting %s jobs", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
+    logging.info("Submitting %s jobs", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     worker.send_job_status(current_job, 3, 10)
 
     submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
@@ -525,9 +526,9 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     if worker.ovdm.get_transfer_public_data():
         logging.debug("Transferring public data files to cruise data directory")
-        worker.send_job_status(current_job, 7, 10)
+        worker.send_job_status(current_job, 6, 10)
 
-        output_results = worker.transfer_publicdata_dir(current_job, 70, 90)
+        output_results = worker.transfer_publicdata_dir(current_job, 60, 75)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -537,7 +538,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
 
     logging.info("Exporting cruise configuration")
-    worker.send_job_status(current_job, 9, 10)
+    worker.send_job_status(current_job, 75, 100)
 
     output_results = worker.export_cruise_config(finalize=True)
 
@@ -546,6 +547,33 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+
+
+    gm_data = {
+        'cruiseID': worker.cruise_id,
+        'cruiseStartDate': worker.cruise_start_date,
+        'systemStatus': "On",
+        'cruiseDataTransfer': {}
+    }
+
+    cruise_data_transfer_jobs = []
+    cruise_data_transfers = worker.ovdm.get_active_cruise_data_transfers()
+
+    for cruise_data_transfer in cruise_data_transfers:
+        logging.debug("Queuing %s job for %s", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], cruise_data_transfer['name'])
+        gm_data['cruiseDataTransfer']['cruiseDataTransferID'] = cruise_data_transfer['cruiseDataTransferID']
+
+        cruise_data_transfer_jobs.append( {"task": CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], "data": json.dumps(gm_data)} )
+
+    logging.info("Submitting %s jobs", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'])
+    worker.send_job_status(current_job, 8, 10)
+
+    submitted_job_request = gm_client.submit_multiple_jobs(cruise_data_transfer_jobs, background=False, wait_until_complete=False)
+
+    time.sleep(1)
+    gm_client.wait_until_jobs_completed(submitted_job_request)
+
+    job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
