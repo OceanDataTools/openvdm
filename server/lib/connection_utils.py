@@ -304,6 +304,7 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     ssh_config_path = os.path.expanduser("~/.ssh/config")
     identity_file = os.path.expanduser("~/.ssh/id_rsa")
     target_host = cfg["sshServer"]
+    rclone_remote = target_host.replace('.','_')
 
     if os.path.exists(ssh_config_path):
         with open(ssh_config_path) as f:
@@ -319,7 +320,7 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
 
     # Build rclone config section
     out = configparser.ConfigParser()
-    out[target_host] = {
+    out[rclone_remote] = {
         "type": "sftp",
         "host": target_host,
         "user": cfg["sshUser"],
@@ -327,13 +328,15 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     }
 
     # Print for debugging
-    logging.debug(f"[{target_host}]")
-    for k, v in out[target_host].items():
+    logging.debug(f"[{rclone_remote}]")
+    for k, v in out[rclone_remote].items():
         logging.debug(f"{k} = {v}")
 
     # Write config, overwriting existing file
     with open(rclone_config, "w") as f:
         out.write(f)
+
+    return rclone_remote
 
 
 def build_rclone_options(cfg, mode='dry-run'):
@@ -935,7 +938,7 @@ def test_cdt_rclone_destination(cfg):
         results.append({"partName": "Write test", "result": "Pass"})
 
     if remote_type == 'sftp':
-        _, dest_dir = remote_path.split('/',1)
+        dest_dir = remote_path
         if not _verify_sftp_destination(cfg['destDir']):
             reason = f"Destination directory {dest_dir} does not exist"
             results.extend([
