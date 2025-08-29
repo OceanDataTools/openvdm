@@ -505,7 +505,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def shutdown(self, *args, **kwargs):
-        print("Shutdown requested: signaling current job to stop...")
+        logging.info("Shutdown requested: signaling current job to stop...")
         self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer.get('cruiseDataTransferID'))
         self._stop_requested = True
         return super().shutdown(*args, **kwargs)

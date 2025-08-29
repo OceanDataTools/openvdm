@@ -126,7 +126,7 @@ def scheduler(interval=None):
         else:
             now_utc = datetime.now(timezone.utc)
             delta = now_utc - last_s2s_xfer
-            if ssdw_transfer['status'] == '1' and delta > timedelta(minutes=4):
+            if ssdw_transfer['status'] == '1' and delta > timedelta(hours=1):
                 logging.info("S2S tranfer has run for an hour, time to restart")
                 gmData = {'pid': ssdw_transfer['pid']}
                 gm_client.submit_job("stopJob", json.dumps(gmData))
@@ -134,7 +134,7 @@ def scheduler(interval=None):
             if ssdw_transfer['enable'] == "1":
                 logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
                 last_s2s_xfer = datetime.now(timezone.utc)
-            
+
                 gmData = {
                 }
 
