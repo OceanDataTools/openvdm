@@ -548,6 +548,14 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
+
+    gm_data = {
+        'cruiseID': worker.cruise_id,
+        'cruiseStartDate': worker.cruise_start_date,
+        'systemStatus': "On",
+        'cruiseDataTransfer': {}
+    }
+
     cruise_data_transfer_jobs = []
     cruise_data_transfers = worker.ovdm.get_active_cruise_data_transfers()
 
