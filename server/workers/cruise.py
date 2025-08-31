@@ -277,6 +277,27 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
 
+        if current_job.task == TASK_NAMES['FINALIZE_CRUISE']:
+
+            gm_data = {
+                'cruiseID': self.cruise_id,
+                'cruiseStartDate': self.cruise_start_date
+            }
+
+            # Pre-finalize cruise
+            pre_finalize_jobs = []
+
+            for task in self.ovdm.get_tasks_for_hook('preFinalizeCurrentCruise'):
+                logging.info("Adding pre-finalize tasks: %s", task)
+                pre_finalize_jobs.append( {"task": task, "data": json.dumps(gm_data)} )
+
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            submitted_job_request = gm_client.submit_multiple_jobs(pre_finalize_jobs, background=False, wait_until_complete=False)
+
+            time.sleep(1)
+            gm_client.wait_until_jobs_completed(submitted_job_request)
+
         return super().on_job_execute(current_job)
 
 
@@ -313,14 +334,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if current_job.task in (TASK_NAMES['CREATE_CRUISE'], TASK_NAMES['FINALIZE_CRUISE']):
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            job_data = {
+            gm_data = {
                 'cruiseID': self.cruise_id,
                 'cruiseStartDate': self.cruise_start_date
             }
 
+            post_hook_jobs = []
+
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
+                post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
+
+            submitted_job_request = gm_client.submit_multiple_jobs(post_hook_jobs, background=False, wait_until_complete=False)
+
+            time.sleep(1)
+            gm_client.wait_until_jobs_completed(submitted_job_request)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None

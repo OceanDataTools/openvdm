@@ -34,7 +34,9 @@ TASK_NAMES = {
     'POST_UPDATE_DATA_DASHBOARD_HOOK': 'postDataDashboard',
     'POST_CREATE_CRUISE_HOOK': 'postSetupNewCruise',
     'POST_CREATE_LOWERING_HOOK': 'postSetupNewLowering',
+    'PRE_FINALIZE_CRUISE_HOOK': 'preFinalizeCurrentCruise',
     'POST_FINALIZE_CRUISE_HOOK': 'postFinalizeCurrentCruise',
+    'PRE_FINALIZE_LOWERING_HOOK': 'preFinalizeCurrentLowering',
     'POST_FINALIZE_LOWERING_HOOK': 'postFinalizeCurrentLowering'
 }
 
@@ -61,8 +63,18 @@ CUSTOM_TASKS = [
     },
     {
         "taskID": "0",
+        "name": TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'],
+        "longName": "Pre finalize current cruise",
+    },
+    {
+        "taskID": "0",
         "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
         "longName": "Post finalize current cruise",
+    },
+    {
+        "taskID": "0",
+        "name": TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'],
+        "longName": "Pre finalize current lowering",
     },
     {
         "taskID": "0",
@@ -439,6 +451,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['POST_CREATE_LOWERING_HOOK'])
     new_worker.register_task(TASK_NAMES['POST_CREATE_LOWERING_HOOK'], task_post_hook)
+
+    logging.info("\tTask: %s", TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'])
+    new_worker.register_task(TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'], task_post_hook)
 
     logging.info("\tTask: %s", TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'])
     new_worker.register_task(TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'], task_post_hook)
