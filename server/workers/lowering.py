@@ -172,6 +172,29 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
 
+        if current_job.task == TASK_NAMES['FINALIZE_LOWERING']:
+
+            gm_data = {
+                'cruiseID': self.cruise_id,
+                'loweringID': self.lowering_id,
+                'loweringStartDate': self.lowering_start_date,
+                'loweringEndDate': self.lowering_start_date
+            }
+
+            # Pre-finalize cruise
+            pre_finalize_jobs = []
+
+            for task in self.ovdm.get_tasks_for_hook('preFinalizeCurrentLowering'):
+                logging.info("Adding pre-finalize tasks: %s", task)
+                pre_finalize_jobs.append( {"task": task, "data": json.dumps(gm_data)} )
+
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            submitted_job_request = gm_client.submit_multiple_jobs(pre_finalize_jobs, background=False, wait_until_complete=False)
+
+            time.sleep(1)
+            gm_client.wait_until_jobs_completed(submitted_job_request)
+
         return super().on_job_execute(current_job)
 
 
