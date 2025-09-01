@@ -290,11 +290,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                             self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
                             last_percent_reported = percent
 
-                # if percent and percent != last_percent_reported:
-                #     logging.info("Progress Update: %d%%", percent)
-                #     self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
-                #     last_percent_reported = percent
-
             proc.wait()
 
             if proc.returncode != 0:
