@@ -274,6 +274,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.cruise_start_date = payload_obj.get('cruiseStartDate', self.ovdm.get_cruise_start_date())
+        self.cruise_end_date = payload_obj.get('cruiseEndDate', self.ovdm.get_cruise_end_date())
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
