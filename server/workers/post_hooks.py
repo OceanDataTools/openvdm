@@ -210,6 +210,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Function run when a new job arrives
         """
         self.stop = False
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         try:
             self.job_data = json.loads(current_job.data)
@@ -269,7 +270,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         else:
             self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
 
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -284,7 +284,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         final_verdict = final_part.get("result", None)
 
         if not final_verdict or final_verdict == "Ignore":
-            logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
             return super().send_job_complete(current_job, job_result)
 
         if final_verdict == "Fail":
@@ -299,7 +298,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s", current_job.handle)
 
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
         return super().send_job_complete(current_job, job_result)
 
 
@@ -423,8 +421,6 @@ if __name__ == "__main__":
         Signal Handler for QUIT
         """
 
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
-
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
@@ -432,8 +428,6 @@ if __name__ == "__main__":
         """
         Signal Handler for INT
         """
-
-        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         logging.warning("INT Signal Received")
         new_worker.quit_worker()
