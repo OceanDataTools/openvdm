@@ -190,7 +190,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                     if percent != last_percent:
                         logging.info("Progress Update: %d%%", percent)
-                        self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
+                        self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
                         last_percent = percent
 
             return last_percent
@@ -203,7 +203,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 if percent != last_percent:
                     logging.info("Progress Update: %d%%", percent)
-                    self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
+                    self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
                     last_percent = percent
 
             return last_percent
@@ -601,7 +601,7 @@ def task_run_cruise_data_transfer(worker, current_job):
     worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing destination")
-    worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 1, 100)
 
     results = worker.test_destination()
 
@@ -613,7 +613,7 @@ def task_run_cruise_data_transfer(worker, current_job):
     job_results['parts'].append({"partName": "Connection test", "result": "Pass"})
 
     logging.info("Transferring files")
-    worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 2, 100)
 
     results = worker.transfer_to_destination(current_job)
 
