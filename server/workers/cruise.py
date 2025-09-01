@@ -360,7 +360,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             gm_data = {
                 'cruiseID': self.cruise_id,
                 'cruiseStartDate': self.cruise_start_date,
-                'cruiseEndDate': self.cruise_emd_date
+                'cruiseEndDate': self.cruise_end_date
             }
 
             # Collect pre-finalize jobs
