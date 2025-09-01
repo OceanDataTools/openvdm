@@ -139,6 +139,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         self.stop = False
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         try:
             payload_obj = json.loads(current_job.data)
@@ -250,7 +251,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         if current_job.task in (TASK_NAMES['CREATE_LOWERING'], TASK_NAMES['FINALIZE_LOWERING']):
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
             gm_data = {
                 'cruiseID': self.cruise_id,
