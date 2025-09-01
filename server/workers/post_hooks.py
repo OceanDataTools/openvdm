@@ -269,6 +269,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         else:
             self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
         return super().on_job_exception(current_job, exc_info)
 
 
@@ -283,6 +284,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         final_verdict = final_part.get("result", None)
 
         if not final_verdict or final_verdict == "Ignore":
+            logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
             return super().send_job_complete(current_job, job_result)
 
         if final_verdict == "Fail":
@@ -297,6 +299,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s", current_job.handle)
 
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
         return super().send_job_complete(current_job, job_result)
 
 
