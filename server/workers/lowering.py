@@ -178,22 +178,43 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 'cruiseID': self.cruise_id,
                 'loweringID': self.lowering_id,
                 'loweringStartDate': self.lowering_start_date,
-                'loweringEndDate': self.lowering_start_date
+                'loweringEndDate': self.lowering_end_date
             }
 
-            # Pre-finalize cruise
+            # Collect pre-finalize jobs
             pre_finalize_jobs = []
+            for task in self.ovdm.get_tasks_for_hook("preFinalizeCurrentLowering"):
+                logging.info("Adding pre-finalize task: %s", task)
+                pre_finalize_jobs.append({"task": task, "data": json.dumps(gm_data)})
 
-            for task in self.ovdm.get_tasks_for_hook('preFinalizeCurrentLowering'):
-                logging.info("Adding pre-finalize tasks: %s", task)
-                pre_finalize_jobs.append( {"task": task, "data": json.dumps(gm_data)} )
+            if not pre_finalize_jobs:
+                logging.info("No pre-finalize tasks found, skipping.")
+                return super().on_job_execute(current_job)
 
+            # Submit jobs to Gearman
             gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            submitted_job_request = gm_client.submit_multiple_jobs(pre_finalize_jobs, background=False, wait_until_complete=False)
+            try:
+                submitted_job_requests = gm_client.submit_multiple_jobs(
+                    pre_finalize_jobs,
+                    background=False,
+                    wait_until_complete=False,  # we'll handle completion below
+                )
 
-            time.sleep(1)
-            gm_client.wait_until_jobs_completed(submitted_job_request)
+                # Wait until all jobs complete
+                gm_client.wait_until_jobs_completed(submitted_job_requests)
+
+                # Log results
+                for job in submitted_job_requests:
+                    if job.complete:
+                        logging.info("Task %s completed successfully", job.job.unique)
+                    elif job.timed_out:
+                        logging.error("Task %s timed out", job.job.unique)
+                    else:
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
+
+            except Exception as e:
+                logging.exception("Error while submitting or running pre-finalize jobs: %s", e)
 
         return super().on_job_execute(current_job)
 
