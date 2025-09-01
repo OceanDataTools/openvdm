@@ -64,22 +64,22 @@ CUSTOM_TASKS = [
     {
         "taskID": "0",
         "name": TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'],
-        "longName": "Pre finalize current cruise",
+        "longName": "Pre-finalize current cruise",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
-        "longName": "Post finalize current cruise",
+        "longName": "Post-finalize current cruise",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'],
-        "longName": "Pre finalize current lowering",
+        "longName": "Pre-finalize current lowering",
     },
     {
         "taskID": "0",
         "name": TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
-        "longName": "Post finalize current lowering",
+        "longName": "Post-finalize current lowering",
     }
 ]
 
