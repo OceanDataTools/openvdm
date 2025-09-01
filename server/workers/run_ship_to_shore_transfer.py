@@ -276,7 +276,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                             if percent != last_percent_reported:
                                 logging.info("Progress Update: %d%%", percent)
-                                self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
+                                self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
                                 last_percent_reported = percent
 
                 if command[0] == 'rclone':
@@ -287,13 +287,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                         logging.debug("percent: %s", percent)
                         if percent != last_percent_reported:
                             logging.info("Progress Update: %d%%", percent)
-                            self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
+                            self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
                             last_percent_reported = percent
-
-                # if percent and percent != last_percent_reported:
-                #     logging.info("Progress Update: %d%%", percent)
-                #     self.send_job_status(current_job, int(75 * percent/100) + 20, 100)
-                #     last_percent_reported = percent
 
             proc.wait()
 
@@ -571,11 +566,11 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 1, 100)
     worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing configuration")
-    worker.send_job_status(current_job, 15, 100)
+    worker.send_job_status(current_job, 2, 100)
 
     results = worker.test_destination()
 
@@ -587,7 +582,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     job_results['parts'].append({"partName": "Destination test", "result": "Pass"})
 
     logging.info("Transferring files")
-    worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 4, 10)
 
     results = worker.transfer_to_destination(current_job)
 
@@ -610,7 +605,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
 
     if job_results['files']['new'] or job_results['files']['updated']:
         logging.info("Writing transfer logfile")
-        worker.send_job_status(current_job, 9, 10)
+        worker.send_job_status(current_job, 96, 10)
 
         logfile_filename = f"{cdt_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
@@ -636,7 +631,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
         job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
 
     logging.info("Writing exclude logfile")
-    worker.send_job_status(current_job, 95, 100)
+    worker.send_job_status(current_job, 98, 100)
 
     logfile_filename = f"{cdt_cfg['name']}_Exclude.log"
     logfile_contents = {
