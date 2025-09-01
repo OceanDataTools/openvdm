@@ -311,11 +311,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # Log results
                 for job in submitted_job_requests:
                     if job.complete:
-                        logging.info("Task %s completed successfully", job.job.handle)
+                        logging.info("Task %s completed successfully", job.job.unique)
                     elif job.timed_out:
-                        logging.error("Task %s timed out", job.job.handle)
+                        logging.error("Task %s timed out", job.job.unique)
                     else:
-                        logging.error("Task %s failed: %s", job.job.handle, job.exception)
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
 
             except Exception as e:
                 logging.exception("Error while submitting or running pre-finalize jobs: %s", e)
