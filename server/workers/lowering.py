@@ -139,6 +139,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
 
         self.stop = False
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         try:
             payload_obj = json.loads(current_job.data)
@@ -171,6 +172,50 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
         self.lowering_dir = os.path.join(self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id)
+
+        if current_job.task == TASK_NAMES['FINALIZE_LOWERING']:
+
+            gm_data = {
+                'cruiseID': self.cruise_id,
+                'loweringID': self.lowering_id,
+                'loweringStartDate': self.lowering_start_date,
+                'loweringEndDate': self.lowering_end_date
+            }
+
+            # Collect pre-finalize jobs
+            pre_finalize_jobs = []
+            for task in self.ovdm.get_tasks_for_hook("preFinalizeCurrentLowering"):
+                logging.info("Adding pre-finalize task: %s", task)
+                pre_finalize_jobs.append({"task": task, "data": json.dumps(gm_data)})
+
+            if not pre_finalize_jobs:
+                logging.info("No pre-finalize tasks found, skipping.")
+                return super().on_job_execute(current_job)
+
+            # Submit jobs to Gearman
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            try:
+                submitted_job_requests = gm_client.submit_multiple_jobs(
+                    pre_finalize_jobs,
+                    background=False,
+                    wait_until_complete=False,  # we'll handle completion below
+                )
+
+                # Wait until all jobs complete
+                gm_client.wait_until_jobs_completed(submitted_job_requests)
+
+                # Log results
+                for job in submitted_job_requests:
+                    if job.complete:
+                        logging.info("Task %s completed successfully", job.job.unique)
+                    elif job.timed_out:
+                        logging.error("Task %s timed out", job.job.unique)
+                    else:
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
+
+            except Exception as e:
+                logging.exception("Error while submitting or running pre-finalize jobs: %s", e)
 
         return super().on_job_execute(current_job)
 
@@ -206,18 +251,48 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         results = json.loads(job_result)
 
         if current_job.task in (TASK_NAMES['CREATE_LOWERING'], TASK_NAMES['FINALIZE_LOWERING']):
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            job_data = {
+            gm_data = {
                 'cruiseID': self.cruise_id,
                 'loweringID': self.lowering_id,
                 'loweringStartDate': self.lowering_start_date,
                 'loweringEndDate': self.lowering_end_date
             }
 
+            # Collect pre-finalize jobs
+            post_hook_jobs = []
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
+                logging.info("Adding post-hook task: %s", task)
+                post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
+
+            if not post_hook_jobs:
+                logging.info("No post-hook tasks found, skipping.")
+                return super().on_job_execute(current_job)
+
+            # Submit jobs to Gearman
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            try:
+                submitted_job_requests = gm_client.submit_multiple_jobs(
+                    post_hook_jobs,
+                    background=False,
+                    wait_until_complete=False,  # we'll handle completion below
+                )
+
+                # Wait until all jobs complete
+                gm_client.wait_until_jobs_completed(submitted_job_requests)
+
+                # Log results
+                for job in submitted_job_requests:
+                    if job.complete:
+                        logging.info("Task %s completed successfully", job.job.unique)
+                    elif job.timed_out:
+                        logging.error("Task %s timed out", job.job.unique)
+                    else:
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
+
+            except Exception as e:
+                logging.exception("Error while submitting or running post-hook jobs: %s", e)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
