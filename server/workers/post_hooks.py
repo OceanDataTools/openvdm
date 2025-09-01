@@ -458,6 +458,9 @@ if __name__ == "__main__":
     logging.info("\tTask: %s", TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'])
     new_worker.register_task(TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'], task_post_hook)
 
+    logging.info("\tTask: %s", TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'])
+    new_worker.register_task(TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'], task_post_hook)
+
     logging.info("\tTask: %s", TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'])
     new_worker.register_task(TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'], task_post_hook)
 
