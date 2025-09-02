@@ -323,9 +323,25 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     out[rclone_remote] = {
         "type": "sftp",
         "host": target_host,
-        "user": cfg["sshUser"],
-        "key_file": identity_file,
+        "user": cfg["sshUser"]
     }
+
+    # If password provided, obscure it; otherwise use key file
+    if cfg["sshUseKey"] == '0':
+        try:
+            result = subprocess.run(
+                ["rclone", "obscure", cfg["sshPass"]],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            obscured_pass = result.stdout.strip()
+            out[rclone_remote]["pass"] = obscured_pass
+        except subprocess.CalledProcessError as e:
+            logging.error("Failed to obscure password with rclone: %s", e)
+            raise
+    else:
+        out[rclone_remote]["key_file"] = identity_file
 
     # Print for debugging
     logging.debug(f"[{rclone_remote}]")
