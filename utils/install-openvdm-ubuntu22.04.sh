@@ -220,12 +220,12 @@ function install_packages {
     
     sudo apt update -qq
 
-    sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 cifs-utils gdal-bin \
-    gearman-job-server git libapache2-mod-php7.3 libapache2-mod-wsgi-py3 \
-    libgearman-dev mysql-client mysql-server ntp php7.3 php7.3-cli \
-    php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml php7.3-zip python3 \
-    python3-dev python3-pip python3-venv rsync samba smbclient sshpass \
-    supervisor
+    sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 \
+    cifs-utils gdal-bin gearman-job-server git libapache2-mod-php7.3 \
+    libapache2-mod-wsgi-py3 libgearman-dev mysql-client mysql-server ntp \
+    php7.3 php7.3-cli php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml \
+    php7.3-zip python3 python3-dev python3-pip python3-venv rclone rsync \
+    samba smbclient sshpass supervisor
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     

@@ -8,7 +8,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2015-01-01
  REVISION:  2025-07-06
 """
@@ -198,7 +198,7 @@ def run_transfer_command(worker, current_job, cmd, file_count):
                     if percent != last_percent_reported:
                         logging.info("Progress Update: %d%%", percent)
                         if current_job:
-                            worker.send_job_status(current_job, int(50 * percent / 100) + 20, 100) # 70 - 20
+                            worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
                         last_percent_reported = percent
 
     return new_files, updated_files
@@ -811,7 +811,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     worker.ovdm.set_running_collection_system_transfer(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
 
     logging.info("Testing source")
-    worker.send_job_status(current_job, 1, 10)
+    worker.send_job_status(current_job, 1, 100)
 
     results = test_cst_source(cst_cfg, worker.source_dir)
 
@@ -823,7 +823,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     job_results['parts'].append({"partName": "Source Test", "result": "Pass"})
 
     logging.info("Testing destination")
-    worker.send_job_status(current_job, 15, 100)
+    worker.send_job_status(current_job, 2, 100)
 
     results = worker.test_destination_dir()
 
@@ -835,7 +835,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     job_results['parts'].append({"partName": "Destination Test", "result": "Pass"})
 
     logging.info("Transferring files")
-    worker.send_job_status(current_job, 2, 10)
+    worker.send_job_status(current_job, 5, 100)
 
     results = worker.transfer_from_source(current_job)
 
@@ -859,7 +859,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     if job_results['files']['new'] or job_results['files']['updated']:
         if cst_cfg['localDirIsMountPoint'] == '0':
             logging.info("Setting file permissions")
-            worker.send_job_status(current_job, 9, 10)
+            worker.send_job_status(current_job, 96, 10)
 
             results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
 
@@ -870,7 +870,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
         logging.info("Writing transfer logfile")
-        worker.send_job_status(current_job, 93, 10)
+        worker.send_job_status(current_job, 97, 10)
 
         logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
@@ -896,7 +896,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         job_results['parts'].append({"partName": "Write transfer logfile", "result": "Pass"})
 
     logging.info("Writing exclude logfile")
-    worker.send_job_status(current_job, 95, 100)
+    worker.send_job_status(current_job, 98, 100)
 
     logfile_filename = f"{cst_cfg['name']}_Exclude.log"
     logfile_contents = {
