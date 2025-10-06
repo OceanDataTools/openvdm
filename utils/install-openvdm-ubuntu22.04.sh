@@ -77,7 +77,7 @@ function set_default_variables {
     DEFAULT_OTHERSHARE_ROOT=/mnt/CruiseSandbox
 
     DEFAULT_OPENVDM_REPO=https://github.com/schmidtocean/openvdm
-    DEFAULT_OPENVDM_BRANCH=master-FKt
+    DEFAULT_OPENVDM_BRANCH=openvdm-soi
     DEFAULT_OPENVDM_SITEROOT=10.23.9.20
 
     DEFAULT_OPENVDM_USER=mt
