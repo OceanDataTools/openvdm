@@ -24,7 +24,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     <div class="row">
 	<div class="col-lg-6">
 <?php
-        if(SHOW_DATES_IN_HEADER) {
+        if(SHOW_DATES_IN_UI) {
 	    $data['cruiseDates'] = $_warehouseModel->getCruiseDates();
 ?>
 	    <div class="panel panel-default panel-heading" style="background-color: #f5f5f5">

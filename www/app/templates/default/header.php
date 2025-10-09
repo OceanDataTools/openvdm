@@ -178,7 +178,7 @@ use Helpers\Hooks;
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="<?php echo DIR;?>"><?php echo SITETITLE;?></a><span class="navbar-brand"><?php echo (SHOW_DATES_IN_HEADER) ? " " . CRUISE_NAME . " Dates: {$data['cruiseDates']['cruiseStartDate']} - {$data['cruiseDates']['cruiseEndDate']}"  : "" ?></span>
+            <a class="navbar-brand" href="<?php echo DIR;?>"><?php echo SITETITLE;?></a><span class="navbar-brand"><?php echo (SHOW_DATES_IN_UI) ? " " . CRUISE_NAME . " Dates: {$data['cruiseDates']['cruiseStartDate']} - {$data['cruiseDates']['cruiseEndDate']}"  : "" ?></span>
         </div> <!-- navbar-header -->
         <ul class="nav navbar-top-links navbar-right">
             <li class="dropdown">

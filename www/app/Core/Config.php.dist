@@ -103,7 +103,7 @@ class Config
         /*
          * Define whether to include cruise dates in UI header
          */
-        define('SHOW_DATES_IN_HEADER', false);
+        define('SHOW_DATES_IN_UI', false);
 
         /*
          * Set default controller and method for legacy calls.
