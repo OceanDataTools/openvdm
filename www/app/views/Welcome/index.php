@@ -3,8 +3,6 @@
 use Core\Error;
 use Helpers\Session;
 
-$_warehouseModel = new \Models\Warehouse();
-
 $enableSSDW = false;
 foreach($data['requiredCruiseDataTransfers'] as $row){
     if (strcmp($row->name, "SSDW") == 0) {
@@ -22,18 +20,32 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     </div>
 
     <div class="row">
-	<div class="col-lg-6">
+    <div class="col-lg-6">
 <?php
-        if(SHOW_DATES_IN_UI) {
-	    $data['cruiseDates'] = $_warehouseModel->getCruiseDates();
+        if(SHOW_CRUISE_META_IN_UI) {
+        $_warehouseModel = new \Models\Warehouse();
+        $cruise_meta['cruiseName'] = $_warehouseModel->getCruiseName();
+        $cruise_meta['cruisePI'] = $_warehouseModel->getCruisePI();
+        $cruise_meta['cruiseLocation'] = $_warehouseModel->getCruiseLocation();
+        $cruise_meta['cruiseStartDate'] = $_warehouseModel->getCruiseStartDate();
+        $cruise_meta['cruiseEndDate'] = $_warehouseModel->getCruiseEndDate();
+        $cruise_meta['cruiseStartPort'] = $_warehouseModel->getCruiseStartPort();
+        $cruise_meta['cruiseEndPort'] = $_warehouseModel->getCruiseEndPort();
 ?>
-	    <div class="panel panel-default panel-heading" style="background-color: #f5f5f5">
-		<?php echo CRUISE_NAME . " Dates: {$data['cruiseDates']['cruiseStartDate']} - {$data['cruiseDates']['cruiseEndDate']}"; ?>
-	    </div>
+        <div class="panel panel-default">
+            <div class="panel-heading"><?php CRUISENAME?> Information</div>
+            <div class="panel-body">
+                Name: <?php echo $cruise_meta['cruiseName']; ?><br/>
+                Chief Scientist: <?php echo $cruise_meta['cruisePI']; ?><br/>
+                Location: <?php echo $cruise_meta['cruiseLocation']; ?><br/>
+                Dates: <?php echo "{$cruise_meta['cruiseStartDate']} - {$cruise_meta['cruiseEndDate']}"; ?><br/>
+                Ports: <?php echo "{$cruise_meta['cruiseStartPort']} -> {$cruise_meta['cruiseEndPort']}"; ?><br/>
+            </div>
+        </div>
 <?php
-	}
+    }
 ?>
-	    <div class="panel panel-default">
+        <div class="panel panel-default">
                 <div class="panel-heading">Incorrect Filenames Detected</div>
                 <div class="panel-body" id="filenameErrors">
 <?php
@@ -86,7 +98,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     if($data['shipboardTransfers']) {
         $itemNum = 0;
 
-	for($i = 0; $i < count($data['shipboardTransfers']); $i++ ) {
+    for($i = 0; $i < count($data['shipboardTransfers']); $i++ ) {
 ?>
                     <h5><?php echo $data['shipboardTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipboardTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
                     <ul>
@@ -108,7 +120,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
             }
 
-	    if(count($data['shipboardTransfers'][$i]->updatedFiles) > 0) {
+        if(count($data['shipboardTransfers'][$i]->updatedFiles) > 0) {
 ?>
                         <li><small><?php echo count($data['shipboardTransfers'][$i]->updatedFiles); ?> File(s) Updated.</small></li>
 <?php
@@ -138,7 +150,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
                     <h5><?php echo $data['shipToShoreTransfers'][$i]->collectionSystemName; ?> - <?php $timestamp = DateTime::createFromFormat('Ymd\THis\Z', $data['shipToShoreTransfers'][$i]->date, new DateTimeZone('UTC')); echo $timestamp->format('Y-m-d H:i:s T'); ?></h5>
                     <ul>
 <?php
-	    if( is_array($data['shipToShoreTransfers'][$i]->newFiles) && sizeof($data['shipToShoreTransfers'][$i]->newFiles) <= 20) {
+        if( is_array($data['shipToShoreTransfers'][$i]->newFiles) && sizeof($data['shipToShoreTransfers'][$i]->newFiles) <= 20) {
                 foreach($data['shipToShoreTransfers'][$i]->newFiles as $file) {
 ?>
                         <li><small><?php echo $file; ?></small></li>
@@ -153,9 +165,9 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 ?>
                         <li><small>...and <strong><?php echo sizeof($data['shipToShoreTransfers'][$i]->newFiles)-20; ?></strong> other files</small></li>
 <?php
-            }	
-		
-	    if(count($data['shipToShoreTransfers'][$i]->updatedFiles) > 0) {
+            }   
+        
+        if(count($data['shipToShoreTransfers'][$i]->updatedFiles) > 0) {
 ?>
                         <li><small><?php echo count($data['shipToShoreTransfers'][$i]->updatedFiles); ?> File(s) Updated.</small></li>
 <?php
