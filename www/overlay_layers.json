@@ -1,0 +1,6 @@
+[
+  {
+    "name": "CS2001_MB_DLY01_50m_WGS84_20120428",
+    "url": "http://openvdm.oceandatatools.org:8000/cog/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?url=http%3A%2F%2Fopenvdm.oceandatatools.org%2FCruiseData%2FCS2001%2FEM302%2Fproc%2FCS2001_MB_DLY01_50m_WGS84_20120428.tif"
+  }
+]

@@ -3,6 +3,8 @@
 use Core\Error;
 use Helpers\Session;
 
+$_warehouseModel = new \Models\Warehouse();
+
 $enableSSDW = false;
 foreach($data['requiredCruiseDataTransfers'] as $row){
     if (strcmp($row->name, "SSDW") == 0) {
@@ -20,8 +22,18 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
     </div>
 
     <div class="row">
-        <div class="col-lg-6">
-            <div class="panel panel-default">
+	<div class="col-lg-6">
+<?php
+        if(SHOW_DATES_IN_HEADER) {
+	    $data['cruiseDates'] = $_warehouseModel->getCruiseDates();
+?>
+	    <div class="panel panel-default panel-heading" style="background-color: #f5f5f5">
+		<?php echo CRUISE_NAME . " Dates: {$data['cruiseDates']['cruiseStartDate']} - {$data['cruiseDates']['cruiseEndDate']}"; ?>
+	    </div>
+<?php
+	}
+?>
+	    <div class="panel panel-default">
                 <div class="panel-heading">Incorrect Filenames Detected</div>
                 <div class="panel-body" id="filenameErrors">
 <?php

@@ -71,6 +71,7 @@ use Helpers\Hooks;
     }
 
     $data['cruiseID'] = $_warehouseModel->getCruiseID();
+    $data['cruiseDates'] = $_warehouseModel->getCruiseDates();
 
     if($_warehouseModel->getShowLoweringComponents()) {
         $data['loweringID'] = $_warehouseModel->getLoweringID();
@@ -177,7 +178,7 @@ use Helpers\Hooks;
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="<?php echo DIR;?>"><?php echo SITETITLE;?><?php echo (SHOW_DATES_IN_HEADER) ? " {$CRUISE_NAME} Dates: {$cruiseDates['cruiseStartDate']} - {$cruiseDates['cruiseEndDate']}"  : "" ?></a>
+            <a class="navbar-brand" href="<?php echo DIR;?>"><?php echo SITETITLE;?></a><span class="navbar-brand"><?php echo (SHOW_DATES_IN_HEADER) ? " " . CRUISE_NAME . " Dates: {$data['cruiseDates']['cruiseStartDate']} - {$data['cruiseDates']['cruiseEndDate']}"  : "" ?></span>
         </div> <!-- navbar-header -->
         <ul class="nav navbar-top-links navbar-right">
             <li class="dropdown">
