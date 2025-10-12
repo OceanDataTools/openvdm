@@ -101,6 +101,11 @@ class Config
         define('DATA_DASHBOARD_MANIFEST_FN', 'manifest.json');
 
         /*
+         * Define whether to include cruise dates in UI header
+         */
+        define('SHOW_CRUISE_META_IN_UI', false);
+
+        /*
          * Set default controller and method for legacy calls.
          */
         define('DEFAULT_CONTROLLER', 'welcome');
