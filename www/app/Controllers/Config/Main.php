@@ -106,8 +106,8 @@ class Main extends Controller {
 
                 if (!empty($cruiseEndDate)) {
                     try {
-                        $start = DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
-                        $end   = DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
 
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
@@ -233,7 +233,8 @@ class Main extends Controller {
             } else {
                 $loweringID = $this->_warehouseModel->getLoweringID();
             }
-            $loweringStartDate = $_POST['loweringStartDate'];
+
+	    $loweringStartDate = $_POST['loweringStartDate'];
             $loweringEndDate = $_POST['loweringEndDate'];
 
             if (strcmp($loweringID, $this->_warehouseModel->getLoweringID()) != 0) {
@@ -253,8 +254,8 @@ class Main extends Controller {
 
                 if (!empty($loweringEndDate)) {
                     try {
-                        $start = DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
-                        $end   = DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
 
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
@@ -300,6 +301,7 @@ class Main extends Controller {
             } else {
                 $data['loweringID'] = $loweringID;
                 $data['loweringStartDate'] = $loweringStartDate;
+                $data['loweringEndDate'] = $loweringEndDate;
             }
         }
         
@@ -476,8 +478,8 @@ class Main extends Controller {
 
                 if (!empty($cruiseEndDate)) {
                     try {
-                        $start = DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
-                        $end   = DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
 
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
@@ -631,8 +633,8 @@ class Main extends Controller {
 
                 if (!empty($loweringEndDate)) {
                     try {
-                        $start = DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
-                        $end   = DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
 
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
