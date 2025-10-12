@@ -103,6 +103,20 @@ class Main extends Controller {
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
                 $error[] = 'Valid ' . CRUISE_NAME . ' End Date is required';
             } else {
+
+                if (!empty($cruiseEndDate)) {
+                    try {
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
+
+                        if ($start && $end && $end <= $start) {
+                            $error[] = CRUISE_NAME . ' End Date must be after Start Date';
+                        }
+                    } catch (Exception $e) {
+                        $error[] = 'Invalid date format encountered.';
+                    }
+                }
+
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();
                 
                 if (!is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
@@ -219,7 +233,8 @@ class Main extends Controller {
             } else {
                 $loweringID = $this->_warehouseModel->getLoweringID();
             }
-            $loweringStartDate = $_POST['loweringStartDate'];
+
+	    $loweringStartDate = $_POST['loweringStartDate'];
             $loweringEndDate = $_POST['loweringEndDate'];
 
             if (strcmp($loweringID, $this->_warehouseModel->getLoweringID()) != 0) {
@@ -236,6 +251,20 @@ class Main extends Controller {
             } elseif(strcmp($loweringEndDate,'') != 0 && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringEndDate)){
                 $error[] = 'Improperly formatted ' . LOWERING_NAME . ' End Date';
             } else {
+
+                if (!empty($loweringEndDate)) {
+                    try {
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
+
+                        if ($start && $end && $end <= $start) {
+                            $error[] = LOWERING_NAME . ' End Date must be after Start Date';
+                        }
+                    } catch (Exception $e) {
+                        $error[] = 'Invalid date format encountered.';
+                    }
+                }
+
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();
                 
                 if (!is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $this->_warehouseModel->getCruiseID() .'/' . $this->_warehouseModel->getLoweringDataBaseDir() . '/' . '/' . $loweringID)) {
@@ -272,6 +301,7 @@ class Main extends Controller {
             } else {
                 $data['loweringID'] = $loweringID;
                 $data['loweringStartDate'] = $loweringStartDate;
+                $data['loweringEndDate'] = $loweringEndDate;
             }
         }
         
@@ -445,6 +475,20 @@ class Main extends Controller {
             } elseif(!preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $cruiseEndDate)){
                 $error[] = 'Valid ' . CRUISE_NAME . ' End Date is required';
             } else {
+
+                if (!empty($cruiseEndDate)) {
+                    try {
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $cruiseStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $cruiseEndDate);
+
+                        if ($start && $end && $end <= $start) {
+                            $error[] = CRUISE_NAME . ' End Date must be after Start Date';
+                        }
+                    } catch (Exception $e) {
+                        $error[] = 'Invalid date format encountered.';
+                    }
+                }
+
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();  
                 if (is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
                     $error[] = 'A ' . CRUISE_NAME . ' Data Directory for that ' . CRUISE_NAME . ' ID already exists';
@@ -586,6 +630,20 @@ class Main extends Controller {
             } elseif($loweringEndDate != '' && !preg_match('/([0-9]{4})\/([0-9]{2})\/([0-9]{2}) ([0-9]{2}):([0-9]{2})/', $loweringEndDate)){
                 $error[] = 'Improperly formatted ' . LOWERING_NAME . ' End Date';
             } else {
+
+                if (!empty($loweringEndDate)) {
+                    try {
+                        $start = \DateTime::createFromFormat('Y/m/d H:i', $loweringStartDate);
+                        $end   = \DateTime::createFromFormat('Y/m/d H:i', $loweringEndDate);
+
+                        if ($start && $end && $end <= $start) {
+                            $error[] = LOWERING_NAME . ' End Date must be after Start Date';
+                        }
+                    } catch (Exception $e) {
+                        $error[] = 'Invalid date format encountered.';
+                    }
+                }
+
                 $warehouseData = $this->_warehouseModel->getShipboardDataWarehouseConfig();  
                 if (is_dir($warehouseData['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID . '/' . $loweringDataBaseDir . '/' . $loweringID)) {
                     $error[] = 'A ' . LOWERING_NAME . ' Data Directory for that ' . LOWERING_NAME . ' ID already exists';
