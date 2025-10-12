@@ -33,13 +33,13 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
         $cruise_meta['cruiseEndPort'] = $_warehouseModel->getCruiseEndPort();
 ?>
         <div class="panel panel-default">
-            <div class="panel-heading"><?php CRUISENAME?> Information</div>
+            <div class="panel-heading"><?php echo CRUISE_NAME; ?> Information</div>
             <div class="panel-body">
-                Name: <?php echo $cruise_meta['cruiseName']; ?><br/>
-                Chief Scientist: <?php echo $cruise_meta['cruisePI']; ?><br/>
-                Location: <?php echo $cruise_meta['cruiseLocation']; ?><br/>
-                Dates: <?php echo "{$cruise_meta['cruiseStartDate']} - {$cruise_meta['cruiseEndDate']}"; ?><br/>
-                Ports: <?php echo "{$cruise_meta['cruiseStartPort']} -> {$cruise_meta['cruiseEndPort']}"; ?><br/>
+                <strong>Name:</strong> <?php echo $cruise_meta['cruiseName']; ?><br/>
+                <strong>Chief Scientist:</strong> <?php echo $cruise_meta['cruisePI']; ?><br/>
+                <strong>Location:</strong> <?php echo $cruise_meta['cruiseLocation']; ?><br/>
+                <strong>Dates:</strong> <?php echo "{$cruise_meta['cruiseStartDate']} - {$cruise_meta['cruiseEndDate']}"; ?><br/>
+                <strong>Ports:</strong> <?php echo "{$cruise_meta['cruiseStartPort']} <strong>--></strong> {$cruise_meta['cruiseEndPort']}"; ?><br/>
             </div>
         </div>
 <?php
