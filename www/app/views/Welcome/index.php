@@ -165,8 +165,8 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 ?>
                         <li><small>...and <strong><?php echo sizeof($data['shipToShoreTransfers'][$i]->newFiles)-20; ?></strong> other files</small></li>
 <?php
-            }   
-        
+            }
+
         if(count($data['shipToShoreTransfers'][$i]->updatedFiles) > 0) {
 ?>
                         <li><small><?php echo count($data['shipToShoreTransfers'][$i]->updatedFiles); ?> File(s) Updated.</small></li>

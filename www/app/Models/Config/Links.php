@@ -12,57 +12,57 @@ class Links extends Model {
     public function getLink($id){
         return $this->db->select("SELECT * FROM ".PREFIX."Links WHERE linkID = :id",array(':id' => $id));
     }
-    
+
     public function getLinkByName($name){
         return $this->db->select("SELECT * FROM ".PREFIX."Links WHERE name = :name",array(':name' => $name));
     }
-    
+
     public function insertLink($data){
         $this->db->insert(PREFIX."Links",$data);
     }
-    
+
     public function updateLink($data,$where){
         $this->db->update(PREFIX."Links",$data, $where);
     }
-    
+
     public function deleteLink($where){
-        $this->db->delete(PREFIX."Links", $where); 
+        $this->db->delete(PREFIX."Links", $where);
     }
-    
+
     public function enableLink($id){
-        $data = array('enable' => 1); 
+        $data = array('enable' => 1);
         $where = array('linkID' => $id);
         $this->db->update(PREFIX."Links",$data, $where);
     }
-    
+
     public function disableLink($id){
-        $data = array('enable' => 0); 
+        $data = array('enable' => 0);
         $where = array('linkID' => $id);
         $this->db->update(PREFIX."Links",$data, $where);
     }
-    
+
     public function privateLink($id){
-        $data = array('private' => 1); 
+        $data = array('private' => 1);
         $where = array('linkID' => $id);
         $this->db->update(PREFIX."Links",$data, $where);
     }
-    
+
     public function publicLink($id){
-        $data = array('private' => 0); 
+        $data = array('private' => 0);
         $where = array('linkID' => $id);
         $this->db->update(PREFIX."Links",$data, $where);
     }
-    
+
     public function processLinkURL($links){
-        
+
         $_warehouseModel = new \Models\Warehouse();
         $cruiseID = $_warehouseModel->getCruiseID();
 	$shipboardDataWarehouseIP = $_warehouseModel->getShipboardDataWarehouseConfig()['shipboardDataWarehouseIP'];
-        
+
         foreach($links as $row) {
             $row->url = str_replace("{cruiseID}", $cruiseID, $row->url);
             $row->url = str_replace("{hostIP}", $shipboardDataWarehouseIP, $row->url);
         }
     }
-    
+
 }

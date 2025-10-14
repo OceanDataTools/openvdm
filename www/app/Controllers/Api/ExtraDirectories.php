@@ -23,7 +23,7 @@ class ExtraDirectories extends Controller {
 
         echo json_encode($this->_extraDirectoriesModel->getExtraDirectories());
     }
-    
+
     public function getActiveExtraDirectories(){
         echo json_encode($this->_extraDirectoriesModel->getActiveExtraDirectories());
     }

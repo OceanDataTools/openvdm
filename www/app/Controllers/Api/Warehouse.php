@@ -25,7 +25,7 @@ class Warehouse extends Controller {
 
         return $returnText;
     }
- 
+
     public function __construct(){
         $this->_warehouseModel = new \Models\Warehouse();
     }
@@ -55,18 +55,18 @@ class Warehouse extends Controller {
         if($this->_warehouseModel->getShipToShoreTransfersStatus()) {
             $response['shipToShoreTransfersStatus'] = "On";
         } else {
-            $response['shipToShoreTransfersStatus'] = "Off";            
+            $response['shipToShoreTransfersStatus'] = "Off";
         }
 
         echo json_encode($response);
     }
-    
+
     // getShipboardDataWarehouseConfig - return the shipboard data warehouse configuration.
 	public function getShipboardDataWarehouseConfig() {
 
         echo json_encode($this->_warehouseModel->getShipboardDataWarehouseConfig());
     }
-    
+
     // getFreeSpace - return the free space on the server.
 	public function getFreeSpace() {
 
@@ -96,14 +96,14 @@ class Warehouse extends Controller {
 
         }
     }
-    
+
     // getCruiseID - return the current cruise ID.
 	public function getCruiseID() {
 
         $response['cruiseID'] = $this->_warehouseModel->getCruiseID();
         echo json_encode($response);
     }
-    
+
     // getCruiseName - return the current cruise ID.
     public function getCruiseName() {
 
@@ -132,14 +132,14 @@ class Warehouse extends Controller {
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         echo json_encode($response);
     }
-    
+
     // getCruiseStartDate - return the current cruise start date.
 	public function getCruiseStartDate() {
 
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         echo json_encode($response);
     }
-    
+
     // getCruiseEndDate - return the current cruise end date.
     public function getCruiseEndDate() {
 
@@ -154,14 +154,14 @@ class Warehouse extends Controller {
         $response['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         echo json_encode($response);
     }
-    
+
     // getCruiseStartPort - return the current cruise start date.
     public function getCruiseStartPort() {
 
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         echo json_encode($response);
     }
-    
+
     // getCruiseEndPort - return the current cruise end date.
     public function getCruiseEndPort() {
 
@@ -214,21 +214,21 @@ class Warehouse extends Controller {
         }
 
     }
-    
+
     // getLoweringID - return the current lowering ID.
     public function getLoweringID() {
 
         $response['loweringID'] = $this->_warehouseModel->getLoweringID();
         echo json_encode($response);
     }
-    
+
     // getLoweringStartDate - return the current lowering start date.
     public function getLoweringStartDate() {
 
         $response['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         echo json_encode($response);
     }
-    
+
     // getLoweringEndDate - return the current lowering end date.
     public function getLoweringEndDate() {
 
@@ -261,9 +261,9 @@ class Warehouse extends Controller {
         $response['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
         echo json_encode($response);
     }
-    
+
     public function getTransferLogSummary() {
-        
+
         $warehouseBaseDir = $this->_warehouseModel->getShipboardDataWarehouseBaseDir();
         $cruiseID = $this->_warehouseModel->getCruiseID();
         $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
@@ -275,7 +275,7 @@ class Warehouse extends Controller {
                 break;
             }
         }
-        
+
         $filename = $warehouseBaseDir . '/' . $cruiseID . '/' . $transferLogDir . '/' . 'TransferLogSummary.json';
         if (file_exists($filename) && is_readable($filename)) {
             echo file_get_contents($filename);
@@ -283,28 +283,28 @@ class Warehouse extends Controller {
             echo "{}";
         }
     }
-        
+
     // getShipToShoreBWLimitStatus - return the ship-to-shore bandwidth limit status
 	public function getShipToShoreBWLimitStatus() {
 
         $response['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
         echo json_encode($response);
     }
-    
+
     // getMD5FilesizeLimit - return the md5 filesize limit
 	public function getMD5FilesizeLimit() {
 
         $response['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
         echo json_encode($response);
     }
-    
+
     // getMd5FilesizeLimitStatus - return md5 filesize limit status
 	public function getMD5FilesizeLimitStatus() {
 
         $response['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
         echo json_encode($response);
     }
-    
+
     public function getMD5SummaryFn() {
 
         $response['md5SummaryFn'] = $this->_warehouseModel->getMd5SummaryFn();
@@ -319,12 +319,12 @@ class Warehouse extends Controller {
 
     // getCruiseConfig - return OVDM cruise config
 	public function getCruiseConfig() {
-        
+
         $collectionSystemsTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
-        $shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();        
-        
+        $shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
+
         $response['cruiseID'] = $this->_warehouseModel->getCruiseID();
         $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
@@ -349,17 +349,17 @@ class Warehouse extends Controller {
         }
 
         echo json_encode($response);
-    
+
     }
 
     // getLoweringConfig - return Lowering config
     public function getLoweringConfig() {
-        
+
         $collectionSystemsTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
         $shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
-                
+
         $response['loweringID'] = $this->_warehouseModel->getLoweringID();
         $response['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         $response['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
@@ -371,16 +371,16 @@ class Warehouse extends Controller {
         }
 
         echo json_encode($response);
-    
+
     }
 
     public function setCruiseSize() {
 
         $this->_warehouseModel->setCruiseSize(array('value' => $_POST['bytes']));
     }
-    
+
     public function setLoweringSize() {
-    
+
         $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes']));
     }
 

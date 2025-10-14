@@ -13,7 +13,7 @@ class CruiseDataTransfers extends Model {
 
         return $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE required = :required ORDER BY ".$sort, array(':required' => '0'));
     }
-    
+
     public function getCruiseDataTransfersStatuses(){
         return $this->db->select("SELECT cruiseDataTransferID, name, longName, status, enable FROM ".PREFIX."CruiseDataTransfers WHERE required = :required ORDER BY name", array(':required' => '0'));
     }
@@ -26,11 +26,11 @@ class CruiseDataTransfers extends Model {
 
         return $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE required = :required ORDER BY ".$sort, array(':required' => '1'));
     }
-    
+
     public function getRequiredCruiseDataTransfersStatuses(){
         return $this->db->select("SELECT cruiseDataTransferID, name, longName, status, enable FROM ".PREFIX."CruiseDataTransfers WHERE required = :required ORDER BY name", array(':required' => '1'));
     }
-    
+
     public function getCruiseDataTransfer($id){
         return $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE cruiseDataTransferID = :id",array(':id' => $id));
     }
@@ -38,20 +38,20 @@ class CruiseDataTransfers extends Model {
     public function getRequiredCruiseDataTransfer($id){
         return $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE cruiseDataTransferID = :id",array(':id' => $id));
     }
-    
+
     public function insertCruiseDataTransfer($data){
         $this->db->insert(PREFIX."CruiseDataTransfers",$data);
     }
-    
+
     public function updateCruiseDataTransfer($data,$where){
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
-    
+
     public function deleteCruiseDataTransfer($where){
         $cruiseDataTransfer = $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE cruiseDataTransferID = :id",array(':id' => $where['cruiseDataTransferID']))[0];
         if(strcmp($cruiseDataTransfer->required,'0') === 0 ){
             $this->db->delete(PREFIX."CruiseDataTransfers", $where);
-        } 
+        }
     }
 
     public function clearCollectionSystemTransfer($collectionSystemTransferID) {
@@ -91,7 +91,7 @@ class CruiseDataTransfers extends Model {
             }
         }
     }
-    
+
     public function setErrorCruiseDataTransfer($id){
         $data = array('status' => '3', 'pid' => '0');
         $where = array('cruiseDataTransferID' => $id);
@@ -130,7 +130,7 @@ class CruiseDataTransfers extends Model {
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
-    
+
     public function setOffCruiseDataTransfer($id){
         $data = array();
         $row = $this->getCruiseDataTransfer($id);
@@ -141,7 +141,7 @@ class CruiseDataTransfers extends Model {
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
 
-    
+
     public function enableCruiseDataTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCruiseDataTransfer($id);
@@ -151,7 +151,7 @@ class CruiseDataTransfers extends Model {
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
-    
+
     public function disableCruiseDataTransfer($id){
         $data = array('enable' => 0, 'status' => 4);
         // $row = $this->getCruiseDataTransfer($id);
@@ -161,7 +161,7 @@ class CruiseDataTransfers extends Model {
         $where = array('cruiseDataTransferID' => $id);
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
-    
+
     public function getCruiseDataTransfersConfig(){
         return $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers ORDER BY cruiseDataTransferID");
     }

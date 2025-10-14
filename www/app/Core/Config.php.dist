@@ -33,7 +33,7 @@ class Config
          * Define relative base path.
          */
         define('DIR', '/');
-        
+
         /*
          * Define path on webserver that contains cruise data
          */
@@ -72,7 +72,7 @@ class Config
         /*
          * Define what to name the cruise config file. (i.e. 'cruise_config.json')
          * When this variable is changed the 'OpenVDM Configuration' transfer will
-         * also need to be updated in the Configuration->System tab of the webUI 
+         * also need to be updated in the Configuration->System tab of the webUI
          */
         define('CRUISE_CONFIG_FN', 'cruise_config.json');
 
@@ -84,14 +84,14 @@ class Config
         /*
          * Define what to name the MD5 checksum manifest file. (i.e. 'md5_summary.txt')
          * When this variable is changed the 'MD5 Summary' transfer will also need to
-         * be updated in the Configuration->System tab of the webUI 
+         * be updated in the Configuration->System tab of the webUI
          */
         define('MD5_SUMMARY_FN', 'md5_summary.txt');
 
         /*
          * Define what to name the MD5 checksum of the MD5 manifest file. (i.e. 'md5_summary.md5')
          * When this variable is changed the 'MD5 Summary' transfer will also need to
-         * be updated in the Configuration->System tab of the webUI 
+         * be updated in the Configuration->System tab of the webUI
          */
         define('MD5_SUMMARY_MD5_FN', 'md5_summary.md5');
 

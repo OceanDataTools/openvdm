@@ -1,12 +1,12 @@
 $(function () {
     'use strict';
-    
+
     var transferLogNum = 5;
-    
+
     function formatTime(dateStr) {
         return dateStr.substr(0, 4) + '-' + dateStr.substr(4, 2) + '-' + dateStr.substr(6, 2) + ' ' + dateStr.substr(9, 2) + ':' + dateStr.substr(11, 2) + ':' + dateStr.substr(13, 2) + ' UTC';
     }
-    
+
     function updateCollectionSystemTransferStatusList(collectionSystemTransferStatusList) {
         var collectionSystemTransferStatusURL = siteRoot + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers/longName';
         $.getJSON(collectionSystemTransferStatusURL, function (data, status) {
@@ -35,9 +35,9 @@ $(function () {
                         }
                     }
                 }
-                
+
                 $(collectionSystemTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateCollectionSystemTransferStatusList(collectionSystemTransferStatusList);
@@ -45,7 +45,7 @@ $(function () {
         });
     }
 
-    
+
     function updateOptionalCruiseDataTransferStatusList(optionalCruiseDataTransferStatusList) {
         var optionalCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getCruiseDataTransfersStatuses';
         $.getJSON(optionalCruiseDataTransferStatusURL, function (data, status) {
@@ -74,16 +74,16 @@ $(function () {
                         }
                     }
                 }
-                
+
                 $(optionalCruiseDataTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateOptionalCruiseDataTransferStatusList(optionalCruiseDataTransferStatusList);
             }, 5000);
         });
     }
-    
+
     function updateRequiredCruiseDataTransferStatusList(requiredCruiseDataTransferStatusList) {
         var requiredCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfersStatuses';
         $.getJSON(requiredCruiseDataTransferStatusURL, function (data, status) {
@@ -110,9 +110,9 @@ $(function () {
                         output += '<span class="pull-right"><i class="fa fa-times"></i> Disabled</span></div>\n';
                     }
                 }
-                
+
                 $(requiredCruiseDataTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateRequiredCruiseDataTransferStatusList(requiredCruiseDataTransferStatusList);
@@ -135,7 +135,7 @@ $(function () {
 
                 var errorFilesOutput = '';
                 if (data.length > 0) {
-                    
+
                     var i = 0;
                     for (i = 0; i < data.length; i++) {
                         if(data[i].errorFiles.length > 0) {
@@ -154,9 +154,9 @@ $(function () {
                             errorFilesOutput += '                   </ul>';
                         }
                     }
-                    
+
                 }
-                
+
                 if (errorFilesOutput == '') {
                     errorFilesOutput = '                   <h5>No Filename Errors Detected</h5>';
                 }
@@ -167,7 +167,7 @@ $(function () {
             }, 5000);
         });
     }
-                  
+
 
     function updateShipboardLogSummary(shipboardFilesPanel) {
         var updateTransferLogSummaryURL = siteRoot + 'api/transferLogs/getShipboardLogsSummary/' + transferLogNum;
@@ -184,7 +184,7 @@ $(function () {
 
                 var shipboardTransfersOutput = '';
                 if ( data.length > 0) {
-                    
+
                     var index = 0;
                     var i = 0;
                     for (i = 0; i < data.length; i++) {
@@ -209,12 +209,12 @@ $(function () {
                         }
                         shipboardTransfersOutput += '                   </ul>';
                     }
-                    
+
 
                 } else {
                     shipboardTransfersOutput = '                   <h5>No Recent Shipboard Transfers Have Occured</h5>';
                 }
-                
+
                 $(shipboardFilesPanel).html(shipboardTransfersOutput);
             } setTimeout(function () {
                 updateShipboardLogSummary(shipboardFilesPanel);
@@ -232,7 +232,7 @@ $(function () {
             minute: "2-digit",
             second: "2-digit"
         };
-        
+
          $.getJSON(updateTransferLogSummaryURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -273,7 +273,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     updateErrorLogSummary('#filenameErrors');
     updateShipboardLogSummary('#shipboardTransfers');
     updateShipToShoreLogSummary('#shipToShoreTransfers');

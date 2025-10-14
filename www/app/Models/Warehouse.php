@@ -4,7 +4,7 @@ namespace models;
 use Core\Model;
 
 class Warehouse extends Model {
-    
+
     // const CONFIG_FN = 'ovdmConfig.json';
     // const LOWERING_CONFIG_FN = 'loweringConfig.json';
     // const MANIFEST_FN = 'manifest.json';
@@ -14,21 +14,21 @@ class Warehouse extends Model {
         if (is_dir($baseDir)) {
             $data['freeSpace'] = disk_free_space($baseDir);
         } else {
-            $data['error'] = '(getFreeSpace) Base Directory: ' . $baseDir . ' is not a directory';            
+            $data['error'] = '(getFreeSpace) Base Directory: ' . $baseDir . ' is not a directory';
         }
-        
+
         return $data;
     }
-    
+
 
     public function getTotalSpace() {
         $baseDir = $this->getShipboardDataWarehouseBaseDir();
         if (is_dir($baseDir)) {
             $data['totalSpace'] = disk_total_space($baseDir);
         } else {
-            $data['error'] = '(getFreeSpace) Base Directory: ' . $baseDir . ' is not a directory';            
+            $data['error'] = '(getFreeSpace) Base Directory: ' . $baseDir . ' is not a directory';
         }
-        
+
         return $data;
     }
 
@@ -40,7 +40,7 @@ class Warehouse extends Model {
         if ($data['cruiseSize'] === 0) {
             $data['error'] = '(getCruiseSize) Unable to get size of cruise directory';
         }
-        
+
         return $data;
     }
 
@@ -52,7 +52,7 @@ class Warehouse extends Model {
         if ($data['loweringSize'] === 0) {
             $data['error'] = '(getLoweringSize) Unable to get size of lowering directory';
         }
-        
+
         return $data;
     }
 
@@ -74,12 +74,12 @@ class Warehouse extends Model {
             return false;
         }
     }
-    
+
     public function getShipboardDataWarehouseStatus() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'shipboardDataWarehouseStatus'");
         return $row[0]->value;
     }
-    
+
     public function getCruiseConfigFn() {
         return CRUISE_CONFIG_FN;
     }
@@ -92,12 +92,12 @@ class Warehouse extends Model {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseID'");
         return $row[0]->value;
     }
-    
+
     public function getCruiseStartDate() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseStartDate'");
         return $row[0]->value;
     }
-    
+
     public function getCruiseEndDate() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseEndDate'");
         return $row[0]->value;
@@ -121,17 +121,17 @@ class Warehouse extends Model {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringID'");
         return $row[0]->value;
     }
-    
+
     public function getLoweringStartDate() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringStartDate'");
         return $row[0]->value;
     }
-    
+
     public function getLoweringEndDate() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringEndDate'");
         return $row[0]->value;
     }
-    
+
     public function getShipToShoreBWLimitStatus() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'shipToShoreBWLimitStatus'");
         return $row[0]->value;
@@ -149,7 +149,7 @@ class Warehouse extends Model {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5FilesizeLimit'");
         return $row[0]->value;
     }
-    
+
     public function getMd5FilesizeLimitStatus() {
         $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'md5FilesizeLimitStatus'");
         return $row[0]->value;
@@ -166,7 +166,7 @@ class Warehouse extends Model {
     public function getShipboardDataWarehouseApacheDir() {
         return CRUISEDATA_APACHEDIR;
     }
-    
+
     public function getLoweringDataBaseDir() {
         return LOWERINGDATA_BASEDIR;
     }
@@ -186,7 +186,7 @@ class Warehouse extends Model {
         $dataDashboardManifestFn = $this->getDataDashboardManifestFn();
         $md5SummaryFn = $this->getMd5SummaryFn();
         $md5SummaryMd5Fn = $this->getMd5SummaryMd5Fn();
-         
+
         return array(
             'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
             'shipboardDataWarehouseBaseDir' => $shipboardDataWarehouseBaseDir,
@@ -202,51 +202,51 @@ class Warehouse extends Model {
             'md5SummaryMd5Fn' => $md5SummaryMd5Fn
         );
     }
-    
+
     public function enableSystem() {
-        $data = array('value' => 'On');   
+        $data = array('value' => 'On');
         $where = array('name' => 'systemStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function disableSystem() {
-        $data = array('value' => 'Off');   
+        $data = array('value' => 'Off');
         $where = array('name' => 'systemStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function enableShipToShoreTransfers() {
-        $data = array('value' => 'On');   
+        $data = array('value' => 'On');
         $where = array('name' => 'shipToShoreTransfersStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function disableShipToShoreTransfers() {
-        $data = array('value' => 'Off');   
+        $data = array('value' => 'Off');
         $where = array('name' => 'shipToShoreTransfersStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function showLoweringComponents() {
-        $data = array('value' => 'Yes');   
+        $data = array('value' => 'Yes');
         $where = array('name' => 'showLoweringComponents');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function hideLoweringComponents() {
-        $data = array('value' => 'No');   
+        $data = array('value' => 'No');
         $where = array('name' => 'showLoweringComponents');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function enableShipToShoreBWLimit() {
-        $data = array('value' => 'On');   
+        $data = array('value' => 'On');
         $where = array('name' => 'shipToShoreBWLimitStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function disableShipToShoreBWLimit() {
-        $data = array('value' => 'Off');   
+        $data = array('value' => 'Off');
         $where = array('name' => 'shipToShoreBWLimitStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
@@ -255,15 +255,15 @@ class Warehouse extends Model {
         $where = array('name' => 'md5FilesizeLimit');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function enableMd5FilesizeLimit() {
-        $data = array('value' => 'On');   
+        $data = array('value' => 'On');
         $where = array('name' => 'md5FilesizeLimitStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
     public function disableMd5FilesizeLimit() {
-        $data = array('value' => 'Off');   
+        $data = array('value' => 'Off');
         $where = array('name' => 'md5FilesizeLimitStatus');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
@@ -284,27 +284,27 @@ class Warehouse extends Model {
         $where = array('name' => 'cruiseID');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruiseName($data) {
         $where = array('name' => 'cruiseName');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruisePI($data) {
         $where = array('name' => 'cruisePI');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruiseLocation($data) {
         $where = array('name' => 'cruiseLocation');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruiseStartDate($data) {
         $where = array('name' => 'cruiseStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruiseEndDate($data) {
         $where = array('name' => 'cruiseEndDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -314,7 +314,7 @@ class Warehouse extends Model {
         $where = array('name' => 'cruiseStartPort');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setCruiseEndPort($data) {
         $where = array('name' => 'cruiseEndPort');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -338,12 +338,12 @@ class Warehouse extends Model {
         $where = array('name' => 'loweringID');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setLoweringStartDate($data) {
         $where = array('name' => 'loweringStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
-    
+
     public function setLoweringEndDate($data) {
         $where = array('name' => 'loweringEndDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -369,21 +369,21 @@ class Warehouse extends Model {
         $where = array('name' => 'shipboardDataWarehouseUsername');
         $this->db->update(PREFIX."CoreVars", array('value' => $data['shipboardDataWarehouseUsername']), $where);
     }
-    
+
     public function setErrorShipboardDataWarehouseStatus() {
         $where = array('name' => 'shipboardDataWarehouseStatus');
         $this->db->update(PREFIX."CoreVars", array('value' => '3'), $where);
     }
-    
+
     public function clearErrorShipboardDataWarehouseStatus() {
         $where = array('name' => 'shipboardDataWarehouseStatus');
         $this->db->update(PREFIX."CoreVars", array('value' => '2'), $where);
     }
-    
+
     public function getCruises() {
-        
+
         if (!$this->_cruises || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
-        
+
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
             //Get the list of directories
@@ -483,7 +483,7 @@ class Warehouse extends Model {
             return array("Error"=>"Could not find base directory.");
         }
     }
-    
+
     public function getLatestCruise() {
         return $this->getCruises()[0];
     }
@@ -504,7 +504,7 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return $ovdmConfigJSON['cruiseName']; 
+                    return $ovdmConfigJSON['cruiseName'];
                 }
             }
             return "Could not find cruise config file.";
@@ -554,7 +554,7 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return $ovdmConfigJSON['cruiseLocation']; 
+                    return $ovdmConfigJSON['cruiseLocation'];
                 }
             }
             return "Could not find cruise config file.";
@@ -578,7 +578,7 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']); 
+                    return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']);
                 }
             }
             return array("Error"=>"Could not find cruise config file.");
@@ -602,7 +602,7 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']); 
+                    return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']);
                 }
             }
             return array("Error"=>"Could not find cruise config file.");
@@ -626,7 +626,7 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseFinalizedOn' => $ovdmConfigJSON['cruiseFinalizedOn']); 
+                    return array('cruiseFinalizedOn' => $ovdmConfigJSON['cruiseFinalizedOn']);
                 }
             }
             return array("Error"=>"Could not find cruise config file.", 'cruiseFinalizedOn' => null);
@@ -654,7 +654,7 @@ class Warehouse extends Model {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
                     $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
-                    return array('loweringStartDate' => $loweringConfigJSON['loweringStartDate'],'loweringEndDate' => $loweringConfigJSON['loweringEndDate']); 
+                    return array('loweringStartDate' => $loweringConfigJSON['loweringStartDate'],'loweringEndDate' => $loweringConfigJSON['loweringEndDate']);
                 }
             }
             return array("Error"=>"Could not find lowering config file.");
@@ -678,7 +678,7 @@ class Warehouse extends Model {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
                     $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
-                    return array('loweringFinalizedOn' => $loweringConfigJSON['loweringFinalizedOn']); 
+                    return array('loweringFinalizedOn' => $loweringConfigJSON['loweringFinalizedOn']);
                 }
             }
             return array("Error"=>"Could not find lowering config file.", 'loweringFinalizedOn' => null);

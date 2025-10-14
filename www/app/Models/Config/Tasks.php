@@ -46,7 +46,7 @@ class Tasks extends Model {
         }
         return $tasks;
     }
-    
+
     public function getLoweringOnlyTasks(){
         $tasks = $this->db->select("SELECT * FROM ".PREFIX."Tasks WHERE cruiseOrLowering = :cruiseOrLowering ORDER BY taskID", array(':cruiseOrLowering' => 1));
         foreach ($tasks as $task){
@@ -58,7 +58,7 @@ class Tasks extends Model {
     public function getTaskStatuses(){
         return $this->db->select("SELECT taskID, name, status FROM ".PREFIX."Tasks ORDER BY taskID");
     }
-    
+
     public function getTask($id){
         $tasks = $this->db->select("SELECT * FROM ".PREFIX."Tasks WHERE taskID = :id",array(':id' => $id));
         foreach ($tasks as $task){
@@ -66,19 +66,19 @@ class Tasks extends Model {
         }
         return $tasks;
     }
-    
+
     public function insertTask($data){
         $this->db->insert(PREFIX."Tasks",$data);
     }
-    
+
     public function updateTask($data,$where){
         $this->db->update(PREFIX."Tasks",$data, $where);
     }
-    
+
     public function deleteTask($where){
         $this->db->delete(PREFIX."Tasks", $where);
     }
-    
+
     public function setErrorTask($id){
         $data = array('status' => '3', 'pid' => '0');
         $where = array('taskID' => $id);
@@ -102,7 +102,7 @@ class Tasks extends Model {
         $where = array('taskID' => $id);
         $this->db->update(PREFIX."Tasks",$data, $where);
     }
-    
+
     public function setOffTask($id){
         $data = array();
         $row = $this->getTask($id);
@@ -113,7 +113,7 @@ class Tasks extends Model {
         $where = array('taskID' => $id);
         $this->db->update(PREFIX."Tasks",$data, $where);
     }
-    
+
     public function enableTask($id){
         $data = array('enable' => 1);
         $row = $this->getTask($id);
@@ -123,9 +123,9 @@ class Tasks extends Model {
         $where = array('taskID' => $id);
         $this->db->update(PREFIX."Tasks",$data, $where);
     }
-    
+
     public function disableTask($id){
-        $data = array('enable' => 0); 
+        $data = array('enable' => 0);
         $row = $this->getTask($id);
         if (strcmp($row[0]->status,'2') === 0) {
             $data['status'] = '4';

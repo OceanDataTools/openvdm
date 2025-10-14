@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     function updateCollectionSystemTransferStatus() {
         var getJobsURL = siteRoot + 'api/collectionSystemTransfers/getCollectionSystemTransfersStatuses';
         $.getJSON(getJobsURL, function (data, status) {
@@ -9,7 +9,7 @@ $(function () {
                 var output = '';
                 var href = '';
                 var i;
-                
+
                 for (i = 0; i < data.length; i++) {
                     if (data[i].status === "1") {
                         output = 'Stop';
@@ -18,7 +18,7 @@ $(function () {
                         output = 'Run';
                         href = siteRoot + 'config/collectionSystemTransfers/run/' + data[i].collectionSystemTransferID;
                     }
-                    
+
                     $('#runStop' + data[i].collectionSystemTransferID).attr("href", href);
                     $('#runStop' + data[i].collectionSystemTransferID).html(output);
 
@@ -26,7 +26,7 @@ $(function () {
             }
         });
     }
-    
+
     setInterval(function () {
         updateCollectionSystemTransferStatus();
     }, 5000);
@@ -76,7 +76,7 @@ $(function () {
 
                     // Log the new URL (for demonstration purposes)
                     // console.log('New URL with input value:', url.href);
-            
+
                     // You can perform any custom action here
                     // For example, let's simulate a page scroll, or show a modal, etc.
 

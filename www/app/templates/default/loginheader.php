@@ -1,11 +1,11 @@
 <?php
 
     use Helpers\Assets;
-    use Helpers\Url;   
+    use Helpers\Url;
 
 ?>
 
-    
+
     <!DOCTYPE html>
 <html lang="<?php echo LANGUAGE_CODE; ?>">
 <head>
@@ -70,6 +70,6 @@
             </div> <!-- /.sidebar-collapse -->
         </div> <!-- /.navbar-static-side -->
     </nav>
-    
+
     <!-- Page Content -->
     <div id="page-wrapper">

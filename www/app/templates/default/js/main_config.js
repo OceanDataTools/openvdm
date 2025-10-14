@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     function updateCollectionSystemTransferStatusList(collectionSystemTransferStatusList) {
 
         var collectionSystemTransferStatusURL = siteRoot + 'api/collectionSystemTransfers/getActiveCollectionSystemTransfers/longName';
@@ -30,9 +30,9 @@ $(function () {
                         }
                     }
                 }
-                
+
                 $(collectionSystemTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateCollectionSystemTransferStatusList(collectionSystemTransferStatusList);
@@ -58,7 +58,7 @@ $(function () {
             });
         }
     }
-    
+
     function updateFinalizedLoweringButton(status) {
         if (status === "3") {
             $('#finalizeCurrentLowering').html('<i class="fa fa-warning"></i> Run End-of-' + lowering_name + ' Tasks');
@@ -114,16 +114,16 @@ $(function () {
                     }
                     output += '</div>';
                 }
-                
+
                 $(taskList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateTaskStatusList(taskList);
             }, 5000);
         });
     }
-    
+
     function updateOptionalCruiseDataTransferStatusList(optionalCruiseDataTransferStatusList) {
         var optionalCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getCruiseDataTransfersStatuses';
         $.getJSON(optionalCruiseDataTransferStatusURL, function (data, status) {
@@ -151,16 +151,16 @@ $(function () {
                         }
                     }
                 }
-                
+
                 $(optionalCruiseDataTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateOptionalCruiseDataTransferStatusList(optionalCruiseDataTransferStatusList);
             }, 5000);
         });
     }
-    
+
     function updateRequiredCruiseDataTransferStatusList(requiredCruiseDataTransferStatusList) {
         var requiredCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfersStatuses';
         $.getJSON(requiredCruiseDataTransferStatusURL, function (data, status) {
@@ -186,9 +186,9 @@ $(function () {
                         output += '<span class="pull-right">Disabled</span></div>\n'
                     }
                 }
-                
+
                 $(requiredCruiseDataTransferStatusList).html(output);
-                
+
             }
             setTimeout(function () {
                 updateRequiredCruiseDataTransferStatusList(requiredCruiseDataTransferStatusList);
@@ -200,7 +200,7 @@ $(function () {
     updateOptionalCruiseDataTransferStatusList('#optionalCruiseDataTransfers');
     updateRequiredCruiseDataTransferStatusList('#requiredCruiseDataTransfers');
     updateTaskStatusList('#taskStatusList');
-    
+
     $('#jobResultsModal').on('hidden.bs.modal', function () {
         window.location.replace(siteRoot + 'config');
     });

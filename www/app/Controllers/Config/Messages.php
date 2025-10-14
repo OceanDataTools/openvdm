@@ -36,24 +36,24 @@ class Messages extends Controller {
         View::render('Config/messages',$data);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function deleteMessage($id){
         $where = array('messageID' => $id);
         $this->_messagesModel->deleteMessage($where);
         Session::set('message','Message Deleted');
         Url::redirect('config/messages');
     }
-    
+
     public function viewedMessage($id){
         $this->_messagesModel->viewedMessage($id);
         Url::redirect('config/messages');
     }
-    
+
     public function viewAllMessages(){
         $this->_messagesModel->viewAllMessages();
         Url::redirect('config/messages');
     }
-    
+
     public function deleteAllMessages(){
         $this->_messagesModel->deleteAllMessages();
         Session::set('message','Messages Deleted');

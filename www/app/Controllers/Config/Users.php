@@ -18,7 +18,7 @@ class Users extends Controller {
 
         $this->_usersModel = new \Models\Config\Users();
     }
-        
+
     public function index(){
         $data['title'] = 'Configuration';
         $data['users'] = $this->_usersModel->getUsers();
@@ -40,8 +40,8 @@ class Users extends Controller {
 
             if($password == ''){
                 $error[] = 'Password is required';
-            } 
-                
+            }
+
             if(strcmp($password, $_POST['password2']) !== 0) {
                 $error[] = 'Passwords must match';
             }
@@ -62,7 +62,7 @@ class Users extends Controller {
         View::render('config/addUser',$data,$error);
         View::rendertemplate('footer',$data);
     }
-        
+
     public function editUser($id){
         $data['title'] = 'Edit User';
         $data['row'] = $this->_usersModel->getUser($id);
@@ -77,20 +77,20 @@ class Users extends Controller {
 
             if($password == ''){
                 $error[] = 'Password is required';
-            }        
+            }
 
             if(strcmp($password, $_POST['password2']) !== 0) {
                 $error[] = 'Passwords must match';
             }
-            
 
-                
+
+
             if(!$error){
                 $postdata = array(
                     'username' => $username,
                     'password' => Password::make($password)
                 );
-            
+
                 $where = array('userID' => $id);
                 $this->_usersModel->updateUser($postdata,$where);
                 Session::set('message','User Updated');
@@ -102,7 +102,7 @@ class Users extends Controller {
         View::render('Config/editUser',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function deleteUser($id){
         $where = array('userID' => $id);
         $this->_usersModel->deleteUser($where);

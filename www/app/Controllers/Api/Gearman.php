@@ -25,7 +25,7 @@ class Gearman extends Controller {
         if(isset($_POST['jobPid'])){
             $data['jobHandle'] = $handle;
             $data['jobPid'] = $_POST['jobPid'];
-        
+
             (isset($_POST['jobName']) ? $data['jobName'] = $_POST['jobName'] : $data['jobName'] = $handle );
             $this->_model->insertJob($data);
             $return['status'] = 'success';
@@ -35,21 +35,20 @@ class Gearman extends Controller {
         }
         echo json_encode($return);
     }
-    
+
     public function getJob($id){
 
         echo json_encode($this->_model->getJob($id));
-        
+
     }
-    
+
     public function getJobs(){
 
         echo json_encode($this->_model->getJobs());
     }
-    
+
     public function clearAllJobsFromDB(){
 
         echo json_encode($this->_model->clearAllJobsFromDB());
     }
-
 }

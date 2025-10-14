@@ -12,10 +12,10 @@ class CruiseDataTransfers extends Controller {
             $_collectionSystemTransfersModel,
             $_extraDirectoriesModel,
             $_transferTypesModel;
-    
+
     private function _buildTransferTypesOptions($checkedType = null) {
         $transferTypes = $this->_transferTypesModel->getTransferTypes();
-        
+
         $output = array();
         $i=1;
 
@@ -23,42 +23,42 @@ class CruiseDataTransfers extends Controller {
             $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
             array_push($output, $option);
         }
-        
+
         return $output;
     }
 
     private function _buildSkipEmptyDirsOptions() {
-        
+
         $trueFalse = array(array('id'=>'skipEmptyDirs0', 'name'=>'skipEmptyDirs', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyDirs1', 'name'=>'skipEmptyDirs', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildSkipEmptyFilesOptions() {
-        
+
         $trueFalse = array(array('id'=>'skipEmptyFiles0', 'name'=>'skipEmptyFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyFiles1', 'name'=>'skipEmptyFiles', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildSyncToDestOptions() {
-        
+
         $trueFalse = array(array('id'=>'syncToDest0', 'name'=>'syncToDest', 'value'=>'0', 'label'=>'No'), array('id'=>'syncToDest1', 'name'=>'syncToDest', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildUseSSHKeyOptions() {
-        
+
         $trueFalse = array(array('id'=>'useSSHKey0', 'name'=>'sshUseKey', 'value'=>'0', 'label'=>'No'), array('id'=>'useSSHKey1', 'name'=>'sshUseKey', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildUseLocalMountPointOptions() {
-        
+
         $trueFalse = array(array('id'=>'localDirIsMountPoint0', 'name'=>'localDirIsMountPoint', 'value'=>'0', 'label'=>'No'), array('id'=>'localDirIsMountPoint1', 'name'=>'localDirIsMountPoint', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
-    
+
     private function _buildIncludeOVDMFilesOptions() {
-        
+
         $trueFalse = array(array('id'=>'includeOVDMFilesOptions0', 'name'=>'includeOVDMFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'includeOVDMFilesOptions1', 'name'=>'includeOVDMFiles', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
@@ -128,18 +128,18 @@ class CruiseDataTransfers extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
             elseif( preg_match('/\s/',$name) ){
                 $error[] = 'Name cannot contain whitespace, underscores are acceptable';
 	    }
-	    
+	
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
@@ -169,18 +169,18 @@ class CruiseDataTransfers extends Controller {
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -198,23 +198,23 @@ class CruiseDataTransfers extends Controller {
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser != 'guest' && $smbPass == ''){
                     $error[] = 'SMB Password is required';
                     $smbDataCheck = false;
-                } 
-            
+                }
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -225,7 +225,7 @@ class CruiseDataTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-                        
+
             } elseif ($transferType == 4) { // SSH Server
                 $sshDataCheck = true;
                 if($sshServer == ''){
@@ -325,15 +325,15 @@ class CruiseDataTransfers extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
-            } 
+            }
 
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
@@ -353,24 +353,24 @@ class CruiseDataTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { // Rsync Server
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -388,23 +388,23 @@ class CruiseDataTransfers extends Controller {
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser != 'guest' && $smbPass == ''){
                     $error[] = 'SMB Password is required';
                     $smbDataCheck = false;
-                } 
-            
+                }
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -415,24 +415,24 @@ class CruiseDataTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-            
+
             } elseif ($transferType == 4) { // SSH Server
                 $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
                 }
-                
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -442,7 +442,7 @@ class CruiseDataTransfers extends Controller {
                     $rsyncServer = '';
                     $rsyncUser = '';
                     $rsyncPass = '';
-                }                
+                }
             }
 
             if(!$error){
@@ -474,7 +474,7 @@ class CruiseDataTransfers extends Controller {
                     'excludedCollectionSystems' => $excludedCollectionSystems,
                     'excludedExtraDirectories' => $excludedExtraDirectories,
                 );
-            
+
                 # create the gearman client
                 $gmc= new \GearmanClient();
 
@@ -483,7 +483,7 @@ class CruiseDataTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
-                $data['testCruiseDataTransferName'] = $longName;     
+                $data['testCruiseDataTransferName'] = $longName;
             }
         }
 
@@ -491,7 +491,7 @@ class CruiseDataTransfers extends Controller {
         View::render('Config/addCruiseDataTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-        
+
     public function edit($id){
         $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
@@ -542,11 +542,11 @@ class CruiseDataTransfers extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
@@ -570,24 +570,24 @@ class CruiseDataTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { //rsync
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -605,23 +605,23 @@ class CruiseDataTransfers extends Controller {
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
-//                } 
-                        
+//                }
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -636,18 +636,18 @@ class CruiseDataTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
-                } 
-                
+                }
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -659,7 +659,7 @@ class CruiseDataTransfers extends Controller {
                     $rsyncPass = '';
                 }
             }
-                
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
@@ -686,15 +686,15 @@ class CruiseDataTransfers extends Controller {
                     'excludedCollectionSystems' => $excludedCollectionSystems,
                     'excludedExtraDirectories' => $excludedExtraDirectories,
                 );
-                
+
                 $where = array('cruiseDataTransferID' => $id);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
-                
+
                 $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
                 Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
                 Url::redirect('config/cruiseDataTransfers'.$filter);
             } else {
-                
+
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->includeOVDMFiles = $includeOVDMFiles;
@@ -750,15 +750,15 @@ class CruiseDataTransfers extends Controller {
 	    }
 	    elseif( preg_match('/\s/',$name) ){
                 $error[] = 'Name cannot contain whitespace, underscores are acceptable';
-            } 
+            }
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
@@ -782,24 +782,24 @@ class CruiseDataTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { //rsync
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -817,23 +817,23 @@ class CruiseDataTransfers extends Controller {
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
-//                } 
-                        
+//                }
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -848,18 +848,18 @@ class CruiseDataTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
-                } 
-                
+                }
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -871,11 +871,11 @@ class CruiseDataTransfers extends Controller {
                     $rsyncPass = '';
                 }
             }
-                
+
             if(!$error){
 
                 $gmData['cruiseDataTransfer'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id)[0];
-                
+
                 $gmData['cruiseDataTransfer']->name = $name;
                 $gmData['cruiseDataTransfer']->longName = $longName;
                 $gmData['cruiseDataTransfer']->includeOVDMFiles = $includeOVDMFiles;
@@ -899,7 +899,7 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->sshPass = $sshPass;
                 $gmData['cruiseDataTransfer']->excludedCollectionSystems = $excludedCollectionSystems;
                 $gmData['cruiseDataTransfer']->excludedExtraDirectories = $excludedExtraDirectories;
-                
+
                 # create the gearman client
                 $gmc= new \GearmanClient();
 
@@ -908,7 +908,7 @@ class CruiseDataTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
-                $data['testCruiseDataTransferName'] = $longName;      
+                $data['testCruiseDataTransferName'] = $longName;
             }
 
             #additional data needed for view
@@ -935,46 +935,46 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->sshPass = $sshPass;
             $data['row'][0]->excludedCollectionSystems = $excludedCollectionSystems;
             $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
-        
+
         }
-        
+
         View::rendertemplate('header',$data);
         View::render('Config/editCruiseDataTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function delete($id){
-                
+
         $where = array('cruiseDataTransferID' => $id);
         $this->_cruiseDataTransfersModel->deleteCruiseDataTransfer($where);
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Session::set('message','Collection System Transfer Deleted');
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
-    
+
     public function enable($id) {
 
         $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
-    
+
     public function disable($id) {
 
         $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($id);
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
-    
+
     public function test($id) {
-        
+
         $cruiseDataTransfer = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id)[0];
         $gmData = array(
             'cruiseDataTransfer' => array(
                 'cruiseDataTransferID' => $cruiseDataTransfer->cruiseDataTransferID
             )
         );
-                
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -996,9 +996,9 @@ class CruiseDataTransfers extends Controller {
         View::render('Config/cruiseDataTransfers',$data);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function run($id) {
-        
+
         $this->_cruiseDataTransfersModel->setStartingCruiseDataTransfer($id);
 
         $_warehouseModel = new \Models\Warehouse();
@@ -1009,7 +1009,7 @@ class CruiseDataTransfers extends Controller {
         $gmData['cruiseDataTransfer']->enable = "1";
         $gmData['systemStatus'] = "On";
 
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -1018,23 +1018,23 @@ class CruiseDataTransfers extends Controller {
 
         #submit job to Gearman
         $job_handle = $gmc->doBackground("runCruiseDataTransfer", json_encode($gmData));
-    
+
         sleep(1);
-        
+
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
-        
+
     public function stop($id) {
 
         $this->_cruiseDataTransfersModel->setStoppingCruiseDataTransfer($id);
-        
+
         $gmData = array(
             'pid' => $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id)[0]->pid
         );
 
         //var_dump($gmData);
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -1043,10 +1043,10 @@ class CruiseDataTransfers extends Controller {
 
         #submit job to Gearman
         $job_handle = $gmc->doBackground("stopJob", json_encode($gmData));
-    
+
         sleep(1);
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";    
+        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 }
