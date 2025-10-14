@@ -7,7 +7,7 @@ DESCRIPTION:  OpenVDM python module
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2016-02-02
  REVISION:  2025-04-12
 """
@@ -877,6 +877,14 @@ class OpenVDM():
         except Exception as exc:
             logging.error("Unable to retrieve cruise data transfer: %s from OpenVDM API", cruise_data_transfer_id)
             raise exc
+
+    def get_active_cruise_data_transfers(self):
+        """
+        Return all active cruise data transfer configurations.
+        """
+
+        return_obj = self.get_cruise_data_transfers()
+        return list(filter(lambda transfer: transfer['enable'] == "1", return_obj))
 
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):

@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     function updateCruiseDataTransferStatus() {
         var getCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getCruiseDataTransfersStatuses';
         $.getJSON(getCruiseDataTransferStatusURL, function (data, status) {
@@ -9,7 +9,7 @@ $(function () {
                 var output = '';
                 var href = '';
                 var i;
-                
+
                 for (i = 0; i < data.length; i++) {
                     if (data[i].status === "1") {
                         output = 'Stop';
@@ -18,19 +18,19 @@ $(function () {
                     } else if (data[i].status === "5") {
                         output = 'Stopping';
                         href = '#';
-                        $('#runStop' + data[i].cruiseDataTransferID).addClass("text-muted");                        
+                        $('#runStop' + data[i].cruiseDataTransferID).addClass("text-muted");
                         $('#runStop' + data[i].cruiseDataTransferID).attr("disabled", "disabled");
                     } else if (data[i].status === "6") {
                         output = 'Starting';
                         href = '#';
-                        $('#runStop' + data[i].cruiseDataTransferID).addClass("text-muted");                        
+                        $('#runStop' + data[i].cruiseDataTransferID).addClass("text-muted");
                         $('#runStop' + data[i].cruiseDataTransferID).attr("disabled", "disabled");
                     } else {
                         output = 'Run';
                         href = siteRoot + 'config/cruiseDataTransfers/run/' + data[i].cruiseDataTransferID;
                         $('#runStop' + data[i].cruiseDataTransferID).removeClass("text-muted");
                     }
-                    
+
                     $('#runStop' + data[i].cruiseDataTransferID).attr("href", href);
                     $('#runStop' + data[i].cruiseDataTransferID).html(output);
 
@@ -43,7 +43,7 @@ $(function () {
             }
         });
     }
-    
+
     setInterval(function () {
         updateCruiseDataTransferStatus();
     }, 5000);
@@ -93,7 +93,7 @@ $(function () {
 
                     // Log the new URL (for demonstration purposes)
                     // console.log('New URL with input value:', url.href);
-            
+
                     // You can perform any custom action here
                     // For example, let's simulate a page scroll, or show a modal, etc.
 
@@ -111,5 +111,5 @@ $(function () {
     const inputField = document.getElementById('transfer-filter');
     const inputValue = inputField ? inputField.value : '';
     transferList.search(inputValue);
-        
+
 });

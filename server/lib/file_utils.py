@@ -7,7 +7,7 @@ DESCRIPTION:  utilities for dealing with local files/directories
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2025-07-05
  REVISION:  2025-07-07
 """

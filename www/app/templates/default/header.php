@@ -75,7 +75,7 @@ use Helpers\Hooks;
     if($_warehouseModel->getShowLoweringComponents()) {
         $data['loweringID'] = $_warehouseModel->getLoweringID();
         $loweringSize = $_warehouseModel->getLoweringSize();
-    
+
         if(isset($loweringSize['error'])){
             $data['loweringSize'] = "Error";
         } else {
@@ -323,7 +323,7 @@ use Helpers\Hooks;
         <div class="row">
             <div class="col-lg-12">
             </br>
-<!--                <h1 class="page-header"><?php echo $data['title']; ?></h1> -->               
+<!--                <h1 class="page-header"><?php echo $data['title']; ?></h1> -->
             </div>
         </div>
 

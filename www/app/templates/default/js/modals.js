@@ -7,7 +7,7 @@ $(function () {
         $(this).find('#modelDeleteItemName').html(itemName);
         $(this).find('#modalDeleteLink').attr("href", deleteURL);
     });
-    
+
     $(document).ready(function(){
         if($('#testResultsModal').length > 0) {
             $('#testResultsModal').modal('show');

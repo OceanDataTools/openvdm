@@ -7,7 +7,7 @@ DESCRIPTION:  Utilities for working with geojson and kml files.
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2024-06-01
 """
 

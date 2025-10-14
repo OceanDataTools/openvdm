@@ -20,7 +20,7 @@ class TransferLogs extends Controller {
 
         $this->_model = new \Models\TransferLogs();
     }
-    
+
     public function getExcludeLogsSummary() {
         echo json_encode($this->_model->getExcludeLogsSummary());
     }

@@ -26,7 +26,7 @@ class FormCustom
             if(strcmp($value, '') === 0) { $value = $params[0]['value']; }
             $x = 0;
             foreach ($params as $k => $v) {
-                $v['id'] = (isset($v['id']))                ? $v['id']                          : "rd_id_{$x}_".rand(1000,9999);               
+                $v['id'] = (isset($v['id']))                ? $v['id']                          : "rd_id_{$x}_".rand(1000,9999);
                 $o .= "<label class='radio-inline'>";
                 $o .= "<input type='radio'";
                 $o .= (isset($v['id']))                     ? " id='{$v['name']}{$v['id']}'"    : '';

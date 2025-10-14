@@ -9,7 +9,7 @@ DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2015-01-01
  REVISION:  2025-07-06
 """
@@ -30,7 +30,8 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
-from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
+from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
+from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
 from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAMES
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
@@ -250,6 +251,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         self.stop = False
+        logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
         try:
             payload_obj = json.loads(current_job.data)
@@ -272,9 +274,53 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.cruise_id = payload_obj.get('cruiseID', self.ovdm.get_cruise_id())
         self.cruise_start_date = payload_obj.get('cruiseStartDate', self.ovdm.get_cruise_start_date())
+        self.cruise_end_date = payload_obj.get('cruiseEndDate', self.ovdm.get_cruise_end_date())
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
         self.cruise_dir = os.path.join(self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_id)
+
+        if current_job.task == TASK_NAMES['FINALIZE_CRUISE']:
+
+            gm_data = {
+                'cruiseID': self.cruise_id,
+                'cruiseStartDate': self.cruise_start_date,
+                'cruiseEndDate': self.cruise_end_date
+            }
+
+            # Collect pre-finalize jobs
+            pre_finalize_jobs = []
+            for task in self.ovdm.get_tasks_for_hook("preFinalizeCurrentCruise"):
+                logging.info("Adding pre-finalize task: %s", task)
+                pre_finalize_jobs.append({"task": task, "data": json.dumps(gm_data)})
+
+            if not pre_finalize_jobs:
+                logging.info("No pre-finalize tasks found, skipping.")
+                return super().on_job_execute(current_job)
+
+            # Submit jobs to Gearman
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            try:
+                submitted_job_requests = gm_client.submit_multiple_jobs(
+                    pre_finalize_jobs,
+                    background=False,
+                    wait_until_complete=False,  # we'll handle completion below
+                )
+
+                # Wait until all jobs complete
+                gm_client.wait_until_jobs_completed(submitted_job_requests)
+
+                # Log results
+                for job in submitted_job_requests:
+                    if job.complete:
+                        logging.info("Task %s completed successfully", job.job.unique)
+                    elif job.timed_out:
+                        logging.error("Task %s timed out", job.job.unique)
+                    else:
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
+
+            except Exception as e:
+                logging.exception("Error while submitting or running pre-finalize jobs: %s", e)
 
         return super().on_job_execute(current_job)
 
@@ -310,16 +356,47 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
 
         if current_job.task in (TASK_NAMES['CREATE_CRUISE'], TASK_NAMES['FINALIZE_CRUISE']):
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            job_data = {
+            gm_data = {
                 'cruiseID': self.cruise_id,
-                'cruiseStartDate': self.cruise_start_date
+                'cruiseStartDate': self.cruise_start_date,
+                'cruiseEndDate': self.cruise_end_date
             }
 
+            # Collect pre-finalize jobs
+            post_hook_jobs = []
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
-                logging.info("Adding post task: %s", task)
-                gm_client.submit_job(task, json.dumps(job_data), background=True)
+                logging.info("Adding post-hook task: %s", task)
+                post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
+
+            if not post_hook_jobs:
+                logging.info("No post-hook tasks found, skipping.")
+                return super().on_job_execute(current_job)
+
+            # Submit jobs to Gearman
+            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+
+            try:
+                submitted_job_requests = gm_client.submit_multiple_jobs(
+                    post_hook_jobs,
+                    background=False,
+                    wait_until_complete=False,  # we'll handle completion below
+                )
+
+                # Wait until all jobs complete
+                gm_client.wait_until_jobs_completed(submitted_job_requests)
+
+                # Log results
+                for job in submitted_job_requests:
+                    if job.complete:
+                        logging.info("Task %s completed successfully", job.job.unique)
+                    elif job.timed_out:
+                        logging.error("Task %s timed out", job.job.unique)
+                    else:
+                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
+
+            except Exception as e:
+                logging.exception("Error while submitting or running post-hook jobs: %s", e)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
@@ -508,12 +585,12 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
     for collection_system_transfer in collection_system_transfers:
-        logging.debug("Queuing %s job for %s", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
+        logging.debug("Queuing %s job for %s", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
         gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
 
-        collection_system_transfer_jobs.append( {"task": RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
+        collection_system_transfer_jobs.append( {"task": CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
 
-    logging.info("Submitting %s jobs", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
+    logging.info("Submitting %s jobs", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     worker.send_job_status(current_job, 3, 10)
 
     submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
@@ -525,9 +602,9 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     if worker.ovdm.get_transfer_public_data():
         logging.debug("Transferring public data files to cruise data directory")
-        worker.send_job_status(current_job, 7, 10)
+        worker.send_job_status(current_job, 6, 10)
 
-        output_results = worker.transfer_publicdata_dir(current_job, 70, 90)
+        output_results = worker.transfer_publicdata_dir(current_job, 60, 75)
         logging.debug("Transfer Complete")
 
         if not output_results['verdict']:
@@ -537,7 +614,7 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         job_results['parts'].append({"partName": "Transfer PublicData files", "result": "Pass"})
 
     logging.info("Exporting cruise configuration")
-    worker.send_job_status(current_job, 9, 10)
+    worker.send_job_status(current_job, 75, 100)
 
     output_results = worker.export_cruise_config(finalize=True)
 
@@ -546,6 +623,33 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+
+
+    gm_data = {
+        'cruiseID': worker.cruise_id,
+        'cruiseStartDate': worker.cruise_start_date,
+        'systemStatus': "On",
+        'cruiseDataTransfer': {}
+    }
+
+    cruise_data_transfer_jobs = []
+    cruise_data_transfers = worker.ovdm.get_active_cruise_data_transfers()
+
+    for cruise_data_transfer in cruise_data_transfers:
+        logging.debug("Queuing %s job for %s", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], cruise_data_transfer['name'])
+        gm_data['cruiseDataTransfer']['cruiseDataTransferID'] = cruise_data_transfer['cruiseDataTransferID']
+
+        cruise_data_transfer_jobs.append( {"task": CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], "data": json.dumps(gm_data)} )
+
+    logging.info("Submitting %s jobs", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'])
+    worker.send_job_status(current_job, 8, 10)
+
+    submitted_job_request = gm_client.submit_multiple_jobs(cruise_data_transfer_jobs, background=False, wait_until_complete=False)
+
+    time.sleep(1)
+    gm_client.wait_until_jobs_completed(submitted_job_request)
+
+    job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
