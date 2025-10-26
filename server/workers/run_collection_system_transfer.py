@@ -115,7 +115,7 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
             return None
 
         if is_default_ignore(filepath):
-                return None
+            return None
 
         try:
             file_mod_time = datetime.strptime(f"{mdate} {mtime}", "%Y/%m/%d %H:%M:%S")
@@ -342,7 +342,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         cst_cfg = self.collection_system_transfer
         transfer_type = get_transfer_type(cst_cfg['transferType'])
         filters = _build_filters(cst_cfg, self.cruise_id, self.lowering_id)
-
+        logging.debug("filters: %s", filters)
         epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
         data_start_time = calendar.timegm(time.strptime(self.data_start_date, "%Y/%m/%d %H:%M"))
         data_end_time = calendar.timegm(time.strptime(self.data_end_date, "%Y/%m/%d %H:%M:%S"))

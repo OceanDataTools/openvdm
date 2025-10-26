@@ -27,7 +27,7 @@ from datetime import timedelta
 from typing import List, Optional
 
 default_ignore_patterns = [
-    "**/@eaDir",
+    "**/@eaDir*",
     "**/.DS_Store",
     "**/._*",
     "**/Thumbs.db",
