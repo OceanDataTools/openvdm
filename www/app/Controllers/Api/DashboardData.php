@@ -19,7 +19,7 @@ class DashboardData extends Controller {
 
         $this->_model = new \Models\DashboardData();
     }
-    
+
     public function getCruises() {
         $cruiseModel = new \Models\Cruises();
         echo json_encode($cruiseModel->getCruises());
@@ -29,7 +29,7 @@ class DashboardData extends Controller {
         $this->_model->setCruiseID($cruiseID);
         echo json_encode($this->_model->getDashboardDataTypes($dataType));
     }
-        
+
     public function getDataObjectsByType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
@@ -49,7 +49,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getLatestVisualizerDataByType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
@@ -61,7 +61,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getLatestStatsByType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
@@ -73,7 +73,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getLatestQualityTestsByType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectList = $this->_model->getDashboardObjectsByTypes($dataType);
@@ -85,7 +85,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectVisualizerDataByJsonName($cruiseID, $dd_json){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByJsonName($dd_json);
@@ -95,7 +95,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectVisualizerDataByRawName($cruiseID, $raw_data){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByRawName($raw_data);
@@ -105,7 +105,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectStatsByJsonName($cruiseID, $dd_json){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectStats = $this->_model->getDashboardObjectStatsByJsonName($dd_json);
@@ -115,7 +115,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectStatsByRawName($cruiseID, $raw_data){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectStats = $this->_model->getDashboardObjectStatsByRawName($raw_data);
@@ -125,7 +125,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectStatsByDataType($cruiseID, $data_type){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectStats = $this->_model->getDataTypeStats($data_type);
@@ -145,7 +145,7 @@ class DashboardData extends Controller {
             echo json_encode(array());
         }
     }
-    
+
     public function getDashboardObjectQualityTestsByRawName($cruiseID, $raw_data){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByRawName($raw_data);

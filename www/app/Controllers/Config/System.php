@@ -7,7 +7,7 @@ use Helpers\Session;
 use Helpers\Url;
 
 class System extends Controller {
-    
+
     private $_warehouseModel;
     private $_extraDirectoriesModel;
     private $_cruiseDataTransfersModel;
@@ -16,7 +16,7 @@ class System extends Controller {
 
 
     private function _buildUseSSHKeyOptions() {
-        
+
         $trueFalse = array(array('id'=>'useSSHKey0', 'name'=>'sshUseKey', 'value'=>'0', 'label'=>'No'), array('id'=>'useSSHKey1', 'name'=>'sshUseKey', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
@@ -28,7 +28,7 @@ class System extends Controller {
             $gmData['siteRoot'] = DIR;
             $gmData['shipboardDataWarehouse'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
             $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
-        
+
             # create the gearman client
             $gmc= new \GearmanClient();
 
@@ -39,22 +39,22 @@ class System extends Controller {
             $job_handle = $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
         }
     }
-    
+
     public function __construct(){
-        
+
         if(!Session::get('loggedin')){
             Url::redirect('config/login');
         }
-        
+
         $this->_warehouseModel = new \Models\Warehouse();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
         $this->_shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
         $this->_linksModel = new \Models\Config\Links();
     }
-    
+
     public function index(){
-            
+
         $data['title'] = 'Configuration';
         $data['javascript'] = array('system');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -68,7 +68,7 @@ class System extends Controller {
 
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-                
+
         foreach($requiredCruiseDataTransfers as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
 
@@ -78,12 +78,12 @@ class System extends Controller {
         }
 
         $this->_linksModel->processLinkURL($data['links']);
-        
+
         View::rendertemplate('header',$data);
         View::render('Config/system',$data);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function editShipboardDataWarehouse(){
 
         $data['title'] = 'Configuration';
@@ -101,13 +101,13 @@ class System extends Controller {
             if($shipboardDataWarehouseUsername == ''){
                 $error[] = 'Shipboard Data Warehouse Username is required';
             }
-            
+
             if(!$error){
                 $postdata = array(
                     'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
                     'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
                 );
-                
+
                 $this->_warehouseModel->setShipboardDataWarehouseConfig($postdata);
                 Session::set('message','Shipboard Data Warehouse Updated');
                 Url::redirect('config/system');
@@ -118,12 +118,12 @@ class System extends Controller {
                 );
             }
         }
-        
+
         View::rendertemplate('header',$data);
         View::render('Config/editShipboardDataWarehouse',$data, $error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function editShoresideDataWarehouse(){
 
         $data['title'] = 'Configuration';
@@ -131,7 +131,7 @@ class System extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
-        
+
 
         foreach($data['requiredCruiseDataTransfers'] as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
@@ -144,7 +144,7 @@ class System extends Controller {
                 break;
             }
         }
-            
+
         if(isset($_POST['submit'])){
             $sshServer = $_POST['sshServer'];
             $sshUser = $_POST['sshUser'];
@@ -176,9 +176,9 @@ class System extends Controller {
                     'sshPass' => $sshPass,
                     'destDir' => $destDir,
                 );
-                
+
                 $where = array('cruiseDataTransferID' => $data['shoresideDataWarehouseConfig']['cruiseDataTransferID']);
-                            
+
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata, $where);
                 Session::set('message','Shoreside Data Warehouse Updated');
                 Url::redirect('config/system');
@@ -192,12 +192,12 @@ class System extends Controller {
                 );
             }
         }
-        
+
         View::rendertemplate('header',$data);
         View::render('Config/editShoresideDataWarehouse',$data, $error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function editExtraDirectories($id){
         $data['title'] = 'Edit Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
@@ -209,25 +209,25 @@ class System extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination directory is required';
-            } 
-                
+            }
+
             if(!$error){
                 $postdata = array(
                     'longName' => $longName,
                     'destDir' => $destDir,
                 );
-            
-                
+
+
                 $where = array('extraDirectoryID' => $id);
                 $this->_extraDirectoriesModel->updateExtraDirectory($postdata,$where);
                 Session::set('message','Extra Directory Updated');
                 Url::redirect('config/system');
             } else {
-                
+
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->destDir = $destDir;
@@ -238,7 +238,7 @@ class System extends Controller {
         View::render('Config/editRequiredExtraDirectories',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function editShipToShoreTransfers($id){
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
@@ -251,24 +251,24 @@ class System extends Controller {
             if($longName == ''){
                 $error[] = 'Long name is required';
             }
-            
+
             if($includeFilter == ''){
                 $includeFilter = '*';
-            } 
+            }
 
             if(!$error){
                 $postdata = array(
                     'longName' => $longName,
                     'includeFilter' => $includeFilter,
                 );
-            
-                
+
+
                 $where = array('shipToShoreTransferID' => $id);
                 $this->_shipToShoreTransfersModel->updateShipToShoreTransfer($postdata,$where);
                 Session::set('message','Ship-to-Shore Transfers Updated');
                 Url::redirect('config/system');
             } else {
-                
+
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->includeFilter = $includeFilter;
             }
@@ -278,19 +278,19 @@ class System extends Controller {
         View::render('Config/editRequiredShipToShoreTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function enableShipToShoreTransfers($id) {
 
         $this->_shipToShoreTransfersModel->enableShipToShoreTransfer($id);
         Url::redirect('config/system');
     }
-    
+
     public function disableShipToShoreTransfers($id) {
 
         $this->_shipToShoreTransfersModel->disableShipToShoreTransfer($id);
         Url::redirect('config/system');
     }
-    
+
     public function editShipToShoreBWLimit(){
         $data['title'] = 'Edit Ship-to-Shore Bandwidth Limit';
         $data['javascript'] = array();
@@ -298,7 +298,7 @@ class System extends Controller {
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
 
         $ssdw = null;
-        
+
         foreach($requiredCruiseDataTransfers as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
                 $ssdw = $row;
@@ -316,7 +316,7 @@ class System extends Controller {
             } elseif (!((string)(int)$shipToShoreBWLimit == $shipToShoreBWLimit)){
                 $error[] = 'Bandwidth limit must be an integer';
             }
-                
+
             if(!$error){
 
                 $postdata = array(
@@ -328,7 +328,7 @@ class System extends Controller {
                 Session::set('message','Ship-to-Shore Bandwidth Limit Updated');
                 Url::redirect('config/system');
             } else {
-                
+
                 $data['shipToShoreBWLimit'] = $shipToShoreBWLimit;
             }
         }
@@ -343,13 +343,13 @@ class System extends Controller {
         $this->_warehouseModel->enableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
-    
+
     public function disableShipToShoreBWLimit() {
 
         $this->_warehouseModel->disableShipToShoreBWLimit();
         Url::redirect('config/system');
     }
-    
+
     public function editMD5FilesizeLimit(){
         $data['title'] = 'Edit MD5 Checksum Filesize Limit';
         $data['javascript'] = array();
@@ -363,7 +363,7 @@ class System extends Controller {
             } elseif (!is_numeric($md5FilesizeLimit)){
                 $error[] = 'MD5 filesize limit must be a number';
             }
-                
+
             if(!$error){
                 $postdata = array(
                     'value' => $md5FilesizeLimit
@@ -373,7 +373,7 @@ class System extends Controller {
                 Session::set('message','MD5 Filesize Limit Updated');
                 Url::redirect('config/system');
             } else {
-                
+
                 $data['md5FilesizeLimit'] = $md5FilesizeLimit;
             }
         }
@@ -382,13 +382,13 @@ class System extends Controller {
         View::render('Config/editMD5FilesizeLimit',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function enableMD5FilesizeLimit() {
 
         $this->_warehouseModel->enableMd5FilesizeLimit();
         Url::redirect('config/system');
     }
-    
+
     public function disableMD5FilesizeLimit() {
 
         $this->_warehouseModel->disableMd5FilesizeLimit();
@@ -396,10 +396,10 @@ class System extends Controller {
     }
 
     public function testShipboardDataWarehouse() {
-        
+
         $_warehouseModel = new \Models\Warehouse();
         $shipboardDataWarehouseConfig = $_warehouseModel->getShipboardDataWarehouseConfig();
-        
+
 	$data['testResults'] = array();
 	$parts = array();
 
@@ -407,10 +407,10 @@ class System extends Controller {
         $publicDataDirectoryTest = (object) array();
         $usernameTest = (object) array();
         $finalVerdict = (object) array();
-        
+
         $finalVerdict->partName = 'FinalVerdict';
         $finalVerdict->result = 'Pass';
-                
+
         $baseDirectoryTest->partName = 'Base Directory';
         if(is_dir( $shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir'] )) {
             $baseDirectoryTest->result = 'Pass';
@@ -418,7 +418,7 @@ class System extends Controller {
             $baseDirectoryTest->result = 'Fail';
             $finalVerdict->result = 'Fail';
         }
-        
+
         array_push($parts, $baseDirectoryTest);
 
         $publicDataDirectoryTest->partName = 'Public Data Directory';
@@ -428,12 +428,12 @@ class System extends Controller {
             $publicDataDirectoryTest->result = 'Fail';
             $finalVerdict->result = 'Fail';
         }
-        
+
         array_push($parts, $publicDataDirectoryTest);
-        
+
         $command = 'getent passwd ' . $shipboardDataWarehouseConfig['shipboardDataWarehouseUsername'];
         exec($command,$op);
-        
+
         $usernameTest->partName = 'Username';
         if(isset($op[0])) {
             $usernameTest->result = 'Pass';
@@ -441,7 +441,7 @@ class System extends Controller {
             $usernameTest->result = 'Fail';
             $finalVerdict->result = 'Fail';
         }
-        
+
         array_push($parts, $usernameTest);
         array_push($parts, $finalVerdict);
 
@@ -452,7 +452,7 @@ class System extends Controller {
         } else {
             $_warehouseModel->setErrorShipboardDataWarehouseStatus();
         }
-        
+
         $data['title'] = 'Configuration';
         $data['javascript'] = array('system');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -484,22 +484,22 @@ class System extends Controller {
         View::rendertemplate('footer',$data);
     }
 
- 
+
     public function testShoresideDataWarehouse() {
-        
+
         $_warehouseModel = new \Models\Warehouse();
         $gmData['siteRoot'] = DIR;
         $gmData['shipboardDataWarehouse'] = $_warehouseModel->getShipboardDataWarehouseConfig();
         $gmData['cruiseID'] = $_warehouseModel->getCruiseID();
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        
+
         foreach($requiredCruiseDataTransfers as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
                 $gmData['cruiseDataTransfer'] = $row;
                 break;
             }
         }
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -508,7 +508,7 @@ class System extends Controller {
 
         #submit job to Gearman, wait for results
         $data['testResults'] = json_decode($gmc->doNormal("testCruiseDataTransfer", json_encode($gmData)), true);
-        
+
         # update collectionSystemTransfer status if needed
         #if(strcmp($data['testResults'][sizeof($data['testResults'])-1]->result, "Fail") === 0) {
         #    $this->_collectionSystemTransfersModel->setError_collectionSystemTransfer($id);
@@ -544,7 +544,7 @@ class System extends Controller {
         View::render('Config/system',$data);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function addLink(){
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
@@ -555,12 +555,12 @@ class System extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
 
             if($url == ''){
                 $error[] = 'URL is required';
-            } 
-                
+            }
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
@@ -568,7 +568,7 @@ class System extends Controller {
                     'private' => '0',
                     'enable' => '0',
                 );
-            
+
                 $this->_linksModel->insertLink($postdata,$where);
                 Session::set('message','Link Added');
                 Url::redirect('config/system');
@@ -579,7 +579,7 @@ class System extends Controller {
         View::render('Config/addLink',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function editLink($id){
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
@@ -591,25 +591,25 @@ class System extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
 
             if($url == ''){
                 $error[] = 'URL is required';
-            } 
-                
+            }
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
                     'url' => $url,
                 );
-            
-                
+
+
                 $where = array('linkID' => $id);
                 $this->_linksModel->updateLink($postdata,$where);
                 Session::set('message','Link Updated');
                 Url::redirect('config/system');
             } else {
-                
+
                 $data['row'][0]->name = $name;
                 $data['row'][0]->url = $url;
             }
@@ -619,7 +619,7 @@ class System extends Controller {
         View::render('Config/editLink',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function deleteLink($id) {
 
         $where = array('linkID' => $id);
@@ -632,19 +632,19 @@ class System extends Controller {
         $this->_linksModel->enableLink($id);
         Url::redirect('config/system');
     }
-    
+
     public function disableLink($id) {
 
         $this->_linksModel->disableLink($id);
         Url::redirect('config/system');
     }
-    
+
     public function privateLink($id) {
 
         $this->_linksModel->privateLink($id);
         Url::redirect('config/system');
     }
-    
+
     public function publicLink($id) {
 
         $this->_linksModel->publicLink($id);

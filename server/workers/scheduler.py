@@ -17,7 +17,7 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2017-09-30
  REVISION:  2025-07-06
 """
@@ -28,6 +28,7 @@ import time
 import json
 import logging
 import argparse
+from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from python3_gearman import GearmanClient
 
@@ -52,6 +53,7 @@ def scheduler(interval=None):
 
     cruise_basedir = ovdm.get_cruisedata_path()
     logfile_purge_timedelta = ovdm.get_logfile_purge_timedelta()
+    last_s2s_xfer = datetime.now(timezone.utc)
 
     if logfile_purge_timedelta:
         logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
@@ -117,16 +119,27 @@ def scheduler(interval=None):
 
         # schedule ship-to-shore transfer
         required_cruise_data_transfers = ovdm.get_required_cruise_data_transfers()
-        for required_cruise_data_transfer in required_cruise_data_transfers:
-            if required_cruise_data_transfer['name'] == 'SSDW' and required_cruise_data_transfer['enable'] != "1":
-                logging.info("Submitting cruise data transfer job for: %s", required_cruise_data_transfer['longName'])
+        ssdw_transfer = next((transfer for transfer in required_cruise_data_transfers if transfer["name"] == "SSDW"), None)
+        if not ssdw_transfer:
+            logging.error("SSDW transfer does not exists???")
+
+        else:
+            now_utc = datetime.now(timezone.utc)
+            delta = now_utc - last_s2s_xfer
+            if ssdw_transfer['status'] == '1' and delta > timedelta(hours=1):
+                logging.info("S2S tranfer has run for an hour, time to restart")
+                gmData = {'pid': ssdw_transfer['pid']}
+                gm_client.submit_job("stopJob", json.dumps(gmData))
+
+            if ssdw_transfer['enable'] == "1":
+                logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
+                last_s2s_xfer = datetime.now(timezone.utc)
 
                 gmData = {
                 }
 
                 gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData), background=True)
                 time.sleep(2)
-                break
 
         delay = interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
         logging.info("Waiting %s seconds until next round of tasks are queued", delay)

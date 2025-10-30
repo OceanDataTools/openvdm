@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     function updateRequiredCruiseDataTransferStatus() {
         var getRequiredCruiseDataTransferStatusURL = siteRoot + 'api/cruiseDataTransfers/getRequiredCruiseDataTransfersStatuses';
         $.getJSON(getRequiredCruiseDataTransferStatusURL, function (data, status) {
@@ -19,7 +19,7 @@ $(function () {
             }
         });
     }
-    
+
     function updateSBDWTestFail() {
         var updateSBDWTestFailURL = siteRoot + 'api/warehouse/getShipboardDataWarehouseStatus';
         $.getJSON(updateSBDWTestFailURL, function (data, status) {
@@ -32,15 +32,15 @@ $(function () {
             }
         });
     }
-    
+
     setInterval(function () {
         updateSBDWTestFail();
     }, 5000);
-    
+
     setInterval(function () {
         updateRequiredCruiseDataTransferStatus();
     }, 5000);
-    
+
     $('#testResultsModal').on('hidden.bs.modal', function () {
         window.location.replace(siteRoot + 'config/system');
     });

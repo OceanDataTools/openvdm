@@ -11,7 +11,7 @@ class Welcome extends Controller {
     private $_cruiseDataTransfersModel;
     private $_transferLogsModel;
     private $_extraDirectoriesModel;
-    
+
     public function __construct(){
         $this->_warehouseModel = new \Models\Warehouse();
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
@@ -26,19 +26,19 @@ class Welcome extends Controller {
         if($this->_warehouseModel->getSystemStatus()) {
             $data['systemStatus'] = "On";
         } else {
-            $data['systemStatus'] = "Off";            
+            $data['systemStatus'] = "Off";
         }
 
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
-        
+
         $data['filenameErrors'] = $this->_transferLogsModel->getExcludeLogsSummary();
         $data['shipboardTransfers'] = $this->_transferLogsModel->getShipboardLogsSummary(5);
         $data['shipToShoreTransfers'] = $this->_transferLogsModel->getShipToShoreLogsSummary(5);
         $data['javascript'] = array('welcome');
-        
+
         View::rendertemplate('header',$data);
         View::render('Welcome/index',$data);
         View::rendertemplate('footer',$data);

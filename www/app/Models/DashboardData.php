@@ -8,7 +8,7 @@ class DashboardData extends Model {
 
     // const CONFIG_FN = 'ovdmConfig.json';
     // const MANIFEST_FN = 'manifest.json';
-    
+
     private $_cruiseDataDir;
     private $_manifestObj;
     private $_cruiseID;
@@ -27,11 +27,11 @@ class DashboardData extends Model {
         }
 
     }
-    
+
     public function getDashboardManifest() {
         return $this->_manifestObj;
     }
-    
+
     private function buildManifestObj(){
 
         $results = array();
@@ -48,7 +48,7 @@ class DashboardData extends Model {
                         $ovdmConfigContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $this->_cruiseConfigFn);
                         $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                         //Get the the directory that holds the DashboardData
-                        if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){	    
+                        if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){	
                            for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
                                 if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
                                     $dataDashboardList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
@@ -120,14 +120,14 @@ class DashboardData extends Model {
 
             $orderby = "dd_json"; //change this to whatever key you want from the array
 
-            array_multisort($sortArray[$orderby],SORT_ASC,$dataObjects); 
+            array_multisort($sortArray[$orderby],SORT_ASC,$dataObjects);
         }
-        return $dataObjects;   
+        return $dataObjects;
     }
-    
+
     public function getDashboardObjectContentsByJsonName($dd_json){
         $dataObjectContents = '';
-        
+
         $foundIt = false;
         foreach ($this->_manifestObj as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
@@ -145,10 +145,10 @@ class DashboardData extends Model {
         }
         return $dataObjectContents;
     }
-    
+
     public function getDashboardObjectContentsByRawName($raw_data){
         $dataObjectContents = '';
-        
+
         $foundIt = false;
         foreach ($this->_manifestObj as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
@@ -166,10 +166,10 @@ class DashboardData extends Model {
         }
         return $dataObjectContents;
     }
-    
+
     public function getDashboardObjectDataTypeByJsonName($dd_json){
         $dataType = '';
-        
+
         foreach ($this->_manifestObj as $manifestItem) {
             if (strcmp($manifestItem['dd_json'], $dd_json) === 0) {
                 $dataType = $manifestItem['type'];
@@ -181,7 +181,7 @@ class DashboardData extends Model {
 
     public function getDashboardObjectDataTypeByRawName($raw_data){
         $dataType = '';
-        
+
         foreach ($this->_manifestObj as $manifestItem) {
             if (strcmp($manifestItem['raw_data'], $raw_data) === 0) {
                 $dataType = $manifestItem['type'];
@@ -190,7 +190,7 @@ class DashboardData extends Model {
         }
         return $dataType;
     }
-        
+
     public function getDashboardObjectVisualizerDataByJsonName($dd_json){
         $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
         return $dataObjectContentsOBJ->visualizerData;
@@ -205,48 +205,48 @@ class DashboardData extends Model {
         $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
         return $dataObjectContentsOBJ->stats;
     }
-    
+
     public function getDashboardObjectStatsByRawName($raw_data){
         $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
         return $dataObjectContentsOBJ->stats;
     }
-    
+
     public function getDashboardObjectQualityTestsByJsonName($dd_json){
         $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
         return $dataObjectContentsOBJ->qualityTests;
     }
-    
+
     public function getDashboardObjectQualityTestsByRawName($raw_data){
         $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
         return $dataObjectContentsOBJ->qualityTests;
     }
-    
+
     public function getCruiseID(){
         return $this->_cruiseID;
     }
-    
+
     public function setCruiseID($cruiseID) {
         $this->_cruiseID = $cruiseID;
         $this->buildManifestObj();
     }
-    
+
     public function getDataTypeStats($dataType) {
 
         $return = array((object)array());
-        
+
         $dataObjects = $this->getDashboardObjectsByTypes($dataType);
-        
+
         if(is_array($dataObjects) && sizeof($dataObjects) === 0){
             $return[0]->error = 'No objects found of type ' . $dataType;
             return $return;
         }
-        
+
         $dataTypeStatsObj = array((object)array());
-        
+
         $init = false;
         for ($i=0; $i < sizeof($dataObjects); $i++) {
             $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json']);
-            
+
             if($dataFileStatsObj[0]->error) {
                 $return[0]->error = $dataFileStatsObj[0]->error;
                 return $return;
@@ -262,20 +262,20 @@ class DashboardData extends Model {
                                 if($dataFileStatsObj[$j]->statValue[0] < $dataTypeStatsObj[$j]->statValue[0]){
                                     $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
                                 }
-                                
+
                                 #End Time
                                 if($dataFileStatsObj[$j]->statValue[1] > $dataTypeStatsObj[$j]->statValue[1]){
                                     $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
                                 }
-                                
+
                                 break;
-                                
+
                             case "geoBounds":
                                 #North
                                 if($dataFileStatsObj[$j]->statValue[0] > $dataTypeStatsObj[$j]->statValue[0]){
                                     $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
                                 }
-                                
+
                                 #East
                                 if($dataFileStatsObj[$j]->statValue[1] < $dataTypeStatsObj[$j]->statValue[1]){
                                     $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
@@ -292,56 +292,56 @@ class DashboardData extends Model {
                                 }
 
                                 break;
-                                
+
                             case "bounds":
                                 #Min
                                 if($dataFileStatsObj[$j]->statValue[0] < $dataTypeStatsObj[$j]->statValue[0]){
                                     $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
                                 }
-                                
+
                                 #Max
                                 if($dataFileStatsObj[$j]->statValue[1] > $dataTypeStatsObj[$j]->statValue[1]){
                                     $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
                                 }
-                                
+
                                 break;
-                            
+
                             case "totalValue":
                                 #Sum values
                                 $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
-                            
+
                                 break;
-                            
+
                             case "valueValidity":
                                 #Sum values
                                 $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
 
                                 $dataTypeStatsObj[$j]->statValue[1] += $dataFileStatsObj[$j]->statValue[1];
-                                
+
                                 break;
                             case "rowValidity":
                                 #Sum values
                                 $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
 
                                 $dataTypeStatsObj[$j]->statValue[1] += $dataFileStatsObj[$j]->statValue[1];
-                                
+
                                 break;
-                                
+
                         }
                     }
-                }   
+                }
             }
         }
-        
+
         $fileCountStat = new \stdClass();
         $fileCountStat->statType = "totalValue";
         $fileCountStat->statName = "File Count";
         $fileCountStat->statUnit = "files";
         $fileCountStat->statValue = array();
         $fileCountStat->statValue[0] = sizeof($dataObjects);
-        
+
         array_unshift($dataTypeStatsObj, $fileCountStat);
-        
+
         $return = $dataTypeStatsObj;
         return $return;
     }

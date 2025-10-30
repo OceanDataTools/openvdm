@@ -10,10 +10,10 @@ class CollectionSystemTransfers extends Controller {
 
     private $_collectionSystemTransfersModel,
             $_transferTypesModel;
-    
+
     private function _buildTransferTypesOptions() {
         $transferTypes = $this->_transferTypesModel->getTransferTypes();
-        
+
         $output = array();
         $i=1;
 
@@ -21,60 +21,60 @@ class CollectionSystemTransfers extends Controller {
             $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
             array_push($output, $option);
         }
-        
+
         return $output;
     }
-    
+
     private function _buildStalenessOptions($staleness="5") {
-        
+
         $trueFalse = array(array('id'=>'staleness0', 'name'=>'staleness', 'value'=>'0', 'label'=>'No'), array('id'=>'staleness1', 'name'=>'staleness', 'value'=>$staleness, 'label'=>'Yes'));
         return $trueFalse;
     }
-    
+
     private function _buildRemoveSourceFilesOptions() {
-        
+
         $trueFalse = array(array('id'=>'removeSourceFiles0', 'name'=>'removeSourceFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'removeSourceFiles1', 'name'=>'removeSourceFiles', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildUseStartDateOptions() {
-        
+
         $trueFalse = array(array('id'=>'useStartDate0', 'name'=>'useStartDate', 'value'=>'0', 'label'=>'No'), array('id'=>'useStartDate1', 'name'=>'useStartDate', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
-    
+
     private function _buildSkipEmptyDirsOptions() {
-        
+
         $trueFalse = array(array('id'=>'skipEmptyDirs0', 'name'=>'skipEmptyDirs', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyDirs1', 'name'=>'skipEmptyDirs', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildSkipEmptyFilesOptions() {
-        
+
         $trueFalse = array(array('id'=>'skipEmptyFiles0', 'name'=>'skipEmptyFiles', 'value'=>'0', 'label'=>'No'), array('id'=>'skipEmptyFiles1', 'name'=>'skipEmptyFiles', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildSyncFromSourceOptions() {
-        
+
         $trueFalse = array(array('id'=>'syncFromSource0', 'name'=>'syncFromSource', 'value'=>'0', 'label'=>'No'), array('id'=>'syncFromSource1', 'name'=>'syncFromSource', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildUseSSHKeyOptions() {
-        
+
         $trueFalse = array(array('id'=>'useSSHKey0', 'name'=>'sshUseKey', 'value'=>'0', 'label'=>'No'), array('id'=>'useSSHKey1', 'name'=>'sshUseKey', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildUseLocalMountPointOptions() {
-        
+
         $trueFalse = array(array('id'=>'localDirIsMountPoint0', 'name'=>'localDirIsMountPoint', 'value'=>'0', 'label'=>'No'), array('id'=>'localDirIsMountPoint1', 'name'=>'localDirIsMountPoint', 'value'=>'1', 'label'=>'Yes'));
         return $trueFalse;
     }
 
     private function _buildCruiseOrLoweringOptions() {
-        
+
         $output = array(array('id'=>'cruiseOrLowering0', 'name'=>'cruiseOrLowering', 'value'=>'0', 'label'=>CRUISE_NAME), array('id'=>'cruiseOrLowering1', 'name'=>'cruiseOrLowering', 'value'=>'1', 'label'=>LOWERING_NAME));
         return $output;
     }
@@ -83,12 +83,12 @@ class CollectionSystemTransfers extends Controller {
         $_warehouseModel = new \Models\Warehouse();
         $warehouseConfig = $_warehouseModel->getShipboardDataWarehouseConfig();
         $cruiseID = $_warehouseModel->getCruiseID();
-        
+
         if(is_dir($warehouseConfig['shipboardDataWarehouseBaseDir'] . '/' . $cruiseID)) {
             $gmData['siteRoot'] = DIR;
             $gmData['shipboardDataWarehouse'] = $warehouseConfig;
             $gmData['cruiseID'] = $cruiseID;
-        
+
             # create the gearman client
             $gmc= new \GearmanClient();
 
@@ -115,7 +115,7 @@ class CollectionSystemTransfers extends Controller {
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $this->_transferTypesModel = new \Models\Config\TransferTypes();
     }
-        
+
     public function index(){
         $data['title'] = 'Configuration';
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName");
@@ -191,20 +191,20 @@ class CollectionSystemTransfers extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($sourceDir == ''){
                 $error[] = 'Source Directory is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
             }
-            
+
             if($includeFilter == ''){
                 $includeFilter = '*';
             } else {
@@ -230,7 +230,7 @@ class CollectionSystemTransfers extends Controller {
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
                 $error[] = 'Transfer limit must be an integer';
             }
-            
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -243,25 +243,25 @@ class CollectionSystemTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { // Rsync Server
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
 
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $smbServer = '';
                     $smbUser = '';
@@ -271,30 +271,30 @@ class CollectionSystemTransfers extends Controller {
                     $sshUser = '';
                     $sshUseKey = '0';
                     $sshPass = '';
-                }       
+                }
 
             } elseif ($transferType == 3) { // SMB Share
                 $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
 //                }
-                
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $rsyncServer = '';
                     $rsyncUser = '';
@@ -309,19 +309,19 @@ class CollectionSystemTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'Rsync Username is required';
                     $sshDataCheck = false;
 
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
                 }
-                
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -332,8 +332,8 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
-            } 
-            
+            }
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
@@ -413,26 +413,26 @@ class CollectionSystemTransfers extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($sourceDir == ''){
                 $error[] = 'Source Directory is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
             }
-            
+
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
                 $error[] = 'Transfer limit must be an integer';
             }
-            
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -445,25 +445,25 @@ class CollectionSystemTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { // Rsync Server
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
 
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -474,30 +474,30 @@ class CollectionSystemTransfers extends Controller {
                     $sshUser = '';
                     $sshUseKey = '0';
                     $sshPass = '';
-                }       
+                }
 
             } elseif ($transferType == 3) { // SMB Share
                 $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
 //                }
-                
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -513,19 +513,19 @@ class CollectionSystemTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'Rsync Username is required';
                     $sshDataCheck = false;
 
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
                 }
-                
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -536,8 +536,8 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
-            }    
-            
+            }
+
             if(!$error){
                 $_warehouseModel = new \Models\Warehouse();
                 $gmData['collectionSystemTransfer'] = (object)array(
@@ -573,7 +573,7 @@ class CollectionSystemTransfers extends Controller {
                     'status' => '4',
                     'enable' => '0',
                 );
-                
+
                 # create the gearman client
                 $gmc= new \GearmanClient();
 
@@ -590,7 +590,7 @@ class CollectionSystemTransfers extends Controller {
         View::render('Config/addCollectionSystemTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-        
+
     public function edit($id) {
         $_warehouseModel = new \Models\Warehouse();
 
@@ -608,10 +608,10 @@ class CollectionSystemTransfers extends Controller {
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
-        $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);        
+        $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);
 
         $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
-        
+
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
             $longName = $_POST['longName'];
@@ -644,26 +644,26 @@ class CollectionSystemTransfers extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
 	    elseif( preg_match('/\s/',$name) ){
 	        $error[] = 'Name cannot contain whitespace, underscores are acceptable';
 	    }
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($sourceDir == ''){
                 $error[] = 'Source Directory is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
-            } 
+            }
 
             if($includeFilter == ''){
                 $includeFilter = '*';
@@ -678,7 +678,7 @@ class CollectionSystemTransfers extends Controller {
             if($ignoreFilter != ''){
                 $ignoreFilter = preg_replace("/\s*,\s*/", ",",$ignoreFilter);
             }
-            
+
             if ($staleness === '') {
                 $staleness = '0';
             } elseif(!((string)(int)$staleness == $staleness)){
@@ -703,24 +703,24 @@ class CollectionSystemTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { //rsync
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -731,30 +731,30 @@ class CollectionSystemTransfers extends Controller {
                     $sshUser = '';
                     $sshUseKey = '0';
                     $sshPass = '';
-                } 
+                }
 
             } elseif ($transferType == 3) { // SMB Share
                 $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
+                }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
 //                }
-                
+
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -770,18 +770,18 @@ class CollectionSystemTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
                 }
-                
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -792,9 +792,9 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
-                        
+
             }
-                
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
@@ -826,20 +826,20 @@ class CollectionSystemTransfers extends Controller {
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
                 );
-            
-                
+
+
                 $where = array('collectionSystemTransferID' => $id);
                 $this->_collectionSystemTransfersModel->updateCollectionSystemTransfer($postdata,$where);
-                
+
                 if($data['row'][0]->destDir != $destDir){
                     $this->updateDestinationDirectory();
 		}
 
-                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : ""; 
+                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
                 Session::set('message','Collection System Transfers Updated');
                 Url::redirect('config/collectionSystemTransfers'.$filter);
             } else {
-                
+
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->transferType = $transferType;
@@ -899,7 +899,7 @@ class CollectionSystemTransfers extends Controller {
             $includeFilter = $_POST['includeFilter'];
             $excludeFilter = $_POST['excludeFilter'];
             $ignoreFilter = $_POST['ignoreFilter'];
-            
+
             if($name == ''){
                 $error[] = 'Name is required';
             }
@@ -909,24 +909,24 @@ class CollectionSystemTransfers extends Controller {
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
-            } 
+            }
 
             if($sourceDir == ''){
                 $error[] = 'Source Directory is required';
-            } 
+            }
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
-            } 
+            }
 
             if($includeFilter == ''){
                 $includeFilter = '*';
             }
-            
+
             if ($bandwidthLimit === '') {
                 $bandwidthLimit = '0';
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
@@ -945,24 +945,24 @@ class CollectionSystemTransfers extends Controller {
                 $sshUser = '';
                 $sshUseKey = '0';
                 $sshPass = '';
-            
+
             } elseif ($transferType == 2) { //rsync
                 $rsyncDataCheck = true;
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
                     $rsyncDataCheck = false;
-                } 
+                }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
                     $rsyncDataCheck = false;
                 }
-                
+
                 if($rsyncDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -973,20 +973,20 @@ class CollectionSystemTransfers extends Controller {
                     $sshUser = '';
                     $sshUseKey = '0';
                     $sshPass = '';
-                } 
+                }
 
             } elseif ($transferType == 3) { // SMB Share
                 $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
                     $smbDataCheck = false;
-                } 
+                }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
                     $smbDataCheck = false;
-                } 
-                
+                }
+
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
 //                    $smbDataCheck = false;
@@ -996,7 +996,7 @@ class CollectionSystemTransfers extends Controller {
                     $smbDomain = 'WORKGROUP'; // Default value
                     $smbDataCheck = false;
                 }
-                
+
                 if($smbDataCheck) {
                     $localDirIsMountPoint = '0';
                     $rsyncServer = '';
@@ -1012,18 +1012,18 @@ class CollectionSystemTransfers extends Controller {
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
                     $sshDataCheck = false;
-                } 
+                }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
                     $sshDataCheck = false;
                 }
-                
+
                 if($sshDataCheck) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
@@ -1034,13 +1034,13 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
-                        
+
             }
 
             if(!$error) {
 
                 $gmData['collectionSystemTransfer'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
-            
+
                 $gmData['collectionSystemTransfer']->name = $name;
                 $gmData['collectionSystemTransfer']->longName = $longName;
                 $gmData['collectionSystemTransfer']->transferType = $transferType;
@@ -1078,7 +1078,7 @@ class CollectionSystemTransfers extends Controller {
 
                 #submit job to Gearman, wait for results
                 $data['testResults'] = json_decode($gmc->doNormal("testCollectionSystemTransfer", json_encode($gmData)), true);
-                $data['testCollectionSystemTransferName'] = $longName;      
+                $data['testCollectionSystemTransferName'] = $longName;
             }
 
             #additional data needed for view
@@ -1116,7 +1116,7 @@ class CollectionSystemTransfers extends Controller {
         View::render('Config/editCollectionSystemTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function delete($id){
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         $where = array('collectionSystemTransferID' => $id);
@@ -1124,7 +1124,7 @@ class CollectionSystemTransfers extends Controller {
         Session::set('message','Collection System Transfer Deleted');
         Url::redirect('config/collectionSystemTransfers'.$filter);
     }
-    
+
     public function enable($id) {
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
         $this->_collectionSystemTransfersModel->enableCollectionSystemTransfer($id);
@@ -1133,22 +1133,22 @@ class CollectionSystemTransfers extends Controller {
 
         Url::redirect('config/collectionSystemTransfers'.$filter);
     }
-    
+
     public function disable($id) {
-	$filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";    
+	$filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
 	$this->_collectionSystemTransfersModel->disableCollectionSystemTransfer($id);
         Url::redirect('config/collectionSystemTransfers'.$filter);
     }
-    
+
     public function test($id) {
-        $_warehouseModel = new \Models\Warehouse(); 
+        $_warehouseModel = new \Models\Warehouse();
         $collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
         $gmData = array(
             'collectionSystemTransfer' => array(
                 'collectionSystemTransferID' => $collectionSystemTransfer->collectionSystemTransferID
             )
         );
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -1171,13 +1171,13 @@ class CollectionSystemTransfers extends Controller {
         View::render('Config/collectionSystemTransfers',$data);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function run($id) {
-        
+
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
 
 	$collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
-        
+
         $gmData = array(
             'collectionSystemTransfer' => array(
                 'collectionSystemTransferID' => $collectionSystemTransfer->collectionSystemTransferID,
@@ -1185,7 +1185,7 @@ class CollectionSystemTransfers extends Controller {
             ),
             'systemStatus' => "On"
         );
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -1199,15 +1199,15 @@ class CollectionSystemTransfers extends Controller {
 
         Url::redirect('config/collectionSystemTransfers'.$filter);
     }
-    
+
     public function stop($id) {
-        
+
         $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
 	
 	$gmData = array(
             'pid' => $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0]->pid
         );
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 

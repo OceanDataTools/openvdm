@@ -36,25 +36,23 @@ class Messages extends Controller {
         }
         echo json_encode($return);
     }
-    
+
     public function viewedMessage($id){
 
         $this->_messageModel->viewedMessage($id);
-        
+
         $return['status'] = 'success';
-        
+
         echo json_encode($return);
     }
-    
+
     public function getRecentMessages(){
 
         echo json_encode($this->_messageModel->getNewMessages($this->_messageLimit));
     }
-    
+
     public function getNewMessagesTotal(){
 
         echo json_encode($this->_messageModel->getNewMessagesTotal());
     }
-
-
 }

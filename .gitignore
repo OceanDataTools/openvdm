@@ -23,3 +23,4 @@ www/.htaccess
 www/composer.lock
 www/errorlog.html
 www/node_modules
+www/overlay_layers.json

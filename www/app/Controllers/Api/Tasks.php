@@ -22,7 +22,7 @@ class Tasks extends Controller {
     public function getTasks(){
         echo json_encode($this->_tasksModel->getTasks());
     }
-    
+
     public function getActiveTasks(){
         echo json_encode($this->_tasksModel->getActiveTasks());
     }
@@ -38,17 +38,17 @@ class Tasks extends Controller {
     public function getTask($id){
         echo json_encode($this->_tasksModel->getTask($id));
     }
-    
+
     // getProcessesStatuses - return the names and statuses of the collection system transfers.
 	public function getTaskStatuses() {
         echo json_encode($this->_tasksModel->getTaskStatuses());
     }
-    
+
     // setErrorProcess
 	public function setErrorTask($id) {
         $this->_tasksModel->setErrorTask($id);
     }
-    
+
     // setRunningProcess
 	public function setRunningTask($id) {
         $return = array();
@@ -66,5 +66,4 @@ class Tasks extends Controller {
 	public function setIdleTask($id) {
         $this->_tasksModel->setIdleTask($id);
     }
-
 }

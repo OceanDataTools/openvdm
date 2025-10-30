@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     var transferTypeOptions = [
         {"value" : "1", "text" : "Local Directory"},
         {"value" : "2", "text" : "Rsync Server"},
@@ -11,18 +11,18 @@ $(function () {
 
     function setSSHUseKeyField(sshUseKey) {
         if(sshUseKey == "1"){
-            $('input[name=sshPass]').val(""); 
+            $('input[name=sshPass]').val("");
             $('input[name=sshPass]').prop('disabled', true);
         } else {
             $('input[name=sshPass]').prop('disabled', false);
         }
     }
-    
+
     function setTransferTypeFields(transferType) {
 
         if (transferType === '') { transferType = '1'; }
         var transferTypeText = transferTypeOptions[parseInt(transferType, 10) - 1].text;
-        
+
         switch (transferTypeText) {
         case "Local Directory":
             $(".localDir").show();
@@ -81,12 +81,12 @@ $(function () {
             $(".removeSource").show();
         }
     }
-    
+
     setTransferTypeFields($('input[name=transferType]:checked').val());
     setSSHUseKeyField($('input[name=sshUseKey]:checked').val())
     setCustomStalenessField($('input[name=staleness]:checked').val())
     setCustomRemoveSourceField()
-    
+
     $('input[name=transferType]').change(function () {
         setTransferTypeFields($(this).val());
         setCustomRemoveSourceField()
@@ -95,7 +95,7 @@ $(function () {
     $('input[name=sshUseKey]').change(function () {
         setSSHUseKeyField($(this).val());
     });
-    
+
     $('input[name=staleness]').change(function () {
         setCustomStalenessField($(this).val());
         setCustomRemoveSourceField()

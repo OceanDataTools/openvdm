@@ -1,8 +1,8 @@
 $(function () {
     'use strict';
-    
+
     var MAPPROXY_DIR = '/mapproxy';
-    
+
     var mapObjects = [];
 
     function updateBounds(mapObject) {
@@ -12,7 +12,7 @@ $(function () {
             for (var item in mapObject['mapBounds'] ){
                 mapBoundsArray.push( mapObject['mapBounds'][ item ] );
             }
-            
+
             if (mapBoundsArray.length > 0) {
                 mapObject['map'].fitBounds(mapBoundsArray);
             }
@@ -20,9 +20,9 @@ $(function () {
     }
 
     function initMapObject(placeholderID, objectListID) {
-        
+
         var mapObject = [];
-        
+
         //Build mapObject object
         mapObject['placeholderID'] = placeholderID;
         mapObject['objectListID'] = objectListID;
@@ -50,7 +50,7 @@ $(function () {
 
         openStreetMap.addTo(mapObject['map']);
         openStreetMap.bringToBack();
-        
+
         var baseLayers = {
             "OpenStreetMap" : openStreetMap,
             "GMRT Base" : gmrtBase
@@ -84,9 +84,9 @@ $(function () {
             } else if ($(this).hasClass("tms-checkbox")) {
                 addTMSToMap(mapObject, $(this).val());
             }
-        });        
+        });
     }
-    
+
     function addLatestPositionLabelToMap(mapObject, dataType) {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
@@ -213,27 +213,27 @@ $(function () {
             }
         });
     }
-    
+
     function removeGeoJSONFromMap(mapObject, dataObjectJsonName) {
         mapObject['map'].removeLayer(mapObject['geoJSONLayers'][dataObjectJsonName]);
         delete mapObject['geoJSONLayers'][dataObjectJsonName];
-            
+
         //remove the bounds and re-center/re-zoom the map
         delete mapObject['mapBounds'][dataObjectJsonName];
-        
+
         updateBounds(mapObject);
     }
-    
+
     function addTMSToMap(mapObject, tmsObjectJsonName) {
         var getDataObjectFileURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + tmsObjectJsonName;
         $.getJSON(getDataObjectFileURL, function (data, status) {
             if (status === 'success' && data !== null) {
-                
+
                 var placeholder = '#' + mapObject['placeholderID'];
                 if ('error' in data){
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                        
+
                     // Calculate the bounds of the layer
                     var coords = data[0]['mapBounds'].split(','),
                         southwest = L.latLng(parseFloat(coords[1]), parseFloat(coords[0])),
@@ -245,21 +245,21 @@ $(function () {
                         bounds:L.latLngBounds(southwest, northeast),
                         zIndex: 10
                     });
-                    
+
                     if (parseFloat(coords[0]) < 0) {
                         southwest = southwest.wrap(360, 0);
                     } else {
                         southwest = southwest.wrap();
                     }
-                    
+
                     if (parseFloat(coords[2]) < 0) {
                         northeast = northeast.wrap(360, 0);
                     } else {
                         northeast = northeast.wrap();
                     }
-                    
+
                     mapObject['mapBounds'][tmsObjectJsonName] = L.latLngBounds(southwest, northeast);
-                        
+
                     // Add the layer to the map
                     mapObject['tmsLayers'][tmsObjectJsonName].addTo(mapObject['map']);
 
@@ -268,15 +268,15 @@ $(function () {
             }
         });
     }
-    
+
     function removeTMSFromMap(mapObject, tmsObjectJsonName) {
         //remove the layer
         mapObject['map'].removeLayer(mapObject['tmsLayers'][tmsObjectJsonName]);
         delete mapObject['tmsLayers'][tmsObjectJsonName];
-            
+
         //remove the bounds and re-center/re-zoom the map
         delete mapObject['mapBounds'][tmsObjectJsonName];
-        
+
         updateBounds(mapObject);
     }
 
@@ -288,14 +288,14 @@ $(function () {
         var objectListPlaceholderID =  tempArray.join('_') + '_objectList-placeholder';
         mapObjects.push(initMapObject(mapPlaceholderID, objectListPlaceholderID));
     });
-    
+
     //build the maps
     for(var i = 0; i < mapObjects.length; i++) {
         mapChecked(mapObjects[i]);
         setTimeout(updateBounds(mapObjects[i]), 5000);
         addLatestPositionLabelToMap(mapObjects[i], 'gga-cnav');
     }
-    
+
     //Check for updates
     $.each(mapObjects, function(i) {
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
@@ -318,5 +318,5 @@ $(function () {
             }
         });
     });
-    
+
 });

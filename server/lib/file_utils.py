@@ -7,7 +7,7 @@ DESCRIPTION:  utilities for dealing with local files/directories
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.11
+  VERSION:  2.12
   CREATED:  2025-07-05
  REVISION:  2025-07-07
 """
@@ -27,7 +27,7 @@ from datetime import timedelta
 from typing import List, Optional
 
 default_ignore_patterns = [
-    "**/@eaDir",
+    "**/@eaDir*",
     "**/.DS_Store",
     "**/._*",
     "**/Thumbs.db",

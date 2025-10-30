@@ -24,7 +24,7 @@ class ShipToShoreTransfers extends Controller {
 
         echo json_encode($this->_model->getShipToShoreTransfers());
     }
-    
+
     public function getRequiredShipToShoreTransfers(){
 
         echo json_encode($this->_model->getRequiredShipToShoreTransfers());

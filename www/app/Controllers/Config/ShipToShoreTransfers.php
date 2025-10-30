@@ -15,7 +15,7 @@ class shipToShoreTransfers extends Controller {
     private $_ssdwConfig;
 
     private function _buildTransferPriorityOptions($checkedType = null) {
-        
+
         $output = array();
 
         for( $i=1; $i<=5; $i++){
@@ -28,14 +28,14 @@ class shipToShoreTransfers extends Controller {
 
         if(!isset($checkedType)) {
             $output[sizeOf($output)-1]['checked']='1';
-        }        
+        }
         return $output;
     }
-    
+
     private function _buildCollectionSystemOptions($selectedCollectionSystemTransferID = null) {
-        
+
         $collectionSystemTransfers = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
-        
+
         $output = array();
 
 	$data = array("0" => "");
@@ -46,7 +46,7 @@ class shipToShoreTransfers extends Controller {
         $output['data'] = $data;
         $output['name'] = "collectionSystemTransfer";
         $output['class'] = "form-control";
-        
+
         //var_dump($output['data']);
         if(isset($selectedCollectionSystemTransferID)) {
             $output['value'] = $selectedCollectionSystemTransferID;
@@ -54,11 +54,11 @@ class shipToShoreTransfers extends Controller {
 	//var_dump($output['data'][1]);
         return $output;
     }
-    
+
     private function _buildExtraDirectoryOptions($selectedExtraDirectoryID = null) {
-        
+
         $extraDirectories = $this->_extraDirectoriesModel->getExtraDirectories();
-        
+
         $output = array();
 
         $data = array("0" => "");
@@ -69,13 +69,13 @@ class shipToShoreTransfers extends Controller {
         $output['data'] = $data;
         $output['name'] = "extraDirectory";
         $output['class'] = "form-control";
-        
+
         if(isset($selectedExtraDirectoryID)) {
             $output['value'] = $selectedExtraDirectoryID;
         }
         return $output;
     }
-    
+
     public function __construct(){
         if(!Session::get('loggedin')){
             Url::redirect('config/login');
@@ -85,9 +85,9 @@ class shipToShoreTransfers extends Controller {
         $this->_cruiseDataTransferModel = new \Models\Config\CruiseDataTransfers();
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
-        
+
         $requiredCruiseDataTransfers = $this->_cruiseDataTransferModel->getRequiredCruiseDataTransfers();
-        
+
         foreach($requiredCruiseDataTransfers as $requiredCruiseDataTransfer) {
             if(strcmp($requiredCruiseDataTransfer->name, 'SSDW') === 0) {
                 $this->_ssdwConfig = $requiredCruiseDataTransfer;
@@ -127,20 +127,20 @@ class shipToShoreTransfers extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($priority == ''){
                 $error[] = 'Priority is required';
             }
-            
+
             if($collectionSystem == 0 && $extraDirectory == 0){
                 $error[] = 'Select a Collections System and/or Extra Directory';
             }
-            
+
             if($includeFilter == ''){
                 $includeFilter = '*';
             } else {
@@ -168,7 +168,7 @@ class shipToShoreTransfers extends Controller {
         View::render('Config/addShipToShoreTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-        
+
     public function edit($id){
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
@@ -184,26 +184,26 @@ class shipToShoreTransfers extends Controller {
 
             if($name == ''){
                 $error[] = 'Name is required';
-            } 
+            }
 
             if($longName == ''){
                 $error[] = 'Long name is required';
-            } 
+            }
 
             if($priority == ''){
                 $error[] = 'Priority is required';
-            } 
+            }
 
             if($collectionSystem == 0 && $extraDirectory == 0){
                 $error[] = 'Select a Collections System and/or Extra Directory';
-            } 
-            
+            }
+
             if($includeFilter == ''){
                 $includeFilter = '*';
             } else {
                 $includeFilter = preg_replace("/\s*,\s*/", ",",$includeFilter);
             }
-                
+
             if(!$error){
                 $postdata = array(
                     'name' => $name,
@@ -213,14 +213,14 @@ class shipToShoreTransfers extends Controller {
                     'extraDirectory' => $extraDirectory,
                     'includeFilter' => $includeFilter,
                 );
-            
-                
+
+
                 $where = array('shipToShoreTransferID' => $id);
                 $this->_shipToShoreTransfersModel->updateShipToShoreTransfer($postdata,$where);
                 Session::set('message','Ship-to-Shore Transfers Updated');
                 Url::redirect('config/shipToShoreTransfers');
             } else {
-                
+
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->priority = $priority;
@@ -238,29 +238,29 @@ class shipToShoreTransfers extends Controller {
         View::render('Config/editShipToShoreTransfers',$data,$error);
         View::rendertemplate('footer',$data);
     }
-    
+
     public function delete($id){
-                
+
         $where = array('shipToShoreTransferID' => $id);
         $this->_shipToShoreTransfersModel->deleteShipToShoreTransfer($where);
         Session::set('message','Ship-to-Shore Transfer Deleted');
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
     public function enable($id) {
 
         $this->_shipToShoreTransfersModel->enableShipToShoreTransfer($id);
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
     public function disable($id) {
 
         $this->_shipToShoreTransfersModel->disableShipToShoreTransfer($id);
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
     public function run() {
-        
+
         $_warehouseModel = new \Models\Warehouse();
         $gmData = array(
             'cruiseDataTransfer' => array(
@@ -269,7 +269,7 @@ class shipToShoreTransfers extends Controller {
             'systemStatus' => "On"
         );
 
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -278,25 +278,25 @@ class shipToShoreTransfers extends Controller {
 
         #submit job to Gearman
         $job_handle = $gmc->doBackground("runShipToShoreTransfer", json_encode($gmData));
-    
+
     //    $done = false;
     //    do
     //    {
             sleep(1);
     //        $stat = $gmc->jobStatus($job_handle);
-    //        if ($stat[0]) // the job is known so it has been added to gearman 
+    //        if ($stat[0]) // the job is known so it has been added to gearman
     //            $done = true;
     //    }
     //    while(!$done);
-        
+
         Url::redirect('config/shipToShoreTransfers');
     }
 
     public function stop() {
-        
+
         $_warehouseModel = new \Models\Warehouse();
         $gmData['pid'] = $this->_ssdwConfig->pid;
-        
+
         # create the gearman client
         $gmc= new \GearmanClient();
 
@@ -305,20 +305,20 @@ class shipToShoreTransfers extends Controller {
 
         #submit job to Gearman
         $job_handle = $gmc->doBackground("stopJob", json_encode($gmData));
-    
+
     //    $done = false;
     //    do
     //    {
             sleep(1);
     //        $stat = $gmc->jobStatus($job_handle);
-    //        if ($stat[0]) // the job is known so it has been added to gearman 
+    //        if ($stat[0]) // the job is known so it has been added to gearman
     //            $done = true;
     //    }
     //    while(!$done);
-        
+
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
     public function enableShipToShoreTransfers() {
 
         //$this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
@@ -326,11 +326,11 @@ class shipToShoreTransfers extends Controller {
         //Url::redirect('config/cruiseDataTransfers');
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
     public function disableShipToShoreTransfers() {
 
         $this->_cruiseDataTransferModel->disableCruiseDataTransfer($this->_ssdwConfig->cruiseDataTransferID);
         Url::redirect('config/shipToShoreTransfers');
     }
-    
+
 }

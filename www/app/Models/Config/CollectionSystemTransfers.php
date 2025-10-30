@@ -55,7 +55,7 @@ class CollectionSystemTransfers extends Model {
     public function getLoweringOnlyCollectionSystemTransfers(){
         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE cruiseOrLowering = :cruiseOrLowering ORDER BY name", array(':cruiseOrLowering' => 1));
     }
-    
+
     public function getCollectionSystemTransfersStatuses(){
         return $this->db->select("SELECT collectionSystemTransferID, name, longName, status, enable FROM ".PREFIX."CollectionSystemTransfers ORDER BY name");
     }
@@ -63,15 +63,15 @@ class CollectionSystemTransfers extends Model {
     public function getCollectionSystemTransfer($id){
         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers WHERE collectionSystemTransferID = :id",array(':id' => $id));
     }
-    
+
     public function insertCollectionSystemTransfer($data){
         $this->db->insert(PREFIX."CollectionSystemTransfers",$data);
     }
-    
+
     public function updateCollectionSystemTransfer($data,$where){
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
-    
+
     public function deleteCollectionSystemTransfer($where){
 
         $cruiseDataTransfers = new \Models\Config\CruiseDataTransfers();
@@ -79,7 +79,7 @@ class CollectionSystemTransfers extends Model {
 
         $this->db->delete(PREFIX."CollectionSystemTransfers", $where);
     }
-    
+
     public function setErrorCollectionSystemTransfer($id){
         $data = array('status' => '3', 'pid' => '0');
         $where = array('collectionSystemTransferID' => $id);
@@ -103,7 +103,7 @@ class CollectionSystemTransfers extends Model {
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
-    
+
     public function setOffCollectionSystemTransfer($id){
         $data = array();
         $row = $this->getCollectionSystemTransfer($id);
@@ -113,7 +113,7 @@ class CollectionSystemTransfers extends Model {
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
-    
+
     public function enableCollectionSystemTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCollectionSystemTransfer($id);
@@ -123,7 +123,7 @@ class CollectionSystemTransfers extends Model {
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
-    
+
     public function disableCollectionSystemTransfer($id){
         $data = array('enable' => 0, 'status' => 4);
         // $row = $this->getCollectionSystemTransfer($id);
@@ -133,7 +133,7 @@ class CollectionSystemTransfers extends Model {
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
-    
+
     public function getCollectionSystemTransfersConfig(){
         return $this->db->select("SELECT * FROM ".PREFIX."CollectionSystemTransfers ORDER BY collectionSystemTransferID");
     }

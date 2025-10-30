@@ -242,3 +242,4 @@ pip install -r requirements.txt
 11. Start the mysql cli `mysql -p`
 12. Select the OpenVDM database by typing: `use openvdm;` (`openvdm` is the default name of the database)
 13. Run the update script: `source <path to openvdm>/database/openvdm_210_to_211.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
+14. Install rclone via `apt-get install rclone` (Ubuntu) or `dnf install rclone` (Rocky/RHEL)

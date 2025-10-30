@@ -1,12 +1,12 @@
 $(function () {
     'use strict';
-    
+
     function formatFilesize(bytes) {
         var s = ['bytes', 'kb', 'MB', 'GB', 'TB', 'PB'];
         var e = Math.floor(Math.log(bytes) / Math.log(1024));
         return (bytes / Math.pow(1024, Math.floor(e))).toFixed(2) + " " + s[e];
     }
-    
+
     function timeElapsedString(mysqlTime) {
 
         var etime = Math.abs(new Date() - new Date(mysqlTime.replace(/ /g, 'T') + 'Z')) / 1000;
@@ -20,7 +20,7 @@ $(function () {
                  {'math' : 60 * 60, 'single': 'hour', 'plural': 'hours'},
                  {'math' : 60, 'single': 'minute', 'plural': 'minutes'},
                  {'math' : 1, 'single': 'second', 'plural': 'seconds'}];
-        
+
         var i = 0;
 
         for (i = 0; i < s.length; i++) {
@@ -32,7 +32,7 @@ $(function () {
             }
         }
     }
-    
+
     function updateSystemStatusPanel(systemStatusPanel, systemStatus) {
         var systemStatusURL = siteRoot + 'api/warehouse/getSystemStatus';
         $.getJSON(systemStatusURL, function (data, status) {
@@ -55,7 +55,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function updateCruiseIDPanel(cruiseIDPanel, cruiseID) {
         var transferStatusURL = siteRoot + 'api/warehouse/getCruiseID';
         $.getJSON(transferStatusURL, function (data, status) {
@@ -75,7 +75,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function updateCruiseSizePanel(cruiseSizePanel, cruiseSize) {
         var transferStatusURL = siteRoot + 'api/warehouse/getCruiseSize';
         $.getJSON(transferStatusURL, function (data, status) {
@@ -127,7 +127,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function updateLoweringSizePanel(loweringSizePanel, loweringSize) {
         var transferStatusURL = siteRoot + 'api/warehouse/getLoweringSize';
         $.getJSON(transferStatusURL, function (data, status) {
@@ -186,7 +186,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function updateMessageCount(OVDM_messageCount) {
         var getNewMessageCount = siteRoot + 'api/messages/getNewMessagesTotal';
         $.getJSON(getNewMessageCount, function (data, status) {
@@ -198,7 +198,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function updateRecentMessages(OVDM_messagesUI, OVDM_messageCount) {
         var getRecentMessagesURL = siteRoot + 'api/messages/getRecentMessages';
         $.getJSON(getRecentMessagesURL, function (data, status) {
@@ -211,7 +211,7 @@ $(function () {
                 for (index = 0; index < data.length; index++) {
                     var timeAgo = timeElapsedString(data[index]['messageTS']);
 
-                    
+
                     var sp = document.createElement('span');
                     sp.setAttribute("class", "pull-right text-muted small");
                     sp.innerHTML = timeAgo;
@@ -219,7 +219,7 @@ $(function () {
                     var s = document.createElement('strong');
                     s.innerHTML = data[index]['messageTitle'];
                     s.appendChild(sp);
-                    
+
                     var a = document.createElement('a');
                     a.setAttribute("class", "OVDM_message");
                     a.setAttribute("messageID", data[index]['messageID']);
@@ -231,42 +231,42 @@ $(function () {
                         $(this).parent().remove(); // remove message <li>
                         $(OVDM_messageCount).html(parseInt($(OVDM_messageCount).text()) - 1);
                     };
-                    
+
                     var li = document.createElement('li');
                     li.appendChild(a);
                     ul.appendChild(li);
-                    
+
                     var divider = document.createElement("li");
                     divider.setAttribute("class", "divider");
 
                     ul.appendChild(divider);
                 }
-                
+
                 var i = document.createElement("i");
                 i.setAttribute("class", "fa fa-angle-right");
-                
+
                 var s = document.createElement("strong");
                 s.innerHTML = "Read All Messages ";
                 s.appendChild(i);
-                
+
                 var a = document.createElement("a");
                 a.setAttribute("class", "text-center");
                 a.setAttribute("href", siteRoot + "config/messages");
                 a.appendChild(s);
-                
+
                 var li = document.createElement("li");
                 li.appendChild(a);
                 ul.appendChild(li);
-                
+
                 $(OVDM_messagesUI).replaceWith(ul);
             }
-            
+
             setTimeout(function () {
                 updateRecentMessages(OVDM_messagesUI);
             }, 5000);
         });
     }
-    
+
     function updateJobs(OVDM_jobsUI, OVDM_jobCount) {
         var getJobsURL = siteRoot + 'api/gearman/getJobs';
         $.getJSON(getJobsURL, function (data, status) {
@@ -280,7 +280,7 @@ $(function () {
 
                     var s = document.createElement("strong");
                     s.innerHTML = "No tasks currently running";
-                    
+
                     a.appendChild(s);
                     li.appendChild(a);
                 } else {
@@ -300,7 +300,7 @@ $(function () {
                         pb2.setAttribute("aria-valuemax", data[i]['jobDenominator']);
                         pb2.setAttribute("style", "width: " + progress + "%");
                         pb2.appendChild(sp2);
-                        
+
                         var pb = document.createElement("div");
                         pb.setAttribute("class", "progress progress-striped active");
                         pb.appendChild(pb2);
@@ -325,7 +325,7 @@ $(function () {
                         a.setAttribute("jobID", data[i]['jobID']);
                         a.setAttribute("href", "#");
                         a.appendChild(d);
-                        
+
                         li.appendChild(a);
                     }
                 }
@@ -338,7 +338,7 @@ $(function () {
             }, 5000);
         });
     }
-    
+
     function messageViewed(messageID) {
         var messageViewedURL = siteRoot + 'config/messages/viewedMessage/' + messageID;
         $.getJSON(messageViewedURL, function (data, status) {
@@ -347,30 +347,30 @@ $(function () {
             }
         });
     }
-    
+
     // When document is ready...
     $(document).ready(function () {
-        
+
         // If cookie is set, scroll to the position saved in the cookie.
         if ((Cookies.get("scrollDown") !== null) && (window.location.hash == null)) {
             $(document).scrollTop(Cookies.get("scrollDown"));
             Cookies.remove("scrollDown");
         }
     });
-    
+
     // When a button is clicked...
     $('a').on("click", function () {
         // Set a cookie that holds the scroll position.
         Cookies.set("scrollDown", $(document).scrollTop());
     });
-    
+
     $('a.OVDM_message').on('click', function () {
         messageViewed($(this).attr('messageID'));
         $(this).parent().next('li').remove(); // remove following divider <li>
         $(this).parent().remove(); // remove message <li>
         $('#OVDM_messageCount').html(parseInt($('#OVDM_messageCount').text())-1); // decrement message count
     });
-    
+
     updateSystemStatusPanel('#systemStatusPanel', '#systemStatus');
     updateCruiseIDPanel('#cruiseIDPanel', '#cruiseID');
     updateCruiseSizePanel('#cruiseSizePanel', '#cruiseSize');

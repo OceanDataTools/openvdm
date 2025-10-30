@@ -1,18 +1,18 @@
 $(function () {
     'use strict';
-    
+
     var MAPPROXY_DIR = '/mapproxy';
     var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
 
     var max_values = 5;
-    
+
     function displayLatestJSON(dataType, reversedY, inverted) {
         var reversedY = reversedY || false;
         var inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
-                
+
                 var placeholderID = dataType + '-placeholder',
                     placeholder = '#' + placeholderID;
                 if (data.indexOf('error') > 0) {
@@ -50,7 +50,7 @@ $(function () {
                             backgroundColor: colors[i%colors.length],
                             color: colors[i%colors.length]
                         });
-                                
+
                         scales[data[i].label] = {
                             type: 'linear',
                             display: false,
@@ -61,7 +61,7 @@ $(function () {
                             }
                         }
                     }
-                
+
                     var chartOptions = {
                         type: 'line',
                         options: {
@@ -96,7 +96,7 @@ $(function () {
             }
         });
     }
-        
+
     function displayLatestGeoJSON(dataType) {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
@@ -109,13 +109,13 @@ $(function () {
                     //Get the last coordinate from the latest trackline
                     var lastCoordinate = data[0].features[0].geometry.coordinates[data[0].features[0].geometry.coordinates.length - 1],
                         latLng = L.latLng(lastCoordinate[1], lastCoordinate[0]);
-                    
+
                     if (lastCoordinate[0] < 0) {
                         latLng = latLng.wrap(360, 0);
                     } else {
                         latLng = latLng.wrap();
                     }
-                    
+
                     // Add latest trackline (GeoJSON)
                     var ggaData = L.geoJson(data[0], {
                         style: { weight: 3 },
@@ -133,7 +133,7 @@ $(function () {
                         }
                     }),
                     mapBounds = ggaData.getBounds();
-                    
+
                     mapBounds.extend(latLng);
 
                     //Build the map
@@ -145,7 +145,7 @@ $(function () {
                         touchZoom: false,
                         scrollWheelZoom: false
                     }).fitBounds(mapBounds).zoomOut(1);
-                    
+
                     mapdb.on('click', function(e) {
                         window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
                     });
@@ -155,32 +155,32 @@ $(function () {
                         // attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
                         maxZoom: 20
                     }).addTo(mapdb);
-                    
+
                     // Add latest trackline (GeoJSON)
                     ggaData.addTo(mapdb);
-                    
+
                     // Add marker at the last coordinate
                     var marker = L.marker(latLng).addTo(mapdb);
-                    
+
                 }
             }
         });
     }
-    
+
     function displayLatestTMS(dataType) {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
-                
+
                 var placeholder = '#' + dataType + '-placeholder';
                 if ('error' in data) {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    
+
                     var coords = data[0]['mapBounds'].split(','),
                             southwest = L.latLng(parseFloat(coords[1]), parseFloat(coords[0])),
                             northeast = L.latLng(parseFloat(coords[3]), parseFloat(coords[2]));
-                        
+
                     //Build Leaflet latLng object
                     var mapBounds = L.latLngBounds(southwest, northeast);
                     var latLng = mapBounds.getCenter();
@@ -194,7 +194,7 @@ $(function () {
                         touchZoom: false,
                         scrollWheelZoom: false
                     });
-                    
+
                     mapdb.on('click', function(e) {
                         window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
                     });
@@ -203,7 +203,7 @@ $(function () {
                     L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
                         maxZoom: 20
                     }).addTo(mapdb);
-                    
+
                     // Add latest geotiff
                     if ('tileDirectory' in data[0]) {
                         L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
@@ -224,7 +224,7 @@ $(function () {
     }
 
     function displayLatestData() {
-        
+
         var i = 0;
         for (i = 0; i < geoJSONTypes.length; i++) {
             if ($('#' + geoJSONTypes[i] + '-placeholder').length) {
@@ -258,6 +258,6 @@ $(function () {
             }
         }
     }
-    
+
     displayLatestData();
 });

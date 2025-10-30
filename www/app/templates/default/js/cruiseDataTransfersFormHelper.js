@@ -1,6 +1,6 @@
 $(function () {
     'use strict';
-    
+
     var transferTypeOptions = [
         {"value" : "1", "text" : "Local Directory"},
         {"value" : "2", "text" : "Rsync Server"},
@@ -11,7 +11,7 @@ $(function () {
 
     function setSSHUseKeyField(sshUseKey) {
         if(sshUseKey == "1"){
-            $('input[name=sshPass]').val(""); 
+            $('input[name=sshPass]').val("");
             $('input[name=sshPass]').prop('disabled', true);
         } else {
             $('input[name=sshPass]').prop('disabled', false);
@@ -22,7 +22,7 @@ $(function () {
 
         if (transferType === '') { transferType = '1'; }
         var transferTypeText = transferTypeOptions[parseInt(transferType, 10) - 1].text;
-        
+
         switch (transferTypeText) {
         case "Local Directory":
             $(".localDir").show();
@@ -62,7 +62,7 @@ $(function () {
         default:
         }
     }
-        
+
     setTransferTypeFields($('input[name=transferType]:checked').val());
     setSSHUseKeyField($('input[name=sshUseKey]:checked').val())
 
@@ -77,11 +77,11 @@ $(function () {
     $('#selectAllCS').change(function() {
       // Check if 'Select All' is checked
       var isChecked = $(this).prop('checked');
-      
+
       // Set all child checkboxes' checked state based on 'Select All'
       $('#excludedCollectionSystems input[type="checkbox"]').prop('checked', isChecked);
     });
-    
+
     // Optional: If any child checkbox is unchecked, uncheck 'Select All'
     $('#excludedCollectionSystems input[type="checkbox"]').change(function() {
       // If any child checkbox is unchecked, uncheck the 'Select All' checkbox
@@ -92,15 +92,15 @@ $(function () {
         $('#selectAllCS').prop('checked', true);
       }
     });
-    
+
     $('#selectAllED').change(function() {
       // Check if 'Select All' is checked
       var isChecked = $(this).prop('checked');
-      
+
       // Set all child checkboxes' checked state based on 'Select All'
       $('#excludedExtraDirectories input[type="checkbox"]').prop('checked', isChecked);
     });
-    
+
     // Optional: If any child checkbox is unchecked, uncheck 'Select All'
     $('#excludedExtraDirectories input[type="checkbox"]').change(function() {
       // If any child checkbox is unchecked, uncheck the 'Select All' checkbox

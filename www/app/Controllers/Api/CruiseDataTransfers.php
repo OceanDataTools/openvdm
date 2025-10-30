@@ -23,12 +23,12 @@ class CruiseDataTransfers extends Controller {
 
         echo json_encode($this->_cruiseDataTransfersModel->getCruiseDataTransfers());
     }
-    
+
     public function getCruiseDataTransfer($id){
 
         echo json_encode($this->_cruiseDataTransfersModel->getCruiseDataTransfer($id));
     }
-    
+
     public function getRequiredCruiseDataTransfers(){
 
         echo json_encode($this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers());
@@ -38,7 +38,7 @@ class CruiseDataTransfers extends Controller {
 
         echo json_encode($this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfer($id));
     }
-    
+
     // getCruiseDataTransfersStatuses - return the names and statuses of the cruise data transfers.
 	public function getCruiseDataTransfersStatuses() {
         echo json_encode($this->_cruiseDataTransfersModel->getCruiseDataTransfersStatuses());
@@ -58,7 +58,7 @@ class CruiseDataTransfers extends Controller {
 	public function setErrorCruiseDataTransfer($id) {
         $this->_cruiseDataTransfersModel->setErrorCruiseDataTransfer($id);
     }
-    
+
     // setRunningCruiseDataTransfer
 	public function setRunningCruiseDataTransfer($id) {
         $return = array();
@@ -71,7 +71,7 @@ class CruiseDataTransfers extends Controller {
         }
         echo json_encode($return);
     }
-    
+
     // setIdlerCruiseDataTransfer
 	public function setIdleCruiseDataTransfer($id) {
         $this->_cruiseDataTransfersModel->setIdleCruiseDataTransfer($id);

@@ -28,10 +28,10 @@ class TransferLogs extends Model {
         }
         return $returnArray;
     }
-    
+
     private function outputLogFileSummary($files) {
         $returnArray = array();
-        
+
         #for($i = sizeof($files)-1; $i >= 0; $i--) {
         for($i = 0; $i < sizeof($files); $i++) {
             if (file_exists($files[$i]) && is_readable($files[$i])) {
@@ -47,11 +47,11 @@ class TransferLogs extends Model {
                     array_push($returnArray, $obj);
                 } else {
                     $obj = (object) array('collectionSystemName' => $collectionSystem, 'date' => $date, 'newFiles' => $transferLogSummary->new, 'updatedFiles' => $transferLogSummary->updated);
-                    array_push($returnArray, $obj);                
+                    array_push($returnArray, $obj);
                 }
             }
         }
-        
+
         if(strcmp($date, "Exclude") != 0) {
             if(is_array($returnArray) && sizeof($returnArray) > 0) {
                 $sortArray = array();
@@ -67,24 +67,24 @@ class TransferLogs extends Model {
 
                 $orderby = "date"; //change this to whatever key you want from the array
 
-                array_multisort($sortArray[$orderby],SORT_DESC,$returnArray); 
-            }            
+                array_multisort($sortArray[$orderby],SORT_DESC,$returnArray);
+            }
         }
-        
-        //return $dataObjects;  
+
+        //return $dataObjects;
         return $returnArray;
     }
-    
+
     public function getExcludeLogFilenames() {
         $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/*_Exclude.log");
         return $this->outputLogFilenames($files);
     }
-    
+
     public function getExcludeLogsSummary() {
         $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/*_Exclude.log");
         return $this->outputLogFileSummary($files);
     }
-    
+
     public function getShipboardLogFilenames($count = 0) {
         $files = preg_grep('#SSDW#', glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/*Z.log"), PREG_GREP_INVERT);
         if (is_array($files) && sizeof($files) > $count) {
@@ -92,9 +92,9 @@ class TransferLogs extends Model {
         }
         return $this->outputLogFilenames($files);
     }
-    
+
     public function getShipboardLogsSummary($count = 0) {
-        
+
         //preg_grep('#\.zip$#', glob('/dir/somewhere/*'), PREG_GREP_INVERT)
         $fileList = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/*Z.log");
         $fileList = preg_grep('#SSDW#', $fileList, PREG_GREP_INVERT);
@@ -104,7 +104,7 @@ class TransferLogs extends Model {
 	}
         return $this->outputLogFileSummary($files);
     }
-    
+
     public function getShipToShoreLogFilenames($count = 0) {
         $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*Z.log");
         if (is_array($files) && sizeof($files) > $count) {
@@ -112,7 +112,7 @@ class TransferLogs extends Model {
         }
         return $this->outputLogFilenames($files);
     }
-    
+
     public function getShipToShoreLogsSummary($count = 0) {
         $fileList = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/SSDW*Z.log");
 	array_multisort(array_map('filemtime', $files = $fileList), SORT_ASC, $files);
@@ -123,17 +123,17 @@ class TransferLogs extends Model {
 	// var_dump($files);
         return $this->outputLogFileSummary($files);
     }
-    
+
     public function getExcludeLogFilenameByName($name) {
-        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_Exclude.log");        
+        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_Exclude.log");
         return $this->outputLogFilenames($files);
     }
-    
+
     public function getExcludeLogSummaryByName($name) {
-        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_Exclude.log");        
+        $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_Exclude.log");
         return $this->outputLogFileSummary($files);
     }
-    
+
     public function getShipboardLogFilenamesByName($name, $count = 0) {
         $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_*Z.log");
         if (is_array($files) && sizeof($files) > $count) {
@@ -141,7 +141,7 @@ class TransferLogs extends Model {
         }
         return $this->outputLogFilenames($files);
     }
-    
+
     public function getShipboardLogsSummaryByName($name, $count = 0) {
         $files = glob($this->_cruiseDataDir . '/' . $this->_cruiseID . '/' . $this->_transferLogsDir ."/" . $name . "_*Z.log");
         if (is_array($files) && sizeof($files) > $count) {

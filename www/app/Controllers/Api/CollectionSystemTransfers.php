@@ -49,7 +49,7 @@ class CollectionSystemTransfers extends Controller {
     public function getCollectionSystemTransfers(){
         echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfers());
     }
-    
+
     public function getActiveCollectionSystemTransfers($sortField = 'name'){
         echo json_encode($this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers($sortField));
     }
@@ -65,17 +65,17 @@ class CollectionSystemTransfers extends Controller {
     public function getCollectionSystemTransfer($id){
         echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id));
     }
-    
+
     // getCollectionSystemTransfersStatuses - return the names and statuses of the collection system transfers.
 	public function getCollectionSystemTransfersStatuses() {
         echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfersStatuses());
     }
-    
+
     // setErrorCollectionSystemTransfersStatuses
 	public function setErrorCollectionSystemTransfer($id) {
         $this->_collectionSystemTransfersModel->setErrorCollectionSystemTransfer($id);
     }
-    
+
     // setRunningCollectionSystemTransfersStatuses
 	public function setRunningCollectionSystemTransfer($id) {
         $return = array();
@@ -89,7 +89,7 @@ class CollectionSystemTransfers extends Controller {
         echo json_encode($return);
     }
 
-    
+
     // setIdleCollectionSystemTransfersStatuses
 	public function setIdleCollectionSystemTransfer($id) {
         $this->_collectionSystemTransfersModel->setIdleCollectionSystemTransfer($id);

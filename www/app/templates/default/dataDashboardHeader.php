@@ -16,7 +16,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
             <div class="col-lg-12">
                 <div class="tabbable" style="margin-bottom: 18px;">
                     <ul class="nav nav-tabs">
-                        <li class="<?php echo ($data['page']==='main'? 'active': ''); ?>"><a id="main" href="<?php echo DIR; ?>dataDashboard">Main</a></li>                  
+                        <li class="<?php echo ($data['page']==='main'? 'active': ''); ?>"><a id="main" href="<?php echo DIR; ?>dataDashboard">Main</a></li>
 <?php
 foreach($data['customDataDashboardTabs'] as $row){
 ?>
@@ -24,7 +24,7 @@ foreach($data['customDataDashboardTabs'] as $row){
 <?php
 }
 ?>
-                        <li class="<?php echo ($data['page']==='dataQuality'? 'active': ''); ?>"><a id="dataQuality" href="<?php echo DIR; ?>dataDashboard/dataQuality">Data Quality</a></li> 
+                        <li class="<?php echo ($data['page']==='dataQuality'? 'active': ''); ?>"><a id="dataQuality" href="<?php echo DIR; ?>dataDashboard/dataQuality">Data Quality</a></li>
                     </ul>
                 </div>
             </div>

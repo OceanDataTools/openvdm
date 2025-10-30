@@ -8,20 +8,20 @@ use Helpers\Session;
 use Helpers\Url;
 
 class DataDashboard extends Controller {
-    
+
     private $_warehouseModel;
     private $_dashboardDataModel;
     private $_dataDashboardModel;
 
     public function __construct(){
-        
+
         $this->_warehouseModel = new \Models\Warehouse();
         $this->_dashboardDataModel = new \Models\DashboardData();
         $this->_dataDashboardModel = new \Models\DataDashboard();
     }
 
     public function index(){
-            
+
         $data['title'] = 'Data Dashboard';
         $data['page'] = 'main';
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
@@ -37,7 +37,7 @@ class DataDashboard extends Controller {
         $data['jsonReversedYTypes'] = $this->_dataDashboardModel->getJSONReversedYTypes();
         $data['jsonReversedYInvertedTypes'] = $this->_dataDashboardModel->getJSONReversedYInvertedTypes();
         $data['jsonInvertedTypes'] = $this->_dataDashboardModel->getJSONInvertedTypes();
-        
+
         $data['subPages'] = $this->_dataDashboardModel->getSubPages();
 
         View::renderTemplate('header', $data);
@@ -49,9 +49,9 @@ class DataDashboard extends Controller {
         }
         View::renderTemplate('footer', $data);
     }
-    
+
     public function customTab($tabName) {
-        
+
         $tab = $this->_dataDashboardModel->getDataDashboardTab($tabName);
         $data['title'] = $tab['title'];
         $data['page'] = $tabName;
@@ -68,14 +68,14 @@ class DataDashboard extends Controller {
                 array_push($data['css'], $cssFile);
             }
         }
-        
+
         $data['javascript'] = array();
         if ($tab['jsArray'] && is_array($tab['jsArray']) && sizeof($tab['jsArray'])>0) {
             foreach ($tab['jsArray'] as $jsFile) {
                 array_push($data['javascript'], $jsFile);
             }
         }
-        
+
         $data['placeholders'] = array();
         if ($tab['placeholderArray'] && is_array($tab['placeholderArray']) && sizeof($tab['placeholderArray'])>0) {
             foreach ($tab['placeholderArray'] as $placeholder) {
@@ -87,7 +87,7 @@ class DataDashboard extends Controller {
                 array_push($data['placeholders'], $placeholder);
             }
         }
-        
+
         $noDataFiles = true;
         for($i = 0; $i < sizeof($data['placeholders']); $i++) {
             for($j = 0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++) {
@@ -96,12 +96,12 @@ class DataDashboard extends Controller {
                     break;
                 }
             }
-            
+
             if(!$noDataFiles) {
                 break;
             }
         }
-        
+
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
 
@@ -111,11 +111,11 @@ class DataDashboard extends Controller {
             View::render('DataDashboard/' . $tab['view'], $data);
         }
         View::renderTemplate('footer', $data);
-        
+
     }
-    
+
     public function dataQuality(){
-        
+
         $data['title'] = 'Data Quality';
         $data['page'] = 'dataQuality';
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
@@ -127,7 +127,7 @@ class DataDashboard extends Controller {
         $data['dataObjects'] = array();
         $data['dataObjectsQualityTests'] = array();
         $data['dataObjectsStats'] = array();
-        
+
         for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
             array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
             array_push($data['dataObjectsQualityTests'], array());
@@ -138,7 +138,7 @@ class DataDashboard extends Controller {
                 array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
             }
         }
-        
+
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
 
@@ -149,9 +149,9 @@ class DataDashboard extends Controller {
         }
         View::renderTemplate('footer', $data);
     }
-    
+
     public function dataQualityShowFileStats($raw_data){
-        
+
         $data['title'] = 'Data Quality';
         $data['page'] = 'dataQuality';
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
@@ -162,7 +162,7 @@ class DataDashboard extends Controller {
         $data['dataObjects'] = array();
         $data['dataObjectsQualityTests'] = array();
         $data['dataObjectsStats'] = array();
-        
+
         for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
             array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
             array_push($data['dataObjectsQualityTests'], array());
@@ -173,20 +173,20 @@ class DataDashboard extends Controller {
                 array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
             }
         }
-        
+
         $data['statsTitle'] = array_pop(explode("/", $raw_data));
-        $data['statsDataType'] = $this->_dashboardDataModel->getDashboardObjectDataTypeByRawName($raw_data);        
+        $data['statsDataType'] = $this->_dashboardDataModel->getDashboardObjectDataTypeByRawName($raw_data);
         $data['stats'] = $this->_dashboardDataModel->getDashboardObjectStatsByRawName($raw_data);
-        
+
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
 
         View::render('DataDashboard/dataQuality', $data);
         View::renderTemplate('footer', $data);
     }
-    
+
     public function dataQualityShowDataTypeStats($dataType){
-        
+
         $data['title'] = 'Data Quality';
         $data['page'] = 'dataQuality';
         $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
@@ -197,7 +197,7 @@ class DataDashboard extends Controller {
         $data['dataObjects'] = array();
         $data['dataObjectsQualityTests'] = array();
         $data['dataObjectsStats'] = array();
-        
+
         for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
             array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
             array_push($data['dataObjectsQualityTests'], array());
@@ -208,11 +208,11 @@ class DataDashboard extends Controller {
                 array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
             }
         }
-        
+
         $data['statsTitle'] = $dataType;
-        $data['statsDataType'] = $dataType;   
+        $data['statsDataType'] = $dataType;
         $data['stats'] = $this->_dashboardDataModel->getDataTypeStats($dataType);
-        
+
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
 
