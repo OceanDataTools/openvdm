@@ -46,6 +46,16 @@ def is_ascii(s):
     except UnicodeEncodeError:
         return False
 
+def expand_patterns(patterns: List[str]) -> List[str]:
+    """
+    Expand recursive glob patterns (with **/) to also include
+    their top-level equivalents (without the **/ prefix).
+    """
+    expanded = set(patterns)
+    for p in patterns:
+        if p.startswith("**/"):
+            expanded.add(p[3:])  # Add version without **/
+    return sorted(expanded)
 
 def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bool:
     """
@@ -53,7 +63,7 @@ def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bo
     """
 
     filepath = os.path.normpath(filepath)
-    patterns = patterns or default_ignore_patterns
+    patterns = expand_patterns(patterns or default_ignore_patterns)
 
     return any(fnmatch.fnmatch(filepath, pattern) for pattern in patterns)
 
