@@ -859,7 +859,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     if job_results['files']['new'] or job_results['files']['updated']:
         if cst_cfg['localDirIsMountPoint'] == '0':
             logging.info("Setting file permissions")
-            worker.send_job_status(current_job, 96, 10)
+            worker.send_job_status(current_job, 96, 100)
 
             results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
 
@@ -870,7 +870,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
         logging.info("Writing transfer logfile")
-        worker.send_job_status(current_job, 97, 10)
+        worker.send_job_status(current_job, 97, 100)
 
         logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {

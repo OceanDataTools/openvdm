@@ -605,7 +605,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
 
     if job_results['files']['new'] or job_results['files']['updated']:
         logging.info("Writing transfer logfile")
-        worker.send_job_status(current_job, 96, 10)
+        worker.send_job_status(current_job, 96, 100)
 
         logfile_filename = f"{cdt_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
