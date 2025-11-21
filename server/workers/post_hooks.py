@@ -21,6 +21,7 @@ import logging
 import os
 import signal
 import sys
+import copy
 import subprocess
 from os.path import dirname, realpath
 import python3_gearman
@@ -144,6 +145,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if not command_list:
             return None
 
+        command_list = copy.deepcopy(command_list)
+ 
         def _replace_tokens(text, replacements):
             for token, value in replacements.items():
                 text = text.replace(token, value)
@@ -153,24 +156,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         replacements = {
             '{cruiseID}': self.cruise_id,
             '{loweringID}': self.lowering_id,
-            '{collectionSystemTransferID}': cst_cfg.get('collectionSystemTransferID')
-            if cst_cfg else None,
+            '{collectionSystemTransferID}':
+                cst_cfg.get('collectionSystemTransferID') if isinstance(cst_cfg, dict) else None,
 
-            '{collectionSystemTransferName}': cst_cfg.get('name')
-            if cst_cfg else None,
+            '{collectionSystemTransferName}':
+                cst_cfg.get('name') if isinstance(cst_cfg, dict) else None,
 
             '{newFiles}': ' '.join(self.files.get('new', [])) if self.files else None,
             '{updatedFiles}': ' '.join(self.files.get('updated', [])) if self.files else None
         }
 
-        # Remove any unset replacements (None values)
-        replacements = {k: v for k, v in replacements.items() if v}
+        # Remove only None (not empty strings)
+        replacements = {k: v for k, v in replacements.items() if v is not None}
 
         for command in command_list:
             logging.debug("Raw Command: %s", json.dumps(command))
             command['command'] = [
                 _replace_tokens(arg, replacements) for arg in command['command']
             ]
+            command['command'] = [s for s in command['command'] if s.strip() != ""]
 
         logging.debug("Processed Command: %s", json.dumps(command_list))
         return command_list
