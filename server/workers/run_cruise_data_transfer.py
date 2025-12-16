@@ -356,7 +356,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'rsync':
                 extra_args += [f"--password-file={password_file}"]
 
-            dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' and transfer_type != 'rsync' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
+            dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
             dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
                 dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
