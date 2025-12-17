@@ -19,4 +19,4 @@ ruff==0.12.9
 six==1.17.0
 tomlkit==0.13.3
 tzdata==2025.2
-urllib3==2.5.0
+urllib3==2.6.2
