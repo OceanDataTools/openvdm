@@ -52,7 +52,7 @@ from server.plugins.parsers.twind_parser import TWindParser
 fileTypeFilters = [
     # {"data_type":"gnsspo000045-gga",   "regex": "*gnsspo000045*",      "parser": "GGA",    'parser_options':{}},
     # {"data_type":"gnsspo000045-vtg",   "regex": "*gnsspo000045*",      "parser": "VTG",    'parser_options':{}},
-    {"data_type":"gga",   "regex": "*/raw/POSMV-*.txt",      "parser": "GGA",    'parser_options':{}},
+    {"data_type":"gga",   "regex": "*/raw/POSMV_GGA-*.txt",      "parser": "GGA",    'parser_options':{}},
     # {"data_type":"hdt",   "regex": "*/raw/POSMV-*.txt",      "parser": "HDT",    'parser_options':{}},
     {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
     {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
