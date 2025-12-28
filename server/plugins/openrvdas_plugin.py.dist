@@ -6,9 +6,13 @@ USAGE:  openrvdas_plugin.py [-h] [--dataType] <dataFile>
 
 DESCRIPTION:  This python script interprets raw files created by the OpenRVDAS
     Data Acquision System.  Depending on the command-line arguments, the script
-    returns the data type of the file or a sub-sampled and json-formatted
-    version of the original file to stdout.  The json-formatted file is
-    used by OpenVDM as part of it's Data dashboard.
+    returns the data type(s) of the file or a sub-sampled and json-formatted
+    version of the original file for a specific type to stdout.  The json-
+    formatted file is used by OpenVDM as part of it's Data dashboard.
+
+    NOTE: Multiple parsers may intentionally process the same file.
+    Each parser is responsible for filtering only the sentences it understands.
+
 
   OPTIONS:  [-h] Return the help message.
             [--dataType] Return the datatype of the file as defined in the
@@ -27,8 +31,8 @@ REQUIREMENTS:  Python3.11
 
 import sys
 import os
+import json
 import fnmatch
-import argparse
 import logging
 
 from os.path import dirname, realpath
@@ -36,21 +40,27 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.gga_parser   import GGAParser
-from server.plugins.parsers.met_parser   import MetParser
-from server.plugins.parsers.svp_parser   import SVPParser
-from server.plugins.parsers.tsg_parser   import TSGParser
-from server.plugins.parsers.twind_parser import TWindParser
+from server.plugins.parsers.vtg_parser   import VTGParser
+# from server.plugins.parsers.hdt_parser   import HDTParser
+# from server.plugins.parsers.met_parser   import MetParser
+# from server.plugins.parsers.svp_parser   import SVPParser
+# from server.plugins.parsers.tsg_parser   import TSGParser
+# from server.plugins.parsers.twind_parser import TWindParser
 
 # -------------------------------------------------------------------------------------
 # This array defines the various dataTypes collected by SCS and the corresponding file
 # regex expression.
 # -------------------------------------------------------------------------------------
 fileTypeFilters = [
-    {"data_type":"gga",   "regex": "*/raw/POSMV_GGA-*.txt",  "parser": "GGA",    'parser_options':{}},
-    {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
-    {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
-    {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{}},
-    {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}}
+    {"data_type":"gnsspo000045-gga",   "regex": "*gnsspo000045*",      "parser": "GGA",    'parser_options':{}},
+    {"data_type":"gnsspo000045-vtg",   "regex": "*gnsspo000045*",      "parser": "VTG",    'parser_options':{}},
+    # {"data_type":"gga",   "regex": "*/raw/POSMV-*.txt",      "parser": "GGA",    'parser_options':{}},
+    # {"data_type":"hdt",   "regex": "*/raw/POSMV-*.txt",      "parser": "HDT",    'parser_options':{}},
+    # {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
+    # {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
+    # {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{}},
+    # {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
+    # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
 ]
 
 # -------------------------------------------------------------------------------------
@@ -59,50 +69,108 @@ fileTypeFilters = [
 # -------------------------------------------------------------------------------------
 
 
-class OpeRVDASPlugin(OpenVDMPlugin):
+class OpenRVDASPlugin(OpenVDMPlugin):
     """
-    OpenVDM plugin for the SCS Underway data acquisition system
+    OpenVDM plugin for the SCS Underway data acquisition system.
+
+    A single data file may contain multiple data types; therefore this plugin
+    can return multiple parsers for a single file.
     """
+
+    PARSER_MAP = {
+        "GGA":   GGAParser,
+        # "HDT":   HDTParser,
+        # "Met":   MetParser,
+        # "SVP":   SVPParser,
+        # "TSG":   TSGParser,
+        # "TWind": TWindParser,
+        "VTG":   VTGParser,
+    }
 
     def __init__(self):
         super().__init__(fileTypeFilters)
 
-
-    def get_parser(self, filepath): # pylint: disable=too-many-return-statements
+    ################################### 
+    def _get_parsers(self, filepath):
         """
-        Function to determine the parser to use with the raw datafile.  If the
-        datatype can not be determined, the function returns false
+        Return a list of (data_type, parser_instance) tuples for the given file.
         """
 
-        file_type_filter = list(filter(lambda file_type_filter: fnmatch.fnmatch(filepath, file_type_filter['regex']), self.file_type_filters))
+        matches = [
+            f for f in self.file_type_filters
+            if fnmatch.fnmatch(filepath, f["regex"])
+        ]
 
-        if len(file_type_filter) == 0:
-            return None
+        if not matches:
+            logging.debug("No file type filters matched %s", filepath)
+            return []
 
-        file_type_filter = file_type_filter[0]
+        parsers = []
 
-        if file_type_filter['parser'] == "GGA":
-            return GGAParser(**file_type_filter['parser_options'])
+        for f in matches:
+            parser_name = f.get("parser")
+            parser_cls = self.PARSER_MAP.get(parser_name)
 
-        if file_type_filter['parser'] == "TSG":
-            return TSGParser(**file_type_filter['parser_options'])
+            if not parser_cls:
+                logging.warning("Unknown parser '%s' for %s", parser_name, filepath)
+                continue
 
-        if file_type_filter['parser'] == "TWind":
-            return TWindParser(**file_type_filter['parser_options'])
+            try:
+                parser = parser_cls(**f.get("parser_options", {}))
+                parsers.append((f["data_type"], parser))
+            except Exception as exc:  # pylint: disable=broad-except
+                logging.exception(
+                    "Failed to instantiate parser %s for %s: %s",
+                    parser_name, filepath, exc
+                )
 
-        if file_type_filter['parser'] == "SVP":
-            return SVPParser(**file_type_filter['parser_options'])
+        return parsers
 
-        if file_type_filter['parser'] == "Met":
-            return MetParser(**file_type_filter['parser_options'])
 
-        return None
+    ################################### 
+    def parse_file(self, filepath):
+        """
+        Parse a file and return all extracted data.
+
+        Returns:
+            {
+                "<data_type>": parsed_object,
+                ...
+            }
+
+        Returns empty dict if nothing could be parsed.
+        """
+
+        parsers = self._get_parsers(filepath)
+        if not parsers:
+            logging.debug("No parsers matched file %s", filepath)
+            return {}
+
+        results = {}
+        for data_type, parser in parsers:
+            logging.warning(data_type)
+
+            try:
+                parser.parse(filepath)
+
+                if parser.plugin_data:
+                    results[data_type] = parser.plugin_data
+            except Exception as exc:  # pylint: disable=broad-except
+                logging.exception(
+                    "Parser '%s' failed for file '%s': %s",
+                    data_type, filepath, exc
+                )
+
+        return results
 
 
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
+
+    import argparse
+
     parser = argparse.ArgumentParser(description='OpenVDM plugin for OpenRVDAS')
     parser.add_argument('--dataType', action='store_true',
                         help='return the dataType of the file')
@@ -126,23 +194,20 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
     if not os.path.isfile(parsed_args.dataFile):
-        logging.error("File not found")
+        logging.error("File not found: %s", parsed_args.dataFile)
         sys.exit(1)
     elif os.stat(parsed_args.dataFile).st_size == 0:
-        logging.warning("File is empty")
+        logging.warning("File is empty: %s", parsed_args.dataFile)
         sys.exit(0)
 
-    plugin = OpeRVDASPlugin()
+    plugin = OpenRVDASPlugin()
 
     if parsed_args.dataType:
-        dataType = plugin.get_data_type(parsed_args.dataFile)
-        if dataType is None:
-            logging.warning("File is of unknown type")
+        data_types = plugin.get_data_types(parsed_args.dataFile)
+        if not data_types:
+            logging.warning("File is of unknown type: %s", parsed_args.dataFile)
             sys.exit(1)
-        print(dataType)
-    else:
-        jsonSTR = plugin.get_json_str(parsed_args.dataFile)
-        if jsonSTR is None:
-            logging.warning("Nothing returned from parser")
-            sys.exit(1)
-        print(jsonSTR)
+        print(",".join(sorted(data_types)))
+        sys.exit(0)
+
+    print(plugin.get_json_str(parsed_args.dataFile))

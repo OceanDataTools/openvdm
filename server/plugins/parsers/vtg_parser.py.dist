@@ -16,34 +16,45 @@ DESCRIPTION:  Parse the supplied NMEA-formtted VTG file and return the json-
             [--noMag] skip the COG magnetic processing
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.10
+REQUIREMENTS:  Python3.11
                Python Modules:
-                   pandas==2.0.3
+                   numpy==2.4.0
+                   pandas==2.3.0
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2016-08-29
- REVISION:  2025-04-12
+ REVISION:  2025-12-30
 """
 
-import csv
-import json
-import logging
 import sys
-from copy import deepcopy
+import logging
 from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
+import numpy as np
+import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','cog_t','T','cog_m','M','sog_kts','N','sog_kph','K','checksum']
 PROC_COLS = ['date_time','cog_t','cog_m','sog_kts','sog_kph']
+
+VTG_FIELDS = [
+    "header",
+    "cog_t",
+    "T",
+    "cog_m",
+    "M",
+    "sog_kts",
+    "N",
+    "sog_kph",
+    "K",
+    "checksum"
+]
 
 ROUNDING = {
     'cog_t': 3,
@@ -52,256 +63,187 @@ ROUNDING = {
     'sog_kph': 3
 }
 
-MIN_COG = 0
-MAX_COG = 360
-
-MAX_SOG_KTS = 25
-MAX_SOG_KPH = MAX_SOG_KTS * 1.852
-
-MAX_DELTA_T = pd.Timedelta('10 seconds')
-
 
 class VTGParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
-    """
+    """Parser for NMEA VTG files, fully refactored like GGAParser."""
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False, no_mag=False):
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
+
+    MIN_COG = 0
+    MAX_COG = 360
+
+    MAX_SOG_KTS = 25
+    MAX_SOG_KPH = MAX_SOG_KTS * 1.852
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False, no_mag=False):
         self.no_mag = no_mag
         proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'cog_m']
-        super().__init__(RAW_COLS, proc_cols, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
 
-
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
-
-        raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
-
-        logging.debug("Parsing data file...")
+    def parse(self, filepath):
+        raw_data = {col: [] for col in self.proc_cols}
         errors = []
+
+        # -------------------------
+        # Read and parse VTG lines
+        # -------------------------
         try:
-            with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='VTG'):
+                logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                if self.skip_header:
-                    next(reader)
+                # Map fields to VTG_FIELDS
+                vtg_data = dict(zip(VTG_FIELDS, fields))
 
-                for lineno, line in enumerate(reader):
+                try:
+                    cog_t = float(vtg_data['cog_t']) if vtg_data['cog_t'] else None
+                    cog_m = float(vtg_data['cog_m']) if (not self.no_mag and vtg_data['cog_m']) else None
+                    sog_kts = float(vtg_data['sog_kts']) if vtg_data['sog_kts'] else None
+                    sog_kph = float(vtg_data['sog_kph']) if vtg_data['sog_kph'] else None
 
-                    try:
-                        date_time = line['date_time']
+                    raw_data['date_time'].append(timestamp_str)
+                    raw_data['cog_t'].append(cog_t)
+                    if not self.no_mag:
+                        raw_data['cog_m'].append(cog_m)
+                    raw_data['sog_kts'].append(sog_kts)
+                    raw_data['sog_kph'].append(sog_kph)
 
-                        cog_t = float(line['cog_t']) if line['cog_t'] != '' else None
-                        if not self.no_mag:
-                            cog_m = float(line['cog_m']) if line['cog_m'] != '' else None
-                        sog_kts = float(line['sog_kts']) if line['sog_kts'] != '' else None
-                        sog_kph = float(line['sog_kph']) if line['sog_kph'] != '' else None
-
-                    except Exception as err:
-                        errors.append(lineno)
-                        logging.warning("Parsing error encountered on line %s", lineno)
-                        logging.debug(line)
-                        logging.debug(str(err))
-
-                    else:
-                        raw_into_df['date_time'].append(date_time)
-                        raw_into_df['cog_t'].append(cog_t)
-                        if not self.no_mag:
-                            raw_into_df['cog_m'].append(cog_m)
-                        raw_into_df['sog_kts'].append(sog_kts)
-                        raw_into_df['sog_kph'].append(sog_kph)
+                except Exception as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped due to parse error: %s", lineno, err)
 
         except Exception as err:
-            logging.error("Problem accessing input file: %s", filepath)
-            logging.error(str(err))
-            return
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
 
-        logging.debug("Finished parsing data file")
+        if not raw_data['date_time']:
+            logging.warning("No valid VTG data in file: %s", filepath)
+            return None
 
-        # If no data ingested from file, quit
-        if len(raw_into_df['date_time']) == 0:
-            logging.warning("Dataframe is empty... quitting")
-            return
-
+        # -------------------------
         # Build DataFrame
-        logging.debug("Building dataframe from parsed data...")
-        df_proc = pd.DataFrame(raw_into_df)
+        # -------------------------
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        if df['date_time'].isna().all():
+            logging.error("All timestamps could not be parsed; aborting.")
+            return None
+        df = df.dropna(subset=['date_time'])
+        df = df.set_index('date_time')
 
-        # Remove row where data is completely missing
-        df_proc.dropna(inplace=True, thresh=4)
-
-        # Convert Date/time column to datetime objects
-        logging.debug("Converting data_time to datetime datatype...")
-        df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
-
-        # Optionally crop data by start/stop times
         if self.start_dt or self.stop_dt:
-            logging.debug("Cropping data...")
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
 
-            df_proc = self.crop_data(df_proc)
+        # -------------------------
+        # DeltaT
+        # -------------------------
+        df['deltaT'] = df.index.to_series().diff()
 
-        # If the crop operation emptied the dataframe, quit
-        if df_proc.shape[0] == 0:
-            logging.warning("Cropped dataframe is empty... quitting")
-            return
-
-        # Calculate deltaT column
-        logging.debug('Building deltaT column...')
-        df_proc = df_proc.join(df_proc['date_time'].diff().to_frame(name='deltaT'))
-
-        logging.debug("Tabulating statistics...")
-        self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
-        self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['cog_t'].min(),ROUNDING['cog_t']), round(df_proc['cog_t'].max(),ROUNDING['cog_t'])], "COG True Bounds", "deg")
-        self.add_value_validity_stat([len(df_proc[(df_proc['cog_t'] >= MIN_COG) & (df_proc['cog_t'] <= MAX_COG)]),len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)])], "COG True Validity")
+        # -------------------------
+        # Statistics
+        # -------------------------
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min(), df.index.max()])
+        self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3),
+                              round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
+                                      len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
+        self.add_bounds_stat([round(df['cog_t'].min(), ROUNDING['cog_t']),
+                              round(df['cog_t'].max(), ROUNDING['cog_t'])], "COG True Bounds", "deg")
+        self.add_value_validity_stat([len(df[(df['cog_t'] >= self.MIN_COG) & (df['cog_t'] <= self.MAX_COG)]),
+                                      len(df[(df['cog_t'] < self.MIN_COG) | (df['cog_t'] > self.MAX_COG)])], "COG True Validity")
         if not self.no_mag:
-            self.add_bounds_stat([round(df_proc['cog_m'].min(),ROUNDING['cog_m']), round(df_proc['cog_m'].max(),ROUNDING['cog_m'])], "COG Magnetic Bounds", "deg")
-            self.add_value_validity_stat([len(df_proc[(df_proc['cog_m'] >= MIN_COG) & (df_proc['cog_m'] <= MAX_COG)]),len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)])], "COG Magnetic Validity")
-        self.add_bounds_stat([round(df_proc['sog_kts'].min(),ROUNDING['sog_kts']), round(df_proc['sog_kts'].max(),ROUNDING['sog_kts'])], 'SOG Knots Bounds', 'deg')
-        self.add_value_validity_stat([len(df_proc[(df_proc['sog_kts'] <= MAX_SOG_KTS)]),len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)])], "SOG Knots Validity")
-        self.add_bounds_stat([round(df_proc['sog_kph'].min(),ROUNDING['sog_kph']), round(df_proc['sog_kph'].max(),ROUNDING['sog_kph'])], 'SOG KPH Bounds', 'deg')
-        self.add_value_validity_stat([len(df_proc[(df_proc['sog_kph'] <= MAX_SOG_KPH)]),len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)])], "SOG KPH Validity")
+            self.add_bounds_stat([round(df['cog_m'].min(), ROUNDING['cog_m']),
+                                  round(df['cog_m'].max(), ROUNDING['cog_m'])], "COG Magnetic Bounds", "deg")
+            self.add_value_validity_stat([len(df[(df['cog_m'] >= self.MIN_COG) & (df['cog_m'] <= self.MAX_COG)]),
+                                          len(df[(df['cog_m'] < self.MIN_COG) | (df['cog_m'] > self.MAX_COG)])], "COG Magnetic Validity")
+        self.add_bounds_stat([round(df['sog_kts'].min(), ROUNDING['sog_kts']),
+                              round(df['sog_kts'].max(), ROUNDING['sog_kts'])], 'SOG Knots Bounds', 'kts')
+        self.add_value_validity_stat([len(df[df['sog_kts'] <= self.MAX_SOG_KTS]),
+                                      len(df[df['sog_kts'] > self.MAX_SOG_KTS])], 'SOG Knots Validity')
+        self.add_bounds_stat([round(df['sog_kph'].min(), ROUNDING['sog_kph']),
+                              round(df['sog_kph'].max(), ROUNDING['sog_kph'])], 'SOG KPH Bounds', 'kph')
+        self.add_value_validity_stat([len(df[df['sog_kph'] <= self.MAX_SOG_KPH]),
+                                      len(df[df['sog_kph'] > self.MAX_SOG_KPH])], 'SOG KPH Validity')
 
-
-        logging.debug("Running quality tests...")
-        # % of bad rows in datafile
-        error_rate = len(errors) / (len(df_proc) + len(errors))
-        if error_rate > .25:
-            self.add_quality_test_failed("Rows")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Rows")
-        else:
-            self.add_quality_test_passed("Rows")
-
-        # % of time gaps in data
-        error_rate = len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("DeltaT")
-        elif error_rate > .10:
-            self.add_quality_test_warning("DeltaT")
-        else:
-            self.add_quality_test_passed("DeltaT")
-
-        error_rate = len(df_proc[(df_proc['sog_kts'] > MAX_SOG_KTS)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("SOG kts")
-        elif error_rate > .10:
-            self.add_quality_test_warning("SOG kts")
-        else:
-            self.add_quality_test_passed("SOG kts")
-
-        error_rate = len(df_proc[(df_proc['sog_kph'] > MAX_SOG_KPH)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("SOG kph")
-        elif error_rate > .10:
-            self.add_quality_test_warning("SOG kph")
-        else:
-            self.add_quality_test_passed("SOG kph")
-
-        error_rate = len(df_proc[(df_proc['cog_t'] < MIN_COG) & (df_proc['cog_t'] > MAX_COG)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("COG True")
-        elif error_rate > .10:
-            self.add_quality_test_warning("COG True")
-        else:
-            self.add_quality_test_passed("COG True")
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        logging.info("Running quality tests...")
+        quality_checks = [
+            ('Rows', len(df)+len(errors), len(errors)),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('SOG kts', len(df), len(df[df['sog_kts'] > self.MAX_SOG_KTS])),
+            ('SOG kph', len(df), len(df[df['sog_kph'] > self.MAX_SOG_KPH])),
+            ('COG True', len(df), len(df[(df['cog_t'] < self.MIN_COG) | (df['cog_t'] > self.MAX_COG)]))
+        ]
 
         if not self.no_mag:
-            error_rate = len(df_proc[(df_proc['cog_m'] < MIN_COG) & (df_proc['cog_m'] > MAX_COG)]) / len(df_proc)
-            if error_rate > .25:
-                self.add_quality_test_failed("COG Magnetic")
-            elif error_rate > .10:
-                self.add_quality_test_warning("COG Magnetic")
+            quality_checks.append(("COG Magnetic", len(df), len(df[(df['cog_m'] < self.MIN_COG) | (df['cog_m'] > self.MAX_COG)])))
+
+        for col, total, bad in quality_checks:
+            error_rate = bad / total
+            if error_rate > 0.25:
+                self.add_quality_test_failed(col)
+            elif error_rate > 0.10:
+                self.add_quality_test_warning(col)
             else:
-                self.add_quality_test_passed("COG Magnetic")
+                self.add_quality_test_passed(col)
 
-        # set index
-        logging.debug('Setting index...')
-        df_proc = df_proc.set_index('date_time')
+        # -------------------------
+        # Resample and round
+        # -------------------------
+        df = self.resample_data(df)
+        df = self.round_data(df, ROUNDING)
+        df = df.set_index('date_time')
 
-        # resample data
-        logging.debug("Resampling data...")
-        df_proc = self.resample_data(df_proc)
+        # -------------------------
+        # Visualization
+        # -------------------------
+        logging.info("Building visualization datasets...")
 
-        # round data
-        logging.debug("Rounding data: %s", ROUNDING)
-        df_proc = self.round_data(df_proc, ROUNDING)
+        for col, unit, label in [('cog_t', 'deg', 'COG True'),
+                                 ('cog_m', 'deg', 'COG Magnetic'),
+                                 ('sog_kts', 'kts', 'SOG kts'),
+                                 ('sog_kph', 'kph', 'SOG kph')]:
+            if col == 'cog_m' and self.no_mag:
+                continue
 
-        # split data where there are gaps
-        logging.debug("Building visualization data...")
+            visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
+            for ts, row in df.iterrows():
+                if pd.notna(row[col]):
+                    ts = pd.Timestamp(ts)
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize('UTC')
+                    epoch_ms = int(ts.timestamp() * 1000)
+                    visualizer_data_obj['data'].append([epoch_ms, row[col]])
 
-        visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_t']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'deg'
-        visualizer_data_obj['label'] = 'COG, True'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
+            self.add_visualization_data(visualizer_data_obj)
 
-        if not self.no_mag:
-            visualizer_data_obj['data'] = json.loads(df_proc[['date_time','cog_m']].to_json(orient='values'))
-            visualizer_data_obj['unit'] = 'deg'
-            visualizer_data_obj['label'] = 'COG, Magnetic'
-            self.add_visualization_data(deepcopy(visualizer_data_obj))
+        # -------------------------
+        # Send errors to OpenVDM
+        # -------------------------
+        self.send_error_msg(errors, filepath)
 
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sog_kts']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'kts'
-        visualizer_data_obj['label'] = 'SOG, kts'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
+    # -----------------------------
+    # CLI hooks for custom arguments
+    # -----------------------------
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        parser.add_argument('--noMag', action='store_true', default=False, help='Skip COG Magnetic')
 
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','sog_kph']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'kph'
-        visualizer_data_obj['label'] = 'SOG, kph'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        # send message about errors encountered to OpenVDM
-        if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
-
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'no_mag': getattr(args, 'noMag', False)}
 
 # -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
+# Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Parse NMEA VTG data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-    parser.add_argument('--timeFormat', help='timestamp format', default=None)
-    parser.add_argument('--startDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop start timestamp (iso8601)')
-    parser.add_argument('--stopDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop stop timestamp (iso8601)')
-    parser.add_argument('--noMag', action='store_true', default=False, help='skip processing for COG magnetic')
-    parser.add_argument('dataFile', metavar='dataFile',
-                        help='the raw data file to process')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    ovdm_parser = VTGParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat, no_mag=parsed_args.noMag)
-
-    try:
-        logging.info("Processing file: %s", parsed_args.dataFile)
-        ovdm_parser.process_file(parsed_args.dataFile)
-        print(ovdm_parser.to_json())
-        logging.info("Done!")
-    except Exception as err:
-        logging.error(str(err))
-        raise err
+    VTGParser.run_cli()
