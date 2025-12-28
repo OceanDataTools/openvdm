@@ -117,7 +117,7 @@ class OpenRVDASPlugin(OpenVDMPlugin):
 # -------------------------------
 # Module-level function for worker
 # -------------------------------
-def parse_file(filepath):
+def process_file(filepath):
     """
     Module-level wrapper for Gearman worker compatibility.
     """
