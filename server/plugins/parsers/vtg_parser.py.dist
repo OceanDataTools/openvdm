@@ -149,7 +149,7 @@ class VTGParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Tabulating statistics...")
         self.add_row_validity_stat([len(df), len(errors)])
-        self.add_time_bounds_stat([df.index.min(), df.index.max()])
+        self.add_time_bounds_stat([df.index.min().isoformat(),df.index.max().isoformat()])
         self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3),
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
