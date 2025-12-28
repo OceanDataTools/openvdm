@@ -37,7 +37,7 @@ from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.openvdm_plugin import OpenVDMPlugin
+from server.lib.openvdm_plugin import OpenVDMPlugin, NpEncoder
 from server.plugins.parsers.gga_parser   import GGAParser
 # from server.plugins.parsers.vtg_parser   import VTGParser
 # from server.plugins.parsers.hdt_parser   import HDTParser
@@ -122,7 +122,7 @@ def parse_file(filepath):
     Module-level wrapper for Gearman worker compatibility.
     """
     plugin = OpenRVDASPlugin()
-    return plugin.parse_file(filepath)
+    return json.dumps(plugin.parse_file(filepath), cls=NpEncoder)
 
 # -------------------------------
 # CLI support
