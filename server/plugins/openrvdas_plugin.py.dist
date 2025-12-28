@@ -122,7 +122,7 @@ def process_file(filepath):
     Module-level wrapper for Gearman worker compatibility.
     """
     plugin = OpenRVDASPlugin()
-    return json.dumps(plugin.parse_file(filepath), cls=NpEncoder)
+    return plugin.parse_file(filepath)
 
 # -------------------------------
 # CLI support

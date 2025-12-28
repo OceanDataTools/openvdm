@@ -242,6 +242,7 @@ class GGAParser(OpenVDMCSVParser):
         # -------------------------
         self.send_error_msg(errors, filepath)
 
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
         return self.plugin_data
 
 

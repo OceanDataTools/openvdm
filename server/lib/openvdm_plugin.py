@@ -424,6 +424,17 @@ class OpenVDMCSVParser(OpenVDMParser):
         super().__init__(use_openvdm_api=use_openvdm_api)
 
 
+    def _sanitize_for_json(self, obj):
+        if isinstance(obj, dict):
+            return {k: self._sanitize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._sanitize_for_json(v) for v in obj]
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return obj
+
     @classmethod
     def add_cli_arguments(cls, parser: "argparse.ArgumentParser"):  # noqa
         """
