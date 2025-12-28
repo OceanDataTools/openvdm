@@ -153,7 +153,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 job_results['parts'].append({"partName": f"Write dashboard file: {filename}", "result": "Fail", "reason": result['reason']})
                 continue
 
-            self._add_manifest_entry(new_manifest_entries, out_obj.get('type', 'unknown'), json_path, raw_path, base_dir)
+            data_types = list(out_obj.keys()) or ['unknown']
+            for dtype in data_types:
+                self._add_manifest_entry(new_manifest_entries, dtype, json_path, raw_path, base_dir)
 
             progress = start + int((end - start) * idx / file_count)
             self.send_job_status(current_job, progress, 100)
