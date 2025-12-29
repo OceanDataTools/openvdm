@@ -691,9 +691,14 @@ class OpenVDMPlugin():
     def get_json_str(self, filepath):
         """
         Return the plugin output corresponding to the given file.
+        Ensures output is JSON-serializable (legacy + new parsers).
         """
 
         data = self.parse_file(filepath)
+
+        # Legacy parsers may return None but populate self.plugin_data
+        if data is None and hasattr(self, 'plugin_data'):
+            data = self.plugin_data
 
         if not data:
             return None
