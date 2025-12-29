@@ -229,13 +229,13 @@ class DashboardData extends Model {
         return $this->extractSection($obj, 'visualizerData', $dataType);
     }
 
-    public function getDashboardObjectVisualizerDataByRawName($raw_data){
+    public function getDashboardObjectVisualizerDataByRawName($raw_data, $dataType){
         // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
         // return $dataObjectContentsOBJ->visualizerData;
         $json = $this->getDashboardObjectContentsByRawName($raw_data);
         $obj  = json_decode($json);
 
-        $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
 
         return $this->extractSection($obj, 'visualizerData', $dataType);
     }
@@ -251,13 +251,13 @@ class DashboardData extends Model {
         return $this->extractSection($obj, 'stats', $dataType);
     }
 
-    public function getDashboardObjectStatsByRawName($raw_data){
+    public function getDashboardObjectStatsByRawName($raw_data, $dataType){
         // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
         // return $dataObjectContentsOBJ->stats;
         $json = $this->getDashboardObjectContentsByRawName($raw_data);
         $obj  = json_decode($json);
 
-        $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
 
         return $this->extractSection($obj, 'stats', $dataType);
     }
@@ -273,13 +273,13 @@ class DashboardData extends Model {
         return $this->extractSection($obj, 'qualityTests', $dataType);
     }
 
-    public function getDashboardObjectQualityTestsByRawName($raw_data){
+    public function getDashboardObjectQualityTestsByRawName($raw_data, $dataType){
         // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
         // return $dataObjectContentsOBJ->qualityTests;
         $json = $this->getDashboardObjectContentsByRawName($raw_data);
         $obj  = json_decode($json);
 
-        $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
 
         return $this->extractSection($obj, 'qualityTests', $dataType);
     }
