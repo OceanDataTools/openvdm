@@ -21,9 +21,10 @@ import shutil
 import logging
 import errno
 import subprocess
+import numpy as np
 from contextlib import contextmanager
 from pwd import getpwnam
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 default_ignore_patterns = [
@@ -313,7 +314,7 @@ def output_json_data_to_file(file_path, contents):
     with open(file_path, mode='w', encoding="utf-8") as json_file:
         logging.debug("Saving JSON file: %s", file_path)
         try:
-            json.dump(contents, json_file, indent=4)
+            json.dump(contents, json_file, indent=2, cls=NpEncoder)
 
         except IOError:
             reason = f'Unable to create data file: {file_path}'
@@ -504,3 +505,24 @@ def test_write_access(dest_dir):
     except (OSError, PermissionError) as exc:
         logging.exception("Write test failed for %s: %s", dest_dir, str(exc))
         return False
+
+class NpEncoder(json.JSONEncoder):
+    """
+    Custom JSON string encoder used to deal with NumPy arrays
+    """
+
+    def default(self, o): # pylint: disable=arguments-differ
+
+        if isinstance(o, np.integer):
+            return int(o)
+
+        if isinstance(o, np.floating):
+            return float(o)
+
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+
+        if isinstance(o, datetime):
+            return o.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        return super().default(o)

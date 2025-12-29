@@ -22,6 +22,7 @@ import pandas as pd
 
 from server.lib.openvdm import OpenVDM
 from server.lib.condense_to_ranges import condense_to_ranges
+from server.lib.file_utils import NpEncoder
 
 
 STAT_TYPES = [
@@ -41,27 +42,6 @@ QUALITY_TEST_RESULT_TYPES = [
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
-
-class NpEncoder(json.JSONEncoder):
-    """
-    Custom JSON string encoder used to deal with NumPy arrays
-    """
-
-    def default(self, o): # pylint: disable=arguments-differ
-
-        if isinstance(o, np.integer):
-            return int(o)
-
-        if isinstance(o, np.floating):
-            return float(o)
-
-        if isinstance(o, np.ndarray):
-            return o.tolist()
-
-        if isinstance(o, datetime):
-            return o.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-        return super().default(o)
 
 
 class OpenVDMParserQualityTest():
