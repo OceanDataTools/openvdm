@@ -54,13 +54,12 @@
                                             <td>
 <?php
                 if($data['dataObjectsStats'][$i][$j]){
-                    var_dump($data['dataObjectsStats'][$i][$j]);
 ?>
-                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataObjects'][$i][$j]['data_type']; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default'>Show</a>
+                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataTypes'][$i]; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default'>Show</a>
 <?php
             } else {
 ?>
-                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataObjects'][$i][$j]['data_type']; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default disabled'>Show</a>
+                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataTypes'][$i]; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default disabled'>Show</a>
 <?php
             }
 ?>
