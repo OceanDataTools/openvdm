@@ -117,7 +117,7 @@ Router::any('config/messages/deleteAllMessages', 'Controllers\Config\Messages@de
 Router::any('dataDashboard', '\Controllers\DataDashboard\DataDashboard@index');
 Router::any('dataDashboard/customTab/(:any)', '\Controllers\DataDashboard\DataDashboard@customTab');
 Router::any('dataDashboard/dataQuality', '\Controllers\DataDashboard\DataDashboard@dataQuality');
-Router::any('dataDashboard/dataQualityShowFileStats/(:all)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowFileStats');
+Router::any('dataDashboard/dataQualityShowFileStats/(:any)/(:all)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowFileStats');
 Router::any('dataDashboard/dataQualityShowDataTypeStats/(:any)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowDataTypeStats');
 
 //API-related routes

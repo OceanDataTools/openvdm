@@ -150,7 +150,7 @@ class DataDashboard extends Controller {
         View::renderTemplate('footer', $data);
     }
 
-    public function dataQualityShowFileStats($raw_data){
+    public function dataQualityShowFileStats($data_type, $raw_data){
 
         $data['title'] = 'Data Quality';
         $data['page'] = 'dataQuality';
@@ -175,8 +175,8 @@ class DataDashboard extends Controller {
         }
 
         $data['statsTitle'] = array_pop(explode("/", $raw_data));
-        $data['statsDataType'] = $this->_dashboardDataModel->getDashboardObjectDataTypeByRawName($raw_data);
-        $data['stats'] = $this->_dashboardDataModel->getDashboardObjectStatsByRawName($raw_data);
+        $data['statsDataType'] = $this->_dashboardDataModel->getDashboardObjectDataTypeByRawName($raw_data, $data_type);
+        $data['stats'] = $this->_dashboardDataModel->getDashboardObjectStatsByRawName($raw_data, $data_type);
 
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
