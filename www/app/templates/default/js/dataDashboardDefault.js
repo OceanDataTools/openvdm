@@ -374,10 +374,10 @@ $(function () {
     }
 
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
-        console.log(chartObject[0].dataType);
+        console.log(chartObject.dataType);
         var reversedY = reversedY || false;
         var inverted = inverted || false;
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject.dataType + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
