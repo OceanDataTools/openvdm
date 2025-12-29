@@ -308,7 +308,7 @@ class DashboardData extends Model {
 
         $init = false;
         for ($i=0; $i < sizeof($dataObjects); $i++) {
-            $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json']);
+            $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json'], $dataType);
 
             if($dataFileStatsObj[0]->error) {
                 $return[0]->error = $dataFileStatsObj[0]->error;
