@@ -141,11 +141,12 @@ class DashboardData extends Model {
         }
 
         // NEW FORMAT fallback: first available dataType
-        foreach ($obj as $dataset) {
-            if (isset($dataset->$section)) {
-                return $dataset->$section;
-            }
-        }
+        // foreach ($obj as $dataset) {
+        //     if (isset($dataset->$section)) {
+        //         return $dataset->$section;
+        //     }
+        // }
+        print($dataType);
 
         return null;
     }
