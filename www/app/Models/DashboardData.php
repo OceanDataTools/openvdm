@@ -240,23 +240,47 @@ class DashboardData extends Model {
     }
 
     public function getDashboardObjectStatsByJsonName($dd_json){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
-        return $dataObjectContentsOBJ->stats;
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
+        // return $dataObjectContentsOBJ->stats;
+        $json = $this->getDashboardObjectContentsByJsonName($dd_json);
+        $obj  = json_decode($json);
+
+        $dataType = $this->getDashboardObjectDataTypeByJsonName($dd_json);
+
+        return $this->extractSection($obj, 'stats', $dataType);
     }
 
     public function getDashboardObjectStatsByRawName($raw_data){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
-        return $dataObjectContentsOBJ->stats;
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
+        // return $dataObjectContentsOBJ->stats;
+        $json = $this->getDashboardObjectContentsByRawName($raw_data);
+        $obj  = json_decode($json);
+
+        $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+
+        return $this->extractSection($obj, 'stats', $dataType);
     }
 
     public function getDashboardObjectQualityTestsByJsonName($dd_json){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
-        return $dataObjectContentsOBJ->qualityTests;
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
+        // return $dataObjectContentsOBJ->qualityTests;
+        $json = $this->getDashboardObjectContentsByJsonName($dd_json);
+        $obj  = json_decode($json);
+
+        $dataType = $this->getDashboardObjectDataTypeByJsonName($dd_json);
+
+        return $this->extractSection($obj, 'qualityTests', $dataType);
     }
 
     public function getDashboardObjectQualityTestsByRawName($raw_data){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
-        return $dataObjectContentsOBJ->qualityTests;
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
+        // return $dataObjectContentsOBJ->qualityTests;
+        $json = $this->getDashboardObjectContentsByRawName($raw_data);
+        $obj  = json_decode($json);
+
+        $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+
+        return $this->extractSection($obj, 'qualityTests', $dataType);
     }
 
     public function getCruiseID(){
