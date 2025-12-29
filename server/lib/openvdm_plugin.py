@@ -284,11 +284,21 @@ class OpenVDMParser():
 
 
     def parse(self, filepath):
-        """
-        Parse the given file
-        """
+        # New-style parsers
+        if hasattr(self, 'process_file'):
+            return self.process_file(filepath)
 
-        raise NotImplementedError('process_file must be implemented by subclass')
+        # Legacy parsers (fallback)
+        if hasattr(self, 'parse_file'):
+            return self.parse_file(filepath)
+
+        if hasattr(self, 'process'):
+            return self.process(filepath)
+
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement process_file(), "
+            "parse_file(), or process()"
+        )
 
 
     def add_visualization_data(self, data):
