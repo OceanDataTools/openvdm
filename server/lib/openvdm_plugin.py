@@ -284,20 +284,30 @@ class OpenVDMParser():
 
 
     def parse(self, filepath):
-        # New-style parsers
+        """
+        Unified entry point for all parsers (legacy + new)
+        """
+
+        # Preferred: new-style parsers override parse()
+        if self.__class__.parse is not OpenVDMCSVParser.parse:
+            result = self.__class__.parse(self, filepath)
+            return result
+
+        # Legacy-style parsers: process_file()
         if hasattr(self, 'process_file'):
-            return self.process_file(filepath)
+            result = self.process_file(filepath)
 
-        # Legacy parsers (fallback)
-        if hasattr(self, 'parse_file'):
-            return self.parse_file(filepath)
+            # Legacy parsers usually return None but populate self.plugin_data
+            if result is not None:
+                return result
 
-        if hasattr(self, 'process'):
-            return self.process(filepath)
+            if hasattr(self, 'plugin_data') and self.plugin_data:
+                return self.plugin_data
+
+            return None
 
         raise NotImplementedError(
-            f"{self.__class__.__name__} must implement process_file(), "
-            "parse_file(), or process()"
+            f"{self.__class__.__name__} must implement parse() or process_file()"
         )
 
 
