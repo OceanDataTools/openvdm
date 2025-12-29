@@ -86,9 +86,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectVisualizerDataByJsonName($cruiseID, $dd_json){
+    public function getDashboardObjectVisualizerDataByJsonName($cruiseID, $ddJSON, $dataType){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByJsonName($dd_json);
+        $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByJsonName($ddJSON, $dataType);
         if(is_array($dataObjectVisualizerData) && sizeof($dataObjectVisualizerData) > 0) {
             echo json_encode($dataObjectVisualizerData);
         } else {
@@ -96,9 +96,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectVisualizerDataByRawName($cruiseID, $raw_data){
+    public function getDashboardObjectVisualizerDataByRawName($cruiseID, $rawData, $dataType){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByRawName($raw_data);
+        $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByRawName($rawData, $dataType);
         if(is_array($dataObjectVisualizerData) && sizeof($dataObjectVisualizerData) > 0) {
             echo json_encode($dataObjectVisualizerData);
         } else {
@@ -106,9 +106,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectStatsByJsonName($cruiseID, $dd_json){
+    public function getDashboardObjectStatsByJsonName($cruiseID, $dataType, $ddJSON){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectStats = $this->_model->getDashboardObjectStatsByJsonName($dd_json);
+        $dataObjectStats = $this->_model->getDashboardObjectStatsByJsonName($ddJSON, $dataType);
         if(is_array($dataObjectStats) && sizeof($dataObjectStats) > 0) {
             echo json_encode($dataObjectStats);
         } else {
@@ -116,9 +116,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectStatsByRawName($cruiseID, $raw_data){
+    public function getDashboardObjectStatsByRawName($cruiseID, $dataType, $rawData){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectStats = $this->_model->getDashboardObjectStatsByRawName($raw_data);
+        $dataObjectStats = $this->_model->getDashboardObjectStatsByRawName($rawData, $dataType);
         if(is_array($dataObjectStats) && sizeof($dataObjectStats) > 0) {
             echo json_encode($dataObjectStats);
         } else {
@@ -126,9 +126,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectStatsByDataType($cruiseID, $data_type){
+    public function getDashboardObjectStatsByDataType($cruiseID, $dataType){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectStats = $this->_model->getDataTypeStats($data_type);
+        $dataObjectStats = $this->_model->getDataTypeStats($dataType);
         if(is_array($dataObjectStats) && sizeof($dataObjectStats) > 0) {
             echo json_encode($dataObjectStats);
         } else {
@@ -136,9 +136,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectQualityTestsByJsonName($cruiseID, $dd_json){
+    public function getDashboardObjectQualityTestsByJsonName($cruiseID, $dataType, $ddJSON){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByJsonName($dd_json);
+        $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByJsonName($ddJSON, $dataType);
         if(is_array($dataObjectQualityTests) && sizeof($dataObjectQualityTests) > 0) {
             echo json_encode($dataObjectQualityTests);
         } else {
@@ -146,9 +146,9 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectQualityTestsByRawName($cruiseID, $raw_data){
+    public function getDashboardObjectQualityTestsByRawName($cruiseID, $dataType, $rawData){
         $this->_model->setCruiseID($cruiseID);
-        $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByRawName($raw_data);
+        $dataObjectQualityTests = $this->_model->getDashboardObjectQualityTestsByRawName($rawData, $dataType);
         if(is_array($dataObjectQualityTests) && sizeof($dataObjectQualityTests) > 0) {
             echo json_encode($dataObjectQualityTests);
         } else {
