@@ -86,7 +86,7 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectVisualizerDataByJsonName($cruiseID, $ddJSON, $dataType){
+    public function getDashboardObjectVisualizerDataByJsonName($cruiseID, $dataType, $ddJSON){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByJsonName($ddJSON, $dataType);
         if(is_array($dataObjectVisualizerData) && sizeof($dataObjectVisualizerData) > 0) {
@@ -96,7 +96,7 @@ class DashboardData extends Controller {
         }
     }
 
-    public function getDashboardObjectVisualizerDataByRawName($cruiseID, $rawData, $dataType){
+    public function getDashboardObjectVisualizerDataByRawName($cruiseID, $dataType, $rawData){
         $this->_model->setCruiseID($cruiseID);
         $dataObjectVisualizerData = $this->_model->getDashboardObjectVisualizerDataByRawName($rawData, $dataType);
         if(is_array($dataObjectVisualizerData) && sizeof($dataObjectVisualizerData) > 0) {
