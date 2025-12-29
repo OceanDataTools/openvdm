@@ -423,7 +423,6 @@ class OpenVDMCSVParser(OpenVDMParser):
 
         super().__init__(use_openvdm_api=use_openvdm_api)
 
-
     def _sanitize_for_json(self, obj):
         if isinstance(obj, dict):
             return {k: self._sanitize_for_json(v) for k, v in obj.items()}
