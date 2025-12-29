@@ -374,7 +374,6 @@ $(function () {
     }
 
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
-        console.log(chartObject.dataType);
         var reversedY = reversedY || false;
         var inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject.dataType + '/' + dataObjectJsonName;
@@ -542,6 +541,7 @@ $(function () {
 
     //Check for updates
     $.each(mapObjects, function(i) {
+        console.log(mapObjects[i]);
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
             if ($(this).is(":checked")) {
                 if ($(this).hasClass("se-checkbox")) {
