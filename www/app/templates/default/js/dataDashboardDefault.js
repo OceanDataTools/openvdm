@@ -256,7 +256,7 @@ $(function () {
     }
 
     function addGeoJSONToMap(mapObject, dataObjectJsonName) {
-        console.log(mapObject);
+        console.log(mapObject, dataObjectJsonName);
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -309,7 +309,6 @@ $(function () {
     }
 
     function addTMSToMap(mapObject, tmsObjectJsonName) {
-        console.log(mapObject);
         var getDataObjectFileURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + tmsObjectJsonName;
         $.getJSON(getDataObjectFileURL, function (data, status) {
             if (status === 'success' && data !== null) {
