@@ -56,7 +56,7 @@ class DashboardData extends Controller {
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
             $lastDataObject = $dataObjectList[sizeof($dataObjectList)-1];
             //echo $lastDataObject['dd_json'];
-            echo json_encode($this->_model->getDashboardObjectVisualizerDataByJsonName($lastDataObject['dd_json']));
+            echo json_encode($this->_model->getDashboardObjectVisualizerDataByJsonName($lastDataObject['dd_json'], $dataType));
         } else {
             echo json_encode(array());
         }
@@ -68,7 +68,7 @@ class DashboardData extends Controller {
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
             $lastDataObject = $dataObjectList[sizeof($dataObjectList)-1];
             //echo $lastDataObject['dd_json'];
-            echo json_encode($this->_model->getDashboardObjectStatsByJsonName($lastDataObject['dd_json']));
+            echo json_encode($this->_model->getDashboardObjectStatsByJsonName($lastDataObject['dd_json'], $dataType));
         } else {
             echo json_encode(array());
         }
@@ -80,7 +80,7 @@ class DashboardData extends Controller {
         if(is_array($dataObjectList) && sizeof($dataObjectList) > 0) {
             $lastDataObject = $dataObjectList[sizeof($dataObjectList)-1];
             //echo $lastDataObject['dd_json'];
-            echo json_encode($this->_model->getDashboardObjectQualityTestsByJsonName($lastDataObject['dd_json']));
+            echo json_encode($this->_model->getDashboardObjectQualityTestsByJsonName($lastDataObject['dd_json'], $dataType));
         } else {
             echo json_encode(array());
         }
