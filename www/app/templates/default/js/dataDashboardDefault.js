@@ -374,7 +374,7 @@ $(function () {
     }
 
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
-        console.log(chartObject);
+        console.log(chartObject[0]dataType);
         var reversedY = reversedY || false;
         var inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
