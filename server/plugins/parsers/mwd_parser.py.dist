@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-FILE:  vtg_parser.py
+FILE:  mwd_parser.py
 
-USAGE:  vtg_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  mwd_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted MWV file and return the json-
+DESCRIPTION:  Parse the supplied NMEA-formtted MWD file and return the json-
               formatted string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
@@ -13,6 +13,7 @@ DESCRIPTION:  Parse the supplied NMEA-formtted MWV file and return the json-
                            yyyy-mm-ddTHH:MM:SS.sssZ
             [--startTS] optional start crop time (strptime format)
             [--stopTS] optional stop crop time (strptime format)
+            [--noMag] skip the Direction magnetic processing
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.11
@@ -40,37 +41,44 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','dir_rel','spd_kts','valid_flag']
+PROC_COLS = ['date_time','dir_t','dir_m','spd_kts','spd_mph']
 
 FIELDS = [
     "header",
-    "dir_rel",
-    "R",
+    "dir_t",
+    "T",
+    "dir_m",
+    "M",
     "spd_kts",
     "N",
-    "valid_flag_checksum",
+    "spd_mph",
+    "M_checksum"
 ]
 
 ROUNDING = {
-    'dir_rel': 2,
-    'spd_kts': 2
+    'dir_t': 2,
+    'dir_m': 2,
+    'spd_kts': 2,
+    'spd_mph': 2
 }
 
 
-class MWVParser(OpenVDMCSVParser):
-    """Parser for NMEA MWV files, fully refactored like GGAParser."""
+class MWDParser(OpenVDMCSVParser):
+    """Parser for NMEA MWD files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     MIN_DIR = 0.0
-    MAX_DIR = 359.99
-    MIN_SPD = 0.0
-    MAX_SPD = 80.0
+    MAX_DIR = 360.0
 
+    MAX_SPD_KTS = 80
+    MAX_SPD_MPH = MAX_SPD_KTS * 1.15078
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False):
-        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                 skip_header=False, use_openvdm_api=False, no_mag=False):
+        self.no_mag = no_mag
+        proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'dir_m']
+        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
 
@@ -79,25 +87,27 @@ class MWVParser(OpenVDMCSVParser):
         errors = []
 
         # -------------------------
-        # Read and parse MWV lines
+        # Read and parse MWD lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWV'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWD'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
-                vtg_data = dict(zip(FIELDS, fields))
+                mwd_data = dict(zip(FIELDS, fields))
 
                 try:
-                    dir_rel = float(vtg_data['dir_rel']) if vtg_data['dir_rel'] else None
-                    spd_kts = float(vtg_data['spd_kts']) if vtg_data['dir_rel'] else None
-
-                    [valid_flag, checksum] = vtg_data['valid_flag_checksum'].split('*')
+                    dir_t = float(mwd_data['dir_t']) if mwd_data['dir_t'] else None
+                    dir_m = float(mwd_data['dir_m']) if (not self.no_mag and mwd_data['dir_m']) else None
+                    spd_kts = float(mwd_data['spd_kts']) if mwd_data['spd_kts'] else None
+                    spd_mph = float(mwd_data['spd_mph']) if mwd_data['spd_mph'] else None
 
                     raw_data['date_time'].append(timestamp_str)
-                    raw_data['dir_rel'].append(dir_rel)
+                    raw_data['dir_t'].append(dir_t)
+                    if not self.no_mag:
+                        raw_data['dir_m'].append(dir_m)
                     raw_data['spd_kts'].append(spd_kts)
-                    raw_data['valid_flag'].append(valid_flag)
+                    raw_data['spd_mph'].append(spd_mph)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -108,7 +118,7 @@ class MWVParser(OpenVDMCSVParser):
             return None
 
         if not raw_data['date_time']:
-            logging.warning("No valid MWV data in file: %s", filepath)
+            logging.warning("No valid MWD data in file: %s", filepath)
             return None
 
         # -------------------------
@@ -143,16 +153,23 @@ class MWVParser(OpenVDMCSVParser):
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df['dir_rel'].min(), ROUNDING['dir_rel']),
-                              round(df['dir_rel'].max(), ROUNDING['dir_rel'])], "Direction Bounds", "deg")
-        self.add_value_validity_stat([len(df[(df['dir_rel'] >= self.MIN_DIR) & (df['dir_rel'] <= self.MAX_DIR)]),
-                                      len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])], "Direction Validity")
+        self.add_bounds_stat([round(df['dir_t'].min(), ROUNDING['dir_t']),
+                              round(df['dir_t'].max(), ROUNDING['dir_t'])], "Direction True Bounds", "deg")
+        self.add_value_validity_stat([len(df[(df['dir_t'] >= self.MIN_DIR) & (df['dir_t'] <= self.MAX_DIR)]),
+                                      len(df[(df['dir_t'] < self.MIN_DIR) | (df['dir_t'] > self.MAX_DIR)])], "Direction True Validity")
+        if not self.no_mag:
+            self.add_bounds_stat([round(df['dir_m'].min(), ROUNDING['dir_m']),
+                                  round(df['dir_m'].max(), ROUNDING['dir_m'])], "Direction Magnetic Bounds", "deg")
+            self.add_value_validity_stat([len(df[(df['dir_m'] >= self.MIN_DIR) & (df['dir_m'] <= self.MAX_DIR)]),
+                                          len(df[(df['dir_m'] < self.MIN_DIR) | (df['dir_m'] > self.MAX_DIR)])], "Direction Magnetic Validity")
         self.add_bounds_stat([round(df['spd_kts'].min(), ROUNDING['spd_kts']),
-                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], "Speed Bounds", "kts")
-        self.add_value_validity_stat([len(df[(df['spd_kts'] >= self.MIN_SPD) & (df['spd_kts'] <= self.MAX_SPD)]),
-                                      len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])], "Speed Validity")
-        self.add_value_validity_stat([len(df[df['valid_flag'] == 'A']),
-                                      len(df[df['valid_flag'] != 'A'])], 'Sensor Data Validity')
+                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], 'Speed Knots Bounds', 'kts')
+        self.add_value_validity_stat([len(df[df['spd_kts'] <= self.MAX_SPD_KTS]),
+                                      len(df[df['spd_kts'] > self.MAX_SPD_KTS])], 'Speed Knots Validity')
+        self.add_bounds_stat([round(df['spd_mph'].min(), ROUNDING['spd_mph']),
+                              round(df['spd_mph'].max(), ROUNDING['spd_mph'])], 'Speed MPH Bounds', 'mph')
+        self.add_value_validity_stat([len(df[df['spd_mph'] <= self.MAX_SPD_MPH]),
+                                      len(df[df['spd_mph'] > self.MAX_SPD_MPH])], 'Speed MPH Validity')
 
         # -------------------------
         # Quality tests
@@ -161,10 +178,13 @@ class MWVParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
-            ('Speed', len(df), len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])),
-            ('Valid', len(df), len(df[(df['valid_flag'] != 'A')]))
+            ('Speed, kts', len(df), len(df[df['spd_kts'] > self.MAX_SPD_KTS])),
+            ('Speed, mph', len(df), len(df[df['spd_mph'] > self.MAX_SPD_MPH])),
+            ('Direction, True', len(df), len(df[(df['dir_t'] < self.MIN_DIR) | (df['dir_t'] > self.MAX_DIR)]))
         ]
+
+        if not self.no_mag:
+            quality_checks.append(("Direction, Magnetic", len(df), len(df[(df['dir_m'] < self.MIN_DIR) | (df['dir_m'] > self.MAX_DIR)])))
 
         for col, total, bad in quality_checks:
             error_rate = bad / total
@@ -174,9 +194,6 @@ class MWVParser(OpenVDMCSVParser):
                 self.add_quality_test_warning(col)
             else:
                 self.add_quality_test_passed(col)
-
-        # Drop non-numeric columns before resampling
-        df = df.drop(columns=['valid_flag'], errors='ignore')
 
         # -------------------------
         # Resample and round
@@ -190,8 +207,12 @@ class MWVParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
-                                 ('spd_kts', 'kts', 'Speed, kts')]:
+        for col, unit, label in [('dir_t', 'deg', 'Direction True'),
+                                 ('dir_m', 'deg', 'Direction Magnetic'),
+                                 ('spd_kts', 'kts', 'Speed kts'),
+                                 ('spd_mph', 'mph', 'Speed mph')]:
+            if col == 'dir_m' and self.no_mag:
+                continue
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
@@ -209,8 +230,19 @@ class MWVParser(OpenVDMCSVParser):
         # -------------------------
         self.send_error_msg(errors, filepath)
 
+    # -----------------------------
+    # CLI hooks for custom arguments
+    # -----------------------------
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        parser.add_argument('--noMag', action='store_true', default=False, help='Skip Direction Magnetic')
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'no_mag': getattr(args, 'noMag', False)}
+
 # -------------------------------------------------------------------------------------
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    MWVParser.run_cli()
+    MWDParser.run_cli()
