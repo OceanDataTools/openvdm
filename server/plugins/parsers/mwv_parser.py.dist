@@ -162,8 +162,8 @@ class MWVParser(OpenVDMCSVParser):
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
-            ('Speed', len(df), len(df[(df['dir_rel'] < self.MIN_SPD) | (df['dir_rel'] > self.MAX_SPD)])),
-            ('Valid', len(df), len(df[(df['dir_rel'] != 'A')]))
+            ('Speed', len(df), len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])),
+            ('Valid', len(df), len(df[(df['valid_flag'] != 'A')]))
         ]
 
         for col, total, bad in quality_checks:
@@ -191,7 +191,7 @@ class MWVParser(OpenVDMCSVParser):
         logging.info("Building visualization datasets...")
 
         for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
-                                 ('spd_kts', 'deg', 'Speed, kts')]:
+                                 ('spd_kts', 'kts', 'Speed, kts')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
