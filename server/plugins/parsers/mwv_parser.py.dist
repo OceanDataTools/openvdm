@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""
+FILE:  vtg_parser.py
+
+USAGE:  vtg_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+
+DESCRIPTION:  Parse the supplied NMEA-formtted MWV file and return the json-
+              formatted string used by OpenVDM as part of it's Data dashboard.
+
+  OPTIONS:  [-h] Return the help message.
+            [-v+] Increase verbosity (default: warning)
+            [--timeFormat] date/time format to use when parsing datafile, default
+                           yyyy-mm-ddTHH:MM:SS.sssZ
+            [--startTS] optional start crop time (strptime format)
+            [--stopTS] optional stop crop time (strptime format)
+            <dataFile> Full or relative path of the data file to process.
+
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   numpy==2.4.0
+                   pandas==2.3.0
+
+     BUGS:
+    NOTES:
+   AUTHOR:  Webb Pinner
+  VERSION:  2.14
+  CREATED:  2016-08-29
+ REVISION:  2025-12-30
+"""
+
+import sys
+import logging
+from datetime import datetime
+from os.path import dirname, realpath
+import pandas as pd
+import numpy as np
+import json
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.lib.openvdm_plugin import OpenVDMCSVParser
+
+PROC_COLS = ['date_time','dir_rel','spd_kts','valid_flag']
+
+FIELDS = [
+    "header",
+    "dir_rel",
+    "R",
+    "spd_kts",
+    "N",
+    "valid_flag_checksum",
+]
+
+ROUNDING = {
+    'dir_rel': 2,
+    'spd_kts': 2
+}
+
+
+class MWVParser(OpenVDMCSVParser):
+    """Parser for NMEA MWV files, fully refactored like GGAParser."""
+
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
+
+    MIN_DIR = 0.0
+    MAX_DIR = 359.99
+    MIN_SPD = 0.0
+    MAX_SPD = 80.0
+
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False):
+        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
+
+    def parse(self, filepath):
+        raw_data = {col: [] for col in self.proc_cols}
+        errors = []
+
+        # -------------------------
+        # Read and parse MWV lines
+        # -------------------------
+        try:
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWV'):
+                logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
+
+                # Map fields to FIELDS
+                vtg_data = dict(zip(FIELDS, fields))
+
+                try:
+                    dir_rel = float(vtg_data['dir_rel']) if vtg_data['dir_rel'] else None
+                    spd_kts = float(vtg_data['spd_kts']) if vtg_data['dir_rel'] else None
+
+                    [valid_flag, checksum] = vtg_data['valid_flag_checksum'].split('*')
+
+                    raw_data['date_time'].append(timestamp_str)
+                    raw_data['dir_rel'].append(dir_rel)
+                    raw_data['spd_kts'].append(spd_kts)
+                    raw_data['valid_flag'].append(valid_flag)
+
+                except Exception as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped due to parse error: %s", lineno, err)
+
+        except Exception as err:
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
+
+        if not raw_data['date_time']:
+            logging.warning("No valid MWV data in file: %s", filepath)
+            return None
+
+        # -------------------------
+        # Build DataFrame
+        # -------------------------
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        if df['date_time'].isna().all():
+            logging.error("All timestamps could not be parsed; aborting.")
+            return None
+        df = df.dropna(subset=['date_time'])
+        df = df.set_index('date_time')
+
+        if self.start_dt or self.stop_dt:
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
+
+        # -------------------------
+        # DeltaT
+        # -------------------------
+        df['deltaT'] = df.index.to_series().diff()
+
+        # -------------------------
+        # Statistics
+        # -------------------------
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(),df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3),
+                              round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
+                                      len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
+        self.add_bounds_stat([round(df['dir_rel'].min(), ROUNDING['dir_rel']),
+                              round(df['dir_rel'].max(), ROUNDING['dir_rel'])], "Direction Bounds", "deg")
+        self.add_value_validity_stat([len(df[(df['dir_rel'] >= self.MIN_DIR) & (df['dir_rel'] <= self.MAX_DIR)]),
+                                      len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])], "Direction Validity")
+        self.add_bounds_stat([round(df['spd_kts'].min(), ROUNDING['spd_kts']),
+                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], "Speed Bounds", "deg")
+        self.add_value_validity_stat([len(df[(df['spd_kts'] >= self.MIN_SPD) & (df['spd_kts'] <= self.MAX_SPD)]),
+                                      len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])], "Speed Validity")
+        self.add_value_validity_stat([len(df[df['valid_flag'] == 'A']),
+                                      len(df[df['valid_flag'] != 'A'])], 'Sensor Data Validity')
+
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        logging.info("Running quality tests...")
+        quality_checks = [
+            ('Rows', len(df)+len(errors), len(errors)),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
+            ('Speed', len(df), len(df[(df['dir_rel'] < self.MIN_SPD) | (df['dir_rel'] > self.MAX_SPD)])),
+            ('Valid', len(df), len(df[(df['dir_rel'] != 'A')]))
+        ]
+
+        for col, total, bad in quality_checks:
+            error_rate = bad / total
+            if error_rate > 0.25:
+                self.add_quality_test_failed(col)
+            elif error_rate > 0.10:
+                self.add_quality_test_warning(col)
+            else:
+                self.add_quality_test_passed(col)
+
+        # Drop non-numeric columns before resampling
+        df = df.drop(columns=['valid_flag'], errors='ignore')
+
+        # -------------------------
+        # Resample and round
+        # -------------------------
+        df = self.resample_data(df)
+        df = self.round_data(df, ROUNDING)
+        df = df.set_index('date_time')
+
+        # -------------------------
+        # Visualization
+        # -------------------------
+        logging.info("Building visualization datasets...")
+
+        for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
+                                 ('spd_kts', 'deg', 'Speed, kts')]:
+
+            visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
+            for ts, row in df.iterrows():
+                if pd.notna(row[col]):
+                    ts = pd.Timestamp(ts)
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize('UTC')
+                    epoch_ms = int(ts.timestamp() * 1000)
+                    visualizer_data_obj['data'].append([epoch_ms, row[col]])
+
+            self.add_visualization_data(visualizer_data_obj)
+
+        # -------------------------
+        # Send errors to OpenVDM
+        # -------------------------
+        self.send_error_msg(errors, filepath)
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    MWVParser.run_cli()
