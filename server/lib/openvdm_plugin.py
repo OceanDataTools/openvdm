@@ -441,7 +441,7 @@ class OpenVDMCSVParser(OpenVDMParser):
         """
         pass
 
-    def read_lines_with_timestamps(self, filepath, nmea_filter=None):
+    def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
         """
         Generator that yields (lineno, timestamp, remainder) for each valid line in the file.
 
@@ -468,7 +468,7 @@ class OpenVDMCSVParser(OpenVDMParser):
                         errors.append(lineno)
                         continue
 
-                    fields = remainder.split(',')
+                    fields = remainder.split(fields_sep)
 
                     # Filter by NMEA sentence type
                     if nmea_filter:

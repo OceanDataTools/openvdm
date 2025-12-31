@@ -58,7 +58,7 @@ ROUNDING = {
 
 
 class GillWO75Parser(OpenVDMCSVParser):
-    """Parser for NMEA MWV files, fully refactored like GGAParser."""
+    """Parser for Gill WO75 files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
@@ -79,7 +79,7 @@ class GillWO75Parser(OpenVDMCSVParser):
         errors = []
 
         # -------------------------
-        # Read and parse MWV lines
+        # Read and parse lines
         # -------------------------
         try:
             for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
@@ -107,7 +107,7 @@ class GillWO75Parser(OpenVDMCSVParser):
             return None
 
         if not raw_data['date_time']:
-            logging.warning("No valid MWV data in file: %s", filepath)
+            logging.warning("No valid data in file: %s", filepath)
             return None
 
         # -------------------------
