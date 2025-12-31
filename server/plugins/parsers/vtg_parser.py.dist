@@ -43,7 +43,7 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser
 
 PROC_COLS = ['date_time','cog_t','cog_m','sog_kts','sog_kph']
 
-VTG_FIELDS = [
+FIELDS = [
     "header",
     "cog_t",
     "T",
@@ -95,13 +95,13 @@ class VTGParser(OpenVDMCSVParser):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to VTG_FIELDS
-                vtg_data = dict(zip(VTG_FIELDS, fields))
+                field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    cog_t = float(vtg_data['cog_t']) if vtg_data['cog_t'] else None
-                    cog_m = float(vtg_data['cog_m']) if (not self.no_mag and vtg_data['cog_m']) else None
-                    sog_kts = float(vtg_data['sog_kts']) if vtg_data['sog_kts'] else None
-                    sog_kph = float(vtg_data['sog_kph']) if vtg_data['sog_kph'] else None
+                    cog_t = float(field_data['cog_t']) if field_data['cog_t'] else None
+                    cog_m = float(field_data['cog_m']) if (not self.no_mag and field_data['cog_m']) else None
+                    sog_kts = float(field_data['sog_kts']) if field_data['sog_kts'] else None
+                    sog_kph = float(field_data['sog_kph']) if field_data['sog_kph'] else None
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['cog_t'].append(cog_t)

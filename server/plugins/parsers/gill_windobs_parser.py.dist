@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-FILE:  mwv_parser.py
+FILE:  gill_wo75_parser.py
 
-USAGE:  mwv_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  gill_wo75_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted MWV file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied Gill Wind Observer 75 file and return the
+              json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -40,24 +41,23 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','dir_rel','spd_kts','valid_flag']
+PROC_COLS = ['date_time','dir_rel','spd_ms','status_flag']
 
 FIELDS = [
-    "header",
+    "A",
     "dir_rel",
-    "R",
-    "spd_kts",
-    "N",
-    "valid_flag_checksum",
+    "spd_ms",
+    "M",
+    "status_flag",
 ]
 
 ROUNDING = {
     'dir_rel': 2,
-    'spd_kts': 2
+    'spd_ms': 2
 }
 
 
-class MWVParser(OpenVDMCSVParser):
+class GillWO75Parser(OpenVDMCSVParser):
     """Parser for NMEA MWV files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
@@ -65,7 +65,7 @@ class MWVParser(OpenVDMCSVParser):
     MIN_DIR = 0.0
     MAX_DIR = 359.99
     MIN_SPD = 0.0
-    MAX_SPD = 80.0
+    MAX_SPD = 41.2
 
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
@@ -82,7 +82,7 @@ class MWVParser(OpenVDMCSVParser):
         # Read and parse MWV lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWV'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
@@ -90,14 +90,13 @@ class MWVParser(OpenVDMCSVParser):
 
                 try:
                     dir_rel = float(field_data['dir_rel']) if field_data['dir_rel'] else None
-                    spd_kts = float(field_data['spd_kts']) if field_data['spd_kts'] else None
-
-                    [valid_flag, checksum] = field_data['valid_flag_checksum'].split('*')
+                    spd_ms = float(field_data['spd_ms']) if field_data['spd_ms'] else None
+                    status_flag = int(field_data['status_flag']) if field_data['status_flag'] else None
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['dir_rel'].append(dir_rel)
-                    raw_data['spd_kts'].append(spd_kts)
-                    raw_data['valid_flag'].append(valid_flag)
+                    raw_data['spd_ms'].append(spd_ms)
+                    raw_data['status_flag'].append(status_flag)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -147,12 +146,12 @@ class MWVParser(OpenVDMCSVParser):
                               round(df['dir_rel'].max(), ROUNDING['dir_rel'])], "Direction Bounds", "deg")
         self.add_value_validity_stat([len(df[(df['dir_rel'] >= self.MIN_DIR) & (df['dir_rel'] <= self.MAX_DIR)]),
                                       len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])], "Direction Validity")
-        self.add_bounds_stat([round(df['spd_kts'].min(), ROUNDING['spd_kts']),
-                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], "Speed Bounds", "kts")
-        self.add_value_validity_stat([len(df[(df['spd_kts'] >= self.MIN_SPD) & (df['spd_kts'] <= self.MAX_SPD)]),
-                                      len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])], "Speed Validity")
-        self.add_value_validity_stat([len(df[df['valid_flag'] == 'A']),
-                                      len(df[df['valid_flag'] != 'A'])], 'Sensor Data Validity')
+        self.add_bounds_stat([round(df['spd_ms'].min(), ROUNDING['spd_ms']),
+                              round(df['spd_ms'].max(), ROUNDING['spd_ms'])], "Speed Bounds", "m/s")
+        self.add_value_validity_stat([len(df[(df['spd_ms'] >= self.MIN_SPD) & (df['spd_ms'] <= self.MAX_SPD)]),
+                                      len(df[(df['spd_ms'] < self.MIN_SPD) | (df['spd_ms'] > self.MAX_SPD)])], "Speed Validity")
+        self.add_value_validity_stat([len(df[df['status_flag'] >= 60]),
+                                      len(df[df['status_flag'] < 66])], 'Status Data Validity')
 
         # -------------------------
         # Quality tests
@@ -162,8 +161,8 @@ class MWVParser(OpenVDMCSVParser):
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
-            ('Speed', len(df), len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])),
-            ('Valid', len(df), len(df[(df['valid_flag'] != 'A')]))
+            ('Speed', len(df), len(df[(df['spd_ms'] < self.MIN_SPD) | (df['spd_ms'] > self.MAX_SPD)])),
+            ('Valid', len(df), len(df[(df['status_flag'] >= 60)]))
         ]
 
         for col, total, bad in quality_checks:
@@ -176,7 +175,7 @@ class MWVParser(OpenVDMCSVParser):
                 self.add_quality_test_passed(col)
 
         # Drop non-numeric columns before resampling
-        df = df.drop(columns=['valid_flag'], errors='ignore')
+        df = df.drop(columns=['status_flag'], errors='ignore')
 
         # -------------------------
         # Resample and round
@@ -191,7 +190,7 @@ class MWVParser(OpenVDMCSVParser):
         logging.info("Building visualization datasets...")
 
         for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
-                                 ('spd_kts', 'kts', 'Speed, kts')]:
+                                 ('spd_ms', 'm/s', 'Speed, m/s')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
@@ -213,4 +212,4 @@ class MWVParser(OpenVDMCSVParser):
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    MWVParser.run_cli()
+    GillWO75Parser.run_cli()

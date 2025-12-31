@@ -43,7 +43,7 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser
 
 PROC_COLS = ['date_time','latitude','longitude','num_satellites','hdop','altitude','height_wgs84']
 
-GGA_FIELDS = [
+FIELDS = [
     "header",
     "gps_time",
     "latitude",
@@ -98,20 +98,20 @@ class GGAParser(OpenVDMCSVParser):
             for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='GGA'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
             
-                # Map fields to GGA_FIELDS
-                gga_data = dict(zip(GGA_FIELDS, fields))
+                # Map fields to FIELDS
+                field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    latitude = float(gga_data['latitude'][:2]) + float(gga_data['latitude'][2:])/60
-                    latitude = self._hemisphere_correction(latitude, gga_data['NS'])
+                    latitude = float(field_data['latitude'][:2]) + float(field_data['latitude'][2:])/60
+                    latitude = self._hemisphere_correction(latitude, field_data['NS'])
 
-                    longitude = float(gga_data['longitude'][:3]) + float(gga_data['longitude'][3:])/60
-                    longitude = self._hemisphere_correction(longitude, gga_data['EW'])
+                    longitude = float(field_data['longitude'][:3]) + float(field_data['longitude'][3:])/60
+                    longitude = self._hemisphere_correction(longitude, field_data['EW'])
 
-                    num_satellites = int(gga_data['num_satellites'])
-                    hdop = float(gga_data['hdop'])
-                    altitude = float(gga_data['altitude']) if gga_data['altitude'] else 0.0
-                    height_wgs84 = float(gga_data['height_wgs84']) if gga_data['height_wgs84'] else 0.0
+                    num_satellites = int(field_data['num_satellites'])
+                    hdop = float(field_data['hdop'])
+                    altitude = float(field_data['altitude']) if field_data['altitude'] else 0.0
+                    height_wgs84 = float(field_data['height_wgs84']) if field_data['height_wgs84'] else 0.0
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['latitude'].append(latitude)

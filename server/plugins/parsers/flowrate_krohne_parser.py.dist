@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-FILE:  mwv_parser.py
+FILE:  flowrate_krohne_parser.py
 
-USAGE:  mwv_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  flowrate_krohne_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted MWV file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied Krohne Optiflux flowrate file and return the
+              json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -40,33 +41,42 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','dir_rel','spd_kts','valid_flag']
+PROC_COLS = ['date_time','flowrate_ms','flowvolume_lpm','coiltemp_c','conductivity_Sm']
 
 FIELDS = [
-    "header",
-    "dir_rel",
-    "R",
-    "spd_kts",
-    "N",
-    "valid_flag_checksum",
+    'flowrate_ms',
+    'flowvolume_lpm',
+    'coiltemp_c',
+    'conductivity_Sm'
 ]
 
 ROUNDING = {
-    'dir_rel': 2,
-    'spd_kts': 2
+    'flowrate_ms': 2,
+    'flowvolume_lpm': 2,
+    'coiltemp_c': 2,
+    'conductivity_Sm': 2
 }
 
 
-class MWVParser(OpenVDMCSVParser):
+class OPTIFLUXParser(OpenVDMCSVParser):
     """Parser for NMEA MWV files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-    MIN_DIR = 0.0
-    MAX_DIR = 359.99
-    MIN_SPD = 0.0
-    MAX_SPD = 80.0
+    MIN_RATE = -12.0
+    MAX_RATE = 12.0
+    MIN_VOL = 0.0
+    
+    # radius in m  = 1.5" pipe * 0.0254m/in / 2
+    # area = pi*r^2
+    # vol/min = area (m^2) * flowrate (m/s) * 60 
+    MAX_VOL = 822
 
+    MIN_TEMP = -40.0
+    MAX_TEMP = 55
+
+    MIN_COND = 0.0
+    MAX_COND = 6.5
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False):
@@ -82,22 +92,23 @@ class MWVParser(OpenVDMCSVParser):
         # Read and parse MWV lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWV'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    dir_rel = float(field_data['dir_rel']) if field_data['dir_rel'] else None
-                    spd_kts = float(field_data['spd_kts']) if field_data['spd_kts'] else None
-
-                    [valid_flag, checksum] = field_data['valid_flag_checksum'].split('*')
+                    flowrate_ms = float(field_data['flowrate_ms']) if field_data['flowrate_ms'] else None
+                    flowvolume_lpm = float(field_data['flowvolume_lpm']) if field_data['flowvolume_lpm'] else None
+                    coiltemp_c = float(field_data['coiltemp_c']) if field_data['coiltemp_c'] else None
+                    conductivity_Sm = float(field_data['conductivity_Sm']) if field_data['conductivity_Sm'] else None
 
                     raw_data['date_time'].append(timestamp_str)
-                    raw_data['dir_rel'].append(dir_rel)
-                    raw_data['spd_kts'].append(spd_kts)
-                    raw_data['valid_flag'].append(valid_flag)
+                    raw_data['flowrate_ms'].append(flowrate_ms)
+                    raw_data['flowvolume_lpm'].append(flowvolume_lpm)
+                    raw_data['coiltemp_c'].append(coiltemp_c)
+                    raw_data['conductivity_Sm'].append(conductivity_Sm)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -143,16 +154,22 @@ class MWVParser(OpenVDMCSVParser):
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df['dir_rel'].min(), ROUNDING['dir_rel']),
-                              round(df['dir_rel'].max(), ROUNDING['dir_rel'])], "Direction Bounds", "deg")
-        self.add_value_validity_stat([len(df[(df['dir_rel'] >= self.MIN_DIR) & (df['dir_rel'] <= self.MAX_DIR)]),
-                                      len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])], "Direction Validity")
-        self.add_bounds_stat([round(df['spd_kts'].min(), ROUNDING['spd_kts']),
-                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], "Speed Bounds", "kts")
-        self.add_value_validity_stat([len(df[(df['spd_kts'] >= self.MIN_SPD) & (df['spd_kts'] <= self.MAX_SPD)]),
-                                      len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])], "Speed Validity")
-        self.add_value_validity_stat([len(df[df['valid_flag'] == 'A']),
-                                      len(df[df['valid_flag'] != 'A'])], 'Sensor Data Validity')
+        self.add_bounds_stat([round(df['flowrate_ms'].min(), ROUNDING['flowrate_ms']),
+                              round(df['flowrate_ms'].max(), ROUNDING['flowrate_ms'])], "Flowrate Bounds", "m/s")
+        self.add_value_validity_stat([len(df[(df['flowrate_ms'] >= self.MIN_RATE) & (df['flowrate_ms'] <= self.MAX_RATE)]),
+                                      len(df[(df['flowrate_ms'] < self.MIN_RATE) | (df['flowrate_ms'] > self.MAX_RATE)])], "Flowrate Validity")
+        self.add_bounds_stat([round(df['flowvolume_lpm'].min(), ROUNDING['flowvolume_lpm']),
+                              round(df['flowvolume_lpm'].max(), ROUNDING['flowvolume_lpm'])], "Volume Bounds", "l/min")
+        self.add_value_validity_stat([len(df[(df['flowvolume_lpm'] >= self.MIN_VOL) & (df['flowvolume_lpm'] <= self.MAX_VOL)]),
+                                      len(df[(df['flowvolume_lpm'] < self.MIN_VOL) | (df['flowvolume_lpm'] > self.MAX_VOL)])], "Volume Validity")
+        self.add_bounds_stat([round(df['coiltemp_c'].min(), ROUNDING['coiltemp_c']),
+                              round(df['coiltemp_c'].max(), ROUNDING['coiltemp_c'])], "Coil Temp Bounds", "C")
+        self.add_value_validity_stat([len(df[(df['coiltemp_c'] >= self.MIN_TEMP) & (df['coiltemp_c'] <= self.MAX_TEMP)]),
+                                      len(df[(df['coiltemp_c'] < self.MIN_TEMP) | (df['coiltemp_c'] > self.MAX_TEMP)])], "Coil Temp Validity")
+        self.add_bounds_stat([round(df['conductivity_Sm'].min(), ROUNDING['conductivity_Sm']),
+                              round(df['conductivity_Sm'].max(), ROUNDING['conductivity_Sm'])], "Conductivity Bounds", "S/m")
+        self.add_value_validity_stat([len(df[(df['conductivity_Sm'] >= self.MIN_COND) & (df['conductivity_Sm'] <= self.MAX_COND)]),
+                                      len(df[(df['conductivity_Sm'] < self.MIN_COND) | (df['conductivity_Sm'] > self.MAX_COND)])], "Conductivity Validity")
 
         # -------------------------
         # Quality tests
@@ -161,9 +178,10 @@ class MWVParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
-            ('Speed', len(df), len(df[(df['spd_kts'] < self.MIN_SPD) | (df['spd_kts'] > self.MAX_SPD)])),
-            ('Valid', len(df), len(df[(df['valid_flag'] != 'A')]))
+            ('Flowrate', len(df), len(df[(df['flowrate_ms'] < self.MIN_RATE) | (df['flowrate_ms'] > self.MAX_RATE)])),
+            ('Volume', len(df), len(df[(df['flowvolume_lpm'] < self.MIN_VOL) | (df['flowvolume_lpm'] > self.MAX_VOL)])),
+            ('Coil Temp', len(df), len(df[(df['coiltemp_c'] < self.MIN_TEMP) | (df['coiltemp_c'] > self.MAX_TEMP)])),
+            ('Conductivity', len(df), len(df[(df['conductivity_Sm'] < self.MIN_COND) | (df['conductivity_Sm'] > self.MAX_COND)])),
         ]
 
         for col, total, bad in quality_checks:
@@ -176,7 +194,7 @@ class MWVParser(OpenVDMCSVParser):
                 self.add_quality_test_passed(col)
 
         # Drop non-numeric columns before resampling
-        df = df.drop(columns=['valid_flag'], errors='ignore')
+        df = df.drop(columns=['status_flag'], errors='ignore')
 
         # -------------------------
         # Resample and round
@@ -190,8 +208,10 @@ class MWVParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
-                                 ('spd_kts', 'kts', 'Speed, kts')]:
+        for col, unit, label in [('flowrate_ms', 'm/s', 'Flowrate, m/s'),
+                                 ('flowvolume_lpm', 'l/min', 'Volume, l/min'),
+                                 ('coiltemp_c', 'C', 'Coil Temp, C'),
+                                 ('conductivity_Sm', 'S/m', 'Conductivity, S/m')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
@@ -213,4 +233,4 @@ class MWVParser(OpenVDMCSVParser):
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    MWVParser.run_cli()
+    OPTIFLUXParser.run_cli()
