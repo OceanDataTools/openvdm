@@ -443,16 +443,42 @@ class OpenVDMCSVParser(OpenVDMParser):
 
     def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
         """
-        Generator that yields (lineno, timestamp, remainder) for each valid line in the file.
+        Generator that yields (lineno, timestamp, remainder, fields) for each valid line.
 
-        Args:
-            filepath (str): Path to the raw data file.
-            nmea_filter (callable or str, optional):
-                - If str, only lines where first field endswith this string are yielded.
-                - If callable, should accept fields list and return True/False.
-        Yields:
-            lineno (int), timestamp_str (str), remainder (str)
+        nmea_filter:
+            - str:
+                * "GGA"        → fields[0].endswith("GGA")
+                * "PSXN,23"    → fields[0].endswith("PSXN") and fields[1] == "23"
+            - callable(fields) → bool
         """
+
+        def make_filter_predicate(nmea_filter):
+            if nmea_filter is None:
+                return None
+
+            if callable(nmea_filter):
+                return nmea_filter
+
+            if isinstance(nmea_filter, str):
+                parts = [p.strip().upper() for p in nmea_filter.split(',')]
+
+                # Simple sentence filter: "GGA"
+                if len(parts) == 1:
+                    sentence = parts[0]
+                    return lambda f: f and f[0].upper().endswith(sentence)
+
+                # Proprietary filter: "PSXN,23"
+                sentence, subtype = parts[0], parts[1]
+                return lambda f: (
+                    len(f) > 1 and
+                    f[0].upper().endswith(sentence) and
+                    f[1] == subtype
+                )
+
+            raise TypeError("nmea_filter must be str or callable")
+
+        filter_predicate = make_filter_predicate(nmea_filter)
+
         errors = []
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -470,21 +496,14 @@ class OpenVDMCSVParser(OpenVDMParser):
 
                     fields = remainder.split(fields_sep)
 
-                    # Filter by NMEA sentence type
-                    if nmea_filter:
-                        if isinstance(nmea_filter, str):
-                            if not fields[0].endswith(nmea_filter):
-                                continue
-                        elif callable(nmea_filter):
-                            if not nmea_filter(fields):
-                                continue
+                    if filter_predicate and not filter_predicate(fields):
+                        continue
 
                     yield lineno, timestamp_str, remainder, fields
 
         except Exception as err:
             logging.error("Failed to read file %s: %s", filepath, err)
             return
-
 
     def crop_data(self, data_frame):
         """
