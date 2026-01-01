@@ -40,20 +40,20 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','dpt_m']
+PROC_COLS = ['date_time','dbs_m']
 
 FIELDS = [
     "header",
-    "dpt_f",
+    "dbs_f",
     "f",
-    "dpt_m"
-    "M"
-    "dpt_fathoms"
+    "dbs_m",
+    "M",
+    "dbs_fathoms",
     "F_checksum"
 ]
 
 ROUNDING = {
-    'dpt_m': 3
+    'dbs_m': 3
 }
 
 
@@ -85,11 +85,13 @@ class DBSParser(OpenVDMCSVParser):
                 # Map fields to DBS_FIELDS
                 field_data = dict(zip(FIELDS, fields))
 
+                logging.debug(field_data)
+
                 try:
-                    dpt_m = float(field_data['dpt_m']) if field_data['dpt_m'] else None
+                    dbs_m = float(field_data['dbs_m']) if field_data['dbs_m'] else None
 
                     raw_data['date_time'].append(timestamp_str)
-                    raw_data['dpt_m'].append(dpt_m)
+                    raw_data['dbs_m'].append(dbs_m)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -135,10 +137,10 @@ class DBSParser(OpenVDMCSVParser):
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df['dpt_m'].min(), ROUNDING['dpt_m']),
-                              round(df['dpt_m'].max(), ROUNDING['dpt_m'])], "Depth Bounds", "m")
-        self.add_value_validity_stat([len(df[(df['dpt_m'] >= self.MIN_DBS) & (df['dpt_m'] <= self.MAX_DBS)]),
-                                      len(df[(df['dpt_m'] < self.MIN_DBS) | (df['dpt_m'] > self.MAX_DBS)])], "Depth Validity")
+        self.add_bounds_stat([round(df['dbs_m'].min(), ROUNDING['dbs_m']),
+                              round(df['dbs_m'].max(), ROUNDING['dbs_m'])], "Depth Bounds", "m")
+        self.add_value_validity_stat([len(df[(df['dbs_m'] >= self.MIN_DBS) & (df['dbs_m'] <= self.MAX_DBS)]),
+                                      len(df[(df['dbs_m'] < self.MIN_DBS) | (df['dbs_m'] > self.MAX_DBS)])], "Depth Validity")
 
         # -------------------------
         # Quality tests
@@ -147,7 +149,7 @@ class DBSParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Depth', len(df), len(df[(df['dpt_m'] < self.MIN_DBS) | (df['dpt_m'] > self.MAX_DBS)]))
+            ('Depth', len(df), len(df[(df['dbs_m'] < self.MIN_DBS) | (df['dbs_m'] > self.MAX_DBS)]))
         ]
 
         for col, total, bad in quality_checks:
@@ -171,7 +173,7 @@ class DBSParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('dpt_m', 'm', 'Depth, m')]:
+        for col, unit, label in [('dbs_m', 'm', 'Depth, m')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
