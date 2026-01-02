@@ -87,7 +87,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         spec.loader.exec_module(plugin_module)
 
         if not hasattr(plugin_module, 'process_file'):
-            logging.error("Plugin %s does not have a 'process_file(raw_path)' function", plugin_name)
+            logging.warning("Plugin %s does not have a 'process_file(raw_path)' function", plugin_name)
             return None
 
         return plugin_module.process_file
@@ -131,6 +131,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 continue
 
             try:
+                logging.info("Processing file: %s", filename)
                 out_obj = plugin_callable(raw_path)
             except Exception as exc:
                 logging.error("Error processing file %s: %s", filename, str(exc))
@@ -140,7 +141,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
             if not out_obj or out_obj.get('error'):
                 msg = out_obj.get('error', f"No output from plugin for file: {filename}")
-                logging.error(msg)
+                logging.warning(msg)
                 self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
                 continue
 
