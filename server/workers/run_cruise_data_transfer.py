@@ -8,7 +8,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2015-01-01
  REVISION:  2025-08-18
 """

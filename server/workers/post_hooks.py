@@ -10,7 +10,7 @@ DESCRIPTION:  Gearman worker that runs user-defined scripts following the
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2015-02-09
  REVISION:  2025-07-06
 """
@@ -146,7 +146,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             return None
 
         command_list = copy.deepcopy(command_list)
- 
+
         def _replace_tokens(text, replacements):
             for token, value in replacements.items():
                 text = text.replace(token, value)
