@@ -179,6 +179,7 @@ $(function () {
     }
 
     function addStartEndPositionsToMap(mapObject, dataType) {
+        console.log(mapObject);
         var loweringID = $('#lowering_sel').val();
         var getDashboardDataFilesURL = siteRoot + 'api/dashboardData/getDataObjectsByType/' + cruiseID + '/' + dataType;
         $.getJSON(getDashboardDataFilesURL, function (data, status) {
@@ -188,7 +189,7 @@ $(function () {
                    return object['raw_data'].includes(loweringID)
                })
 
-               var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + files[0]['dd_json'];
+               var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataType + '/' + files[0]['dd_json'];
                $.getJSON(getVisualizerDataURL, function (data, status) {
                     if (status === 'success' && data !== null) {
 
@@ -255,6 +256,7 @@ $(function () {
     }
 
     function addGeoJSONToMap(mapObject, dataObjectJsonName) {
+        console.log(mapObject, dataObjectJsonName);
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -373,7 +375,7 @@ $(function () {
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
         var reversedY = reversedY || false;
         var inverted = inverted || false;
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject.dataType + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -538,6 +540,7 @@ $(function () {
 
     //Check for updates
     $.each(mapObjects, function(i) {
+        console.log(mapObjects[i]);
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
             if ($(this).is(":checked")) {
                 if ($(this).hasClass("se-checkbox")) {
