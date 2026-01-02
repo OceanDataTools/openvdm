@@ -462,6 +462,7 @@ $(function () {
                                 zoom: {
                                     limits: {
                                         x: {min: 'original', max: 'original', minRange: 60 * 1000},
+                                        y: {min: 'original', max: 'original'},
                                     },
                                     zoom: {
                                         wheel: {
