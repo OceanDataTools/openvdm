@@ -202,9 +202,9 @@ class XDRParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('pres_mbar', 'mBar', 'Air Pres, mBar'),
-                                 ('temp_c', 'C', 'Temperature, C'),
-                                 ('humid_%', '%', 'Rel. Humidity, %')]:
+        for col, unit, label in [('pres_mbar', 'mBar', 'Air Pres'),
+                                 ('temp_c', 'C', 'Temperature'),
+                                 ('humid_%', '%', 'Rel. Humidity')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

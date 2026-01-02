@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-FILE:  flowrate_triplet_parser.py
+FILE:  fluoro_triplet_parser.py
 
-USAGE:  flowrate_triplet_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  fluoro_triplet_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
 DESCRIPTION:  Parse the supplied SBE ECO Triplet fluorometer file and return
               the json-formatted string used by OpenVDM as part of it's Data
