@@ -150,8 +150,8 @@ class GillWO75Parser(OpenVDMCSVParser):
                               round(df['spd_ms'].max(), ROUNDING['spd_ms'])], "Speed Bounds", "m/s")
         self.add_value_validity_stat([len(df[(df['spd_ms'] >= self.MIN_SPD) & (df['spd_ms'] <= self.MAX_SPD)]),
                                       len(df[(df['spd_ms'] < self.MIN_SPD) | (df['spd_ms'] > self.MAX_SPD)])], "Speed Validity")
-        self.add_value_validity_stat([len(df[df['status_flag'] in [60,66]]),
-                                      len(df[df['status_flag'] not in [60,66]])], 'Status Data Validity')
+        self.add_value_validity_stat([len(df[df['status_flag'].isin([60, 66])]),
+                                      len(df[~df['status_flag'].isin([60, 66])])], 'Status Data Validity')
 
         # -------------------------
         # Quality tests
@@ -162,7 +162,7 @@ class GillWO75Parser(OpenVDMCSVParser):
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Direction', len(df), len(df[(df['dir_rel'] < self.MIN_DIR) | (df['dir_rel'] > self.MAX_DIR)])),
             ('Speed', len(df), len(df[(df['spd_ms'] < self.MIN_SPD) | (df['spd_ms'] > self.MAX_SPD)])),
-            ('Valid', len(df), len(df[(df['status_flag'] not in [60,66])]))
+            ('Valid', len(df), len(df[~df['status_flag'].isin([60, 66])]))
         ]
 
         for col, total, bad in quality_checks:
