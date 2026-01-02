@@ -190,7 +190,7 @@ class PSXN23Parser(OpenVDMCSVParser):
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Roll', len(df), len(df[(df['roll'] < self.MIN_ROLL) | (df['roll'] > self.MAX_ROLL)])),
             ('Pitch', len(df), len(df[(df['pitch'] < self.MIN_PITCH) | (df['pitch'] > self.MAX_PITCH)])),
-            ('Heading', len(df), len(df[(df['pitch'] < self.MIN_HEADING) | (df['pitch'] > self.MAX_HEADING)])),
+            ('Heading', len(df), len(df[(df['heading'] < self.MIN_HEADING) | (df['heading'] > self.MAX_HEADING)])),
         ]
 
         for col, total, bad in quality_checks:

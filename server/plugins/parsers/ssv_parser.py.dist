@@ -2,7 +2,7 @@
 """
 FILE:  ssv_parser.py
 
-USAGE:  ssv_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  ssv_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
 DESCRIPTION:  Parse the supplied SV file and return the json-
               formatted string used by OpenVDM as part of it's Data dashboard.
@@ -13,7 +13,6 @@ DESCRIPTION:  Parse the supplied SV file and return the json-
                            yyyy-mm-ddTHH:MM:SS.sssZ
             [--startTS] optional start crop time (strptime format)
             [--stopTS] optional stop crop time (strptime format)
-            [--sbe38] file includes temp data from external SBE38
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.11
@@ -170,7 +169,7 @@ class SSVParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('sv_ms', 'm/s', 'SV, m/s')]:
+        for col, unit, label in [('sv_ms', 'm/s', 'SV')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

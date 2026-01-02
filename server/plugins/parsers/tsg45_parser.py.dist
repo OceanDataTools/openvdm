@@ -2,7 +2,7 @@
 """
 FILE:  tsg45_parser.py
 
-USAGE:  tsg45_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  tsg45_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--sbe38] <dataFile>
 
 DESCRIPTION:  Parse the supplied SBE45 TSG file and return the json-
               formatted string used by OpenVDM as part of it's Data dashboard.
@@ -191,11 +191,11 @@ class SBE45TSGParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('temp_c', 'deg', 'Temperature, C'),
-                                 ('cond_Sm', 'S/m', 'Conductivity, S/m'),
-                                 ('sal_PSU', 'PSU', 'Salinity, PSU'),
-                                 ('sv_ms', 'm/s', 'SV, m/s'),
-                                 ('sbe38_temp_c', 'deg', 'SBE38 Temp., C')]:
+        for col, unit, label in [('temp_c', 'C', 'Temperature'),
+                                 ('cond_Sm', 'S/m', 'Conductivity'),
+                                 ('sal_PSU', 'PSU', 'Salinity'),
+                                 ('sv_ms', 'm/s', 'SV'),
+                                 ('sbe38_temp_c', 'C', 'SBE38 Temp.')]:
             if col == 'sbe38_temp_c' and not self.sbe38:
                 continue
 

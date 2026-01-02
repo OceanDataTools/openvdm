@@ -173,7 +173,7 @@ class DBSParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('dbs_m', 'm', 'Depth, m')]:
+        for col, unit, label in [('dbs_m', 'm', 'Depth')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

@@ -208,9 +208,9 @@ class MWDParser(OpenVDMCSVParser):
         logging.info("Building visualization datasets...")
 
         for col, unit, label in [('dir_t', 'deg', 'Direction True'),
-                                 ('dir_m', 'deg', 'Direction Magnetic'),
-                                 ('spd_kts', 'kts', 'Speed kts'),
-                                 ('spd_mph', 'mph', 'Speed mph')]:
+                                 ('dir_m', 'deg', 'Direction Mag.'),
+                                 ('spd_kts', 'kts', 'Speed'),
+                                 ('spd_mph', 'mph', 'Speed')]:
             if col == 'dir_m' and self.no_mag:
                 continue
 

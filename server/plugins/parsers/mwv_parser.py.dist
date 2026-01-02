@@ -190,8 +190,8 @@ class MWVParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('dir_rel', 'deg', 'Direction Relative'),
-                                 ('spd_kts', 'kts', 'Speed, kts')]:
+        for col, unit, label in [('dir_rel', 'deg', 'Direction Rel.'),
+                                 ('spd_kts', 'kts', 'Speed')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

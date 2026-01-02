@@ -2,7 +2,7 @@
 """
 FILE:  tsg38_parser.py
 
-USAGE:  tsg38_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  tsg38_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
 DESCRIPTION:  Parse the supplied SBE38 file and return the json-
               formatted string used by OpenVDM as part of it's Data dashboard.
@@ -13,7 +13,6 @@ DESCRIPTION:  Parse the supplied SBE38 file and return the json-
                            yyyy-mm-ddTHH:MM:SS.sssZ
             [--startTS] optional start crop time (strptime format)
             [--stopTS] optional stop crop time (strptime format)
-            [--sbe38] file includes temp data from external SBE38
             <dataFile> Full or relative path of the data file to process.
 
 REQUIREMENTS:  Python3.11
@@ -161,7 +160,7 @@ class SBE38Parser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('temp_c', 'deg', 'Temperature, C')]:
+        for col, unit, label in [('temp_c', 'C', 'Temperature')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

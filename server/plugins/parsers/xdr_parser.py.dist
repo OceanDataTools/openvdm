@@ -175,7 +175,7 @@ class XDRParser(OpenVDMCSVParser):
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Air Pressure', len(df), len(df[(df['pres_mbar'] < self.MIN_PRES) | (df['pres_mbar'] > self.MAX_PRES)])),
             ('Air Temperature', len(df), len(df[(df['temp_c'] < self.MIN_TEMP) | (df['temp_c'] > self.MAX_TEMP)])),
-            ('Rel. Humidity', len(df), len(df[(df['humid_%'] < self.MIN_TEMP) | (df['humid_%'] > self.MAX_TEMP)])),
+            ('Rel. Humidity', len(df), len(df[(df['humid_%'] < self.MIN_HUMID) | (df['humid_%'] > self.MAX_HUMID)])),
         ]
 
         for col, total, bad in quality_checks:

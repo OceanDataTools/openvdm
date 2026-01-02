@@ -209,9 +209,9 @@ class VTGParser(OpenVDMCSVParser):
         logging.info("Building visualization datasets...")
 
         for col, unit, label in [('cog_t', 'deg', 'COG True'),
-                                 ('cog_m', 'deg', 'COG Magnetic'),
-                                 ('sog_kts', 'kts', 'SOG kts'),
-                                 ('sog_kph', 'kph', 'SOG kph')]:
+                                 ('cog_m', 'deg', 'COG Mag.'),
+                                 ('sog_kts', 'kts', 'SOG'),
+                                 ('sog_kph', 'kph', 'SOG')]:
             if col == 'cog_m' and self.no_mag:
                 continue
 

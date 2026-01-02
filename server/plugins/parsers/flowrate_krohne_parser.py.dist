@@ -208,10 +208,10 @@ class OPTIFLUXParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('flowrate_ms', 'm/s', 'Flowrate, m/s'),
-                                 ('flowvolume_lpm', 'l/min', 'Volume, l/min'),
-                                 ('coiltemp_c', 'C', 'Coil Temp, C'),
-                                 ('conductivity_Sm', 'S/m', 'Conductivity, S/m')]:
+        for col, unit, label in [('flowrate_ms', 'm/s', 'Flowrate'),
+                                 ('flowvolume_lpm', 'l/min', 'Volume'),
+                                 ('coiltemp_c', 'C', 'Coil Temp'),
+                                 ('conductivity_Sm', 'S/m', 'Conductivity')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
