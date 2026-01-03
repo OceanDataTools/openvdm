@@ -17,89 +17,105 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 def combine_geojson_files(input_files, prefix, device_name):
     """
-    Function to combine all the geoJSON-formatted files listed in the 'files' array
-    command-line argument.  The function is also passed the cruiseID and device name so
-    that this information can be added as a property to the final geoJSON file.
+    Combine GeoJSON trackline data from OpenVDM dashboard files.
 
-    If the raw datafile cannot be processed the function returns false.  If there were no
-    files to process the fuction returns Null.  Otherwise the fuction returns the
-    combined geoJSON object
+    Ignores non-GeoJSON visualizerData entries (e.g. timeseries).
+    Returns None on failure or if no usable GeoJSON data is found.
     """
 
-    def normalize_dashboard_geojson(data: dict) -> dict:
+    def extract_visualizer_data(data: dict) -> list[dict]:
         """
-        Normalize legacy and current OpenVDM dashboard formats.
-
-        NEW format:
-          { "<datatype>": { "visualizerData": [...] } }
-
-        LEGACY format:
-          { "visualizerData": [...] }
-
-        Returns:
-          { "visualizerData": [...] }
+        Return the raw visualizerData list from legacy or new formats.
         """
 
-        # NEW format: single datatype key
+        # New format: datatype-wrapped
         if len(data) == 1:
             _, inner = next(iter(data.items()))
             if isinstance(inner, dict) and "visualizerData" in inner:
-                if not isinstance(inner["visualizerData"], list):
-                    raise ValueError("'visualizerData' must be a list")
-                return inner
+                vdata = inner["visualizerData"]
+                if isinstance(vdata, list):
+                    return vdata
 
-        # LEGACY format
-        if "visualizerData" in data:
-            if not isinstance(data["visualizerData"], list):
-                raise ValueError("'visualizerData' must be a list")
-            return data
+        # Legacy format
+        if "visualizerData" in data and isinstance(data["visualizerData"], list):
+            return data["visualizerData"]
 
-        raise ValueError(
-            "Unrecognized dashboard GeoJSON format "
-            "(expected datatype-wrapped or legacy visualizerData)"
-        )
+        raise ValueError("Unrecognized dashboard JSON format")
 
-    # Blank geoJson object
-    returned_geojson_obj = {
-        "type":"FeatureCollection",
-        "features":[
-            {
-                "type":"Feature",
-                "geometry":{
-                    "type":"LineString",
-                    "coordinates":[]
-                },
-                "properties": {
-                    "name": f'{prefix}_{device_name}',
-                    "coordTimes":[]
-                }
-            }
-        ]
-    }
+    # ------------------------------------------------------------------
 
-    if len(input_files) == 0:
+    if not input_files:
         return None
 
+    combined = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [],
+                },
+                "properties": {
+                    "name": f"{prefix}_{device_name}",
+                    "coordTimes": [],
+                },
+            }
+        ],
+    }
+
+    out_feature = combined["features"][0]
+    found_geojson = False
+
+    # ------------------------------------------------------------------
+
     for file in input_files:
-
-        # Open the dashboardData file
         try:
-            with open(file, mode='r', encoding="utf-8") as geojson_file:
-                raw_geojson_obj = json.load(geojson_file)
-                normalized = normalize_dashboard_geojson(raw_geojson_obj)
-                geojson_obj = normalized["visualizerData"][0]
+            with open(file, "r", encoding="utf-8") as f:
+                raw = json.load(f)
 
-                returned_geojson_obj['features'][0]['geometry']['coordinates'] += geojson_obj['visualizerData'][0]['features'][0]['geometry']['coordinates']
-                returned_geojson_obj['features'][0]['properties']['coordTimes'] += geojson_obj['visualizerData'][0]['features'][0]['properties']['coordTimes']
+            visualizers = extract_visualizer_data(raw)
 
-        # If the file cannot be processed return false.
+            for entry in visualizers:
+                # Skip non-GeoJSON visualizers (timeseries, stats, etc.)
+                if (
+                    not isinstance(entry, dict)
+                    or entry.get("type") != "FeatureCollection"
+                    or not isinstance(entry.get("features"), list)
+                ):
+                    continue
+
+                found_geojson = True
+
+                for feature in entry["features"]:
+                    geom = feature.get("geometry", {})
+                    props = feature.get("properties", {})
+
+                    if geom.get("type") != "LineString":
+                        continue
+
+                    coords = geom.get("coordinates", [])
+                    times = props.get("coordTimes", [])
+
+                    if not isinstance(coords, list) or not isinstance(times, list):
+                        continue
+
+                    out_feature["geometry"]["coordinates"].extend(coords)
+                    out_feature["properties"]["coordTimes"].extend(times)
+
         except Exception as exc:
-            logging.error("ERROR: Could not proccess file: %s", file)
+            logging.error("ERROR: Could not process file: %s", file)
             logging.debug(str(exc))
             return None
 
-    # If processing is successful, return the (geo)json object
-    return returned_geojson_obj
+    if not found_geojson:
+        logging.warning(
+            "No GeoJSON FeatureCollections found for %s", device_name
+        )
+        return None
+
+    return combined
+
 
 
 def convert_to_kml(geojson_obj):
