@@ -13,6 +13,7 @@ DESCRIPTION:  Utilities for working with geojson and kml files.
 
 import json
 import logging
+from datetime import datetime, timezone
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 def combine_geojson_files(input_files, prefix, device_name):
@@ -121,6 +122,25 @@ def convert_to_kml(geojson_obj):
     Adds a <TimeSpan> to the Placemark using the first and last coordTimes.
     """
 
+    def _to_kml_time(value):
+        """
+        Convert coordTimes value to ISO-8601 string for KML.
+        Supports:
+          - ISO strings (pass-through)
+          - epoch milliseconds
+          - epoch seconds
+        """
+        if isinstance(value, str):
+            return value
+
+        if isinstance(value, (int, float)):
+            # Heuristic: milliseconds vs seconds
+            if value > 1e12:
+                value /= 1000.0
+            return datetime.fromtimestamp(value, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+        raise ValueError(f"Unsupported coordTime type: {type(value)}")
+
     feature = geojson_obj["features"][0]
     props = feature.get("properties", {})
     coords = feature["geometry"]["coordinates"]
@@ -146,15 +166,20 @@ def convert_to_kml(geojson_obj):
     # --------------------------------------------------
 
     if coord_times and len(coord_times) >= 2:
-        begin = coord_times[0]
-        end = coord_times[-1]
+        try:
+            begin = _to_kml_time(coord_times[0])
+            end = _to_kml_time(coord_times[-1])
 
-        if begin and end:
-            timespan = SubElement(placemark, "TimeSpan")
-            begin_el = SubElement(timespan, "begin")
-            begin_el.text = begin
-            end_el = SubElement(timespan, "end")
-            end_el.text = end
+            if begin and end:
+                timespan = SubElement(placemark, "TimeSpan")
+                begin_el = SubElement(timespan, "begin")
+                begin_el.text = begin
+                end_el = SubElement(timespan, "end")
+                end_el.text = end
+
+        except Exception as err:
+            logging.warning("Skipping TimeSpan due to invalid coordTimes: %s", err)
+
 
     # --------------------------------------------------
     # Geometry
