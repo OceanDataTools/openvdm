@@ -113,34 +113,67 @@ def combine_geojson_files(input_files, prefix, device_name):
     return combined
 
 
+
+
 def convert_to_kml(geojson_obj):
     """
-    Function to convert a geoJSON object to a KML (v2.2) string.
-    Function returns a KML-formatted string
+    Convert a GeoJSON FeatureCollection with coordTimes into a KML 2.2 string.
+    Adds a <TimeSpan> to the Placemark using the first and last coordTimes.
     """
 
-    kml = Element('kml')
-    kml.set('xmlns', 'http://www.opengis.net/kml/2.2')
-    kml.set('xmlns:gx','http://www.google.com/kml/ext/2.2')
-    kml.set('xmlns:kml','http://www.opengis.net/kml/2.2')
-    kml.set('xmlns:atom','http://www.w3.org/2005/Atom')
-    document = SubElement(kml, 'Document')
-    name = SubElement(document, 'name')
-    name.text = f"{geojson_obj['features'][0]['properties']['name']}_Trackline.kml"
-    placemark = SubElement(document, 'Placemark')
-    name2 = SubElement(placemark, 'name')
-    name2.text = "path1"
-    linestring = SubElement(placemark, 'LineString')
-    tessellate = SubElement(linestring, 'tessellate')
+    feature = geojson_obj["features"][0]
+    props = feature.get("properties", {})
+    coords = feature["geometry"]["coordinates"]
+    coord_times = props.get("coordTimes", [])
+
+    kml = Element("kml")
+    kml.set("xmlns", "http://www.opengis.net/kml/2.2")
+    kml.set("xmlns:gx", "http://www.google.com/kml/ext/2.2")
+    kml.set("xmlns:kml", "http://www.opengis.net/kml/2.2")
+    kml.set("xmlns:atom", "http://www.w3.org/2005/Atom")
+
+    document = SubElement(kml, "Document")
+    name = SubElement(document, "name")
+    name.text = f"{props.get('name', 'Trackline')}_Trackline.kml"
+
+    placemark = SubElement(document, "Placemark")
+
+    pm_name = SubElement(placemark, "name")
+    pm_name.text = "path1"
+
+    # --------------------------------------------------
+    # TimeSpan (optional, but recommended)
+    # --------------------------------------------------
+
+    if coord_times and len(coord_times) >= 2:
+        begin = coord_times[0]
+        end = coord_times[-1]
+
+        if begin and end:
+            timespan = SubElement(placemark, "TimeSpan")
+            begin_el = SubElement(timespan, "begin")
+            begin_el.text = begin
+            end_el = SubElement(timespan, "end")
+            end_el.text = end
+
+    # --------------------------------------------------
+    # Geometry
+    # --------------------------------------------------
+
+    linestring = SubElement(placemark, "LineString")
+
+    tessellate = SubElement(linestring, "tessellate")
     tessellate.text = "1"
-    coordinates = SubElement(linestring, 'coordinates')
 
-    coordinates_text = ''
+    coordinates_el = SubElement(linestring, "coordinates")
 
-    for coordinate in geojson_obj['features'][0]['geometry']['coordinates']:
-        coordinates_text += f'{coordinate[0]},{coordinate[1]},0 '
+    coordinates_text = []
+    for lon, lat, *rest in coords:
+        coordinates_text.append(f"{lon},{lat},0")
 
-    coordinates_text = coordinates_text.rstrip(' ')
-    coordinates.text = coordinates_text
+    coordinates_el.text = " ".join(coordinates_text)
 
-    return f'<?xml version="1.0" encoding="utf-8"?>{tostring(kml).decode("utf8")}'
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        + tostring(kml, encoding="utf-8").decode("utf-8")
+    )
