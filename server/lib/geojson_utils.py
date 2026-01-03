@@ -17,30 +17,30 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 def combine_geojson_files(input_files, prefix, device_name):
     """
-    Combine GeoJSON trackline data from OpenVDM dashboard files.
+    Combine GeoJSON LineString data from OpenVDM dashboard files.
 
-    Ignores non-GeoJSON visualizerData entries (e.g. timeseries).
-    Returns None on failure or if no usable GeoJSON data is found.
+    - Supports legacy and new (multi-datatype) dashboard formats
+    - Ignores non-GeoJSON visualizerData entries (timeseries, plots, stats)
+    - Returns None if no usable GeoJSON data is found or on error
     """
 
-    def extract_visualizer_data(data: dict) -> list[dict]:
+    def iter_visualizer_entries(data: dict):
         """
-        Return the raw visualizerData list from legacy or new formats.
+        Yield every visualizerData entry from legacy or new dashboard JSON.
         """
-
-        # New format: datatype-wrapped
-        if len(data) == 1:
-            _, inner = next(iter(data.items()))
-            if isinstance(inner, dict) and "visualizerData" in inner:
-                vdata = inner["visualizerData"]
-                if isinstance(vdata, list):
-                    return vdata
 
         # Legacy format
         if "visualizerData" in data and isinstance(data["visualizerData"], list):
-            return data["visualizerData"]
+            yield from data["visualizerData"]
 
-        raise ValueError("Unrecognized dashboard JSON format")
+        # New format: multiple datatypes possible
+        for value in data.values():
+            if (
+                isinstance(value, dict)
+                and "visualizerData" in value
+                and isinstance(value["visualizerData"], list)
+            ):
+                yield from value["visualizerData"]
 
     # ------------------------------------------------------------------
 
@@ -74,10 +74,8 @@ def combine_geojson_files(input_files, prefix, device_name):
             with open(file, "r", encoding="utf-8") as f:
                 raw = json.load(f)
 
-            visualizers = extract_visualizer_data(raw)
-
-            for entry in visualizers:
-                # Skip non-GeoJSON visualizers (timeseries, stats, etc.)
+            for entry in iter_visualizer_entries(raw):
+                # Only GeoJSON FeatureCollections are relevant
                 if (
                     not isinstance(entry, dict)
                     or entry.get("type") != "FeatureCollection"
@@ -109,13 +107,10 @@ def combine_geojson_files(input_files, prefix, device_name):
             return None
 
     if not found_geojson:
-        logging.warning(
-            "No GeoJSON FeatureCollections found for %s", device_name
-        )
+        logging.warning("No GeoJSON track data found for %s", device_name)
         return None
 
     return combined
-
 
 
 def convert_to_kml(geojson_obj):
