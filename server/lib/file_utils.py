@@ -314,7 +314,7 @@ def output_json_data_to_file(file_path, contents):
     with open(file_path, mode='w', encoding="utf-8") as json_file:
         logging.debug("Saving JSON file: %s", file_path)
         try:
-            json.dump(contents, json_file, indent=2, cls=NpEncoder)
+            json.dump(contents, json_file, cls=NpEncoder)
 
         except IOError:
             reason = f'Unable to create data file: {file_path}'
