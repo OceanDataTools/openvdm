@@ -26,6 +26,39 @@ def combine_geojson_files(input_files, prefix, device_name):
     combined geoJSON object
     """
 
+    def normalize_dashboard_geojson(data: dict) -> dict:
+        """
+        Normalize legacy and current OpenVDM dashboard formats.
+
+        NEW format:
+          { "<datatype>": { "visualizerData": [...] } }
+
+        LEGACY format:
+          { "visualizerData": [...] }
+
+        Returns:
+          { "visualizerData": [...] }
+        """
+
+        # NEW format: single datatype key
+        if len(data) == 1:
+            _, inner = next(iter(data.items()))
+            if isinstance(inner, dict) and "visualizerData" in inner:
+                if not isinstance(inner["visualizerData"], list):
+                    raise ValueError("'visualizerData' must be a list")
+                return inner
+
+        # LEGACY format
+        if "visualizerData" in data:
+            if not isinstance(data["visualizerData"], list):
+                raise ValueError("'visualizerData' must be a list")
+            return data
+
+        raise ValueError(
+            "Unrecognized dashboard GeoJSON format "
+            "(expected datatype-wrapped or legacy visualizerData)"
+        )
+
     # Blank geoJson object
     returned_geojson_obj = {
         "type":"FeatureCollection",
@@ -52,7 +85,9 @@ def combine_geojson_files(input_files, prefix, device_name):
         # Open the dashboardData file
         try:
             with open(file, mode='r', encoding="utf-8") as geojson_file:
-                geojson_obj = json.load(geojson_file)
+                raw_geojson_obj = json.load(geojson_file)
+                normalized = normalize_dashboard_geojson(raw_geojson_obj)
+                geojson_obj = normalized["visualizerData"][0]
 
                 returned_geojson_obj['features'][0]['geometry']['coordinates'] += geojson_obj['visualizerData'][0]['features'][0]['geometry']['coordinates']
                 returned_geojson_obj['features'][0]['properties']['coordTimes'] += geojson_obj['visualizerData'][0]['features'][0]['properties']['coordTimes']
