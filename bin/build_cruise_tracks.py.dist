@@ -16,14 +16,38 @@ DESCRIPTION:
     Creates geoJSON and kml representations of the shiptrack for the specified cruise
     based on the geoJSON data created as part of the OpenVDM plugins.
 
-    In this example there is an OpenVDM plugin for the OpenRVDAS collection
-    system. That plugin created json-formatted dashboardData files for two
-    sensors: CNAV and POSMV.  These datasets are defined within the 
-    "DEFAULT_GPS_SOURCES_YAML" yaml string.
+    This utility processes dashboardData files that may be in either:
+      - Legacy format:
+            { "visualizerData": [...] }
+      - Current (datatype-keyed) format:
+            { "<datatype>": { "visualizerData": [...] } }
 
-    Each element within the "GPSSources" array includes the name of the device
-    (used in the final filename) and a dashboard data type as defined by the
-    collection system plugin.
+    Only GeoJSON-based visualizerData entries (FeatureCollection / LineString)
+    are used to build ship tracklines. Non-spatial visualizerData (e.g. time-series
+    plots) are safely ignored.
+
+    When present, coordinate timestamp arrays ("coordTimes") are preserved and
+    propagated into the output formats:
+      - GeoJSON: retained as feature properties
+      - KML: converted to ISO-8601 and expressed as a TimeSpan element
+
+    In a typical configuration, an OpenVDM plugin (e.g. for the OpenRVDAS
+    collection system) generates dashboardData files for multiple GPS sensors
+    such as CNAV or POSMV. These sources are defined in the
+    DEFAULT_GPS_SOURCES_YAML configuration.
+
+    Each entry in the GPSSources list specifies:
+      - The device name (used in output filenames)
+      - The associated dashboard data type to extract
+
+    Tracklines from multiple files and/or time ranges are concatenated in
+    chronological order to produce a single continuous ship track per device.
+
+NOTES:
+    - Coordinate timestamps may be provided as ISO-8601 strings or epoch
+      milliseconds; both are supported.
+    - KML output conforms to KML v2.2.
+    - Files containing unrecognized or malformed data are skipped with warnings.
 
     BUGS:
    NOTES:
@@ -55,12 +79,12 @@ DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
 # ----------------------------------------------------------------------
 
 DEFAULT_GPS_SOURCES_YAML = """
-CollectionSystem: CORIOLIX_SKQ
+CollectionSystem: OpenRVDAS
 GPSSources:
   - device: CNAV
-    type: gnsspo000045-gga
-  - device: Seapath
-    type: gnsspo112593-gga
+    type: cnav-gga
+  - device: POSMV
+    type: posmv-gga
 """
 
 # ----------------------------------------------------------------------
@@ -329,7 +353,7 @@ def main():
     parser.add_argument("-c", dest="cruiseID")
     parser.add_argument("-o", dest="outputDir")
     parser.add_argument("-u", "--username")
-    parser.add_argument("--gps-sources", dest="gps_sources_file")
+    parser.add_argument("--config_file", dest="gps_sources_file")
     parser.add_argument("collectionSystem")
 
     args = parser.parse_args()
