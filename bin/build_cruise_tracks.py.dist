@@ -55,12 +55,12 @@ DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
 # ----------------------------------------------------------------------
 
 DEFAULT_GPS_SOURCES_YAML = """
-CollectionSystem: OpenRVDAS
+CollectionSystem: CORIOLIX_SKQ
 GPSSources:
   - device: CNAV
     type: gnsspo000045-gga
-  - device: POSMV
-    type: posmv000001-gga
+  - device: Seapath
+    type: gnsspo112593-gga
 """
 
 # ----------------------------------------------------------------------
@@ -147,7 +147,13 @@ def resolve_manifest_path(openVDM, cruise_base_dir):
     if not manifest_fn:
         raise RuntimeError("OpenVDM returned no manifest filename")
 
-    manifest_path = os.path.join(cruise_base_dir, manifest_fn)
+    manifest_path = os.path.join(
+        cruise_base_dir,
+        openVDM.get_extra_directory_by_name(
+            DASHBOARD_EXTRA_DIR_NAME
+        )["destDir"],
+        manifest_fn
+    )
     if not os.path.isfile(manifest_path):
         raise RuntimeError(f"Manifest not found: {manifest_path}")
 
