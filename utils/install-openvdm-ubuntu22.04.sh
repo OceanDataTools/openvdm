@@ -174,7 +174,7 @@ function install_packages {
     sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
     # Constants
-    CODENAME="jammy"
+    CODENAME="noble"
     KEYRING_DIR="/etc/apt/keyrings"
     KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
     APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
