@@ -174,7 +174,7 @@ function install_packages {
     sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
     # Constants
-    CODENAME="jammy"
+    CODENAME="noble"
     KEYRING_DIR="/etc/apt/keyrings"
     KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
     APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
@@ -222,7 +222,7 @@ function install_packages {
 
     sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 \
     cifs-utils gdal-bin gearman-job-server git libapache2-mod-php7.3 \
-    libapache2-mod-wsgi-py3 libgearman-dev mysql-client mysql-server ntp \
+    libapache2-mod-wsgi-py3 libgearman-dev mysql-client mysql-server \
     php7.3 php7.3-cli php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml \
     php7.3-zip python3 python3-dev python3-pip python3-venv rclone rsync \
     samba smbclient sshpass supervisor
@@ -886,23 +886,34 @@ function setup_timezone {
 ###########################################################################
 ###########################################################################
 # Set system ssh
-function setup_ssh {
+function setup_ssh {                                                                                                                                                               
+                                                                                                                                                                                   
+      # Generate SSH keypair for root if missing                                                                                                                                     
+      if [[ ! -d ~/.ssh || ! -e ~/.ssh/id_rsa.pub ]]; then                                                                                                                           
+          mkdir -p ~/.ssh                                                                                                                                                            
+          chmod 700 ~/.ssh                                                                                                                                                         
+          ssh-keygen -q -N "" -t rsa -f ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
+      fi
 
-    if [ ! -e ~/.ssh/id_rsa.pub ]; then
-        cat /dev/zero | ssh-keygen -q -N "" > /dev/null
-        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-    fi
+      # Authorize root's key for passwordless login as root
+      if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
+          cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+      fi
 
-    if [ ! -e /home/${OPENVDM_USER}/.ssh/authorized_keys ]; then
-        mkdir -p /home/${OPENVDM_USER}/.ssh
-        cat ~/.ssh/id_rsa.pub >> /home/${OPENVDM_USER}/.ssh/authorized_keys
-    
-        chown -R ${OPENVDM_USER}:${OPENVDM_USER} /home/${OPENVDM_USER}/.ssh
-        chmod 600 /home/${OPENVDM_USER}/.ssh/authorized_keys
-    fi
+      # Authorize root's key for passwordless login as OPENVDM_USER
+      if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
+          mkdir -p "/home/${OPENVDM_USER}/.ssh"
+          chmod 700 "/home/${OPENVDM_USER}/.ssh"
+          cat ~/.ssh/id_rsa.pub >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+          chmod 600 "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+          chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
+      fi
 
-    ssh ${OPENVDM_USER}@${HOSTNAME} -o StrictHostKeyChecking=accept-new ls > /dev/null
-}
+      # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
+      ssh -o StrictHostKeyChecking=accept-new "${OPENVDM_USER}@${HOSTNAME}" ls > /dev/null
+  }
 
 
 ###########################################################################

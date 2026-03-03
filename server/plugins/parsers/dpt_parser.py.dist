@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FILE:  dpt_parser.py
+FILE:  dbt_parser.py
 
-USAGE:  dpt_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  dbt_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA DPT file and return the json-formatted
-              string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied NMEA-formtted DBT file and return the json-
+              formatted string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -15,223 +15,179 @@ DESCRIPTION:  Parse the supplied NMEA DPT file and return the json-formatted
             [--stopTS] optional stop crop time (strptime format)
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.10
+REQUIREMENTS:  Python3.11
                Python Modules:
-                   pandas==2.2.3
+                   numpy==2.4.0
+                   pandas==2.3.0
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2016-08-29
- REVISION:  2025-04-12
+ REVISION:  2025-12-30
 """
 
-import csv
-import json
-import logging
 import sys
-from copy import deepcopy
+import logging
 from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
+import numpy as np
+import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','depth','surface_offset','max-depth_checksum']
-PROC_COLS = ['date_time','depth']
+PROC_COLS = ['date_time','dpt_m']
+
+FIELDS = [
+    "header",
+    "dpt_m",
+    "dist_to_surface_m",
+    "max_dpt_checksum"
+]
 
 ROUNDING = {
-    'depth': 3
+    'dpt_m': 3
 }
 
-MIN_DEPTH = 0
 
-MAX_DELTA_T = pd.Timedelta('10 seconds')
+class DBTParser(OpenVDMCSVParser):
+    """Parser for NMEA DBT files, fully refactored like GGAParser."""
 
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-class DPTParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
-    """
+    MIN_DBT = 0
+    MAX_DBT = 12000
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
-        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False, no_mag=False):
+        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
 
-
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
-
-        raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
-
-        logging.debug("Parsing data file...")
+    def parse(self, filepath):
+        raw_data = {col: [] for col in self.proc_cols}
         errors = []
+
+        # -------------------------
+        # Read and parse DBT lines
+        # -------------------------
         try:
-            with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='DBT'):
+                logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                if self.skip_header:
-                    next(reader)
+                # Map fields to DBT_FIELDS
+                field_data = dict(zip(FIELDS, fields))
 
-                for lineno, line in enumerate(reader):
+                try:
+                    dpt_m = float(field_data['dpt_m']) if field_data['dpt_m'] else None
 
-                    try:
-                        date_time = line['date_time']
+                    raw_data['date_time'].append(timestamp_str)
+                    raw_data['dpt_m'].append(dpt_m)
 
-                        depth = float(line['depth'])
-
-                    except Exception as err:
-                        errors.append(lineno)
-                        logging.warning("Parsing error encountered on line %s", lineno)
-                        logging.debug(line)
-                        logging.debug(str(err))
-
-                    else:
-                        raw_into_df['date_time'].append(date_time)
-                        raw_into_df['depth'].append(depth)
+                except Exception as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped due to parse error: %s", lineno, err)
 
         except Exception as err:
-            logging.error("Problem accessing input file: %s", filepath)
-            logging.error(str(err))
-            return
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
 
-        logging.debug("Finished parsing data file")
+        if not raw_data['date_time']:
+            logging.warning("No valid DBT data in file: %s", filepath)
+            return None
 
-        # If no data ingested from file, quit
-        if len(raw_into_df['date_time']) == 0:
-            logging.warning("Dataframe is empty... quitting")
-            return
-
+        # -------------------------
         # Build DataFrame
-        logging.debug("Building dataframe from parsed data...")
-        df_proc = pd.DataFrame(raw_into_df)
+        # -------------------------
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        if df['date_time'].isna().all():
+            logging.error("All timestamps could not be parsed; aborting.")
+            return None
+        df = df.dropna(subset=['date_time'])
+        df = df.set_index('date_time')
 
-        # Convert Date/time column to datetime objects
-        logging.debug("Converting data_time to datetime datatype...")
-
-        df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
-
-        # Optionally crop data by start/stop times
         if self.start_dt or self.stop_dt:
-            logging.debug("Cropping data...")
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
 
-            df_proc = self.crop_data(df_proc)
+        # -------------------------
+        # DeltaT
+        # -------------------------
+        df['deltaT'] = df.index.to_series().diff()
 
-        # If the crop operation emptied the dataframe, quit
-        if df_proc.shape[0] == 0:
-            logging.warning("Cropped dataframe is empty... quitting")
-            return
+        # -------------------------
+        # Statistics
+        # -------------------------
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(),df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3),
+                              round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
+                                      len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
+        self.add_bounds_stat([round(df['dpt_m'].min(), ROUNDING['dpt_m']),
+                              round(df['dpt_m'].max(), ROUNDING['dpt_m'])], "Depth Bounds", "m")
+        self.add_value_validity_stat([len(df[(df['dpt_m'] >= self.MIN_DBT) & (df['dpt_m'] <= self.MAX_DBT)]),
+                                      len(df[(df['dpt_m'] < self.MIN_DBT) | (df['dpt_m'] > self.MAX_DBT)])], "Depth Validity")
 
-        # Calculate deltaT column
-        logging.debug('Building deltaT column...')
-        df_proc = df_proc.join(df_proc['date_time'].diff().to_frame(name='deltaT'))
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        logging.info("Running quality tests...")
+        quality_checks = [
+            ('Rows', len(df)+len(errors), len(errors)),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('Depth', len(df), len(df[(df['dpt_m'] < self.MIN_DBT) | (df['dpt_m'] > self.MAX_DBT)]))
+        ]
 
-        logging.debug("Tabulating statistics...")
-        self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
-        self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['depth'].min(),ROUNDING['depth']), round(df_proc['depth'].max(),ROUNDING['depth'])], 'Depth Bounds', 'm')
-        self.add_value_validity_stat([len(df_proc[(df_proc['depth'] >= MIN_DEPTH)]),len(df_proc[(df_proc['depth'] < MIN_DEPTH)])], 'Depth Validity')
+        for col, total, bad in quality_checks:
+            error_rate = bad / total
+            if error_rate > 0.25:
+                self.add_quality_test_failed(col)
+            elif error_rate > 0.10:
+                self.add_quality_test_warning(col)
+            else:
+                self.add_quality_test_passed(col)
 
-        logging.debug("Running quality tests...")
-        # % of bad rows in datafile
-        error_rate = len(errors) / (len(df_proc) + len(errors))
-        if error_rate > .25:
-            self.add_quality_test_failed("Rows")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Rows")
-        else:
-            self.add_quality_test_passed("Rows")
+        # -------------------------
+        # Resample and round
+        # -------------------------
+        df = self.resample_data(df)
+        df = self.round_data(df, ROUNDING)
+        df = df.set_index('date_time')
 
-        # % of time gaps in data
-        error_rate = len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("DeltaT")
-        elif error_rate > .10:
-            self.add_quality_test_warning("DeltaT")
-        else:
-            self.add_quality_test_passed("DeltaT")
+        # -------------------------
+        # Visualization
+        # -------------------------
+        logging.info("Building visualization datasets...")
 
-        error_rate = len(df_proc[(df_proc['depth'] < MIN_DEPTH)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("Depth")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Depth")
-        else:
-            self.add_quality_test_passed("Depth")
+        for col, unit, label in [('dpt_m', 'm', 'Depth')]:
 
-        # set index
-        logging.debug('Setting index...')
-        df_proc = df_proc.set_index('date_time')
+            visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
+            for ts, row in df.iterrows():
+                if pd.notna(row[col]):
+                    ts = pd.Timestamp(ts)
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize('UTC')
+                    epoch_ms = int(ts.timestamp() * 1000)
+                    visualizer_data_obj['data'].append([epoch_ms, row[col]])
 
-        # resample data
-        logging.debug("Resampling data...")
-        df_proc = self.resample_data(df_proc)
+            self.add_visualization_data(visualizer_data_obj)
 
-        # round data
-        logging.debug("Rounding data: %s", ROUNDING)
-        df_proc = self.round_data(df_proc, ROUNDING)
-
-        # split data where there are gaps
-        logging.debug("Building visualization data...")
-
-        visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','depth']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'm'
-        visualizer_data_obj['label'] = 'Depth'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        # send message about errors encountered to OpenVDM
-        if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
-
+        # -------------------------
+        # Send errors to OpenVDM
+        # -------------------------
+        self.send_error_msg(errors, filepath)
 
 # -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
+# Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Parse NMEA DPT data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-    parser.add_argument('--timeFormat', help='timestamp format', default=None)
-    parser.add_argument('--startDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop start timestamp (iso8601)')
-    parser.add_argument('--stopDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop stop timestamp (iso8601)')
-    parser.add_argument('dataFile', metavar='dataFile',
-                        help='the raw data file to process')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    ovdm_parser = DPTParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
-
-    try:
-        logging.info("Processing file: %s", parsed_args.dataFile)
-        ovdm_parser.process_file(parsed_args.dataFile)
-        print(ovdm_parser.to_json())
-        logging.info("Done!")
-    except Exception as err:
-        logging.error(str(err))
-        raise err
+    DBTParser.run_cli()

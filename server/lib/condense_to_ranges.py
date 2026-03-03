@@ -7,7 +7,7 @@ DESCRIPTION:  Utilities for condensing file parsing error messages
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2024-06-01
 """
 

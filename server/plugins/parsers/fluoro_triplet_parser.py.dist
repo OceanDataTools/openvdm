@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-FILE:  hdt_parser.py
+FILE:  fluoro_triplet_parser.py
 
-USAGE:  hdt_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  fluoro_triplet_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted HDT file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied SBE ECO Triplet fluorometer file and return
+              the json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -40,29 +41,39 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','hdg_t']
+PROC_COLS = ['date_time','scattering','chlor','fdom']
 
 FIELDS = [
-    "header",
-    "hdg_t",
-    "T_checksum"
+    'sensor_date',
+    'sensor_time',
+    '650',
+    'scattering_signal_count',
+    '695',
+    'chlor_signal_count',
+    '460',
+    'fdom_signal_count',
+    'cpu_thermistor'
 ]
 
 ROUNDING = {
-    'hdg_t': 3
+    'scattering': 9,
+    'chlor': 3,
+    'fdom': 3
 }
 
+CAL = {
+    'scattering_signal_count': {'m': 2.113e-06, 'b': 2.113e-06 * -31, 'uom': 'm^-1sr^-1'},
+    'chlor_signal_count': {'m': 0.0072, 'b': 0.0072 * -45, 'uom': 'ug/l'},
+    'fdom_signal_count': {'m': 0.0908, 'b': 0.0908 * -50, 'uom': 'ppb'}
+}
 
-class HDTParser(OpenVDMCSVParser):
-    """Parser for NMEA HDT files, fully refactored like GGAParser."""
+class ECOTripletParser(OpenVDMCSVParser):
+    """Parser for Seabird ECO Triplet files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-    MIN_HDT = 0
-    MAX_HDT = 360
-
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False):
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -72,20 +83,26 @@ class HDTParser(OpenVDMCSVParser):
         errors = []
 
         # -------------------------
-        # Read and parse HDT lines
+        # Read and parse lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='HDT'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, fields_sep='\t'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                # Map fields to HDT_FIELDS
+                # Map fields to FIELDS
                 field_data = dict(zip(FIELDS, fields))
 
+                logging.debug(field_data)
+
                 try:
-                    hdg_t = float(field_data['hdg_t']) if field_data['hdg_t'] else None
+                    scattering = float(field_data['scattering_signal_count']) * CAL['scattering_signal_count']['m'] + CAL['scattering_signal_count']['b'] if field_data['scattering_signal_count'] else None
+                    chlor = float(field_data['chlor_signal_count']) * CAL['chlor_signal_count']['m'] + CAL['chlor_signal_count']['b'] if field_data['chlor_signal_count'] else None
+                    fdom = float(field_data['fdom_signal_count']) * CAL['fdom_signal_count']['m'] + CAL['fdom_signal_count']['b'] if field_data['fdom_signal_count'] else None
 
                     raw_data['date_time'].append(timestamp_str)
-                    raw_data['hdg_t'].append(hdg_t)
+                    raw_data['scattering'].append(scattering)
+                    raw_data['chlor'].append(chlor)
+                    raw_data['fdom'].append(fdom)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -96,7 +113,7 @@ class HDTParser(OpenVDMCSVParser):
             return None
 
         if not raw_data['date_time']:
-            logging.warning("No valid HDT data in file: %s", filepath)
+            logging.warning("No valid data in file: %s", filepath)
             return None
 
         # -------------------------
@@ -131,10 +148,12 @@ class HDTParser(OpenVDMCSVParser):
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df['hdg_t'].min(), ROUNDING['hdg_t']),
-                              round(df['hdg_t'].max(), ROUNDING['hdg_t'])], "Heading True Bounds", "deg")
-        self.add_value_validity_stat([len(df[(df['hdg_t'] >= self.MIN_HDT) & (df['hdg_t'] <= self.MAX_HDT)]),
-                                      len(df[(df['hdg_t'] < self.MIN_HDT) | (df['hdg_t'] > self.MAX_HDT)])], "Heading True Validity")
+        self.add_bounds_stat([round(df['scattering'].min(), ROUNDING['scattering']),
+                              round(df['scattering'].max(), ROUNDING['scattering'])], "Scattering Bounds", CAL['scattering_signal_count']['uom'])
+        self.add_bounds_stat([round(df['chlor'].min(), ROUNDING['chlor']),
+                              round(df['chlor'].max(), ROUNDING['chlor'])], "Chlorophyll Bounds", CAL['chlor_signal_count']['uom'])
+        self.add_bounds_stat([round(df['fdom'].min(), ROUNDING['fdom']),
+                              round(df['fdom'].max(), ROUNDING['fdom'])], "FDOM Bounds", CAL['fdom_signal_count']['uom'])
 
         # -------------------------
         # Quality tests
@@ -143,7 +162,6 @@ class HDTParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Heading True', len(df), len(df[(df['hdg_t'] < self.MIN_HDT) | (df['hdg_t'] > self.MAX_HDT)]))
         ]
 
         for col, total, bad in quality_checks:
@@ -154,6 +172,9 @@ class HDTParser(OpenVDMCSVParser):
                 self.add_quality_test_warning(col)
             else:
                 self.add_quality_test_passed(col)
+
+        # Drop non-numeric columns before resampling
+        df = df.drop(columns=['status_flag'], errors='ignore')
 
         # -------------------------
         # Resample and round
@@ -167,7 +188,9 @@ class HDTParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('hdg_t', 'deg', 'Heading True')]:
+        for col, unit, label in [('scattering', CAL['scattering_signal_count']['uom'], 'Scattering'),
+                                 ('chlor', CAL['chlor_signal_count']['uom'], 'Chlorophyll'),
+                                 ('fdom', CAL['fdom_signal_count']['uom'], 'FDOM')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
@@ -189,4 +212,4 @@ class HDTParser(OpenVDMCSVParser):
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    HDTParser.run_cli()
+    ECOTripletParser.run_cli()

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-FILE:  hdt_parser.py
+FILE:  flowrate_krohne_parser.py
 
-USAGE:  hdt_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
+USAGE:  flowrate_krohne_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA-formtted HDT file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied Krohne Optiflux flowrate file and return the
+              json-formatted string used by OpenVDM as part of it's Data
+              dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -40,29 +41,45 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','hdg_t']
+PROC_COLS = ['date_time','flowrate_ms','flowvolume_lpm','coiltemp_c','conductivity_Sm']
 
 FIELDS = [
-    "header",
-    "hdg_t",
-    "T_checksum"
+    'flowrate_ms',
+    'flowvolume_lpm',
+    'coiltemp_c',
+    'conductivity_Sm'
 ]
 
 ROUNDING = {
-    'hdg_t': 3
+    'flowrate_ms': 2,
+    'flowvolume_lpm': 2,
+    'coiltemp_c': 2,
+    'conductivity_Sm': 2
 }
 
 
-class HDTParser(OpenVDMCSVParser):
-    """Parser for NMEA HDT files, fully refactored like GGAParser."""
+class OPTIFLUXParser(OpenVDMCSVParser):
+    """Parser for Optiflux files, fully refactored like GGAParser."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-    MIN_HDT = 0
-    MAX_HDT = 360
+    MIN_RATE = -12.0
+    MAX_RATE = 12.0
+    MIN_VOL = 0.0
+    
+    # radius in m  = 1.5" pipe * 0.0254m/in / 2
+    # area = pi*r^2
+    # vol/min = area (m^2) * flowrate (m/s) * 60 
+    MAX_VOL = 822
+
+    MIN_TEMP = -40.0
+    MAX_TEMP = 55
+
+    MIN_COND = 0.0
+    MAX_COND = 6.5
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False):
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -72,20 +89,26 @@ class HDTParser(OpenVDMCSVParser):
         errors = []
 
         # -------------------------
-        # Read and parse HDT lines
+        # Read and parse lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='HDT'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                # Map fields to HDT_FIELDS
+                # Map fields to FIELDS
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    hdg_t = float(field_data['hdg_t']) if field_data['hdg_t'] else None
+                    flowrate_ms = float(field_data['flowrate_ms']) if field_data['flowrate_ms'] else None
+                    flowvolume_lpm = float(field_data['flowvolume_lpm']) if field_data['flowvolume_lpm'] else None
+                    coiltemp_c = float(field_data['coiltemp_c']) if field_data['coiltemp_c'] else None
+                    conductivity_Sm = float(field_data['conductivity_Sm']) if field_data['conductivity_Sm'] else None
 
                     raw_data['date_time'].append(timestamp_str)
-                    raw_data['hdg_t'].append(hdg_t)
+                    raw_data['flowrate_ms'].append(flowrate_ms)
+                    raw_data['flowvolume_lpm'].append(flowvolume_lpm)
+                    raw_data['coiltemp_c'].append(coiltemp_c)
+                    raw_data['conductivity_Sm'].append(conductivity_Sm)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -96,7 +119,7 @@ class HDTParser(OpenVDMCSVParser):
             return None
 
         if not raw_data['date_time']:
-            logging.warning("No valid HDT data in file: %s", filepath)
+            logging.warning("No valid data in file: %s", filepath)
             return None
 
         # -------------------------
@@ -131,10 +154,22 @@ class HDTParser(OpenVDMCSVParser):
                               round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df['hdg_t'].min(), ROUNDING['hdg_t']),
-                              round(df['hdg_t'].max(), ROUNDING['hdg_t'])], "Heading True Bounds", "deg")
-        self.add_value_validity_stat([len(df[(df['hdg_t'] >= self.MIN_HDT) & (df['hdg_t'] <= self.MAX_HDT)]),
-                                      len(df[(df['hdg_t'] < self.MIN_HDT) | (df['hdg_t'] > self.MAX_HDT)])], "Heading True Validity")
+        self.add_bounds_stat([round(df['flowrate_ms'].min(), ROUNDING['flowrate_ms']),
+                              round(df['flowrate_ms'].max(), ROUNDING['flowrate_ms'])], "Flowrate Bounds", "m/s")
+        self.add_value_validity_stat([len(df[(df['flowrate_ms'] >= self.MIN_RATE) & (df['flowrate_ms'] <= self.MAX_RATE)]),
+                                      len(df[(df['flowrate_ms'] < self.MIN_RATE) | (df['flowrate_ms'] > self.MAX_RATE)])], "Flowrate Validity")
+        self.add_bounds_stat([round(df['flowvolume_lpm'].min(), ROUNDING['flowvolume_lpm']),
+                              round(df['flowvolume_lpm'].max(), ROUNDING['flowvolume_lpm'])], "Volume Bounds", "l/min")
+        self.add_value_validity_stat([len(df[(df['flowvolume_lpm'] >= self.MIN_VOL) & (df['flowvolume_lpm'] <= self.MAX_VOL)]),
+                                      len(df[(df['flowvolume_lpm'] < self.MIN_VOL) | (df['flowvolume_lpm'] > self.MAX_VOL)])], "Volume Validity")
+        self.add_bounds_stat([round(df['coiltemp_c'].min(), ROUNDING['coiltemp_c']),
+                              round(df['coiltemp_c'].max(), ROUNDING['coiltemp_c'])], "Coil Temp Bounds", "C")
+        self.add_value_validity_stat([len(df[(df['coiltemp_c'] >= self.MIN_TEMP) & (df['coiltemp_c'] <= self.MAX_TEMP)]),
+                                      len(df[(df['coiltemp_c'] < self.MIN_TEMP) | (df['coiltemp_c'] > self.MAX_TEMP)])], "Coil Temp Validity")
+        self.add_bounds_stat([round(df['conductivity_Sm'].min(), ROUNDING['conductivity_Sm']),
+                              round(df['conductivity_Sm'].max(), ROUNDING['conductivity_Sm'])], "Conductivity Bounds", "S/m")
+        self.add_value_validity_stat([len(df[(df['conductivity_Sm'] >= self.MIN_COND) & (df['conductivity_Sm'] <= self.MAX_COND)]),
+                                      len(df[(df['conductivity_Sm'] < self.MIN_COND) | (df['conductivity_Sm'] > self.MAX_COND)])], "Conductivity Validity")
 
         # -------------------------
         # Quality tests
@@ -143,7 +178,10 @@ class HDTParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Heading True', len(df), len(df[(df['hdg_t'] < self.MIN_HDT) | (df['hdg_t'] > self.MAX_HDT)]))
+            ('Flowrate', len(df), len(df[(df['flowrate_ms'] < self.MIN_RATE) | (df['flowrate_ms'] > self.MAX_RATE)])),
+            ('Volume', len(df), len(df[(df['flowvolume_lpm'] < self.MIN_VOL) | (df['flowvolume_lpm'] > self.MAX_VOL)])),
+            ('Coil Temp', len(df), len(df[(df['coiltemp_c'] < self.MIN_TEMP) | (df['coiltemp_c'] > self.MAX_TEMP)])),
+            ('Conductivity', len(df), len(df[(df['conductivity_Sm'] < self.MIN_COND) | (df['conductivity_Sm'] > self.MAX_COND)])),
         ]
 
         for col, total, bad in quality_checks:
@@ -154,6 +192,9 @@ class HDTParser(OpenVDMCSVParser):
                 self.add_quality_test_warning(col)
             else:
                 self.add_quality_test_passed(col)
+
+        # Drop non-numeric columns before resampling
+        df = df.drop(columns=['status_flag'], errors='ignore')
 
         # -------------------------
         # Resample and round
@@ -167,7 +208,10 @@ class HDTParser(OpenVDMCSVParser):
         # -------------------------
         logging.info("Building visualization datasets...")
 
-        for col, unit, label in [('hdg_t', 'deg', 'Heading True')]:
+        for col, unit, label in [('flowrate_ms', 'm/s', 'Flowrate'),
+                                 ('flowvolume_lpm', 'l/min', 'Volume'),
+                                 ('coiltemp_c', 'C', 'Coil Temp'),
+                                 ('conductivity_Sm', 'S/m', 'Conductivity')]:
 
             visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():
@@ -189,4 +233,4 @@ class HDTParser(OpenVDMCSVParser):
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    HDTParser.run_cli()
+    OPTIFLUXParser.run_cli()

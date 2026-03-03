@@ -117,7 +117,7 @@ Router::any('config/messages/deleteAllMessages', 'Controllers\Config\Messages@de
 Router::any('dataDashboard', '\Controllers\DataDashboard\DataDashboard@index');
 Router::any('dataDashboard/customTab/(:any)', '\Controllers\DataDashboard\DataDashboard@customTab');
 Router::any('dataDashboard/dataQuality', '\Controllers\DataDashboard\DataDashboard@dataQuality');
-Router::any('dataDashboard/dataQualityShowFileStats/(:all)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowFileStats');
+Router::any('dataDashboard/dataQualityShowFileStats/(:any)/(:all)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowFileStats');
 Router::any('dataDashboard/dataQualityShowDataTypeStats/(:any)', '\Controllers\DataDashboard\DataDashboard@dataQualityShowDataTypeStats');
 
 //API-related routes
@@ -186,13 +186,13 @@ Router::any('api/dashboardData/getLatestDataObjectByType/(:any)/(:any)', 'Contro
 Router::any('api/dashboardData/getLatestVisualizerDataByType/(:any)/(:any)', 'Controllers\Api\DashboardData@getLatestVisualizerDataByType');
 Router::any('api/dashboardData/getLatestStatsByType/(:any)/(:any)', 'Controllers\Api\DashboardData@getLatestStatsByType');
 Router::any('api/dashboardData/getLatestQualityTestsByType/(:any)/(:any)', 'Controllers\Api\DashboardData@getLatestQualityTestsByType');
-Router::any('api/dashboardData/getDashboardObjectVisualizerDataByJsonName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectVisualizerDataByJsonName');
-Router::any('api/dashboardData/getDashboardObjectVisualizerDataByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectVisualizerDataByRawName');
-Router::any('api/dashboardData/getDashboardObjectStatsByJsonName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByJsonName');
-Router::any('api/dashboardData/getDashboardObjectStatsByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByRawName');
+Router::any('api/dashboardData/getDashboardObjectVisualizerDataByJsonName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectVisualizerDataByJsonName');
+Router::any('api/dashboardData/getDashboardObjectVisualizerDataByRawName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectVisualizerDataByRawName');
+Router::any('api/dashboardData/getDashboardObjectStatsByJsonName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByJsonName');
+Router::any('api/dashboardData/getDashboardObjectStatsByRawName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByRawName');
 Router::any('api/dashboardData/getDashboardObjectStatsByDataType/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectStatsByDataType');
-Router::any('api/dashboardData/getDashboardObjectQualityTestsByJsonName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByJsonName');
-Router::any('api/dashboardData/getDashboardObjectQualityTestsByRawName/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByRawName');
+Router::any('api/dashboardData/getDashboardObjectQualityTestsByJsonName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByJsonName');
+Router::any('api/dashboardData/getDashboardObjectQualityTestsByRawName/(:any)/(:any)/(:all)', 'Controllers\Api\DashboardData@getDashboardObjectQualityTestsByRawName');
 
 Router::any('api/extraDirectories/getExtraDirectories', 'Controllers\Api\ExtraDirectories@getExtraDirectories');
 Router::any('api/extraDirectories/getActiveExtraDirectories', 'Controllers\Api\ExtraDirectories@getActiveExtraDirectories');

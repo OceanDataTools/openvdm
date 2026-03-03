@@ -18,21 +18,19 @@ DESCRIPTION:  Parse the supplied NMEA-formtted GGA file and return the json-
 REQUIREMENTS:  Python3.11
                Python Modules:
                    geopy==2.4.0
-                   numpy==2.2.4
-                   pandas==2.2.3
+                   numpy==2.4.0
+                   pandas==2.3.0
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2016-08-29
- REVISION:  2025-04-12
+ REVISION:  2025-12-30
 """
 
-import csv
-import json
-import logging
 import sys
+import logging
 from datetime import datetime
 from os.path import dirname, realpath
 from geopy import Point
@@ -41,12 +39,27 @@ import numpy as np
 import pandas as pd
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
-
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','gps_time','latitude','NS','longitude','EW','fix_quality','num_satellites','hdop','altitude','altitude_m','height_wgs84','height_wgs84_m','last_update','dgps_station_checksum']
 PROC_COLS = ['date_time','latitude','longitude','num_satellites','hdop','altitude','height_wgs84']
+
+FIELDS = [
+    "header",
+    "gps_time",
+    "latitude",
+    "NS",
+    "longitude",
+    "EW",
+    "fix_quality",
+    "num_satellites",
+    "hdop",
+    "altitude",
+    "altitude_units",
+    "height_wgs84",
+    "height_units",
+    "dgps_age",
+    "dgps_station"
+]
 
 ROUNDING = {
     'latitude': 8,
@@ -57,254 +70,184 @@ ROUNDING = {
     'velocity': 3
 }
 
-MAX_VELOCITY = 18 #Max speed of vessel (mph)
-MAX_DELTA_T = pd.Timedelta('10 seconds')
-
-DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 format, OpenRVDAS style
-
-
 class GGAParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
-    """
+    """Parser for lines with optional leading text, ISO8601 timestamp, and a GGA sentence."""
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
-        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+    MAX_VELOCITY = 18 #Max speed of vessel (mph)
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
 
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=True, use_openvdm_api=False,
+                 timestamp_separator=None):
+        super().__init__(None, PROC_COLS,
+                         start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format,
+                         skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api,
+                         timestamp_separator=timestamp_separator)
 
     @staticmethod
     def _hemisphere_correction(lat_lon, hemisphere):
-        if hemisphere in ('W', "S"):
-            return lat_lon * -1.0
+        return -lat_lon if hemisphere in ('S', 'W') else lat_lon
 
-        return lat_lon
-
-
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
-
-        raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
-
-        logging.debug("Parsing data file...")
+    def parse(self, filepath) -> dict | None:
+        raw_data = {col: [] for col in self.proc_cols}
         errors = []
+
         try:
-            with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((line.replace('\0', '') for line in csvfile), self.raw_cols)
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='GGA'):
+                logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
+            
+                # Map fields to FIELDS
+                field_data = dict(zip(FIELDS, fields))
 
-                if self.skip_header:
-                    next(reader)
+                try:
+                    latitude = float(field_data['latitude'][:2]) + float(field_data['latitude'][2:])/60
+                    latitude = self._hemisphere_correction(latitude, field_data['NS'])
 
-                for lineno, line in enumerate(reader):
+                    longitude = float(field_data['longitude'][:3]) + float(field_data['longitude'][3:])/60
+                    longitude = self._hemisphere_correction(longitude, field_data['EW'])
 
-                    try:
-                        date_time = line['date_time']
+                    num_satellites = int(field_data['num_satellites'])
+                    hdop = float(field_data['hdop'])
+                    altitude = float(field_data['altitude']) if field_data['altitude'] else 0.0
+                    height_wgs84 = float(field_data['height_wgs84']) if field_data['height_wgs84'] else 0.0
 
-                        longitude = (self._hemisphere_correction(float(line['longitude'][:3]) + float(line['longitude'][3:])/60, line['EW']))
-                        latitude = (self._hemisphere_correction(float(line['latitude'][:2]) + float(line['latitude'][2:])/60, line['NS']))
-                        num_satellites = int(line['num_satellites'])
-                        hdop = float(line['hdop'])
-                        altitude = float(line['altitude']) if line['altitude'] != '' else 0.0
-                        height_wgs84 = float(line['height_wgs84']) if line['height_wgs84'] != '' else 0.0
+                    raw_data['date_time'].append(timestamp_str)
+                    raw_data['latitude'].append(latitude)
+                    raw_data['longitude'].append(longitude)
+                    raw_data['num_satellites'].append(num_satellites)
+                    raw_data['hdop'].append(hdop)
+                    raw_data['altitude'].append(altitude)
+                    raw_data['height_wgs84'].append(height_wgs84)
 
-                    except Exception as err:
-                        errors.append(lineno)
-                        logging.warning("Parsing error encountered on line %s", lineno)
-                        logging.debug(line)
-                        logging.debug(str(err))
-
-                    else:
-                        raw_into_df['date_time'].append(date_time)
-                        raw_into_df['longitude'].append(longitude)
-                        raw_into_df['latitude'].append(latitude)
-                        raw_into_df['num_satellites'].append(num_satellites)
-                        raw_into_df['hdop'].append(hdop)
-                        raw_into_df['altitude'].append(altitude)
-                        raw_into_df['height_wgs84'].append(height_wgs84)
+                except Exception as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped due to parse error: %s", lineno, err)
 
         except Exception as err:
-            logging.error("Problem accessing input file: %s", filepath)
-            logging.error(str(err))
-            return
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
 
-        logging.debug("Finished parsing data file")
+        if not raw_data['date_time']:
+            logging.warning("No valid GGA data in file: %s", filepath)
+            return None
 
-        # If no data ingested from file, quit
-        if len(raw_into_df['date_time']) == 0:
-            logging.warning("Dataframe is empty... quitting")
-            return
-
+        # -------------------------
         # Build DataFrame
-        logging.debug("Building dataframe from parsed data...")
-        df_proc = pd.DataFrame(raw_into_df)
+        # -------------------------
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        if df['date_time'].isna().all():
+            logging.error("All timestamps could not be parsed; aborting.")
+            return None
+        df = df.dropna(subset=['date_time'])
+        df = df.set_index('date_time')
 
-        # Convert Date/time column to datetime objects
-        logging.debug("Converting data_time to datetime datatype...")
-
-        df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
-
-        # Optionally crop data by start/stop times
         if self.start_dt or self.stop_dt:
-            logging.debug("Cropping data...")
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
 
-            df_proc = self.crop_data(df_proc)
+        # -------------------------
+        # DeltaT
+        # -------------------------
+        df['deltaT'] = df.index.to_series().diff()
 
-        # If the crop operation emptied the dataframe, quit
-        if df_proc.shape[0] == 0:
-            logging.warning("Cropped dataframe is empty... quitting")
-            return
+        # -------------------------
+        # Compute  distance, velocity
+        # -------------------------
+        df['point'] = df.apply(lambda row: Point(latitude=row['latitude'], longitude=row['longitude']), axis=1)
+        df['point_next'] = df['point'].shift(1)
+        df['distance'] = df.apply(
+            lambda row: great_circle(row['point'], row['point_next']).nm if row['point_next'] is not None else np.nan,
+            axis=1
+        )
+        df['velocity'] = df['distance'] / (df['deltaT'].dt.total_seconds() / 3600)
+        df = df.drop(['point', 'point_next'], axis=1)
 
-        # Calculate deltaT column
-        logging.debug('Building deltaT column...')
-        df_proc = df_proc.join(df_proc['date_time'].diff().to_frame(name='deltaT'))
+        # -------------------------
+        # Statistics
+        # -------------------------
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(),df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3), round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([len(df[(df['deltaT'] <= self.MAX_DELTA_T)]),len(df[(df['deltaT'] > self.MAX_DELTA_T)])], 'DeltaT Validity')
+        self.add_geobounds_stat([round(df['latitude'].max(),ROUNDING['latitude']),round(df['longitude'].max(),ROUNDING['longitude']),round(df['latitude'].min(),ROUNDING['latitude']),round(df['longitude'].min(),ROUNDING['longitude'])])
+        self.add_bounds_stat([round(df['velocity'].min(),ROUNDING['velocity']), 999999.999 if np.isinf(df['velocity'].max()) else round(df['velocity'].max(),ROUNDING['velocity'])], 'Velocity Bounds', 'kts')
+        self.add_value_validity_stat([len(df[(df['velocity'] <= self.MAX_VELOCITY)]),len(df[(df['velocity'] > self.MAX_VELOCITY)])], 'Velocity Validity')
+        self.add_total_value_stat([round(df['distance'].sum(axis=0),3)], 'Distance Traveled', 'nm')
+        self.add_bounds_stat([int(df['num_satellites'].min()), int(df['num_satellites'].max())], 'Number of Satellites', 'sats')
+        self.add_bounds_stat([round(df['hdop'].min(),ROUNDING['hdop']), round(df['hdop'].max(),ROUNDING['hdop'])], 'Horizontal Degree of Precision')
+        self.add_bounds_stat([round(df['altitude'].min(),ROUNDING['altitude']), round(df['altitude'].max(),ROUNDING['altitude'])], 'Altitude', 'm')
+        self.add_bounds_stat([round(df['height_wgs84'].min(),ROUNDING['height_wgs84']), round(df['height_wgs84'].max(),ROUNDING['height_wgs84'])], 'Height WGS84', 'm')
 
-        # Calculate distance column
-        logging.debug("Building distance column...")
-        df_proc['point'] = df_proc.apply(lambda row: Point(latitude=row['latitude'], longitude=row['longitude']), axis=1)
-        df_proc['point_next'] = df_proc['point'].shift(1)
-        df_proc.loc[df_proc['point_next'].isna(), 'point_next'] = None
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        logging.info("Running quality tests...")
+        quality_checks = [
+            ('Rows', len(df)+len(errors), len(errors)),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('Velocity', len(df), len(df[df['velocity'] > self.MAX_VELOCITY]))
+        ]
 
-        df_proc['distance'] = df_proc.apply(lambda row: great_circle(row['point'], row['point_next']).nm if row['point_next'] is not None else float('nan'), axis=1)
-        df_proc = df_proc.drop('point_next', axis=1)
-        df_proc = df_proc.drop('point', axis=1)
+        for col, total, bad in quality_checks:
+            error_rate = bad / total
+            if error_rate > 0.25:
+                self.add_quality_test_failed(col)
+            elif error_rate > 0.10:
+                self.add_quality_test_warning(col)
+            else:
+                self.add_quality_test_passed(col)
 
-        # Calculate velocity column
-        logging.debug("Building velocity column...")
-        df_proc['velocity'] = df_proc['distance'] / (df_proc.deltaT.dt.total_seconds() / 3600)
+        # -------------------------
+        # Resample and round
+        # -------------------------
+        df = self.resample_data(df)
+        df = self.round_data(df, ROUNDING)
+        df = df.set_index('date_time')
 
-        logging.debug("Tabulating statistics...")
-        self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
-        self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_geobounds_stat([round(df_proc['latitude'].max(),ROUNDING['latitude']),round(df_proc['longitude'].max(),ROUNDING['longitude']),round(df_proc['latitude'].min(),ROUNDING['latitude']),round(df_proc['longitude'].min(),ROUNDING['longitude'])])
-        self.add_bounds_stat([round(df_proc['velocity'].min(),ROUNDING['velocity']), 999999.999 if np.isinf(df_proc['velocity'].max()) else round(df_proc['velocity'].max(),ROUNDING['velocity'])], 'Velocity Bounds', 'kts')
-        self.add_value_validity_stat([len(df_proc[(df_proc['velocity'] <= MAX_VELOCITY)]),len(df_proc[(df_proc['velocity'] > MAX_VELOCITY)])], 'Velocity Validity')
-        self.add_total_value_stat([round(df_proc['distance'].sum(axis=0),3)], 'Distance Traveled', 'nm')
-        self.add_bounds_stat([int(df_proc['num_satellites'].min()), int(df_proc['num_satellites'].max())], 'Number of Satellites', 'sats')
-        self.add_bounds_stat([round(df_proc['hdop'].min(),ROUNDING['hdop']), round(df_proc['hdop'].max(),ROUNDING['hdop'])], 'Horizontal Degree of Precision')
-        self.add_bounds_stat([round(df_proc['altitude'].min(),ROUNDING['altitude']), round(df_proc['altitude'].max(),ROUNDING['altitude'])], 'Altitude', 'm')
-        self.add_bounds_stat([round(df_proc['height_wgs84'].min(),ROUNDING['height_wgs84']), round(df_proc['height_wgs84'].max(),ROUNDING['height_wgs84'])], 'Height WGS84', 'm')
+        # -------------------------
+        # Visualization
+        # -------------------------
+        logging.info("Building visualization datasets...")
 
-        logging.debug("Running quality tests...")
-        # % of bad rows in datafile
-        error_rate = len(errors) / (len(df_proc) + len(errors))
-        if error_rate > .25:
-            self.add_quality_test_failed("Rows")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Rows")
-        else:
-            self.add_quality_test_passed("Rows")
+        # df = df.dropna(subset=['latitude', 'longitude'])
 
-        # % of time gaps in data
-        error_rate = len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("DeltaT")
-        elif error_rate > .10:
-            self.add_quality_test_warning("DeltaT")
-        else:
-            self.add_quality_test_passed("DeltaT")
+        # Split by gaps
+        segments = np.split(df, np.where(df['latitude'].isna() | df['longitude'].isna())[0])
+        segments = [seg.dropna(subset=['latitude', 'longitude']) for seg in segments if not seg.empty]
 
-        # % of bad velocities in data
-        error_rate = len(df_proc[(df_proc['velocity'] > MAX_VELOCITY)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("Velocity")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Velocity")
-        else:
-            self.add_quality_test_passed("Velocity")
-
-        # set index
-        logging.debug('Setting index...')
-        df_proc = df_proc.set_index('date_time')
-
-        # resample data
-        logging.debug("Resampling data...")
-        df_proc = self.resample_data(df_proc)
-
-        # round data
-        logging.debug("Rounding data: %s", ROUNDING)
-        df_proc = self.round_data(df_proc, ROUNDING)
-
-        # split data where there are gaps
-        logging.debug("Building visualization data...")
-        events = np.split(df_proc, np.where(np.isnan(df_proc['latitude']))[0])
-
-        # removing NaN entries
-        events = [event[~np.isnan(event.latitude)] for event in events if not isinstance(event, np.ndarray)]
-
-        # removing empty DataFrames
-        events = [event for event in events if not event.empty]
-
-        visualizer_data_obj = {
-            'type':'FeatureCollection',
-            'features': []
-        }
-
-        for event in events:
-            # logging.debug("EV: %s".format(ev))
-            feature = {
-                'type':'Feature',
-                'geometry':{
-                    'type':'LineString',
-                    'coordinates':json.loads(event[['longitude','latitude']].to_json(orient='values'))
+        features = []
+        for seg in segments:
+            features.append({
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'LineString',
+                    'coordinates': seg[['longitude', 'latitude']].values.tolist()
                 },
                 'properties': {
-                    'coordTimes': json.loads(event['date_time'].to_json(orient='values')),
+                    'coordTimes': (seg.index.view('int64') // 1_000_000).tolist(),
                     'name': filepath
                 }
-            }
-            #print(feature)
-            visualizer_data_obj['features'].append(feature)
+            })
 
-        self.add_visualization_data(visualizer_data_obj)
+        self.add_visualization_data({'type': 'FeatureCollection', 'features': features})
 
-        # send message about errors encountered to OpenVDM
-        if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
+        # -------------------------
+        # Send errors to OpenVDM
+        # -------------------------
+        self.send_error_msg(errors, filepath)
+
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
 
 
 # -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
+# Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Parse NMEA GGA data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-    parser.add_argument('--timeFormat', help='timestamp format', default=None)
-    parser.add_argument('--startDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop start timestamp (iso8601)')
-    parser.add_argument('--stopDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop stop timestamp (iso8601)')
-    parser.add_argument('dataFile', metavar='dataFile',
-                        help='the raw data file to process')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    ovdm_parser = GGAParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
-
-    try:
-        logging.info("Processing file: %s", parsed_args.dataFile)
-        ovdm_parser.process_file(parsed_args.dataFile)
-        print(ovdm_parser.to_json())
-        logging.info("Done!")
-    except Exception as err:
-        logging.error(str(err))
-        raise err
+    GGAParser.run_cli()

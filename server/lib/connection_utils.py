@@ -7,7 +7,7 @@ DESCRIPTION:  utilities used to connect with remote systems
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.14
   CREATED:  2025-07-05
  REVISION:  2025-08-18
 """
