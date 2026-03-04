@@ -175,7 +175,7 @@ function install_packages {
     sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
     # Constants
-    CODENAME="noble"
+    CODENAME=$(lsb_release -cs)
     KEYRING_DIR="/etc/apt/keyrings"
     KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
     APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
@@ -807,6 +807,21 @@ function configure_mysql {
 
     systemctl restart mysql    # to manually start db server
     systemctl enable mysql     # to make it start on boot
+
+    # MySQL 8.4+ removed mysql_native_password as a default auth plugin.
+    # Re-enable it so existing SQL statements and PHP 7.x drivers work on both
+    # MySQL 8.0 (Ubuntu 22.04) and MySQL 8.4 (Ubuntu 24.04).
+    MYSQL_MAJOR_MINOR=$(mysql --version | grep -oP '\d+\.\d+' | head -1)
+    MYSQL_MAJOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f1)
+    MYSQL_MINOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f2)
+    if [ "$MYSQL_MAJOR" -gt 8 ] || { [ "$MYSQL_MAJOR" -eq 8 ] && [ "$MYSQL_MINOR" -ge 4 ]; }; then
+        echo "MySQL 8.4+ detected: enabling mysql_native_password plugin"
+        MYSQLD_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
+        if ! grep -q "^mysql_native_password" "$MYSQLD_CONF"; then
+            echo "mysql_native_password=ON" >> "$MYSQLD_CONF"
+        fi
+        systemctl restart mysql
+    fi
 
     echo "Setting up root user"
     # Verify current root password for mysql
