@@ -1,10 +1,11 @@
 # Open Vessel Data Management
 
 ## Installation Guide
-At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
+At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04/24.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
 
 ### Operating Systems
  - Ubuntu 22.04: <https://releases.ubuntu.com/22.04/>
+ - Ubuntu 24.04: <https://releases.ubuntu.com/24.04/>
  - Rocky 8.10 <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
 
 ### If you are installing OpenVDM remotely
@@ -21,7 +22,7 @@ Download the install script
 ```
 export OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
 export BRANCH=master
-wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
+wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu.sh
 
 # Alternate script for installing on Rocky/RHEL 8
 # wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-rocky8.10.sh
@@ -32,7 +33,7 @@ sudo ./install-openvdm.sh
 
 If wget is not available you can install it or use the following `curl` command:
 ```
-curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu22.04.sh
+curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu.sh
 ```
 
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
