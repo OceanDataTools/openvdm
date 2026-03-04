@@ -175,7 +175,7 @@ function install_packages {
     sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
 
     # Constants
-    CODENAME="noble"
+    CODENAME=$(lsb_release -cs)
     KEYRING_DIR="/etc/apt/keyrings"
     KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
     APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
@@ -219,13 +219,22 @@ function install_packages {
         sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/node /usr/local/bin/
     fi
     
+    # On Ubuntu 22.04 (jammy) the system Python is 3.10, which is too old for
+    # some required packages (numpy 2.2+, pandas 2.3+).  Install Python 3.12
+    # from the deadsnakes PPA so both 22.04 and 24.04 use the same version.
+    if [ "$CODENAME" = "jammy" ]; then
+        sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+    fi
+
     sudo apt update -qq
 
     sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 \
     cifs-utils gdal-bin gearman-job-server git libapache2-mod-php7.3 \
     libapache2-mod-wsgi-py3 libgearman-dev mysql-client mysql-server \
     php7.3 php7.3-cli php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml \
-    php7.3-zip python3 python3-dev python3-pip python3-venv rclone rsync \
+    php7.3-zip python3 python3-dev python3-pip python3-venv \
+    python3.12 python3.12-dev python3.12-venv rclone rsync \
     samba smbclient sshpass supervisor
 
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
@@ -252,8 +261,9 @@ function install_python_packages {
     startingDir=${PWD}
 
     cd $INSTALL_ROOT/openvdm
-    # Set up virtual environment
-    python3 -m venv ./venv
+    # Set up virtual environment using Python 3.12 (installed on both 22.04
+    # via deadsnakes PPA and natively on 24.04) to satisfy package requirements.
+    python3.12 -m venv ./venv
     source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
@@ -689,7 +699,7 @@ function configure_mapproxy {
         startingDir=${PWD}
 
         # Create venv and install
-        python3 -m venv /opt/mapproxy
+        python3.12 -m venv /opt/mapproxy
         source /opt/mapproxy/bin/activate
         GDAL_VERSION=$(gdal-config --version)
         pip install gdal==${GDAL_VERSION}
@@ -807,6 +817,21 @@ function configure_mysql {
 
     systemctl restart mysql    # to manually start db server
     systemctl enable mysql     # to make it start on boot
+
+    # MySQL 8.4+ removed mysql_native_password as a default auth plugin.
+    # Re-enable it so existing SQL statements and PHP 7.x drivers work on both
+    # MySQL 8.0 (Ubuntu 22.04) and MySQL 8.4 (Ubuntu 24.04).
+    MYSQL_MAJOR_MINOR=$(mysql --version | grep -oP '\d+\.\d+' | head -1)
+    MYSQL_MAJOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f1)
+    MYSQL_MINOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f2)
+    if [ "$MYSQL_MAJOR" -gt 8 ] || { [ "$MYSQL_MAJOR" -eq 8 ] && [ "$MYSQL_MINOR" -ge 4 ]; }; then
+        echo "MySQL 8.4+ detected: enabling mysql_native_password plugin"
+        MYSQLD_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
+        if ! grep -q "^mysql_native_password" "$MYSQLD_CONF"; then
+            echo "mysql_native_password=ON" >> "$MYSQLD_CONF"
+        fi
+        systemctl restart mysql
+    fi
 
     echo "Setting up root user"
     # Verify current root password for mysql
