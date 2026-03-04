@@ -1196,20 +1196,23 @@ INSTALL_MAPPROXY=$YES_NO_RESULT
 
 if [ $INSTALL_MAPPROXY == 'yes' ]; then
 
-echo "Where should the cached tiles be stored? It is recommended that the"
-echo "tile cache directory be located on a mounted volume that is"
-echo "independent of the volume used for the operating system."
-echo
-read -p "Cache data directory for MapProxy? ($DATA_ROOT/cache_data) " MAPPROXY_CACHE
-MAPPROXY_CACHE=${DATA_ROOT:-$DATA_ROOT/cache_data}
+    echo "Where should the cached tiles be stored? It is recommended that the"
+    echo "tile cache directory be located on a mounted volume that is"
+    echo "independent of the volume used for the operating system."
+    echo
+    read -p "Cache data directory for MapProxy? ($DATA_ROOT/cache_data) " MAPPROXY_CACHE
+    MAPPROXY_CACHE=${DATA_ROOT:-$DATA_ROOT/cache_data}
 
-if [ ! -d $MAPPROXY_CACHE ]; then
-    yes_no "Cache data directory ${MAPPROXY_CACHE} does not exists... create it? " "yes"
+    if [ ! -d $MAPPROXY_CACHE ]; then
+        yes_no "Cache data directory ${MAPPROXY_CACHE} does not exists... create it? " "yes"
     
-    if [ $YES_NO_RESULT == "no" ]; then
-        exit_gracefully
+        if [ $YES_NO_RESULT == "no" ]; then
+            exit_gracefully
+        fi
     fi
 fi
+echo
+
 #########################################################################
 # Install PublicData?
 echo "#####################################################################"
