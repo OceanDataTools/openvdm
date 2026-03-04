@@ -117,6 +117,7 @@ DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
 
 DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
+DEFAULT_MAPPROXY_CACHE=$MAPPROXY_CACHE
 
 DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
 DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
@@ -230,9 +231,7 @@ function install_packages {
     if [ $INSTALL_MAPPROXY == 'yes' ]; then
     
         sudo NEEDRESTART_MODE=a apt install -q -y libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj
-        
-        pip3 install MapProxy --quiet
+            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev
     fi
     
     cd ~
@@ -512,9 +511,9 @@ function configure_samba {
     
     cat >> /etc/samba/smb.conf <<EOF
 
-/### Added by OpenVDM install script ###
+### Added by OpenVDM install script ###
 include = /etc/samba/openvdm.conf
-/### Added by OpenVDM install script ###
+### Added by OpenVDM install script ###
 EOF
 
     cat > /etc/samba/openvdm.conf <<EOF
@@ -612,11 +611,10 @@ EOF
 if [ $INSTALL_MAPPROXY == 'yes' ]; then
     cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
 
-    WSGIScriptAlias /mapproxy /var/www/mapproxy/config.py
+    WSGIScriptAlias /mapproxy /opt/mapproxy/config/mapproxy.wsgi
 
-    <Directory /var/www/mapproxy/>
-      Order deny,allow
-      Allow from all
+    <Directory /opt/mapproxy/config>
+      Require all granted
     </Directory>
 EOF
 fi
@@ -690,10 +688,20 @@ function configure_mapproxy {
 
         startingDir=${PWD}
 
-        cd ~
-        mapproxy-util create -t base-config --force mapproxy
+        # Create venv and install
+        python3 -m venv /opt/mapproxy
+        source /opt/mapproxy/bin/activate
+        GDAL_VERSION=$(gdal-config --version)
+        pip install gdal==${GDAL_VERSION}
+        pip install MapProxy mod_wsgi
 
-        cat > ~/mapproxy/mapproxy.yaml <<EOF
+        # Create a starter config
+        mapproxy-util create -t base-config /opt/mapproxy/config
+
+        # cd ~
+        # mapproxy-util create -t base-config --force mapproxy
+
+        cat > /opt/mapproxy/config/mapproxy.yaml <<EOF
 # -------------------------------
 # MapProxy configuration.
 # -------------------------------
@@ -737,13 +745,13 @@ caches:
 sources:
   esri_worldOceanBase:
     type: tile
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/%(z)s/%(y)s/%(x)s.png
+    url: https://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/%(z)s/%(y)s/%(x)s.png
     grid: esri_online
 
   esri_worldOceanReference:
     type: tile
     transparent: true
-    url: http://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/%(z)s/%(y)s/%(x)s.png
+    url: https://server.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/%(z)s/%(y)s/%(x)s.png
     grid: esri_online
 
 grids:
@@ -757,16 +765,28 @@ grids:
      num_levels: 11
 
 globals:
+  cache:
+    base_dir: ${MAPPROXY_CACHE}
+    lock_dir: ${MAPPROXY_CACHE}/locks
 EOF
 
-        cp -r ~/mapproxy /var/www/
-        mkdir -p /var/www/mapproxy/cache_data
-        chmod 777 /var/www/mapproxy/cache_data
-        chown -R root:root /var/www/mapproxy
+        mkdir -p $MAPPROXY_CACHE/locks
+        chown -R www-data:www-data $MAPPROXY_CACHE
 
-        cd /var/www/mapproxy
-        mapproxy-util create -t wsgi-app -f mapproxy.yaml --force config.py
+        chmod -R 755 /opt/mapproxy/config
 
+        mkdir /var/log/mapproxy
+        chown www-data:www-data /var/log/mapproxy
+
+        mapproxy-util create -t wsgi-app -f /opt/mapproxy/config/mapproxy.yaml /opt/mapproxy/config/mapproxy.wsgi
+        mapproxy-util create -t log-ini /opt/mapproxy/config/log.ini
+        sed -i -e "s|# from logging.config import fileConfig|from logging.config import fileConfig|" /opt/mapproxy/config/mapproxy.wsgi
+        sed -i -e "s|# import os.path|import os.path|" /opt/mapproxy/config/mapproxy.wsgi
+        sed -i -e "s|# fileConfig(r'/opt/mapproxy/config/log.ini', {'here': os.path.dirname(__file__)})|fileConfig(r'/opt/mapproxy/config/log.ini', {'here': '/var/log/mapproxy'})|" /opt/mapproxy/config/mapproxy.wsgi
+
+        mod_wsgi-express install-module | sudo tee /etc/apache2/mods-available/wsgi.load
+        a2enmod wsgi
+        systemctl restart apache2.service
         # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
         cd ${startingDir}
     fi
@@ -1031,7 +1051,7 @@ EOF
         sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 
         if [ $INSTALL_PUBLICDATA == 'no' ]; then
-            sed -i -e "s/transferPubicData: True/transferPubicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+            sed -i -e "s/transferPublicData: True/transferPublicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
         fi
 
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
@@ -1133,7 +1153,7 @@ if [ ! -d $DATA_ROOT ]; then
     yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
     
     if [ $YES_NO_RESULT == "no" ]; then
-        exit
+        exit_gracefully
     fi
 fi
 echo
@@ -1173,6 +1193,24 @@ echo "reduce ship-to-shore network traffic for GIS-enabled webpages."
 echo
 yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
 INSTALL_MAPPROXY=$YES_NO_RESULT
+
+if [ $INSTALL_MAPPROXY == 'yes' ]; then
+
+    echo "Where should the cached tiles be stored? It is recommended that the"
+    echo "tile cache directory be located on a mounted volume that is"
+    echo "independent of the volume used for the operating system."
+    echo
+    read -p "Cache data directory for MapProxy? ($DATA_ROOT/cache_data) " MAPPROXY_CACHE
+    MAPPROXY_CACHE=${DATA_ROOT:-$DATA_ROOT/cache_data}
+
+    if [ ! -d $MAPPROXY_CACHE ]; then
+        yes_no "Cache data directory ${MAPPROXY_CACHE} does not exists... create it? " "yes"
+    
+        if [ $YES_NO_RESULT == "no" ]; then
+            exit_gracefully
+        fi
+    fi
+fi
 echo
 
 #########################################################################
@@ -1215,7 +1253,7 @@ setup_timezone
 echo
 
 echo "#####################################################################"
-echo "Setting ssh pubic/private keys"
+echo "Setting ssh public/private keys"
 setup_ssh
 echo
 
