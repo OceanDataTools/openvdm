@@ -31,6 +31,7 @@ class TransferLogs extends Model {
 
     private function outputLogFileSummary($files) {
         $returnArray = array();
+        $date = '';
 
         #for($i = sizeof($files)-1; $i >= 0; $i--) {
         for($i = 0; $i < sizeof($files); $i++) {

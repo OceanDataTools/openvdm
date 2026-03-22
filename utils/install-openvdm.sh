@@ -1,19 +1,22 @@
 #!/bin/bash -e
 
 # OpenVDM is available as open source under the MIT License at
-#   https:/github.com/oceandatatools/openvdm
+#   https://github.com/oceandatatools/openvdm
 #
-# This script installs and configures OpenVDM to run on Ubuntu 22.04.  It
-# is designed to be run as root. It should take a (relatively) clean
-# Ubuntu 22.04 installation and install and configure all the components
-# to run the full OpenVDM system.
+# This script installs and configures OpenVDM.  It supports:
+#   - Ubuntu 22.04 (Jammy) and 24.04 (Noble)
+#   - Debian 12 (Bookworm) and 13 (Trixie)
+#   - AlmaLinux 8/9, Rocky Linux 8/9, RHEL 8/9
 #
-# It should be re-run whenever the code has been refresh. Preferably
+# It is designed to be run as root. It should take a (relatively) clean
+# installation and install and configure all the components to run the
+# full OpenVDM system.
+#
+# It should be re-run whenever the code has been refreshed. Preferably
 # by first running 'git pull' to get the latest copy of the script,
-# and then running 'utils/build_openvdm_ubuntu22.04.sh' to run that
-# script.
+# and then running 'utils/install-openvdm.sh' to run that script.
 #
-# The script has been designed to be idempotent, that is, if can be
+# The script has been designed to be idempotent, that is, it can be
 # run over again with no ill effects.
 #
 # This script is somewhat rudimentary and has not been extensively
@@ -25,8 +28,10 @@
 # set -o nounset
 # set -o errexit
 # set -o pipefail
+# set -o xtrace
 
 PREFERENCES_FILE='.install_openvdm_preferences'
+
 
 ###########################################################################
 ###########################################################################
@@ -34,8 +39,8 @@ function exit_gracefully {
     echo Exiting.
 
     # Try deactivating virtual environment, if it's active
-    if [ -n "$INSTALL_ROOT" ];then
-        deactivate
+    if [ -n "$INSTALL_ROOT" ]; then
+        deactivate 2>/dev/null || true
     fi
     return -1 2> /dev/null || exit -1  # exit correctly if sourced/bashed
 }
@@ -66,6 +71,92 @@ yes_no() {
 
 ###########################################################################
 ###########################################################################
+# Run firewall-cmd with the given arguments and reload, but only if
+# firewall-cmd is available on this system.
+function firewall_cmd_if_available {
+    if command -v firewall-cmd > /dev/null 2>&1; then
+        firewall-cmd "$@"
+        firewall-cmd --reload
+    fi
+}
+
+###########################################################################
+###########################################################################
+# Detect the operating system and set distro-specific variables
+function detect_os {
+
+    if [ ! -f /etc/os-release ]; then
+        echo "ERROR: Cannot detect OS (/etc/os-release not found)"
+        exit_gracefully
+    fi
+
+    # Source /etc/os-release to get ID, VERSION_ID, VERSION_CODENAME, etc.
+    . /etc/os-release
+    OS_ID="${ID}"
+    OS_ID_LIKE="${ID_LIKE:-}"
+    OS_VERSION_ID="${VERSION_ID:-0}"
+    OS_VERSION_MAJOR="${VERSION_ID%%.*}"
+    OS_CODENAME="${VERSION_CODENAME:-}"
+
+    # Determine OS family
+    case "$OS_ID" in
+        ubuntu|debian)
+            OS_FAMILY="debian"
+            ;;
+        rhel|centos|rocky|almalinux|fedora)
+            OS_FAMILY="rhel"
+            ;;
+        *)
+            if echo "$OS_ID_LIKE" | grep -qE "(debian|ubuntu)"; then
+                OS_FAMILY="debian"
+            elif echo "$OS_ID_LIKE" | grep -qE "(rhel|fedora|centos)"; then
+                OS_FAMILY="rhel"
+            else
+                echo "ERROR: Unsupported OS: $OS_ID"
+                exit_gracefully
+            fi
+            ;;
+    esac
+
+    # Set distro-specific service names and paths
+    if [ "$OS_FAMILY" = "debian" ]; then
+        APACHE_SERVICE="apache2"
+        APACHE_CONF_DIR="/etc/apache2/sites-available"
+        # Use the literal Apache variable string (bash heredoc will expand this
+        # shell variable to its value, which Apache then interprets at runtime)
+        APACHE_LOG_DIR="\${APACHE_LOG_DIR}"
+        APACHE_USER="www-data"
+        SUPERVISOR_CONF="/etc/supervisor/supervisord.conf"
+        SUPERVISOR_CONF_D="/etc/supervisor/conf.d"
+        SUPERVISOR_PROG_EXT="conf"
+        SUPERVISOR_SERVICE="supervisor"
+        # Ubuntu repos ship mysql-server; Debian ships mariadb-server
+        MYSQL_SERVICE=$([ "$OS_ID" = "ubuntu" ] && echo "mysql" || echo "mariadb")
+        GEARMAN_SERVICE="gearman-job-server"
+        SAMBA_SERVICES="smbd nmbd"
+        SUDO_GROUP="sudo"
+        HAS_SELINUX=false
+    else
+        APACHE_SERVICE="httpd"
+        APACHE_CONF_DIR="/etc/httpd/conf.d"
+        APACHE_LOG_DIR="/var/log/httpd"
+        APACHE_USER="apache"
+        SUPERVISOR_CONF="/etc/supervisord.conf"
+        SUPERVISOR_CONF_D="/etc/supervisord.d"
+        SUPERVISOR_PROG_EXT="ini"
+        SUPERVISOR_SERVICE="supervisord"
+        MYSQL_SERVICE="mysqld"
+        GEARMAN_SERVICE="gearmand"
+        SAMBA_SERVICES="smb nmb"
+        SUDO_GROUP="wheel"
+        HAS_SELINUX=true
+    fi
+
+    echo "Detected OS: $OS_ID $OS_VERSION_ID ($OS_FAMILY family)"
+}
+
+###########################################################################
+###########################################################################
 # Read any pre-saved default variables from file
 function set_default_variables {
     # Defaults that will be overwritten by the preferences file, if it
@@ -80,8 +171,9 @@ function set_default_variables {
     DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
     DEFAULT_OPENVDM_USER=survey
-    
+
     DEFAULT_INSTALL_MAPPROXY=no
+    DEFAULT_MAPPROXY_CACHE=
 
     DEFAULT_INSTALL_PUBLICDATA=yes
     DEFAULT_INSTALL_VISITORINFORMATION=no
@@ -90,9 +182,9 @@ function set_default_variables {
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
-    if [ -e $PREFERENCES_FILE ]; then
+    if [ -e "$PREFERENCES_FILE" ]; then
         echo Reading pre-saved defaults from "$PREFERENCES_FILE"
-        source $PREFERENCES_FILE
+        source "$PREFERENCES_FILE"
         echo branch $DEFAULT_OPENVDM_BRANCH
     fi
 }
@@ -102,8 +194,8 @@ function set_default_variables {
 ###########################################################################
 # Save defaults in a preferences file for the next time we run.
 function save_default_variables {
-    cat > $PREFERENCES_FILE <<EOF
-# Defaults written by/to be read by install_openvdm_ubuntu22.04.sh
+    cat > "$PREFERENCES_FILE" <<EOF
+# Defaults written by/to be read by install-openvdm.sh
 
 DEFAULT_HOSTNAME=$HOSTNAME
 DEFAULT_INSTALL_ROOT=$INSTALL_ROOT
@@ -127,17 +219,21 @@ DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
 EOF
 }
 
-
 ###########################################################################
 ###########################################################################
 # Set hostname
 function set_hostname {
     HOSTNAME=$1
 
-    hostnamectl set-hostname $HOSTNAME
-    echo $HOSTNAME > /etc/hostname
+    hostnamectl set-hostname "$HOSTNAME"
 
-    ETC_HOSTS_LINE="127.0.1.1 $HOSTNAME"
+    if [ "$OS_FAMILY" = "debian" ]; then
+        echo "$HOSTNAME" > /etc/hostname
+        ETC_HOSTS_LINE="127.0.1.1 $HOSTNAME"
+    else
+        ETC_HOSTS_LINE="127.0.1.1 $HOSTNAME $HOSTNAME"
+    fi
+
     if grep -q "$ETC_HOSTS_LINE" /etc/hosts ; then
         echo Hostname already in /etc/hosts
     else
@@ -153,14 +249,21 @@ function create_user {
     OPENVDM_USER=$1
 
     echo "Checking if user $OPENVDM_USER exists yet"
-    if id -u $OPENVDM_USER > /dev/null; then
+    if id -u $OPENVDM_USER > /dev/null 2>&1; then
         echo User exists, skipping
         return
     fi
 
     echo "Creating $OPENVDM_USER"
-    adduser --gecos "" $OPENVDM_USER
-    usermod -a -G sudo $OPENVDM_USER
+    if [ "$OS_FAMILY" = "debian" ]; then
+        adduser --gecos "" $OPENVDM_USER
+        usermod -a -G $SUDO_GROUP $OPENVDM_USER
+    else
+        adduser $OPENVDM_USER
+        passwd $OPENVDM_USER
+        usermod -a -G tty $OPENVDM_USER
+        usermod -a -G $SUDO_GROUP $OPENVDM_USER
+    fi
 }
 
 ###########################################################################
@@ -170,86 +273,225 @@ function install_packages {
 
     startingDir=${PWD}
 
-    sudo NEEDRESTART_MODE=a apt-get update -qq
-
-    sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common ca-certificates curl gnupg
-
-    # Constants
-    CODENAME=$(lsb_release -cs)
-    KEYRING_DIR="/etc/apt/keyrings"
-    KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
-    APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
-    APACHE_PPA_URL="http://ppa.launchpad.net/ondrej/apache2/ubuntu"
-    PHP_PPA_LIST="/etc/apt/sources.list.d/ondrej-php.list"
-    PHP_PPA_URL="http://ppa.launchpad.net/ondrej/php/ubuntu"
-
-    # Make sure keyrings dir exists
-    sudo mkdir -p "$KEYRING_DIR"
-
-    echo "Downloading and importing public keys..."
-
-    # Download individual keys (in ASCII format) and dearmor them
-    # First: Ondřej’s PHP packaging key (E5267A6C)
-    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x4F4EA0AAE5267A6C" \
-      | gpg --dearmor | sudo tee "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
-
-    # Second: DPA key (71DAEAAB4AD4CAB6) — still used by Launchpad for some builds
-    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x71DAEAAB4AD4CAB6" \
-      | gpg --dearmor | sudo tee -a "$KEYRING_DIR/ondrej-php.gpg" > /dev/null
-
-    echo "➕ Adding PHP PPA with correct keyring..."
-    echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
-      sudo tee "$PHP_PPA_LIST"
-
-    # Add Apache2 PPA
-    echo "➕ Adding Apache2 PPA..."
-    echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
-      sudo tee "$APACHE_PPA_LIST"
-
-    # Install nodejs v20.11.0 LTS
-    if [ ! -e "/usr/local/bin/npm" ]; then
-        cd ~
-        wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-        nvm install --lts
-        NODE_VERSION=`node -v`
-        sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/npm /usr/local/bin/
-        sudo ln -s $HOME/.nvm/versions/node/$NODE_VERSION/bin/node /usr/local/bin/
-    fi
-    
-    # On Ubuntu 22.04 (jammy) the system Python is 3.10, which is too old for
-    # some required packages (numpy 2.2+, pandas 2.3+).  Install Python 3.12
-    # from the deadsnakes PPA so both 22.04 and 24.04 use the same version.
-    if [ "$CODENAME" = "jammy" ]; then
-        sudo NEEDRESTART_MODE=a apt-get install -q -y software-properties-common
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
+    if [ "$OS_FAMILY" = "debian" ]; then
+        _install_packages_debian
+    else
+        _install_packages_rhel
     fi
 
-    sudo apt update -qq
-
-    sudo NEEDRESTART_MODE=a apt install -q -y openssh-server apache2 \
-    cifs-utils gdal-bin gearman-job-server git libapache2-mod-php7.3 \
-    libapache2-mod-wsgi-py3 libgearman-dev mysql-client mysql-server \
-    php7.3 php7.3-cli php7.3-curl php7.3-gearman php7.3-mysql php7.3-yaml \
-    php7.3-zip python3 python3-dev python3-pip python3-venv \
-    python3.12 python3.12-dev python3.12-venv rclone rsync \
-    samba smbclient sshpass supervisor
-
-    if [ $INSTALL_MAPPROXY == 'yes' ]; then
-    
-        sudo NEEDRESTART_MODE=a apt install -q -y libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev
-    fi
-    
+    # Install Composer (both families)
     cd ~
     curl -sS https://getcomposer.org/installer | php
     mv composer.phar /usr/local/bin/composer
 
-    cd ${startingDir}
+    cd "${startingDir}"
 }
 
+###########################################################################
+###########################################################################
+# Debian/Ubuntu package installation
+function _install_packages_debian {
+
+    export NEEDRESTART_MODE=a
+
+    apt-get update -qq
+    apt-get install -q -y ca-certificates curl gnupg
+
+    # Use the codename already parsed from /etc/os-release in detect_os()
+    # rather than calling lsb_release, which is not installed on minimal Debian.
+    CODENAME="${OS_CODENAME}"
+    KEYRING_DIR="/etc/apt/keyrings"
+    mkdir -p "$KEYRING_DIR"
+
+    if [ "$OS_ID" = "ubuntu" ]; then
+        # Ubuntu: software-properties-common provides add-apt-repository
+        apt-get install -q -y software-properties-common
+
+        # Ubuntu: use Ondrej's PPA from Launchpad via keyserver.ubuntu.com
+        KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
+        PHP_PPA_URL="http://ppa.launchpad.net/ondrej/php/ubuntu"
+        APACHE_PPA_URL="http://ppa.launchpad.net/ondrej/apache2/ubuntu"
+        PHP_PPA_LIST="/etc/apt/sources.list.d/ondrej-php.list"
+        APACHE_PPA_LIST="/etc/apt/sources.list.d/ondrej-apache2.list"
+
+        echo "Downloading and importing Ondrej PPA keys..."
+        curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x4F4EA0AAE5267A6C" \
+            | gpg --dearmor | tee "$KEYRING_FILE" > /dev/null
+        curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x71DAEAAB4AD4CAB6" \
+            | gpg --dearmor | tee -a "$KEYRING_FILE" > /dev/null
+
+        echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
+            tee "$PHP_PPA_LIST"
+        echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
+            tee "$APACHE_PPA_LIST"
+
+        # On Ubuntu 22.04 (jammy) the system Python is 3.10 — too old for
+        # some required packages. Install Python 3.12 from the deadsnakes PPA.
+        if [ "$CODENAME" = "jammy" ]; then
+            add-apt-repository -y ppa:deadsnakes/ppa
+        fi
+
+    else
+        # Debian: use packages.sury.org (no add-apt-repository needed)
+        KEYRING_FILE="$KEYRING_DIR/sury-php.gpg"
+        PHP_PPA_LIST="/etc/apt/sources.list.d/sury-php.list"
+        APACHE_PPA_LIST="/etc/apt/sources.list.d/sury-apache2.list"
+
+        echo "Downloading and importing Sury packages key..."
+        curl -fsSL "https://packages.sury.org/php/apt.gpg" \
+            | gpg --dearmor | tee "$KEYRING_FILE" > /dev/null
+
+        echo "deb [signed-by=$KEYRING_FILE] https://packages.sury.org/php/ $CODENAME main" | \
+            tee "$PHP_PPA_LIST"
+        echo "deb [signed-by=$KEYRING_FILE] https://packages.sury.org/apache2/ $CODENAME main" | \
+            tee "$APACHE_PPA_LIST"
+
+        # Debian 12 (bookworm) ships Python 3.11 natively; no backports needed.
+        # Debian 13+ (trixie and later) ship Python 3.12+ natively.
+        if [ "$CODENAME" = "bookworm" ]; then
+            BACKPORTS_LIST="/etc/apt/sources.list.d/bookworm-backports.list"
+            if [ ! -f "$BACKPORTS_LIST" ]; then
+                echo "Adding Debian bookworm-backports..."
+                echo "deb http://deb.debian.org/debian bookworm-backports main" | \
+                    tee "$BACKPORTS_LIST"
+            fi
+        fi
+    fi
+
+    # Install Node.js via nvm
+    if [ ! -e "/usr/local/bin/npm" ]; then
+        cd ~
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        nvm install --lts
+        NODE_VERSION=$(node -v)
+        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/
+        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/
+    fi
+
+    # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
+    apt-get update
+
+    # Ubuntu ships mysql-server/mysql-client; Debian ships mariadb-server/mariadb-client
+    if [ "$OS_ID" = "ubuntu" ]; then
+        MYSQL_PKGS="mysql-client mysql-server"
+    else
+        MYSQL_PKGS="mariadb-client mariadb-server"
+    fi
+
+    NEEDRESTART_MODE=a apt-get install -q -y \
+        openssh-server apache2 \
+        cifs-utils gdal-bin gearman-job-server git \
+        libapache2-mod-php8.2 libapache2-mod-wsgi-py3 libgearman-dev \
+        $MYSQL_PKGS \
+        php8.2 php8.2-cli php8.2-curl php8.2-gearman php8.2-mysql php8.2-yaml php8.2-zip \
+        python3 python3-dev python3-pip python3-venv \
+        rclone rsync samba smbclient sshpass supervisor
+
+    # Install newest available Python >= 3.12.
+    # Try versioned packages from newest to oldest; fall back to system python3
+    # if it is already >= 3.11 (e.g. trixie ships python3.13 as python3).
+    _PYTHON_INSTALLED=false
+    for _VER in 3.15 3.14 3.13 3.12 3.11; do
+        if apt-cache show "python${_VER}" > /dev/null 2>&1; then
+            _PKGS="python${_VER} python${_VER}-dev python${_VER}-venv"
+            NEEDRESTART_MODE=a apt-get install -y $_PKGS
+            if command -v "python${_VER}" > /dev/null 2>&1; then
+                _PYTHON_INSTALLED=true
+                break
+            fi
+        fi
+    done
+
+    if [ "$_PYTHON_INSTALLED" = "false" ]; then
+        if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
+            echo "No versioned python3.11+ package found; system python3 is $(python3 --version)"
+            NEEDRESTART_MODE=a apt-get install -q -y python3-dev python3-venv
+        else
+            echo "ERROR: Python >= 3.11 is required but no suitable version is available."
+            exit_gracefully
+            exit 1
+        fi
+    fi
+
+    if [ "$INSTALL_MAPPROXY" = "yes" ]; then
+        NEEDRESTART_MODE=a apt-get install -q -y \
+            libgeos-dev libgdal-dev proj-bin \
+            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev
+    fi
+}
+
+###########################################################################
+###########################################################################
+# RHEL/Rocky/Alma package installation
+function _install_packages_rhel {
+
+    dnf install -y epel-release
+
+    # Enable powertools (v8) or crb (v9+)
+    if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
+        dnf config-manager --set-enabled crb
+    else
+        dnf config-manager --set-enabled powertools
+    fi
+
+    dnf -y update --nobest
+
+    # Install Remi PHP 8.2 repository
+    if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+    else
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
+    fi
+    dnf module reset php -y
+    dnf module enable php:remi-8.2 -y
+    dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
+
+    # On RHEL 9+, MySQL is delivered as an AppStream module; enable it before install.
+    if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
+        dnf module reset mysql -y
+        dnf module enable mysql:8.0 -y
+    fi
+
+    # Install newest available Python >= 3.11.
+    # Try versioned packages from newest to oldest.
+    _PYTHON_INSTALLED=false
+    for _VER in 3.15 3.14 3.13 3.12 3.11; do
+        if dnf info "python${_VER}" > /dev/null 2>&1; then
+            dnf install -y "python${_VER}" "python${_VER}-devel"
+            _PYTHON_INSTALLED=true
+            break
+        fi
+    done
+
+    if [ "$_PYTHON_INSTALLED" = "false" ]; then
+        if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
+            echo "No versioned python3.11+ package found; system python3 is $(python3 --version)"
+            python3 -m pip install --upgrade pip --quiet
+        else
+            echo "ERROR: Python >= 3.11 is required but no suitable version is available."
+            exit_gracefully
+        fi
+    fi
+
+    # Core packages
+    dnf -y install \
+        cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
+        gdal-devel libgearman-devel geos-devel libjpeg-devel make redhat-rpm-config \
+        mysql-server nodejs npm \
+        openssh-server policycoreutils-python-utils proj proj-devel \
+        python3-pyproj \
+        rsync samba samba-client samba-common samba-common-tools \
+        setroubleshoot sshpass supervisor unzip zlib-devel
+
+    # rclone is not in RHEL/AlmaLinux repos — install from official script
+    if ! command -v rclone > /dev/null 2>&1; then
+        curl -fsSL https://rclone.org/install.sh | bash
+    fi
+
+}
 
 ###########################################################################
 ###########################################################################
@@ -261,64 +503,103 @@ function install_python_packages {
     startingDir=${PWD}
 
     cd $INSTALL_ROOT/openvdm
-    # Set up virtual environment using Python 3.12 (installed on both 22.04
-    # via deadsnakes PPA and natively on 24.04) to satisfy package requirements.
-    python3.12 -m venv ./venv
+
+    ${PYTHON_CMD} -m venv ./venv
     source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
         --trusted-host files.pythonhosted.org --upgrade pip --quiet
-    pip install wheel --quiet # To help with the rest of the installations
+    pip install wheel --quiet
 
     pip install -r requirements.txt --quiet
 
-    if [ $INSTALL_MAPPROXY == 'yes' ]; then
-       pip install geographiclib==1.52 geopy==2.2.0 --quiet
-       pip install --config-settings="--global-option=build_ext" \
-                   --config-settings="--global-option=-I/usr/include/gdal" \
-                   GDAL==`gdal-config \
-                   --version` \
-                   --quiet
-
+    if [ "$INSTALL_MAPPROXY" = "yes" ]; then
+        pip install geographiclib==1.52 geopy==2.2.0 --quiet
+        _GDAL_VER=$(gdal-config --version)
+        _GDAL_MAJOR=$(echo "$_GDAL_VER" | cut -d. -f1)
+        _GDAL_MINOR=$(echo "$_GDAL_VER" | cut -d. -f2)
+        if [ "$_GDAL_MAJOR" -gt 3 ] || { [ "$_GDAL_MAJOR" -eq 3 ] && [ "$_GDAL_MINOR" -ge 3 ]; }; then
+            pip install --config-settings="--global-option=build_ext" \
+                        --config-settings="--global-option=-I/usr/include/gdal" \
+                        GDAL=="${_GDAL_VER}" \
+                        --quiet
+        else
+            echo "WARNING: System GDAL ${_GDAL_VER} < 3.3; Python GDAL bindings skipped (incompatible with modern setuptools). The geotiff_parser plugin will not be functional."
+        fi
     fi
+
+    deactivate
+
+    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/venv
 
     cd $startingDir
 }
 
+###########################################################################
+###########################################################################
+# Detect the best installed Python >= 3.11 and set PYTHON_CMD / PYTHON_VERSION.
+# Must be called after install_packages so the packages are already present.
+function detect_python {
+
+    for _ver in 3.15 3.14 3.13 3.12 3.11; do
+        if command -v "python${_ver}" > /dev/null 2>&1; then
+            PYTHON_CMD="python${_ver}"
+            PYTHON_VERSION="${_ver}"
+            echo "Using Python ${_ver} (${PYTHON_CMD})"
+            return 0
+        fi
+    done
+
+    # Fall back to the system python3 if it is already >= 3.11
+    if command -v python3 > /dev/null 2>&1 && \
+       python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
+        PYTHON_CMD="python3"
+        PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        echo "Using system Python ${PYTHON_VERSION} (python3)"
+        return 0
+    fi
+
+    echo "ERROR: Python >= 3.11 is required but no suitable version was found."
+    exit_gracefully
+    exit 1
+}
 
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure supervisor
 function configure_supervisor {
 
-    mv /etc/supervisor/supervisord.conf /etc/supervisor/supervisord.conf.orig
+    VENV_BIN=${INSTALL_ROOT}/openvdm/venv/bin
 
-    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' /etc/supervisor/supervisord.conf.orig |
-    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/supervisor/supervisord.conf
+    # Backup and strip any previous OpenVDM supervisor config
+    if [ -e "${SUPERVISOR_CONF}" ]; then
+        cp "${SUPERVISOR_CONF}" "${SUPERVISOR_CONF}.orig"
+        sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' \
+            "${SUPERVISOR_CONF}.orig" |
+        sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > "${SUPERVISOR_CONF}"
+    fi
 
-    if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
-        cat >> /etc/supervisor/supervisord.conf <<EOF
+    if [ "$SUPERVISORD_WEBINTERFACE" = "yes" ]; then
+        cat >> "${SUPERVISOR_CONF}" <<EOF
 
 ### Added by OpenVDM install script ###
 [inet_http_server]
 port=9001
 EOF
-        if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
-            SUPERVISORD_WEBINTERFACE_HASH=`echo -n ${SUPERVISORD_WEBINTERFACE_PASS} | sha1sum | awk '{printf("{SHA}%s",$1)}'`
-            cat >> /etc/supervisor/supervisord.conf <<EOF
+        if [ "$SUPERVISORD_WEBINTERFACE_AUTH" = "yes" ]; then
+            SUPERVISORD_WEBINTERFACE_HASH=$(echo -n "${SUPERVISORD_WEBINTERFACE_PASS}" | sha1sum | awk '{printf("{SHA}%s",$1)}')
+            cat >> "${SUPERVISOR_CONF}" <<EOF
 username=${SUPERVISORD_WEBINTERFACE_USER}
 password=${SUPERVISORD_WEBINTERFACE_HASH} ; echo -n "<password>" | sha1sum | awk '{printf("{SHA}%s",\$1)}'
 EOF
         fi
 
-      cat >> /etc/supervisor/supervisord.conf <<EOF
+        cat >> "${SUPERVISOR_CONF}" <<EOF
 ### Added by OpenVDM install script ###
 EOF
     fi
 
-VENV_BIN=${INSTALL_ROOT}/openvdm/venv/bin
-
-    cat > /etc/supervisor/conf.d/openvdm.conf << EOF
+    cat > "${SUPERVISOR_CONF_D}/openvdm.${SUPERVISOR_PROG_EXT}" << EOF
 [program:cruise]
 command=${VENV_BIN}/python server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
@@ -489,36 +770,45 @@ stopsignal=INT
 programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_summary,post_hooks,reboot_reset,run_collection_system_transfer,run_cruise_data_transfer,run_ship_to_shore_transfer,scheduler,size_cacher,stop_job,test_collection_system_transfer,test_cruise_data_transfer
 
 EOF
+
+    # On RHEL, open firewall port for supervisor web interface if enabled
+    if [ "$OS_FAMILY" = "rhel" ] && [ "$SUPERVISORD_WEBINTERFACE" = "yes" ]; then
+        echo "Updating Firewall rules for Supervisor Web Server"
+        firewall_cmd_if_available --zone=public --add-port=9001/tcp --permanent
+    fi
+
     echo "Starting new supervisor processes"
+    systemctl restart "${SUPERVISOR_SERVICE}"
+    systemctl enable "${SUPERVISOR_SERVICE}"
     supervisorctl reread
-    systemctl restart supervisor.service
-    
+    supervisorctl update
 }
 
-
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure gearman
 function configure_gearman {
-    echo "Restarting Gearman Job Server"
-    service gearman-job-server restart
+    echo "Starting Gearman Job Server"
+    systemctl start "${GEARMAN_SERVICE}"
+    systemctl enable "${GEARMAN_SERVICE}"
 }
 
-
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure samba
 function configure_samba {
 
     echo "Creating SMB user: ${OPENVDM_USER}, password set to same as OpenVDM DB user"
-    (echo ${OPENVDM_DATABASE_PASSWORD}; echo ${OPENVDM_DATABASE_PASSWORD}) | smbpasswd -s -a ${OPENVDM_USER}
+    (echo "${OPENVDM_DATABASE_PASSWORD}"; echo "${OPENVDM_DATABASE_PASSWORD}") | smbpasswd -s -a "${OPENVDM_USER}"
 
-    mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
+    if [ -e /etc/samba/smb.conf ]; then
+        mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
 
-    sed -e 's/obey pam restrictions = yes/obey pam restrictions = no/' /etc/samba/smb.conf.orig |
-    sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' |
-    sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba'  > /etc/samba/smb.conf
-    
+        sed -e 's/obey pam restrictions = yes/obey pam restrictions = no/' /etc/samba/smb.conf.orig |
+        sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' |
+        sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/samba/smb.conf
+    fi
+
     cat >> /etc/samba/smb.conf <<EOF
 
 ### Added by OpenVDM install script ###
@@ -544,8 +834,8 @@ EOF
   delete veto files = yes
 EOF
 
-if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
-    cat >> /etc/samba/openvdm.conf <<EOF
+    if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
+        cat >> /etc/samba/openvdm.conf <<EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
@@ -560,10 +850,10 @@ if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
   veto files = /._*/.DS_Store/.Trashes*/
   delete veto files = yes
 EOF
-fi
+    fi
 
-if [ $INSTALL_PUBLICDATA == 'yes' ]; then
-    cat >> /etc/samba/openvdm.conf <<EOF
+    if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
+        cat >> /etc/samba/openvdm.conf <<EOF
 
 [PublicData]
   comment=Public Data, read/write access to all
@@ -579,9 +869,18 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
   force create mode = 666
   force directory mode = 777
 EOF
-fi
+    fi
+
+    if [ "$OS_FAMILY" = "rhel" ]; then
+        echo "Updating firewall rules for samba"
+        firewall_cmd_if_available --add-service=samba --zone=public --permanent
+    fi
+
     echo "Restarting Samba Service"
-    systemctl restart smbd.service
+    for svc in $SAMBA_SERVICES; do
+        systemctl start "${svc}"
+        systemctl enable "${svc}"
+    done
 }
 
 ###########################################################################
@@ -590,46 +889,51 @@ fi
 function configure_apache {
 
     echo "Building new vhost file"
-    cat > /etc/apache2/sites-available/openvdm.conf <<EOF
+    VHOST_FILE="${APACHE_CONF_DIR}/openvdm.conf"
+
+    cat > "${VHOST_FILE}" <<EOF
 <VirtualHost *:80>
     ServerName $HOSTNAME
 
     ServerAdmin webmaster@localhost
     DocumentRoot /var/www/openvdm
 
-    # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
-    # error, crit, alert, emerg.
-    # It is also possible to configure the loglevel for particular
-    # modules, e.g.
-    #LogLevel info ssl:warn
-
-    ErrorLog \${APACHE_LOG_DIR}/error.log
-    CustomLog \${APACHE_LOG_DIR}/access.log combined
-
-    # For most configuration files from conf-available/, which are
-    # enabled or disabled at a global level, it is possible to
-    # include a line for only one particular virtual host. For example the
-    # following line enables the CGI configuration for this host only
-    # after it has been globally disabled with "a2disconf".
-    #Include conf-available/serve-cgi-bin.conf
+    ErrorLog ${APACHE_LOG_DIR}/openvdm_error.log
+    CustomLog ${APACHE_LOG_DIR}/openvdm_requests.log combined
 
     <Directory "/var/www/openvdm">
       AllowOverride all
     </Directory>
 EOF
 
-if [ $INSTALL_MAPPROXY == 'yes' ]; then
-    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+    if [ "$INSTALL_MAPPROXY" = "yes" ]; then
+        # On RHEL, venv site-packages may be in lib64/ rather than lib/.
+        # Compute the path now using PYTHON_CMD so it can be written directly
+        # into the WSGIDaemonProcess directive without a post-hoc sed fixup.
+        _WSGI_PYTHON_HOME="python-home=/opt/mapproxy"
+        if [ "$OS_FAMILY" = "rhel" ]; then
+            _MP_PYTHON_VER=$("${PYTHON_CMD}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+            if "${PYTHON_CMD}" -c "import sysconfig; print(sysconfig.get_path('purelib'))" | grep -q lib64; then
+                _MP_VENV_SITE="/opt/mapproxy/lib64/python${_MP_PYTHON_VER}/site-packages"
+            else
+                _MP_VENV_SITE="/opt/mapproxy/lib/python${_MP_PYTHON_VER}/site-packages"
+            fi
+            _WSGI_PYTHON_HOME="python-home=/opt/mapproxy python-path=${_MP_VENV_SITE}"
+        fi
+        cat >> "${VHOST_FILE}" <<EOF
 
+    WSGIDaemonProcess mapproxy user=${APACHE_USER} group=${APACHE_USER} ${_WSGI_PYTHON_HOME} threads=5
+    WSGIProcessGroup mapproxy
+    WSGIApplicationGroup %{GLOBAL}
     WSGIScriptAlias /mapproxy /opt/mapproxy/config/mapproxy.wsgi
 
     <Directory /opt/mapproxy/config>
       Require all granted
     </Directory>
 EOF
-fi
+    fi
 
-cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+    cat >> "${VHOST_FILE}" <<EOF
 
     Alias /CruiseData/ $DATA_ROOT/CruiseData/
     <Directory "$DATA_ROOT/CruiseData">
@@ -641,8 +945,8 @@ cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
     </Directory>
 EOF
 
-if [ $INSTALL_PUBLICDATA == 'yes' ]; then
-    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+    if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
+        cat >> "${VHOST_FILE}" <<EOF
 
     Alias /PublicData/ $DATA_ROOT/PublicData/
     <Directory "$DATA_ROOT/PublicData">
@@ -653,10 +957,10 @@ if [ $INSTALL_PUBLICDATA == 'yes' ]; then
       Require all granted
     </Directory>
 EOF
-fi
+    fi
 
-if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
-    cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+    if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
+        cat >> "${VHOST_FILE}" <<EOF
 
     Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
     <Directory "$DATA_ROOT/VisitorInformation">
@@ -667,49 +971,77 @@ if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
       Require all granted
     </Directory>
 EOF
-fi
+    fi
 
-cat >> /etc/apache2/sites-available/openvdm.conf <<EOF
+    cat >> "${VHOST_FILE}" <<EOF
 
 </VirtualHost>
 EOF
 
-    echo "Enabling rewrite Module"
-    a2enmod -q rewrite
+    if [ "$OS_FAMILY" = "debian" ]; then
+        echo "Enabling rewrite Module"
+        a2enmod -q rewrite
 
-    echo "Disabling default vhost"
-    a2dissite -q 000-default
+        echo "Disabling default vhost"
+        a2dissite -q 000-default
 
-    echo "Enabling new vhost"
-    a2ensite -q openvdm
+        echo "Enabling new vhost"
+        a2ensite -q openvdm
+    else
+        # RHEL: open firewall ports and configure SELinux
+        echo "Updating Firewall rules for Apache Web Server"
+        firewall_cmd_if_available --permanent --add-service={http,https}
 
-    echo "Restarting Apache WebServer"
-    systemctl restart apache2.service
+        echo "Setting SELinux exception rules"
+        chcon -R -t httpd_sys_content_t ${DATA_ROOT}
+        chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
 
+        setsebool httpd_tmp_exec on
+        setsebool -P httpd_can_network_connect=1
+    fi
+
+    # Enable Apache so it starts on boot. Only start/restart it now if MapProxy
+    # is not being installed — if it is, mod_wsgi and /opt/mapproxy won't exist
+    # yet and Apache would fail to parse the WSGIDaemonProcess directive.
+    # configure_mapproxy will do the final restart once everything is in place.
+    systemctl enable "${APACHE_SERVICE}"
+    if [ "$INSTALL_MAPPROXY" != "yes" ]; then
+        echo "Starting Apache Web Server"
+        systemctl restart "${APACHE_SERVICE}"
+    fi
 }
 
-
 ###########################################################################
 ###########################################################################
-# Install and configure database
+# Install and configure MapProxy
 function configure_mapproxy {
 
-    if [ $INSTALL_MAPPROXY == 'yes' ]; then
+    if [ "$INSTALL_MAPPROXY" = "yes" ] && [ ! -e "${INSTALL_ROOT}/mapproxy/config/mapproxy.yaml" ]; then
 
         startingDir=${PWD}
 
-        # Create venv and install
-        python3.12 -m venv /opt/mapproxy
+        # On Debian, use system python3 so the venv matches libapache2-mod-wsgi-py3.
+        # On RHEL, system python3 may be too old for MapProxy 6.x (requires 3.9+),
+        # so use ${PYTHON_CMD} (3.11+) and pip-compile mod_wsgi to match.
+        if [ "$OS_FAMILY" = "debian" ]; then
+            python3 -m venv --clear /opt/mapproxy
+        else
+            ${PYTHON_CMD} -m venv --clear /opt/mapproxy
+        fi
         source /opt/mapproxy/bin/activate
-        GDAL_VERSION=$(gdal-config --version)
-        pip install gdal==${GDAL_VERSION}
-        pip install MapProxy mod_wsgi
+        pip install --upgrade pip --quiet
+        _GDAL_VER=$(gdal-config --version)
+        _GDAL_MAJOR=$(echo "$_GDAL_VER" | cut -d. -f1)
+        _GDAL_MINOR=$(echo "$_GDAL_VER" | cut -d. -f2)
+        if [ "$_GDAL_MAJOR" -gt 3 ] || { [ "$_GDAL_MAJOR" -eq 3 ] && [ "$_GDAL_MINOR" -ge 3 ]; }; then
+            pip install gdal==${_GDAL_VER}
+        else
+            echo "WARNING: System GDAL ${_GDAL_VER} < 3.3; Python GDAL bindings skipped for MapProxy venv."
+        fi
+        pip install MapProxy
 
         # Create a starter config
         mapproxy-util create -t base-config /opt/mapproxy/config
-
-        # cd ~
-        # mapproxy-util create -t base-config --force mapproxy
 
         cat > /opt/mapproxy/config/mapproxy.yaml <<EOF
 # -------------------------------
@@ -780,13 +1112,12 @@ globals:
     lock_dir: ${MAPPROXY_CACHE}/locks
 EOF
 
-        mkdir -p $MAPPROXY_CACHE/locks
-        chown -R www-data:www-data $MAPPROXY_CACHE
-
+        mkdir -p "${MAPPROXY_CACHE}/locks"
+        chown -R "${APACHE_USER}:${APACHE_USER}" "${MAPPROXY_CACHE}"
         chmod -R 755 /opt/mapproxy/config
 
-        mkdir /var/log/mapproxy
-        chown www-data:www-data /var/log/mapproxy
+        mkdir -p /var/log/mapproxy
+        chown "${APACHE_USER}:${APACHE_USER}" /var/log/mapproxy
 
         mapproxy-util create -t wsgi-app -f /opt/mapproxy/config/mapproxy.yaml /opt/mapproxy/config/mapproxy.wsgi
         mapproxy-util create -t log-ini /opt/mapproxy/config/log.ini
@@ -794,14 +1125,29 @@ EOF
         sed -i -e "s|# import os.path|import os.path|" /opt/mapproxy/config/mapproxy.wsgi
         sed -i -e "s|# fileConfig(r'/opt/mapproxy/config/log.ini', {'here': os.path.dirname(__file__)})|fileConfig(r'/opt/mapproxy/config/log.ini', {'here': '/var/log/mapproxy'})|" /opt/mapproxy/config/mapproxy.wsgi
 
-        mod_wsgi-express install-module | sudo tee /etc/apache2/mods-available/wsgi.load
-        a2enmod wsgi
-        systemctl restart apache2.service
-        # sed -e "s|cgi import|html import|" /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py > /usr/lib/python3/dist-packages/mapproxy/service/template_helper.py
-        cd ${startingDir}
+        if [ "$OS_FAMILY" = "debian" ]; then
+            # Use the system mod_wsgi package (libapache2-mod-wsgi-py3), which is
+            # compiled for the same system python3 used by the venv above.
+            a2enmod wsgi-py3
+        else
+            # RHEL: pip-compile mod_wsgi for the same Python used by the venv,
+            # then load it as an Apache module.
+            pip install mod_wsgi --quiet
+            _MODWSGI_SO=$(/opt/mapproxy/bin/mod_wsgi-express module-location)
+            echo "LoadModule wsgi_module ${_MODWSGI_SO}" > /etc/httpd/conf.modules.d/10-wsgi-openvdm.conf
+        fi
+
+        if [ "$OS_FAMILY" = "rhel" ]; then
+            chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /opt/mapproxy
+            chcon -R -t httpd_sys_rw_content_t "${MAPPROXY_CACHE}" 2>/dev/null || true
+        fi
+
+        systemctl restart "${APACHE_SERVICE}"
+        deactivate
+
+        cd "${startingDir}"
     fi
 }
-
 
 ###########################################################################
 ###########################################################################
@@ -815,25 +1161,38 @@ function configure_mysql {
 
     echo "Enabling MySQL Database Server"
 
-    systemctl restart mysql    # to manually start db server
-    systemctl enable mysql     # to make it start on boot
+    systemctl enable "${MYSQL_SERVICE}"
+    systemctl start "${MYSQL_SERVICE}"
 
     # MySQL 8.4+ removed mysql_native_password as a default auth plugin.
-    # Re-enable it so existing SQL statements and PHP 7.x drivers work on both
-    # MySQL 8.0 (Ubuntu 22.04) and MySQL 8.4 (Ubuntu 24.04).
-    MYSQL_MAJOR_MINOR=$(mysql --version | grep -oP '\d+\.\d+' | head -1)
-    MYSQL_MAJOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f1)
-    MYSQL_MINOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f2)
-    if [ "$MYSQL_MAJOR" -gt 8 ] || { [ "$MYSQL_MAJOR" -eq 8 ] && [ "$MYSQL_MINOR" -ge 4 ]; }; then
-        echo "MySQL 8.4+ detected: enabling mysql_native_password plugin"
-        MYSQLD_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
-        if ! grep -q "^mysql_native_password" "$MYSQLD_CONF"; then
-            echo "mysql_native_password=ON" >> "$MYSQLD_CONF"
+    # Re-enable it so PHP drivers and existing SQL statements work on 8.4+.
+    # MariaDB (Debian) already uses native password by default — skip this block.
+    if [ "$MYSQL_SERVICE" = "mysql" ] || [ "$MYSQL_SERVICE" = "mysqld" ]; then
+        MYSQL_MAJOR_MINOR=$(mysql --version | grep -oP '\d+\.\d+' | head -1)
+        MYSQL_MAJOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f1)
+        MYSQL_MINOR=$(echo $MYSQL_MAJOR_MINOR | cut -d. -f2)
+        if [ "$MYSQL_MAJOR" -gt 8 ] || { [ "$MYSQL_MAJOR" -eq 8 ] && [ "$MYSQL_MINOR" -ge 4 ]; }; then
+            echo "MySQL 8.4+ detected: enabling mysql_native_password plugin"
+            if [ "$OS_FAMILY" = "debian" ]; then
+                MYSQLD_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
+            else
+                MYSQLD_CONF="/etc/my.cnf"
+            fi
+            if ! grep -q "^mysql_native_password" "$MYSQLD_CONF"; then
+                echo "mysql_native_password=ON" >> "$MYSQLD_CONF"
+            fi
+            systemctl restart "${MYSQL_SERVICE}"
         fi
-        systemctl restart mysql
     fi
 
-    echo "Setting up root user"
+    # MariaDB uses simpler IDENTIFIED BY syntax; MySQL needs explicit plugin name
+    if [ "$MYSQL_SERVICE" = "mariadb" ]; then
+        MYSQL_AUTH_CLAUSE="IDENTIFIED BY"
+    else
+        MYSQL_AUTH_CLAUSE="IDENTIFIED WITH mysql_native_password BY"
+    fi
+
+    echo "Setting up database root user and permissions"
     # Verify current root password for mysql
     while true; do
         # Check whether they're right about the current password; need
@@ -849,7 +1208,7 @@ function configure_mysql {
 
     # Set the new root password
     cat > /tmp/set_pwd <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$NEW_ROOT_DATABASE_PASSWORD';
+ALTER USER 'root'@'localhost' $MYSQL_AUTH_CLAUSE '$NEW_ROOT_DATABASE_PASSWORD';
 FLUSH PRIVILEGES;
 EOF
 
@@ -860,25 +1219,19 @@ EOF
     [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
     rm -f /tmp/set_pwd
 
-    # Now do the rest of the 'mysql_safe_installation' stuff
-#     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD <<EOF
-# DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
-# DELETE FROM mysql.user WHERE User='';
-# DELETE FROM mysql.db WHERE Db='test' OR Db='test_%';
-# FLUSH PRIVILEGES;
-# EOF
-
-    # Start mysql to start up as a service
-    update-rc.d mysql defaults
+    if [ "$OS_FAMILY" = "debian" ]; then
+        # Ensure mysql starts on boot via update-rc.d
+        update-rc.d ${MYSQL_SERVICE} defaults
+    fi
 
     echo "Setting up OpenVDM database user: ${OPENVDM_USER}"
     mysql -u root -p$NEW_ROOT_DATABASE_PASSWORD 2> /dev/null <<EOF
 drop user if exists '$OPENVDM_USER'@'localhost';
-create user '$OPENVDM_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$OPENVDM_DATABASE_PASSWORD';
+create user '$OPENVDM_USER'@'localhost' $MYSQL_AUTH_CLAUSE '$OPENVDM_DATABASE_PASSWORD';
 flush privileges;
 \q
 EOF
-
+    echo "Done setting up MySQL"
 }
 
 ###########################################################################
@@ -887,7 +1240,7 @@ EOF
 function configure_directories {
 
     if [ ! -d $DATA_ROOT ]; then
-        echo "Creating data directory structure starting at: $DATA_ROOT"
+        echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
         mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
@@ -899,12 +1252,12 @@ function configure_directories {
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
         touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
 
-        if [ $INSTALL_PUBLICDATA == 'yes' ]; then
+        if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
             mkdir -p ${DATA_ROOT}/PublicData
             chmod -R 777 ${DATA_ROOT}/PublicData
         fi
 
-        if [ $INSTALL_VISITORINFORMATION == 'yes' ]; then
+        if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
             mkdir -p ${DATA_ROOT}/VisitorInformation
         fi
 
@@ -918,48 +1271,49 @@ function configure_directories {
 
 }
 
-
 ###########################################################################
 ###########################################################################
 # Set system timezone
 function setup_timezone {
-    echo "Etc/UTC" > /etc/timezone
-    dpkg-reconfigure --frontend noninteractive tzdata
+    if [ "$OS_FAMILY" = "debian" ]; then
+        echo "Etc/UTC" > /etc/timezone
+        dpkg-reconfigure --frontend noninteractive tzdata
+    else
+        timedatectl set-timezone UTC
+    fi
 }
-
 
 ###########################################################################
 ###########################################################################
 # Set system ssh
-function setup_ssh {                                                                                                                                                               
-                                                                                                                                                                                   
-      # Generate SSH keypair for root if missing                                                                                                                                     
-      if [[ ! -d ~/.ssh || ! -e ~/.ssh/id_rsa.pub ]]; then                                                                                                                           
-          mkdir -p ~/.ssh                                                                                                                                                            
-          chmod 700 ~/.ssh                                                                                                                                                         
-          ssh-keygen -q -N "" -t rsa -f ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
-      fi
+function setup_ssh {
 
-      # Authorize root's key for passwordless login as root
-      if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
-          cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-          chmod 600 ~/.ssh/authorized_keys
-      fi
+    # Generate SSH keypair for root if missing
+    if [ ! -d ~/.ssh ] || [ ! -e ~/.ssh/id_rsa.pub ]; then
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keygen -q -N "" -t rsa -f ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
+    fi
 
-      # Authorize root's key for passwordless login as OPENVDM_USER
-      if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
-          mkdir -p "/home/${OPENVDM_USER}/.ssh"
-          chmod 700 "/home/${OPENVDM_USER}/.ssh"
-          cat ~/.ssh/id_rsa.pub >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-          chmod 600 "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-          chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
-      fi
+    # Authorize root's key for passwordless login as root
+    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
+        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+    fi
 
-      # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
-      ssh -o StrictHostKeyChecking=accept-new "${OPENVDM_USER}@${HOSTNAME}" ls > /dev/null
-  }
+    # Authorize root's key for passwordless login as OPENVDM_USER
+    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
+        mkdir -p "/home/${OPENVDM_USER}/.ssh"
+        chmod 700 "/home/${OPENVDM_USER}/.ssh"
+        cat ~/.ssh/id_rsa.pub >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+        chmod 600 "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+        chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
+    fi
 
+    # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
+    ssh -o StrictHostKeyChecking=accept-new "${OPENVDM_USER}@${HOSTNAME}" ls > /dev/null
+}
 
 ###########################################################################
 ###########################################################################
@@ -984,16 +1338,16 @@ function install_openvdm {
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            sudo -u $OPENVDM_USER git pull
-            sudo -u $OPENVDM_USER git checkout $OPENVDM_BRANCH
-            sudo -u $OPENVDM_USER git pull
+            sudo -u ${OPENVDM_USER} git pull
+            sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH
+            sudo -u ${OPENVDM_USER} git pull
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
             cd ..
             rm -rf openvdm
             git clone -q -b $OPENVDM_BRANCH $OPENVDM_REPO ./openvdm
-	    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
+            chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
         fi
     fi
 
@@ -1013,16 +1367,16 @@ EOF
         sed -e "s/127\.0\.0\.1/${OPENVDM_SITEROOT}/" \
         > ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
 
-        if [ $INSTALL_PUBLICDATA == 'no' ]; then
-            sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql 
+        if [ "$INSTALL_PUBLICDATA" = "no" ]; then
+            sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
 
-        if [ $INSTALL_VISITORINFORMATION == 'no' ]; then
+        if [ "$INSTALL_VISITORINFORMATION" = "no" ]; then
             sed -i -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
 
         hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
-	cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF 
+        cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
 
 INSERT INTO OVDM_Users (username, password)
 VALUES ('${OPENVDM_USER}', '${hashed_password}');
@@ -1040,8 +1394,7 @@ EOF
 
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    composer -q install
-
+    /usr/local/bin/composer -q install
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
@@ -1063,7 +1416,7 @@ EOF
 
     touch ${INSTALL_ROOT}/openvdm/www/errorlog.html
     chmod 777 ${INSTALL_ROOT}/openvdm/www/errorlog.html
-    chown -R root:root ${INSTALL_ROOT}/openvdm/www
+    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
 
     echo "Installing web-app"
 
@@ -1075,7 +1428,7 @@ EOF
         echo "Building server configuration file"
         sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 
-        if [ $INSTALL_PUBLICDATA == 'no' ]; then
+        if [ "$INSTALL_PUBLICDATA" = "no" ]; then
             sed -i -e "s/transferPublicData: True/transferPublicData: False/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
         fi
 
@@ -1088,11 +1441,11 @@ EOF
 
 ###########################################################################
 ###########################################################################
-###########################################################################
-###########################################################################
 # Start of actual script
 ###########################################################################
-###########################################################################
+
+# Detect OS and set distro-specific variables
+detect_os
 
 # Read from the preferences file in $PREFERENCES_FILE, if it exists
 set_default_variables
@@ -1102,13 +1455,14 @@ if [ "$(whoami)" != "root" ]; then
     exit_gracefully
 fi
 
-
 echo "#####################################################################"
 echo "OpenVDM configuration script"
 echo "#####################################################################"
 read -p "Name to assign to host ($DEFAULT_HOSTNAME)? " HOSTNAME
 HOSTNAME=${HOSTNAME:-$DEFAULT_HOSTNAME}
 echo "Hostname will be '$HOSTNAME'"
+
+###########################################################################
 # Set hostname
 set_hostname $HOSTNAME
 echo
@@ -1136,6 +1490,7 @@ echo
 echo "Access URL: 'http://$OPENVDM_SITEROOT'"
 echo
 
+###########################################################################
 # Create user if they don't exist yet
 echo "#####################################################################"
 read -p "OpenVDM user to create? ($DEFAULT_OPENVDM_USER) " OPENVDM_USER
@@ -1144,9 +1499,9 @@ create_user $OPENVDM_USER
 echo
 
 echo "#####################################################################"
-echo "Gathing information for MySQL installation/configuration"
+echo "Gathering information for MySQL installation/configuration"
 echo "Root database password will be empty on initial installation. If this"
-echo "is the initial installation, hit "return" when prompted for root"
+echo "is the initial installation, hit \"return\" when prompted for root"
 echo "database password, otherwise enter the password you used during the"
 echo "initial installation."
 echo
@@ -1163,7 +1518,7 @@ echo
 echo "#####################################################################"
 echo "Gathering information on where OpenVDM should store cruise data files"
 echo "The root data directory needs to be large enough to store at least a"
-echo "single cruise worth of data but ideally should be large enougn to"
+echo "single cruise worth of data but ideally should be large enough to"
 echo "hold several cruises worth of data."
 echo
 echo "It is recommended that the root data directory be located on a"
@@ -1174,10 +1529,10 @@ echo
 read -p "Root data directory for OpenVDM? ($DEFAULT_DATA_ROOT) " DATA_ROOT
 DATA_ROOT=${DATA_ROOT:-$DEFAULT_DATA_ROOT}
 
-if [ ! -d $DATA_ROOT ]; then
-    yes_no "Root data directory ${DATA_ROOT} does not exists... create it? " "yes"
-    
-    if [ $YES_NO_RESULT == "no" ]; then
+if [ ! -d "$DATA_ROOT" ]; then
+    yes_no "Root data directory ${DATA_ROOT} does not exist... create it? " "yes"
+
+    if [ "$YES_NO_RESULT" = "no" ]; then
         exit_gracefully
     fi
 fi
@@ -1193,12 +1548,12 @@ echo
 yes_no "Enable Supervisor Web-interface? " $DEFAULT_SUPERVISORD_WEBINTERFACE
 SUPERVISORD_WEBINTERFACE=$YES_NO_RESULT
 
-if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
+if [ "$SUPERVISORD_WEBINTERFACE" = "yes" ]; then
 
     yes_no "Enable user/pass on Supervisor Web-interface? " $DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH
     SUPERVISORD_WEBINTERFACE_AUTH=$YES_NO_RESULT
 
-    if [ $SUPERVISORD_WEBINTERFACE_AUTH == 'yes' ]; then
+    if [ "$SUPERVISORD_WEBINTERFACE_AUTH" = "yes" ]; then
 
         read -p "Username? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_USER
         SUPERVISORD_WEBINTERFACE_USER=${SUPERVISORD_WEBINTERFACE_USER:-$OPENVDM_USER}
@@ -1206,7 +1561,10 @@ if [ $SUPERVISORD_WEBINTERFACE == 'yes' ]; then
         read -p "Password? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_PASS
         SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_USER}
     fi
+else
+  SUPERVISORD_WEBINTERFACE_AUTH=no
 fi
+
 echo
 
 #########################################################################
@@ -1219,19 +1577,20 @@ echo
 yes_no "Install MapProxy? " $DEFAULT_INSTALL_MAPPROXY
 INSTALL_MAPPROXY=$YES_NO_RESULT
 
-if [ $INSTALL_MAPPROXY == 'yes' ]; then
+MAPPROXY_CACHE=${DEFAULT_MAPPROXY_CACHE:-}
+if [ "$INSTALL_MAPPROXY" = "yes" ]; then
 
     echo "Where should the cached tiles be stored? It is recommended that the"
     echo "tile cache directory be located on a mounted volume that is"
     echo "independent of the volume used for the operating system."
     echo
     read -p "Cache data directory for MapProxy? ($DATA_ROOT/cache_data) " MAPPROXY_CACHE
-    MAPPROXY_CACHE=${DATA_ROOT:-$DATA_ROOT/cache_data}
+    MAPPROXY_CACHE=${MAPPROXY_CACHE:-$DATA_ROOT/cache_data}
 
-    if [ ! -d $MAPPROXY_CACHE ]; then
-        yes_no "Cache data directory ${MAPPROXY_CACHE} does not exists... create it? " "yes"
-    
-        if [ $YES_NO_RESULT == "no" ]; then
+    if [ ! -d "$MAPPROXY_CACHE" ]; then
+        yes_no "Cache data directory ${MAPPROXY_CACHE} does not exist... create it? " "yes"
+
+        if [ "$YES_NO_RESULT" = "no" ]; then
             exit_gracefully
         fi
     fi
@@ -1253,14 +1612,13 @@ echo
 #########################################################################
 # Install VisitorInformation?
 echo "#####################################################################"
-echo "Setup a VistorInformation SMB Share for sharing documentation, print"
+echo "Setup a VisitorInformation SMB Share for sharing documentation, print"
 echo "drivers, etc with crew and scientists."
 echo
 yes_no "Setup VisitorInformation Share? " $DEFAULT_INSTALL_VISITORINFORMATION
 INSTALL_VISITORINFORMATION=$YES_NO_RESULT
 echo
 
-#########################################################################
 #########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
@@ -1273,7 +1631,12 @@ echo "Installing required software packages and libraries"
 install_packages
 
 echo "#####################################################################"
-echo "Setting system timezone to Etc/UTC"
+echo "Detecting Python version"
+detect_python
+echo
+
+echo "#####################################################################"
+echo "Setting system timezone to UTC"
 setup_timezone
 echo
 
@@ -1313,13 +1676,13 @@ install_python_packages
 echo
 
 echo "#####################################################################"
-echo "Installing/Configuring MapProxy"
-configure_mapproxy
+echo "Configuring Apache"
+configure_apache
 echo
 
 echo "#####################################################################"
-echo "Configuring Apache2"
-configure_apache
+echo "Installing/Configuring MapProxy"
+configure_mapproxy
 echo
 
 echo "#####################################################################"
