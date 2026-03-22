@@ -4,15 +4,26 @@
 At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04/24.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
 
 ### Operating Systems
+ - Debian 12: <https://wiki.debian.org/DebianBookworm>
+ - Debian 13: <https://wiki.debian.org/DebianTrixie>
  - Ubuntu 22.04: <https://releases.ubuntu.com/22.04/>
  - Ubuntu 24.04: <https://releases.ubuntu.com/24.04/>
- - Rocky 8.10 <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
+ - Rocky 8 <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
+ - Rocky 9 <https://rockylinux.org/news/rocky-linux-9-7-ga-release>
+ - AlmaLinux 8 <https://almalinux.org/get-almalinux/>
+ - AlmaLinux 9 <https://almalinux.org/get-almalinux/>
 
 ### If you are installing OpenVDM remotely
 
 If this is going to be a remote install then SSH Server must be installed.
+ - Debian/Ubuntu
 ```
 apt install -y ssh
+```
+
+ - Rocky/AlmaLinux
+```
+dnf install ssh
 ```
 
 ### Install OpenVDM and it's dependencies
@@ -22,18 +33,17 @@ Download the install script
 ```
 export OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
 export BRANCH=master
-wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu.sh
-
-# Alternate script for installing on Rocky/RHEL 8
-# wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-rocky8.10.sh
-
-chmod +x install-openvdm.sh
-sudo ./install-openvdm.sh
+wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm.sh
 ```
 
-If wget is not available you can install it or use the following `curl` command:
+If the wget utility is not available you can download the install script using this `curl` command:
 ```
-curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm-ubuntu.sh
+curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm.sh
+```
+
+Run the install script
+```
+bash ./install_openvdm.sh
 ```
 
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
@@ -114,7 +124,14 @@ Optionally install: MapProxy
 MapProxy is used for caching map tiles from ESRI and Google. This can
 reduce ship-to-shore network traffic for GIS-enabled webpages.
 
-Install MapProxy?  (no) 
+Install MapProxy?  (no) yes
+
+Where should the cached tiles be stored? It is recommended that the
+tile cache directory be located on a mounted volume that is
+independent of the volume used for the operating system.
+
+Cache data directory for MapProxy? (/data/cache_data)
+Cache data directory /data/cache_data does not exist... create it?  (yes)
 ```
 
 ```
@@ -244,3 +261,8 @@ pip install -r requirements.txt
 12. Select the OpenVDM database by typing: `use openvdm;` (`openvdm` is the default name of the database)
 13. Run the update script: `source <path to openvdm>/database/openvdm_210_to_211.sql`  You should see that the database was updated.  If you see any errors please save those errors to a text file and contact Webb Pinner at OceanDataTools.
 14. Install rclone via `apt-get install rclone` (Ubuntu) or `dnf install rclone` (Rocky/RHEL)
+
+## Upgrading from 2.14.
+
+OpenVDM v2.15 moves away from PHP 7.3 to PHP 8.2.  This isn't a trivial change and will require the installation of PHP 8.2 and reconfiguration of Apache to use the new version.  Recommend backing up the OpenVDM database and reinstalling OpenVDM onto a fresh OS install using the updated ./utils/install_openvdm.sh script. 
+
