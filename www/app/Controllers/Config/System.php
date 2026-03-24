@@ -89,6 +89,7 @@ class System extends Controller {
         $data['title'] = 'Configuration';
         $data['javascript'] = array();
         $data['shipboardDataWarehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'];
@@ -131,7 +132,7 @@ class System extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
-
+        $error = [];
 
         foreach($data['requiredCruiseDataTransfers'] as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
@@ -202,6 +203,7 @@ class System extends Controller {
         $data['title'] = 'Edit Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
         $data['row'] = $this->_extraDirectoriesModel->getExtraDirectory($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $longName = $_POST['longName'];
@@ -228,7 +230,6 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
 
-                $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->destDir = $destDir;
             }
@@ -243,6 +244,7 @@ class System extends Controller {
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
         $data['row'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $longName = $_POST['longName'];
@@ -306,7 +308,8 @@ class System extends Controller {
             }
         }
 
-        $data['shipToShoreBWLimit'] = $ssdw->bandwidthLimit;
+        $data['shipToShoreBWLimit'] = $ssdw->bandwidthLimit ?? 0;
+        $error = [];
 
         if(isset($_POST['submit'])){
             $shipToShoreBWLimit = $_POST['shipToShoreBWLimit'];
@@ -354,6 +357,7 @@ class System extends Controller {
         $data['title'] = 'Edit MD5 Checksum Filesize Limit';
         $data['javascript'] = array();
         $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $md5FilesizeLimit = $_POST['md5FilesizeLimit'];
@@ -548,6 +552,7 @@ class System extends Controller {
     public function addLink(){
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -569,7 +574,7 @@ class System extends Controller {
                     'enable' => '0',
                 );
 
-                $this->_linksModel->insertLink($postdata,$where);
+                $this->_linksModel->insertLink($postdata);
                 Session::set('message','Link Added');
                 Url::redirect('config/system');
             }
@@ -584,6 +589,7 @@ class System extends Controller {
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
         $data['row'] = $this->_linksModel->getLink($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];

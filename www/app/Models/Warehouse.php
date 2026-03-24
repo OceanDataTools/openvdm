@@ -437,7 +437,7 @@ class Warehouse extends Model {
     }
 
     public function getLowerings() {
-        if (!$this->_lowerings || (is_array($this->_lowerings) && sizeof($this->_lowerings) == 0)) {
+        if (!isset($this->_lowerings) || (is_array($this->_lowerings) && sizeof($this->_lowerings) == 0)) {
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
             $cruiseDir = $baseDir . DIRECTORY_SEPARATOR . $this->getCruiseID();
             $loweringDataBaseDir = $cruiseDir . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir();
@@ -470,7 +470,7 @@ class Warehouse extends Model {
             }
 
             //If there are no lowerings
-            if(!$this->_lowerings) {
+            if(empty($this->_lowerings)) {
                 return array();
             }
 

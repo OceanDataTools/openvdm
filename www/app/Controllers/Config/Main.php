@@ -59,6 +59,7 @@ class Main extends Controller {
         $data['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         $data['cruises'] = $this->_warehouseModel->getCruises();
         $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
+        $error = [];
 
         if(isset($_POST['submit'])) {
 
@@ -222,6 +223,7 @@ class Main extends Controller {
         $data['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         $data['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
         $data['lowerings'] = $this->_warehouseModel->getLowerings();
+        $error = [];
 
         if(isset($_POST['submit'])) {
 
@@ -313,14 +315,14 @@ class Main extends Controller {
     public function enableSystem() {
 
         $this->_warehouseModel->enableSystem();
-        Url::redirect($_SERVER['HTTP_REFERER'], true);
+        Url::redirect($_SERVER['HTTP_REFERER'] ?? '', true);
         //Url::redirect('config');
     }
 
     public function disableSystem() {
 
         $this->_warehouseModel->disableSystem();
-        Url::redirect($_SERVER['HTTP_REFERER'], true);
+        Url::redirect($_SERVER['HTTP_REFERER'] ?? '', true);
         //Url::redirect('config');
     }
 
@@ -454,8 +456,7 @@ class Main extends Controller {
         $data['cruiseEndDate'] = '';
         $data['cruiseStartPort'] = '';
         $data['cruiseEndPort'] = '';
-
-//        $error = array();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $cruiseID = $_POST['cruiseID'];
@@ -614,7 +615,7 @@ class Main extends Controller {
         $data['loweringID'] = '';
         $data['loweringStartDate'] = '';
         $data['loweringEndDate'] = '';
-//        $error = array();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $cruiseID = $this->_warehouseModel->getCruiseID();
