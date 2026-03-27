@@ -147,10 +147,10 @@ class System extends Controller {
         }
 
         if(isset($_POST['submit'])){
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
             $destDir = $_POST['destDir'];
 
             if($sshServer == ''){
