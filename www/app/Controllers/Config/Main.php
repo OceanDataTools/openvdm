@@ -181,7 +181,7 @@ class Main extends Controller {
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(isset($_POST)) {
+        } elseif(!empty($_POST)) {
 
             if(isset($_POST['hideLoweringComponents'])) {
                 $this->_warehouseModel->hideLoweringComponents();
@@ -688,10 +688,10 @@ class Main extends Controller {
                 $data['loweringStartDate'] = $loweringStartDate;
                 $data['loweringEndDate'] = $loweringEndDate;
             }
-        } elseif(isset($_POST)) {
-            $data['loweringID'] = $_POST['loweringID'];
-            $data['loweringStartDate'] = $_POST['loweringStartDate'];
-            $data['loweringEndDate'] = $_POST['loweringEndDate'];
+        } elseif(!empty($_POST)) {
+            $data['loweringID'] = $_POST['loweringID'] ?? '';
+            $data['loweringStartDate'] = $_POST['loweringStartDate'] ?? '';
+            $data['loweringEndDate'] = $_POST['loweringEndDate'] ?? '';
 
             foreach($data['collectionSystemTransfers'] as $row) {
                 if(isset($_POST['enableCS' . $row->collectionSystemTransferID])) {
