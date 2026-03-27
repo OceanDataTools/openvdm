@@ -63,14 +63,14 @@ class DataDashboard extends Controller {
         $data['dataWarehouseApacheDir'] = $this->_warehouseModel->getShipboardDataWarehouseApacheDir();
 
         $data['css'] = array();
-        if ($tab['cssArray'] && is_array($tab['cssArray']) && sizeof($tab['cssArray'])>0) {
+        if (!empty($tab['cssArray']) && is_array($tab['cssArray']) && sizeof($tab['cssArray'])>0) {
             foreach ($tab['cssArray'] as $cssFile) {
                 array_push($data['css'], $cssFile);
             }
         }
 
         $data['javascript'] = array();
-        if ($tab['jsArray'] && is_array($tab['jsArray']) && sizeof($tab['jsArray'])>0) {
+        if (!empty($tab['jsArray']) && is_array($tab['jsArray']) && sizeof($tab['jsArray'])>0) {
             foreach ($tab['jsArray'] as $jsFile) {
                 array_push($data['javascript'], $jsFile);
             }

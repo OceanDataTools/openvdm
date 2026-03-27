@@ -201,7 +201,7 @@ $_warehouseModel = new \Models\Warehouse();
         </div>
     </div>
 <?php
-    if($data['jobResults']) {
+    if(!empty($data['jobResults'])) {
 ?>
 <div class="modal fade" id="jobResultsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">
