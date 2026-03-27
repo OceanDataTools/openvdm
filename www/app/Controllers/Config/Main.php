@@ -552,15 +552,15 @@ class Main extends Controller {
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(isset($_POST)) {
-            $data['cruiseID'] = $_POST['cruiseID'];
-            $data['cruiseName'] = $_POST['cruiseName'];
-            $data['cruisePI'] = $_POST['cruisePI'];
-            $data['cruiseLocation'] = $_POST['cruiseLocation'];
-            $data['cruiseStartDate'] = $_POST['cruiseStartDate'];
-            $data['cruiseEndDate'] = $_POST['cruiseEndDate'];
-            $data['cruiseStartPort'] = $_POST['cruiseStartPort'];
-            $data['cruiseEndPort'] = $_POST['cruiseEndPort'];
+        } elseif(!empty($_POST)) {
+            $data['cruiseID'] = $_POST['cruiseID'] ?? '';
+            $data['cruiseName'] = $_POST['cruiseName'] ?? '';
+            $data['cruisePI'] = $_POST['cruisePI'] ?? '';
+            $data['cruiseLocation'] = $_POST['cruiseLocation'] ?? '';
+            $data['cruiseStartDate'] = $_POST['cruiseStartDate'] ?? '';
+            $data['cruiseEndDate'] = $_POST['cruiseEndDate'] ?? '';
+            $data['cruiseStartPort'] = $_POST['cruiseStartPort'] ?? '';
+            $data['cruiseEndPort'] = $_POST['cruiseEndPort'] ?? '';
 
 
             if(isset($_POST['hideLoweringComponents'])) {
