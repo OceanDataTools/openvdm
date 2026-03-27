@@ -382,7 +382,7 @@ class Warehouse extends Model {
 
     public function getCruises() {
 
-        if (!$this->_cruises || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
+        if (!isset($this->_cruises) || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
 
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
