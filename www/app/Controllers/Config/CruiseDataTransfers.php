@@ -692,7 +692,7 @@ class CruiseDataTransfers extends Controller {
                 $where = array('cruiseDataTransferID' => $id);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
 
-                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+                $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
                 Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
                 Url::redirect('config/cruiseDataTransfers'.$filter);
             } else {
@@ -949,7 +949,7 @@ class CruiseDataTransfers extends Controller {
 
         $where = array('cruiseDataTransferID' => $id);
         $this->_cruiseDataTransfersModel->deleteCruiseDataTransfer($where);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Session::set('message','Collection System Transfer Deleted');
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
@@ -957,14 +957,14 @@ class CruiseDataTransfers extends Controller {
     public function enable($id) {
 
         $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
     public function disable($id) {
 
         $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($id);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
@@ -1023,7 +1023,7 @@ class CruiseDataTransfers extends Controller {
 
         sleep(1);
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
@@ -1048,7 +1048,7 @@ class CruiseDataTransfers extends Controller {
 
         sleep(1);
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 }
