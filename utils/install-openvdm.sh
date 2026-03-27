@@ -1512,12 +1512,21 @@ function install_sample_data {
         chcon -R -t samba_share_t "${SAMPLEDATA_ROOT}" 2>/dev/null || true
     fi
 
-    # Build customized SQL: substitute default paths/user/password with local values
+    # Build customized SQL: substitute default paths/user/password with local values.
+    # Strip DROP TABLE and CREATE TABLE blocks from the sample data SQL so that the
+    # table schema installed by openvdm_db.sql is preserved; use TRUNCATE instead to
+    # clear existing rows before inserting sample data.
     echo "Importing sample data database configuration"
     sed -e "s|/data/sample_data|${SAMPLEDATA_ROOT}|g" \
         "${SAMPLEDATA_INSTALL_DIR}/openvdm_sample_data.sql" | \
     sed -e "s/survey/${OPENVDM_USER}/g" | \
-    sed -e "s/sample_smb_passwd/${OPENVDM_DATABASE_PASSWORD}/g" \
+    sed -e "s/sample_smb_passwd/${OPENVDM_DATABASE_PASSWORD}/g" | \
+    sed -e '/^DROP TABLE/d' \
+        -e '/^CREATE TABLE/,/^) ENGINE=/d' \
+        -e '/^\/\*!40101 SET @saved_cs_client/d' \
+        -e '/^\/\*!5[0-9][0-9][0-9][0-9] SET character_set_client/d' \
+        -e '/^\/\*!40101 SET character_set_client = @saved_cs_client/d' | \
+    sed -e 's/^LOCK TABLES `\(.*\)` WRITE;/TRUNCATE TABLE `\1`;\nLOCK TABLES `\1` WRITE;/' \
     > /tmp/openvdm_sample_data_custom.sql
 
     mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" 2>/dev/null <<EOF
