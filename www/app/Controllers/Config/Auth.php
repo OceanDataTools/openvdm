@@ -21,6 +21,8 @@ class Auth extends Controller {
             Url::redirect('config');
         }
 
+        $error = [];
+
         if(isset($_POST['submit'])){
 
             $username = $_POST['username'];
@@ -47,7 +49,7 @@ class Auth extends Controller {
         }
 
         $data['title'] = 'Login';
-        $data['referrer'] = $_SERVER['HTTP_REFERER'];
+        $data['referrer'] = $_SERVER['HTTP_REFERER'] ?? '';
         View::rendertemplate('loginheader', $data);
         View::render('Config/login', $data,$error);
         View::rendertemplate('footer', $data);

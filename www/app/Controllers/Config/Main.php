@@ -59,6 +59,7 @@ class Main extends Controller {
         $data['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         $data['cruises'] = $this->_warehouseModel->getCruises();
         $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
+        $error = [];
 
         if(isset($_POST['submit'])) {
 
@@ -180,7 +181,7 @@ class Main extends Controller {
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(isset($_POST)) {
+        } elseif(!empty($_POST)) {
 
             if(isset($_POST['hideLoweringComponents'])) {
                 $this->_warehouseModel->hideLoweringComponents();
@@ -222,6 +223,7 @@ class Main extends Controller {
         $data['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         $data['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
         $data['lowerings'] = $this->_warehouseModel->getLowerings();
+        $error = [];
 
         if(isset($_POST['submit'])) {
 
@@ -313,14 +315,14 @@ class Main extends Controller {
     public function enableSystem() {
 
         $this->_warehouseModel->enableSystem();
-        Url::redirect($_SERVER['HTTP_REFERER'], true);
+        Url::redirect($_SERVER['HTTP_REFERER'] ?? '', true);
         //Url::redirect('config');
     }
 
     public function disableSystem() {
 
         $this->_warehouseModel->disableSystem();
-        Url::redirect($_SERVER['HTTP_REFERER'], true);
+        Url::redirect($_SERVER['HTTP_REFERER'] ?? '', true);
         //Url::redirect('config');
     }
 
@@ -454,8 +456,7 @@ class Main extends Controller {
         $data['cruiseEndDate'] = '';
         $data['cruiseStartPort'] = '';
         $data['cruiseEndPort'] = '';
-
-//        $error = array();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $cruiseID = $_POST['cruiseID'];
@@ -551,15 +552,15 @@ class Main extends Controller {
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(isset($_POST)) {
-            $data['cruiseID'] = $_POST['cruiseID'];
-            $data['cruiseName'] = $_POST['cruiseName'];
-            $data['cruisePI'] = $_POST['cruisePI'];
-            $data['cruiseLocation'] = $_POST['cruiseLocation'];
-            $data['cruiseStartDate'] = $_POST['cruiseStartDate'];
-            $data['cruiseEndDate'] = $_POST['cruiseEndDate'];
-            $data['cruiseStartPort'] = $_POST['cruiseStartPort'];
-            $data['cruiseEndPort'] = $_POST['cruiseEndPort'];
+        } elseif(!empty($_POST)) {
+            $data['cruiseID'] = $_POST['cruiseID'] ?? '';
+            $data['cruiseName'] = $_POST['cruiseName'] ?? '';
+            $data['cruisePI'] = $_POST['cruisePI'] ?? '';
+            $data['cruiseLocation'] = $_POST['cruiseLocation'] ?? '';
+            $data['cruiseStartDate'] = $_POST['cruiseStartDate'] ?? '';
+            $data['cruiseEndDate'] = $_POST['cruiseEndDate'] ?? '';
+            $data['cruiseStartPort'] = $_POST['cruiseStartPort'] ?? '';
+            $data['cruiseEndPort'] = $_POST['cruiseEndPort'] ?? '';
 
 
             if(isset($_POST['hideLoweringComponents'])) {
@@ -614,7 +615,7 @@ class Main extends Controller {
         $data['loweringID'] = '';
         $data['loweringStartDate'] = '';
         $data['loweringEndDate'] = '';
-//        $error = array();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $cruiseID = $this->_warehouseModel->getCruiseID();
@@ -687,10 +688,10 @@ class Main extends Controller {
                 $data['loweringStartDate'] = $loweringStartDate;
                 $data['loweringEndDate'] = $loweringEndDate;
             }
-        } elseif(isset($_POST)) {
-            $data['loweringID'] = $_POST['loweringID'];
-            $data['loweringStartDate'] = $_POST['loweringStartDate'];
-            $data['loweringEndDate'] = $_POST['loweringEndDate'];
+        } elseif(!empty($_POST)) {
+            $data['loweringID'] = $_POST['loweringID'] ?? '';
+            $data['loweringStartDate'] = $_POST['loweringStartDate'] ?? '';
+            $data['loweringEndDate'] = $_POST['loweringEndDate'] ?? '';
 
             foreach($data['collectionSystemTransfers'] as $row) {
                 if(isset($_POST['enableCS' . $row->collectionSystemTransferID])) {

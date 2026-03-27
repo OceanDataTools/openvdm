@@ -262,7 +262,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
 </div> <!-- /.modal -->
 
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog" aria-labelledby="Test Results" aria-hidden="true">
     <div class="modal-dialog">

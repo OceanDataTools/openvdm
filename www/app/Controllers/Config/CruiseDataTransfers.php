@@ -89,7 +89,7 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
-        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
+        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType'] ?? '');
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
         $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
@@ -98,6 +98,7 @@ class CruiseDataTransfers extends Controller {
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -507,6 +508,7 @@ class CruiseDataTransfers extends Controller {
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         $data['row'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];

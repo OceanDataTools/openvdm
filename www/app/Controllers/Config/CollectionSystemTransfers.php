@@ -149,6 +149,7 @@ class CollectionSystemTransfers extends Controller {
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -611,6 +612,7 @@ class CollectionSystemTransfers extends Controller {
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);
 
         $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];

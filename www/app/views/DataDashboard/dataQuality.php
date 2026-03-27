@@ -120,7 +120,7 @@
     for($i=0; $i<(sizeof($data['stats'])); $i++){
 ?>
                         <tr>
-                            <td><?php echo $data['stats'][$i]->statName; ?>:</td>
+                            <td><?php echo $data['stats'][$i]->statName ?? ''; ?>:</td>
                             <td>
 <?php
         if(strcmp($data['stats'][$i]->statType, 'bounds') === 0){

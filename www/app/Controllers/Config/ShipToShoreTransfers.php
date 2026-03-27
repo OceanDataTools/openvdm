@@ -112,9 +112,10 @@ class shipToShoreTransfers extends Controller {
     public function add(){
         $data['title'] = 'Add Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
-        $data['transferPriorityOptions'] = $this->_buildTransferPriorityOptions($_POST['priority']);
-        $data['collectionSystemOptions'] = $this->_buildCollectionSystemOptions($_POST['collectionSystemTransfer']);
-        $data['extraDirectoryOptions'] = $this->_buildExtraDirectoryOptions($_POST['extraDirectory']);
+        $data['transferPriorityOptions'] = $this->_buildTransferPriorityOptions($_POST['priority'] ?? '');
+        $data['collectionSystemOptions'] = $this->_buildCollectionSystemOptions($_POST['collectionSystemTransfer'] ?? '');
+        $data['extraDirectoryOptions'] = $this->_buildExtraDirectoryOptions($_POST['extraDirectory'] ?? '');
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];
@@ -173,6 +174,7 @@ class shipToShoreTransfers extends Controller {
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
         $data['row'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $name = $_POST['name'];

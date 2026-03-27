@@ -156,7 +156,7 @@ class DashboardData extends Model {
         $dataObjectContents = '';
 
         $foundIt = false;
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
                 if (strcmp($manifestItemKey, 'dd_json') === 0){
                     if(strcmp($manifestItemValue, $dd_json) === 0) {
@@ -177,7 +177,7 @@ class DashboardData extends Model {
         $dataObjectContents = '';
 
         $foundIt = false;
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
                 if (strcmp($manifestItemKey, 'raw_data') === 0){
                     if(strcmp($manifestItemValue, $raw_data) === 0) {
@@ -197,7 +197,7 @@ class DashboardData extends Model {
     public function getDashboardObjectDataTypeByJsonName($dd_json){
         $dataType = '';
 
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             if (strcmp($manifestItem['dd_json'], $dd_json) === 0) {
                 $dataType = $manifestItem['type'];
                 break;
@@ -209,7 +209,7 @@ class DashboardData extends Model {
     public function getDashboardObjectDataTypeByRawName($raw_data){
         $dataType = '';
 
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             if (strcmp($manifestItem['raw_data'], $raw_data) === 0) {
                 $dataType = $manifestItem['type'];
                 break;
