@@ -384,6 +384,7 @@ class Warehouse extends Model {
 
         if (!isset($this->_cruises) || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
 
+            $this->_cruises = array();
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
             //Get the list of directories
