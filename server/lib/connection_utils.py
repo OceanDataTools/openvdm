@@ -121,7 +121,7 @@ def mount_smb_share(cfg, mntpoint, smb_version):
     """
 
     # Logic handles if cfg is a cst or cdt
-    read_write = 'rw' if cfg.get('removeSourceFiles', '1') == '1' else 'ro'
+    read_write = 'rw' if str(cfg.get('removeSourceFiles', '1')) == '1' else 'ro'
 
     opts = f"{read_write},domain={cfg['smbDomain']},vers={smb_version}"
 
@@ -369,9 +369,9 @@ def build_rclone_options(cfg, mode='dry-run'):
         remote_type = 'local'
 
     flags = ["--progress"]
-    copy_sync = "sync" if cfg.get('syncToDest', '0') == '1' else "copy"
+    copy_sync = "sync" if str(cfg.get('syncToDest', '0')) == '1' else "copy"
 
-    #if cfg.get('skipEmptyFiles') == '1':
+    #if str(cfg.get('skipEmptyFiles', '')) == '1':
     #    flags.extend(['--min-size', '1B'])
 
     if cfg.get('skipEmptyDirs') == '0':
@@ -401,10 +401,10 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     if not is_darwin:
         flags.insert(1, '--protect-args')
 
-    if cfg.get('skipEmptyFiles') == '1':
+    if str(cfg.get('skipEmptyFiles', '')) == '1':
         flags.insert(1, '--min-size=1')
 
-    if cfg.get('skipEmptyDirs') == '1':
+    if str(cfg.get('skipEmptyDirs', '')) == '1':
         flags.insert(1, '-m')
 
     if mode == 'dry-run':
@@ -419,11 +419,11 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
             flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
 
         # Logic handles if cfg is a cst or cdt
-        if cfg.get('removeSourceFiles', '0') == '1':
+        if str(cfg.get('removeSourceFiles', '0')) == '1':
             flags.insert(2, '--remove-source-files')
 
         # Logic handles if cfg is a cst or cdt
-        if cfg.get('syncToDest', '0') == '1':
+        if str(cfg.get('syncToDest', '0')) == '1':
             flags.insert(2, '--delete')
 
     return flags
@@ -438,7 +438,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
         reason = f"Unable to find destination directory: {dest_dir} on the data warehouse"
         results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
 
-        if is_mountpoint == '1':
+        if str(is_mountpoint) == '1':
             results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
 
         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -447,7 +447,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
 
     results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
-    if is_mountpoint == '1':
+    if str(is_mountpoint) == '1':
         mnt_dir = os.sep + os.path.join(*dest_dir.strip(os.sep).split(os.sep)[:2])
         if not os.path.ismount(mnt_dir):
             results.extend([{
@@ -533,29 +533,29 @@ def test_cst_source(cst_cfg, source_dir):
                 reason = f"Unable to find source directory: {source_dir} on the data warehouse"
                 results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['localDirIsMountPoint'] == '1':
+                if str(cst_cfg['localDirIsMountPoint']) == '1':
                     results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if str(cst_cfg['removeSourceFiles']) == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
             results.extend([{"partName": "Source directory", "result": "Pass"}])
 
-            if cst_cfg['localDirIsMountPoint'] == '1':
+            if str(cst_cfg['localDirIsMountPoint']) == '1':
                 mnt_dir = os.sep + os.path.join(*source_dir.strip(os.sep).split(os.sep)[:2])
                 if not os.path.ismount(mnt_dir):
                     results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
 
-                    if cst_cfg['removeSourceFiles'] == '1':
+                    if str(cst_cfg['removeSourceFiles']) == '1':
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
                 results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
 
-            if cst_cfg['removeSourceFiles'] == '1':
+            if str(cst_cfg['removeSourceFiles']) == '1':
                 if not test_write_access(source_dir):
                     reason = f"Unable to delete source files from: {source_dir} on SMB share"
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -579,7 +579,7 @@ def test_cst_source(cst_cfg, source_dir):
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if str(cst_cfg['removeSourceFiles']) == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -594,7 +594,7 @@ def test_cst_source(cst_cfg, source_dir):
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if str(cst_cfg['removeSourceFiles']) == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -607,14 +607,14 @@ def test_cst_source(cst_cfg, source_dir):
                 reason = f"Unable to find source directory: {source_dir} on SMB share"
                 results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if str(cst_cfg['removeSourceFiles']) == '1':
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
             results.extend([{"partName": "Source directory", "result": "Pass"}])
 
-            if cst_cfg['removeSourceFiles'] == '1':
+            if str(cst_cfg['removeSourceFiles']) == '1':
                 if not test_write_access(smb_source_dir):
                     reason = f"Unable to delete source files from: {source_dir} on SMB share"
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -668,7 +668,7 @@ def test_cst_source(cst_cfg, source_dir):
         # Tests for SSH
         if transfer_type == 'ssh':
 
-            use_pubkey = cst_cfg['sshUseKey'] == '1'
+            use_pubkey = str(cst_cfg['sshUseKey']) == '1'
 
             contest_success = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
@@ -790,7 +790,7 @@ def test_cdt_destination(cdt_cfg):
         # Tests for SSH
         if transfer_type == 'ssh':
 
-            use_pubkey = cdt_cfg['sshUseKey'] == '1'
+            use_pubkey = str(cdt_cfg['sshUseKey']) == '1'
 
             contest_success = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
