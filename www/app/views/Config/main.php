@@ -64,7 +64,6 @@ $_warehouseModel = new \Models\Warehouse();
                 <div class="panel-body">
                     <div class="list-group mb-0" id="taskStatusList">
 <?php
-    var_dump($data['tasks']);
     if($data['tasks']){
         foreach($data['tasks'] as $row){
             if((strcmp($row->name, "setupNewCruise") != 0) && (strcmp($row->name, "finalizeCurrentCruise") != 0) && (strcmp($row->name, "setupNewLowering") != 0) && (strcmp($row->name, "finalizeCurrentLowering") != 0)) {
