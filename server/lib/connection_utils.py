@@ -29,6 +29,8 @@ def get_transfer_type(transfer_type):
     Return a human-readable transfer type
     """
 
+    transfer_type = str(transfer_type)
+
     if transfer_type == "1": # Local directory
         return 'local'
 
