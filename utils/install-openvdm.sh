@@ -134,6 +134,7 @@ function detect_os {
         MYSQL_SERVICE=$([ "$OS_ID" = "ubuntu" ] && echo "mysql" || echo "mariadb")
         GEARMAN_SERVICE="gearman-job-server"
         SAMBA_SERVICES="smbd nmbd"
+        RSYNC_SERVICE="rsync"
         SUDO_GROUP="sudo"
         HAS_SELINUX=false
     else
@@ -148,6 +149,7 @@ function detect_os {
         MYSQL_SERVICE="mysqld"
         GEARMAN_SERVICE="gearmand"
         SAMBA_SERVICES="smb nmb"
+        RSYNC_SERVICE="rsyncd"
         SUDO_GROUP="wheel"
         HAS_SELINUX=true
     fi
@@ -177,6 +179,11 @@ function set_default_variables {
 
     DEFAULT_INSTALL_PUBLICDATA=yes
     DEFAULT_INSTALL_VISITORINFORMATION=no
+
+    DEFAULT_INSTALL_SAMPLEDATA=no
+    DEFAULT_SAMPLEDATA_ROOT=/data/sample_data
+    DEFAULT_SAMPLEDATA_REPO=https://github.com/oceandatatools/openvdm_sample_data
+    DEFAULT_SAMPLEDATA_BRANCH=master
 
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
@@ -213,6 +220,11 @@ DEFAULT_MAPPROXY_CACHE=$MAPPROXY_CACHE
 
 DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
 DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
+
+DEFAULT_INSTALL_SAMPLEDATA=$INSTALL_SAMPLEDATA
+DEFAULT_SAMPLEDATA_ROOT=$SAMPLEDATA_ROOT
+DEFAULT_SAMPLEDATA_REPO=$SAMPLEDATA_REPO
+DEFAULT_SAMPLEDATA_BRANCH=$SAMPLEDATA_BRANCH
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
@@ -1441,6 +1453,232 @@ EOF
 
 ###########################################################################
 ###########################################################################
+# Install sample data from the openvdm_sample_data repository
+function install_sample_data {
+    # Expect the following shell variables to be appropriately set:
+    # INSTALL_ROOT          - root directory where openvdm is installed
+    # OPENVDM_USER          - valid userid
+    # OPENVDM_DATABASE_PASSWORD - OpenVDM DB/SMB password (reused for sample SMB shares)
+    # NEW_ROOT_DATABASE_PASSWORD - MySQL root password
+    # SAMPLEDATA_ROOT       - where sample data files will be extracted
+    # SAMPLEDATA_REPO       - git repository URL for openvdm_sample_data
+    # SAMPLEDATA_BRANCH     - branch to clone/checkout
+
+    local startingDir="${PWD}"
+    local SAMPLEDATA_INSTALL_DIR="${INSTALL_ROOT}/openvdm_sample_data"
+
+    echo "Installing OpenVDM Sample Data"
+
+    # Clone or update the openvdm_sample_data repository
+    if [ ! -d "${SAMPLEDATA_INSTALL_DIR}" ]; then
+        echo "Cloning OpenVDM Sample Data repository"
+        cd "${INSTALL_ROOT}"
+        git clone -q -b "${SAMPLEDATA_BRANCH}" "${SAMPLEDATA_REPO}" ./openvdm_sample_data
+        chown -R "${OPENVDM_USER}:${OPENVDM_USER}" ./openvdm_sample_data
+    else
+        cd "${SAMPLEDATA_INSTALL_DIR}"
+        if [ -e .git ]; then
+            echo "Updating existing OpenVDM Sample Data repository"
+            sudo -u "${OPENVDM_USER}" git pull
+            sudo -u "${OPENVDM_USER}" git checkout "${SAMPLEDATA_BRANCH}"
+            sudo -u "${OPENVDM_USER}" git pull
+        else
+            echo "Reinstalling OpenVDM Sample Data from repository"
+            cd "${INSTALL_ROOT}"
+            rm -rf openvdm_sample_data
+            git clone -q -b "${SAMPLEDATA_BRANCH}" "${SAMPLEDATA_REPO}" ./openvdm_sample_data
+            chown -R "${OPENVDM_USER}:${OPENVDM_USER}" ./openvdm_sample_data
+        fi
+    fi
+
+    # Extract sample data files
+    echo "Extracting sample data to ${SAMPLEDATA_ROOT}"
+    mkdir -p "${SAMPLEDATA_ROOT}"
+    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}"
+
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssdw"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
+
+    if [ "$HAS_SELINUX" = true ]; then
+        chcon -R -t samba_share_t "${SAMPLEDATA_ROOT}" 2>/dev/null || true
+    fi
+
+    # Build customized SQL: substitute default paths/user/password with local values.
+    # Strip DROP TABLE and CREATE TABLE blocks from the sample data SQL so that the
+    # table schema installed by openvdm_db.sql is preserved; use TRUNCATE instead to
+    # clear existing rows before inserting sample data.
+    echo "Importing sample data database configuration"
+    sed -e "s|/data/sample_data|${SAMPLEDATA_ROOT}|g" \
+        "${SAMPLEDATA_INSTALL_DIR}/openvdm_sample_data.sql" | \
+    sed -e "s/survey/${OPENVDM_USER}/g" | \
+    sed -e "s/sample_smb_passwd/${OPENVDM_DATABASE_PASSWORD}/g" | \
+    sed -e '/^DROP TABLE/d' \
+        -e '/^CREATE TABLE/,/^) ENGINE=/d' \
+        -e '/^\/\*!40101 SET @saved_cs_client/d' \
+        -e '/^\/\*!5[0-9][0-9][0-9][0-9] SET character_set_client/d' \
+        -e '/^\/\*!40101 SET character_set_client = @saved_cs_client/d' | \
+    sed -e 's/^LOCK TABLES `\(.*\)` WRITE;/TRUNCATE TABLE `\1`;\nLOCK TABLES `\1` WRITE;/' \
+    > /tmp/openvdm_sample_data_custom.sql
+
+    mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" 2>/dev/null <<EOF
+USE openvdm;
+source /tmp/openvdm_sample_data_custom.sql;
+flush privileges;
+\q
+EOF
+    rm -f /tmp/openvdm_sample_data_custom.sql
+
+    # Enable sample data plugins (copy .dist files only if active copy does not exist)
+    echo "Enabling sample data plugins"
+    local PLUGIN_DIR="${INSTALL_ROOT}/openvdm/server/plugins"
+    for dist_file in \
+        em302_plugin.py \
+        openrvdas_plugin.py \
+        rov_openrvdas_plugin.py; do
+        if [ -e "${PLUGIN_DIR}/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/${dist_file}" ]; then
+            cp "${PLUGIN_DIR}/${dist_file}.dist" "${PLUGIN_DIR}/${dist_file}"
+        fi
+    done
+    for dist_file in \
+        comp_pres_parser.py \
+        ctd_parser.py \
+        geotiff_parser.py \
+        gga_parser.py \
+        met_parser.py \
+        o2_parser.py \
+        paro_parser.py \
+        sprint_parser.py \
+        svp_parser.py \
+        twind_parser.py; do
+        if [ -e "${PLUGIN_DIR}/parsers/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/parsers/${dist_file}" ]; then
+            cp "${PLUGIN_DIR}/parsers/${dist_file}.dist" "${PLUGIN_DIR}/parsers/${dist_file}"
+        fi
+    done
+
+    # Add Samba shares for sample data
+    echo "Configuring Samba shares for sample data"
+    sed -i '/### Added by openvdm_sample_data install script ###/,/### Added by openvdm_sample_data install script ###/d' \
+        /etc/samba/openvdm.conf 2>/dev/null || true
+
+    cat >> /etc/samba/openvdm.conf <<EOF
+
+### Added by openvdm_sample_data install script ###
+[SampleAuthSource]
+  comment=Sample Data, read-only authenticated access
+  path=${SAMPLEDATA_ROOT}/auth_source
+  browsable = yes
+  public = yes
+  hide unreadable = yes
+  guest ok = no
+  writable = no
+
+[SampleAnonSource]
+  comment=Sample Data, read-only guest access
+  path=${SAMPLEDATA_ROOT}/anon_source
+  browsable = yes
+  public = yes
+  hide unreadable = yes
+  guest ok = yes
+  writable = no
+
+[SampleAuthDestination]
+  comment=Sample Destination, authenticated write access
+  path=${SAMPLEDATA_ROOT}/auth_destination
+  browsable = yes
+  public = yes
+  hide unreadable = yes
+  guest ok = no
+  writable = yes
+  write list = ${OPENVDM_USER}
+  create mask = 0644
+  directory mask = 0755
+  veto files = /._*/.DS_Store/.Trashes*/
+  delete veto files = yes
+
+[SampleAnonDestination]
+  comment=Sample Destination, guest write access
+  path=${SAMPLEDATA_ROOT}/anon_destination
+  browseable = yes
+  public = yes
+  guest ok = yes
+  writable = yes
+  create mask = 0000
+  directory mask = 0000
+  veto files = /._*/.DS_Store/.Trashes*/
+  delete veto files = yes
+  force create mode = 666
+  force directory mode = 777
+### Added by openvdm_sample_data install script ###
+EOF
+
+    for svc in $SAMBA_SERVICES; do
+        systemctl restart "${svc}"
+    done
+
+    # Configure rsync daemon for sample data
+    echo "Configuring rsync daemon for sample data"
+    sed -i '/### Added by openvdm_sample_data install script ###/,/### Added by openvdm_sample_data install script ###/d' \
+        /etc/rsyncd.conf 2>/dev/null || true
+    sed -i '/### Added by openvdm_sample_data install script ###/,/### Added by openvdm_sample_data install script ###/d' \
+        /etc/rsyncd.passwd 2>/dev/null || true
+
+    cat >> /etc/rsyncd.conf <<EOF
+
+### Added by openvdm_sample_data install script ###
+lock file = /var/run/rsync.lock
+log file = /var/log/rsyncd.log
+pid file = /var/run/rsyncd.pid
+
+[sample_data]
+    path = ${SAMPLEDATA_ROOT}/rsync_source
+    uid = ${OPENVDM_USER}
+    gid = ${OPENVDM_USER}
+    read only = yes
+    list = yes
+    auth users = ${OPENVDM_USER}
+    secrets file = /etc/rsyncd.passwd
+    hosts allow = 127.0.0.1/255.255.255.0, localhost
+
+[sample_dest]
+    path = ${SAMPLEDATA_ROOT}/rsync_destination
+    uid = ${OPENVDM_USER}
+    gid = ${OPENVDM_USER}
+    read only = no
+    list = yes
+    auth users = ${OPENVDM_USER}
+    secrets file = /etc/rsyncd.passwd
+    hosts allow = 127.0.0.1/255.255.255.0, localhost
+### Added by openvdm_sample_data install script ###
+EOF
+
+    printf '### Added by openvdm_sample_data install script ###\n%s:b4dPassword!\n### Added by openvdm_sample_data install script ###\n' \
+        "${OPENVDM_USER}" >> /etc/rsyncd.passwd
+    chmod 600 /etc/rsyncd.passwd
+
+    systemctl enable "${RSYNC_SERVICE}"
+    systemctl restart "${RSYNC_SERVICE}"
+
+    echo "Sample data installation complete"
+    echo "NOTE: The following tasks should be run from the OpenVDM Config page:"
+    echo "  - Rebuild Cruise Directory"
+    echo "  - Re-export the OpenVDM Configuration"
+    echo "  - Rebuild Data Dashboard"
+    echo "  - Rebuild MD5 Summary"
+
+    cd "${startingDir}"
+}
+
+###########################################################################
+###########################################################################
 # Start of actual script
 ###########################################################################
 
@@ -1620,6 +1858,34 @@ INSTALL_VISITORINFORMATION=$YES_NO_RESULT
 echo
 
 #########################################################################
+# Install sample data?
+echo "#####################################################################"
+echo "Optionally install sample data from the openvdm_sample_data repository."
+echo "This configures demonstration collection systems, cruise data transfers,"
+echo "and ship-to-shore transfers using local sample instrument data."
+echo "WARNING: This will replace any existing transfer configuration in the"
+echo "OpenVDM database."
+echo
+yes_no "Install sample data? " $DEFAULT_INSTALL_SAMPLEDATA
+INSTALL_SAMPLEDATA=$YES_NO_RESULT
+
+if [ "$INSTALL_SAMPLEDATA" = "yes" ]; then
+    read -p "Root directory for sample data? ($DEFAULT_SAMPLEDATA_ROOT) " SAMPLEDATA_ROOT
+    SAMPLEDATA_ROOT=${SAMPLEDATA_ROOT:-$DEFAULT_SAMPLEDATA_ROOT}
+
+    read -p "Sample data repository? ($DEFAULT_SAMPLEDATA_REPO) " SAMPLEDATA_REPO
+    SAMPLEDATA_REPO=${SAMPLEDATA_REPO:-$DEFAULT_SAMPLEDATA_REPO}
+
+    read -p "Sample data branch? ($DEFAULT_SAMPLEDATA_BRANCH) " SAMPLEDATA_BRANCH
+    SAMPLEDATA_BRANCH=${SAMPLEDATA_BRANCH:-$DEFAULT_SAMPLEDATA_BRANCH}
+else
+    SAMPLEDATA_ROOT=${DEFAULT_SAMPLEDATA_ROOT}
+    SAMPLEDATA_REPO=${DEFAULT_SAMPLEDATA_REPO}
+    SAMPLEDATA_BRANCH=${DEFAULT_SAMPLEDATA_BRANCH}
+fi
+echo
+
+#########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
 
@@ -1689,6 +1955,13 @@ echo "#####################################################################"
 echo "Configuring Supervisor"
 configure_supervisor
 echo
+
+if [ "$INSTALL_SAMPLEDATA" = "yes" ]; then
+    echo "#####################################################################"
+    echo "Installing Sample Data"
+    install_sample_data
+    echo
+fi
 
 echo "#####################################################################"
 echo "OpenVDM Installation: Complete"
