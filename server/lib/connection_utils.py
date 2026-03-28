@@ -227,6 +227,7 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
     subprocess
     """
 
+    passwd = passwd or ''
     if (len(passwd) == 0) and use_pubkey is False:
         raise ValueError("Must specify either a passwd or use_pubkey")
 
@@ -244,13 +245,14 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
 
     cmd_str = ' '.join(cmd)
-    if len(passwd) > 0:
+    if passwd and len(passwd) > 0:
         cmd_str = cmd_str.replace(f'{passwd}', '****')
 
     logging.debug("test_ssh_connection cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH connection test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH connection test failed: %s", str(exc))
@@ -263,16 +265,18 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
     Verify the presence of a directort on the ssh server
     """
 
+    passwd = passwd or ''
     cmd = build_ssh_command(None, user, server, f'ls "{remote_dir}"', passwd, use_pubkey)
 
     cmd_str = ' '.join(cmd)
-    if len(passwd) > 0:
+    if passwd and len(passwd) > 0:
         cmd_str = cmd_str.replace(f'{passwd}', '****')
 
     logging.debug("test_ssh_destination cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH destination test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH destination test failed: %s", str(exc))
@@ -285,16 +289,18 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     Verify write access to the directory on the remote ssh server.
     """
 
+    passwd = passwd or ''
     cmd = build_ssh_command(None, user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
     cmd_str = ' '.join(cmd)
-    if len(passwd) > 0:
+    if passwd and len(passwd) > 0:
         cmd_str = cmd_str.replace(f'{passwd}', '****')
 
     logging.debug("test_ssh_write_access cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH write test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH write test failed: %s", str(exc))
@@ -303,13 +309,14 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
     cmd_str = ' '.join(cmd)
-    if len(passwd) > 0:
+    if passwd and len(passwd) > 0:
         cmd_str = cmd_str.replace(f'{passwd}', '****')
 
     logging.debug("test_ssh_write_access cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH write test cleanup failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH write test failed: %s", str(exc))
