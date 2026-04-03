@@ -2,7 +2,7 @@ $(function () {
     'use strict';
 
     var MAPPROXY_DIR = '/mapproxy';
-    var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
+    var TITILER_URL = '/titiler'
 
     var greenIcon = null;
     var redIcon = null;
@@ -179,7 +179,6 @@ $(function () {
     }
 
     function addStartEndPositionsToMap(mapObject, dataType) {
-        console.log(mapObject);
         var loweringID = $('#lowering_sel').val();
         var getDashboardDataFilesURL = siteRoot + 'api/dashboardData/getDataObjectsByType/' + cruiseID + '/' + dataType;
         $.getJSON(getDashboardDataFilesURL, function (data, status) {
@@ -256,7 +255,6 @@ $(function () {
     }
 
     function addGeoJSONToMap(mapObject, dataObjectJsonName) {
-        console.log(mapObject, dataObjectJsonName);
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -540,7 +538,6 @@ $(function () {
 
     //Check for updates
     $.each(mapObjects, function(i) {
-        console.log(mapObjects[i]);
         $( '#' + mapObjects[i]['objectListID']).find(':checkbox:checked').change(function() {
             if ($(this).is(":checked")) {
                 if ($(this).hasClass("se-checkbox")) {

@@ -35,29 +35,26 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMParser
 
 TIMEOUT = 2
-DEFAULT_TITILER_URL = 'http://localhost:8000'
+DEFAULT_TITILER_URL = 'http://localhost/titiler'
+DEFAULT_CRUISEDATA_URL = 'http://localhost/CruiseData'
+DEFAULT_CRUISEPATH = '/data/CruiseData'
 
 class GeoTIFFParser(OpenVDMParser):
     """
     Custom OpenVDM file parser
     """
 
-    def __init__(self, use_openvdm_api=False, cruisedata_url=None, titiler_url=None):
+    def __init__(self, use_openvdm_api=False, cruisedata_path=None, cruisedata_url=None, titiler_url=None):
         super().__init__(use_openvdm_api=use_openvdm_api)
 
         self.titiler_url = titiler_url or DEFAULT_TITILER_URL
 
-        if cruisedata_url is None and not use_openvdm_api:
-            raise ValueError('Unable to determine base URL of datafile')
-
-        if cruisedata_url:
-            self.cruisedata_url = cruisedata_url
-
+        if use_openvdm_api:
+            self.cruisedata_url = cruisedata_url or self.openvdm.get_cruisedata_url()
+            self.cruisedata_path = cruisedata_path or self.openvdm.get_cruisedata_path()
         else:
-            self.cruisedata_url = self.openvdm.get_cruisedata_url()
-
-        self.cruisedata_path = self.openvdm.get_cruisedata_path()
-
+            self.cruisedata_url = cruisedata_url or DEFAULT_CRUISEDATA_URL
+            self.cruisedata_path = cruisedata_path or DEFAULT_CRUISEPATH
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """
@@ -72,11 +69,12 @@ class GeoTIFFParser(OpenVDMParser):
             'url': f"{self.cruisedata_url}{filepath.replace(self.cruisedata_path, '')}"
         }
 
-        url = f'{self.titiler_url}/cog/bounds'
+        url = f'{self.titiler_url}/cog/info'
 
         try:
             req = requests.get(url, params=params, timeout=TIMEOUT)
-            bounds = req.json()['bounds']
+            res = req.json()
+            bounds = res.get('bounds')
             bounds = [round(bound, 6) for bound in bounds]
         except Exception as err:
             logging.error("Unable to retrieve metadata on file from TiTiler API")
@@ -105,8 +103,10 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', dest='verbosity',
                         default=0, action='count',
                         help='Increase output verbosity')
-    parser.add_argument('--outputDir', metavar='outputDir', default=None,
-                        help='where to save the output tiles')
+    parser.add_argument('--cruisedataPath', metavar='cruisedataPath', default=None,
+                        help='Path to CruiseData')
+    parser.add_argument('--cruisedataURL', metavar='cruisedataURL', default=None,
+                        help='URL to CruiseData')
     parser.add_argument('dataFile', metavar='dataFile',
                         help='the raw data file to process')
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = GeoTIFFParser(output_dir=parsed_args.outputDir)
+    ovdm_parser = GeoTIFFParser(cruisedata_path=parsed_args.cruisedataPath, cruisedata_url=parsed_args.cruisedataURL)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

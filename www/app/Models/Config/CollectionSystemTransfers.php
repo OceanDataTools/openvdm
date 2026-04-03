@@ -95,7 +95,7 @@ class CollectionSystemTransfers extends Model {
     public function setIdleCollectionSystemTransfer($id){
         $data = array();
         $row = $this->getCollectionSystemTransfer($id);
-        if ($row[0]->enable === 1) {
+        if ((int)$row[0]->enable === 1) {
             $data = array('status' => '2', 'pid' => '0');
         } else {
             $data = array('status' => '4', 'pid' => '0');
@@ -107,7 +107,7 @@ class CollectionSystemTransfers extends Model {
     public function setOffCollectionSystemTransfer($id){
         $data = array();
         $row = $this->getCollectionSystemTransfer($id);
-        if ($row[0]->status === 2) {
+        if ((int)$row[0]->status === 2) {
             $data['status'] = '4';
         }
         $where = array('collectionSystemTransferID' => $id);
@@ -117,7 +117,7 @@ class CollectionSystemTransfers extends Model {
     public function enableCollectionSystemTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCollectionSystemTransfer($id);
-        if ($row[0]->status !== 1) {
+        if ((int)$row[0]->status !== 1) {
             $data['status'] = '2';
         }
         $where = array('collectionSystemTransferID' => $id);

@@ -336,7 +336,6 @@ $(function () {
                     }
 
                     mapObject['mapBounds'][tmsObjectJsonName] = L.latLngBounds(southwest, northeast);
-                    //console.log(mapObject['mapBounds'][tmsObjectJsonName]);
 
                     // Add the layer to the map
                     mapObject['tmsLayers'][tmsObjectJsonName].addTo(mapObject['map']);

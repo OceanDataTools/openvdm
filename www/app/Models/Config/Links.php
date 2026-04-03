@@ -57,11 +57,11 @@ class Links extends Model {
 
         $_warehouseModel = new \Models\Warehouse();
         $cruiseID = $_warehouseModel->getCruiseID();
-	$shipboardDataWarehouseIP = $_warehouseModel->getShipboardDataWarehouseConfig()['shipboardDataWarehouseIP'];
+        $hostIP = $_SERVER['HTTP_HOST'];
 
         foreach($links as $row) {
             $row->url = str_replace("{cruiseID}", $cruiseID, $row->url);
-            $row->url = str_replace("{hostIP}", $shipboardDataWarehouseIP, $row->url);
+            $row->url = str_replace("{hostIP}", $hostIP, $row->url);
         }
     }
 

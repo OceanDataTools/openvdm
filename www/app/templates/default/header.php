@@ -345,7 +345,7 @@ use Helpers\Hooks;
     $systemStatusClass = 'panel-red';
 
     if($data['systemStatus'] === 'On') {
-        if($cruiseDates['cruiseStartDate'] > $nowDateStr || ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr)) {
+        if(isset($cruiseDates['cruiseStartDate']) && ($cruiseDates['cruiseStartDate'] > $nowDateStr || ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr))) {
             $systemStatusClass = 'panel-yellow';
         } else {
             $systemStatusClass = 'panel-green';
