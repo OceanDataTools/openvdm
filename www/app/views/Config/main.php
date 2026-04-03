@@ -100,7 +100,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>
@@ -167,7 +167,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>

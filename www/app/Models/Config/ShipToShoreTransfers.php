@@ -37,7 +37,7 @@ class ShipToShoreTransfers extends Model {
 
     public function deleteShipToShoreTransfer($where){
         $result = $this->db->select("SELECT * FROM ".PREFIX."ShipToShoreTransfers WHERE shipToShoreTransferID = :id",array(':id' => $where['shipToShoreTransferID']));
-        if(isset($result[0]) && strcmp($result[0]->required, '0') === 0 ){
+        if(isset($result[0]) && $result[0]->required === 0) {
             $this->db->delete(PREFIX."ShipToShoreTransfers", $where);
         }
     }

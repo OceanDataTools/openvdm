@@ -6,7 +6,7 @@ use Helpers\Session;
 $testFailSSDW = '';
 foreach($data['requiredCruiseDataTransfers'] as $row){
     if (strcmp($row->name, "SSDW") === 0) {
-        if (strcmp($row->status, "3") === 0) {
+        if ($row->status === 3) {
             $testFailSSDW = '<i class="fa fa-warning text-danger"></i>';
         }
         break;
@@ -14,7 +14,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 }
 
 $testFailSBDW = '';
-if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
+if ($data['shipboardDataWarehouseStatus'] === '3') {
     $testFailSBDW = '<i class="fa fa-warning text-danger"></i>';
 }
 
@@ -52,7 +52,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Ship-to-Shore Transfer Bandwidth Limit: <strong><?php echo (strcmp($data['shipToShoreBWLimit'], '0') === 0 ? 'Unlimited' : $data['shipToShoreBWLimit'] . ' Kbps'); ?></strong></td>
+                        <td>Ship-to-Shore Transfer Bandwidth Limit: <strong><?php echo ($data['shipToShoreBWLimit'] === '0' ? 'Unlimited' : $data['shipToShoreBWLimit'] . ' Kbps'); ?></strong></td>
                         <td><a href='<?php echo DIR; ?>config/system/editShipToShoreBWLimit'>Edit</a></td>
                         <td style='text-align:center'>
 <?php
@@ -69,7 +69,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                         </td>
                     </tr>
                     <tr>
-                        <td>Data Filesize Limit for MD5 Checksum: <strong><?php echo (strcmp($data['md5FilesizeLimit'], '0') === 0 ? 'Unlimited' : $data['md5FilesizeLimit'] . ' MB'); ?></strong></td>
+                        <td>Data Filesize Limit for MD5 Checksum: <strong><?php echo ($data['md5FilesizeLimit'] === '0' ? 'Unlimited' : $data['md5FilesizeLimit'] . ' MB'); ?></strong></td>
                         <td><a href='<?php echo DIR; ?>config/system/editMD5FilesizeLimit'>Edit</a></td>
                         <td style='text-align:center'>
 <?php
@@ -110,7 +110,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->private == "0"){
+            if($row->private === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/privateLink/<?php echo $row->linkID; ?>'>No</a>
 <?php
@@ -123,7 +123,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->enable == "0"){
+            if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableLink/<?php echo $row->linkID; ?>'>Off</a>
 <?php
@@ -161,7 +161,7 @@ if (strcmp($data['shipboardDataWarehouseStatus'], "3") === 0) {
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->enable == "0"){
+            if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/enableShipToShoreTransfers/<?php echo $row->shipToShoreTransferID; ?>'>Off</a>
 <?php
