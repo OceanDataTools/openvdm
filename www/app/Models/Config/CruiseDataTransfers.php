@@ -49,7 +49,7 @@ class CruiseDataTransfers extends Model {
 
     public function deleteCruiseDataTransfer($where){
         $result = $this->db->select("SELECT * FROM ".PREFIX."CruiseDataTransfers WHERE cruiseDataTransferID = :id",array(':id' => $where['cruiseDataTransferID']));
-        if(isset($result[0]) && $result[0]->required === 0) {
+        if(isset($result[0]) && (int)$result[0]->required === 0) {
             $this->db->delete(PREFIX."CruiseDataTransfers", $where);
         }
     }
@@ -122,7 +122,7 @@ class CruiseDataTransfers extends Model {
         $data = array();
         // $data = array('status' => '2', 'pid' => '0');
         $row = $this->getCruiseDataTransfer($id);
-        if ($row[0]->enable === 1) {
+        if ((int)$row[0]->enable === 1) {
             $data = array('status' => '2', 'pid' => '0');
         } else {
             $data = array('status' => '4', 'pid' => '0');
@@ -134,7 +134,7 @@ class CruiseDataTransfers extends Model {
     public function setOffCruiseDataTransfer($id){
         $data = array();
         $row = $this->getCruiseDataTransfer($id);
-        if ($row[0]->status === 2) {
+        if ((int)$row[0]->status === 2) {
             $data['status'] = '4';
         }
         $where = array('cruiseDataTransferID' => $id);
@@ -145,7 +145,7 @@ class CruiseDataTransfers extends Model {
     public function enableCruiseDataTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCruiseDataTransfer($id);
-        if ($row[0]->status !== 1) {
+        if ((int)$row[0]->status !== 1) {
             $data['status'] = '2';
         }
         $where = array('cruiseDataTransferID' => $id);

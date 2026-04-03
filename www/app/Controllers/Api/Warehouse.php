@@ -37,10 +37,12 @@ class Warehouse extends Controller {
             $nowDateStr = gmdate('Y/m/d H:i');
             $cruiseDates = $this->_warehouseModel->getCruiseDates();
 
-            if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
-                $response['warning'] = CRUISE_NAME . " has not started";
-            } elseif ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
-                $response['warning'] = CRUISE_NAME . " has Ended";
+            if(isset($cruiseDates['cruiseStartDate'])) {
+                if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
+                    $response['warning'] = CRUISE_NAME . " has not started";
+                } elseif ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
+                    $response['warning'] = CRUISE_NAME . " has Ended";
+                }
             }
 
         } else {

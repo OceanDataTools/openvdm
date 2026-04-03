@@ -66,7 +66,7 @@ class Main extends Controller {
             $cruiseID = null;
             $setLatestLowering = false;
 
-            if ($_POST['cruiseID']) {
+            if (!empty($_POST['cruiseID'])) {
                 $cruiseID = $_POST['cruiseID'];
             } else {
                 $cruiseID = $this->_warehouseModel->getCruiseID();
@@ -89,12 +89,12 @@ class Main extends Controller {
                 $cruiseLocation = $this->_warehouseModel->getCruiseLocation($_POST['cruiseID']);
 
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
-                $cruiseStartDate = $cruiseDates['cruiseStartDate'];
-                $cruiseEndDate = $cruiseDates['cruiseEndDate'];
+                $cruiseStartDate = $cruiseDates['cruiseStartDate'] ?? '';
+                $cruiseEndDate = $cruiseDates['cruiseEndDate'] ?? '';
 
                 $cruisePorts = $this->_warehouseModel->getCruisePorts($_POST['cruiseID']);
-                $cruiseStartPort = $cruisePorts['cruiseStartPort'];
-                $cruiseEndPort = $cruisePorts['cruiseEndPort'];
+                $cruiseStartPort = $cruisePorts['cruiseStartPort'] ?? '';
+                $cruiseEndPort = $cruisePorts['cruiseEndPort'] ?? '';
             }
 
             if($cruiseID == ''){
@@ -143,8 +143,8 @@ class Main extends Controller {
 
                     $loweringDates = $this->_warehouseModel->getLoweringDates();
 
-                    $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringDates['loweringStartDate']));
-                    $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringDates['loweringEndDate']));
+                    $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringDates['loweringStartDate'] ?? ''));
+                    $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringDates['loweringEndDate'] ?? ''));
                 } else {
                     $this->_warehouseModel->setLoweringID(array('value' => ''));
                     $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
@@ -242,8 +242,8 @@ class Main extends Controller {
             if (strcmp($loweringID, $this->_warehouseModel->getLoweringID()) != 0) {
                 $setLatestLowering = true;
                 $loweringDates = $this->_warehouseModel->getLoweringDates($_POST['loweringID']);
-                $loweringStartDate = $loweringDates['loweringStartDate'];
-                $loweringEndDate = $loweringDates['loweringEndDate'];
+                $loweringStartDate = $loweringDates['loweringStartDate'] ?? '';
+                $loweringEndDate = $loweringDates['loweringEndDate'] ?? '';
             }
 
             if($loweringID == ''){

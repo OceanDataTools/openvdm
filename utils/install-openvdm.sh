@@ -180,6 +180,9 @@ function set_default_variables {
     DEFAULT_INSTALL_PUBLICDATA=yes
     DEFAULT_INSTALL_VISITORINFORMATION=no
 
+    DEFAULT_INSTALL_TITILER=no
+    DEFAULT_TITILER_PORT=8000
+
     DEFAULT_INSTALL_SAMPLEDATA=no
     DEFAULT_SAMPLEDATA_ROOT=/data/sample_data
     DEFAULT_SAMPLEDATA_REPO=https://github.com/oceandatatools/openvdm_sample_data
@@ -220,6 +223,9 @@ DEFAULT_MAPPROXY_CACHE=$MAPPROXY_CACHE
 
 DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
 DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
+
+DEFAULT_INSTALL_TITILER=$INSTALL_TITILER
+DEFAULT_TITILER_PORT=$TITILER_PORT
 
 DEFAULT_INSTALL_SAMPLEDATA=$INSTALL_SAMPLEDATA
 DEFAULT_SAMPLEDATA_ROOT=$SAMPLEDATA_ROOT
@@ -985,6 +991,15 @@ EOF
 EOF
     fi
 
+    if [ "$INSTALL_TITILER" = "yes" ]; then
+        cat >> "${VHOST_FILE}" <<EOF
+
+    ProxyPreserveHost On
+    ProxyPass /titiler/ http://127.0.0.1:${TITILER_PORT}/
+    ProxyPassReverse /titiler/ http://127.0.0.1:${TITILER_PORT}/
+EOF
+    fi
+
     cat >> "${VHOST_FILE}" <<EOF
 
 </VirtualHost>
@@ -993,6 +1008,11 @@ EOF
     if [ "$OS_FAMILY" = "debian" ]; then
         echo "Enabling rewrite Module"
         a2enmod -q rewrite
+
+        if [ "$INSTALL_TITILER" = "yes" ]; then
+            echo "Enabling proxy modules for TiTiler"
+            a2enmod -q proxy proxy_http
+        fi
 
         echo "Disabling default vhost"
         a2dissite -q 000-default
@@ -1163,6 +1183,73 @@ EOF
 
 ###########################################################################
 ###########################################################################
+# Install and configure TiTiler
+function configure_titiler {
+
+    if [ "$INSTALL_TITILER" != "yes" ]; then
+        return
+    fi
+
+    echo "Installing TiTiler in /opt/titiler"
+
+    ${PYTHON_CMD} -m venv /opt/titiler
+    source /opt/titiler/bin/activate
+    pip install --upgrade pip --quiet
+    pip install "titiler.application" "uvicorn[standard]" --quiet
+    deactivate
+
+    # Middleware wrapper that sets root_path and app_root_path on every
+    # request so all URL generation inside TiTiler (url_for, base_url,
+    # OpenAPI servers) includes the /titiler prefix. Apache strips the
+    # /titiler prefix before forwarding, so TiTiler sees plain paths.
+    cat > /opt/titiler/wrapper.py << 'PYEOF'
+from titiler.application.main import app as titiler_app
+
+
+class RootPathMiddleware:
+    def __init__(self, app, root_path):
+        self.app = app
+        self.root_path = root_path
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            scope["root_path"] = self.root_path
+            scope["app_root_path"] = self.root_path
+        await self.app(scope, receive, send)
+
+
+app = RootPathMiddleware(titiler_app, "/titiler")
+PYEOF
+
+    mkdir -p /var/log/titiler
+
+    cat > "${SUPERVISOR_CONF_D}/titiler.${SUPERVISOR_PROG_EXT}" << EOF
+[program:titiler]
+command=/opt/titiler/bin/uvicorn wrapper:app --host 127.0.0.1 --port ${TITILER_PORT}
+directory=/opt/titiler
+redirect_stderr=true
+stdout_logfile=/var/log/titiler/titiler.log
+user=${OPENVDM_USER}
+autostart=true
+autorestart=true
+stopsignal=INT
+EOF
+
+    if [ "$OS_FAMILY" = "rhel" ]; then
+        echo "Setting SELinux exception for TiTiler"
+        chcon -R -t httpd_sys_content_t /opt/titiler 2>/dev/null || true
+        setsebool -P httpd_can_network_connect=1
+    fi
+
+    supervisorctl reread
+    supervisorctl update
+
+    echo "TiTiler installed and running on port ${TITILER_PORT}"
+    echo "Accessible via Apache at http://${OPENVDM_SITEROOT}/titiler/"
+}
+
+###########################################################################
+###########################################################################
 # Install and configure database
 function configure_mysql {
     # Expect the following shell variables to be appropriately set:
@@ -1254,15 +1341,7 @@ function configure_directories {
     if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData
-        mkdir -p ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/TransferLogs
-
-        echo "[]" > ${DATA_ROOT}/CruiseData/Test_Cruise/OpenVDM/DashboardData/manifest.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/ovdmConfig.json
-        echo "{}" > ${DATA_ROOT}/CruiseData/Test_Cruise/Vehicle/Test_Lowering/loweringConfig.json
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.md5
-        touch ${DATA_ROOT}/CruiseData/Test_Cruise/MD5_Summary.txt
+        mkdir -p ${DATA_ROOT}/CruiseData
 
         if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
             mkdir -p ${DATA_ROOT}/PublicData
@@ -1494,7 +1573,7 @@ function install_sample_data {
     # Extract sample data files
     echo "Extracting sample data to ${SAMPLEDATA_ROOT}"
     mkdir -p "${SAMPLEDATA_ROOT}"
-    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}"
+    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}" --warning=no-unknown-keyword
 
     chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
     chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
@@ -1549,20 +1628,17 @@ EOF
         fi
     done
     for dist_file in \
-        comp_pres_parser.py \
-        ctd_parser.py \
-        geotiff_parser.py \
+        geotiff_titiler_parser.py \
         gga_parser.py \
         met_parser.py \
-        o2_parser.py \
-        paro_parser.py \
-        sprint_parser.py \
-        svp_parser.py \
+        ssv_parser.py \
+        tsg45_parser.py \
         twind_parser.py; do
         if [ -e "${PLUGIN_DIR}/parsers/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/parsers/${dist_file}" ]; then
             cp "${PLUGIN_DIR}/parsers/${dist_file}.dist" "${PLUGIN_DIR}/parsers/${dist_file}"
         fi
     done
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${PLUGIN_DIR}"
 
     # Add Samba shares for sample data
     echo "Configuring Samba shares for sample data"
@@ -1668,11 +1744,6 @@ EOF
     systemctl restart "${RSYNC_SERVICE}"
 
     echo "Sample data installation complete"
-    echo "NOTE: The following tasks should be run from the OpenVDM Config page:"
-    echo "  - Rebuild Cruise Directory"
-    echo "  - Re-export the OpenVDM Configuration"
-    echo "  - Rebuild Data Dashboard"
-    echo "  - Rebuild MD5 Summary"
 
     cd "${startingDir}"
 }
@@ -1836,6 +1907,24 @@ fi
 echo
 
 #########################################################################
+# Install TiTiler?
+echo "#####################################################################"
+echo "Optionally install TiTiler, a dynamic tile server for Cloud Optimized"
+echo "GeoTIFFs (COGs). TiTiler is required for the geotiff_titiler_parser"
+echo "plugin used by the sample data configuration."
+echo
+yes_no "Install TiTiler? " $DEFAULT_INSTALL_TITILER
+INSTALL_TITILER=$YES_NO_RESULT
+
+if [ "$INSTALL_TITILER" = "yes" ]; then
+    read -p "Port for TiTiler service? ($DEFAULT_TITILER_PORT) " TITILER_PORT
+    TITILER_PORT=${TITILER_PORT:-$DEFAULT_TITILER_PORT}
+else
+    TITILER_PORT=${DEFAULT_TITILER_PORT}
+fi
+echo
+
+#########################################################################
 # Install PublicData?
 echo "#####################################################################"
 echo "Setup a PublicData SMB Share for scientists and crew to share files,"
@@ -1882,6 +1971,11 @@ else
     SAMPLEDATA_ROOT=${DEFAULT_SAMPLEDATA_ROOT}
     SAMPLEDATA_REPO=${DEFAULT_SAMPLEDATA_REPO}
     SAMPLEDATA_BRANCH=${DEFAULT_SAMPLEDATA_BRANCH}
+fi
+
+if [ "$INSTALL_SAMPLEDATA" = "yes" ] && [ "$INSTALL_TITILER" != "yes" ]; then
+    echo "Sample data requires TiTiler — enabling TiTiler install."
+    INSTALL_TITILER=yes
 fi
 echo
 
@@ -1956,12 +2050,90 @@ echo "Configuring Supervisor"
 configure_supervisor
 echo
 
+echo "#####################################################################"
+echo "Installing/Configuring TiTiler"
+configure_titiler
+echo
+
 if [ "$INSTALL_SAMPLEDATA" = "yes" ]; then
     echo "#####################################################################"
     echo "Installing Sample Data"
     install_sample_data
     echo
 fi
+
+echo "#####################################################################"
+echo "Running post-install OpenVDM tasks"
+sleep 3
+
+OVDM_CRUISE_ID=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='cruiseID';" 2>/dev/null)
+OVDM_CRUISE_START_DATE=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='cruiseStartDate';" 2>/dev/null)
+OVDM_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=0;" \
+    2>/dev/null | tr '\n' ',')
+OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+
+export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
+"${INSTALL_ROOT}/openvdm/venv/bin/python3" - <<'PYEOF'
+import os, sys, json
+
+try:
+    import python3_gearman
+except ImportError as e:
+    print(f'Warning: python3_gearman not available: {e}', file=sys.stderr)
+    sys.exit(0)
+
+cruise_id = os.environ.get('OVDM_CRUISE_ID', '')
+cruise_start_date = os.environ.get('OVDM_CRUISE_START_DATE', '')
+cst_ids = [x for x in os.environ.get('OVDM_CST_IDS', '').split(',') if x]
+cruise_dir = os.environ.get('OVDM_CRUISE_DIR', '')
+install_sampledata = os.environ.get('INSTALL_SAMPLEDATA', 'no') == 'yes'
+
+gm = python3_gearman.GearmanClient(['localhost:4730'])
+
+if not os.path.exists(cruise_dir):
+    # Fresh install: setupNewCruise creates the directory, MD5 files,
+    # cruise_config.json, and data dashboard manifest in one shot.
+    print('  Setting up new cruise...')
+    try:
+        gm.submit_job('setupNewCruise', '{}', wait_until_complete=True, poll_timeout=120)
+        print('  Setup new cruise: done')
+    except Exception as e:
+        print(f'  Warning: setupNewCruise failed: {e}', file=sys.stderr)
+else:
+    # Re-install: cruise directory already exists; just re-export config
+    # and rebuild the directory structure.
+    for label, task, timeout in [
+        ('Re-export cruise configuration', 'exportOVDMConfig',      30),
+        ('Rebuild cruise directory',        'rebuildCruiseDirectory', 120),
+    ]:
+        print(f'  {label}...')
+        try:
+            gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
+            print(f'  {label}: done')
+        except Exception as e:
+            print(f'  Warning: {label} failed: {e}', file=sys.stderr)
+
+if install_sampledata and cst_ids:
+    print(f'  Running {len(cst_ids)} collection system transfer(s)...')
+    try:
+        jobs = []
+        for cst_id in cst_ids:
+            payload = json.dumps({
+                'cruiseID': cruise_id,
+                'cruiseStartDate': cruise_start_date,
+                'systemStatus': 'On',
+                'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}
+            })
+            jobs.append({'task': 'runCollectionSystemTransfer', 'data': payload})
+        gm.submit_multiple_jobs(jobs, background=False, wait_until_complete=True, poll_timeout=600)
+        print('  Collection system transfers: done')
+    except Exception as e:
+        print(f'  Warning: collection system transfers failed: {e}', file=sys.stderr)
+PYEOF
+echo
 
 echo "#####################################################################"
 echo "OpenVDM Installation: Complete"

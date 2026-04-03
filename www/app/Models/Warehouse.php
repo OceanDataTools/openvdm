@@ -381,67 +381,51 @@ class Warehouse extends Model {
     }
 
     public function getCruises() {
+        $cruises = array();
+        $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
-        if (!isset($this->_cruises) || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
-
-            $this->_cruises = array();
-            $baseDir = $this->getShipboardDataWarehouseBaseDir();
-
-            //Get the list of directories
-            if (is_dir($baseDir)) {
-                $rootList = scandir($baseDir);
-
-                foreach ($rootList as $rootKey => $rootValue) {
-                    if (!in_array($rootValue,array(".",".."))) {
-                        if (is_dir($baseDir . DIRECTORY_SEPARATOR . $rootValue) && is_readable($baseDir . DIRECTORY_SEPARATOR . $rootValue)) {
-
-                            //Check each Directory for the OpenVDM Config file.json
-                            $cruiseList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue);
-                            foreach ($cruiseList as $cruiseKey => $cruiseValue) {
-                                if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
-                                    $ovdmConfigContents = file_get_contents($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
-                                    $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-
-                                    //Get the the directory that holds the DashboardData
-                                    if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)) {
-                                        for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++) {
-                                            if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0) {
-                                                $dataDashboardList = scandir($baseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
-
-                                                foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue) {
-
-                                                    //If a manifest file is found, add CruiseID to output
-                                                    if (in_array($dataDashboardValue,array($this->getDataDashboardManifestFn()))) {
-                                                        $this->_cruises[] = $rootValue;
-                                                        break;
-                                                    }
-                                                }
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
+        if (is_dir($baseDir)) {
+            $rootList = scandir($baseDir);
+            foreach ($rootList as $rootValue) {
+                if (!in_array($rootValue, array(".", ".."))) {
+                    $cruiseDir = $baseDir . DIRECTORY_SEPARATOR . $rootValue;
+                    if (is_dir($cruiseDir) && is_readable($cruiseDir)) {
+                        if (is_file($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn())) {
+                            $cruises[] = $rootValue;
                         }
                     }
                 }
             }
-
-            if(is_array($this->_cruises) && sizeof($this->_cruises) > 0) {
-                rsort($this->_cruises);
-            }
-            return $this->_cruises;
-        } else {
-            return array("Error"=>"Could not find base directory.");
         }
+
+        if (sizeof($cruises) > 0) {
+            rsort($cruises);
+        }
+        return $cruises;
     }
 
     public function getLowerings() {
         if (!isset($this->_lowerings) || (is_array($this->_lowerings) && sizeof($this->_lowerings) == 0)) {
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
             $cruiseDir = $baseDir . DIRECTORY_SEPARATOR . $this->getCruiseID();
-            $loweringDataBaseDir = $cruiseDir . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir();
+
+            // Read loweringConfigPath from cruise_config.json if available
+            $loweringConfigPath = null;
+            $cruiseConfigFile = $cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn();
+            if (is_file($cruiseConfigFile)) {
+                $cruiseConfigJSON = json_decode(file_get_contents($cruiseConfigFile), true);
+                if (isset($cruiseConfigJSON['loweringConfigPath'])) {
+                    $loweringConfigPath = str_replace('/', DIRECTORY_SEPARATOR, $cruiseConfigJSON['loweringConfigPath']);
+                }
+            }
+
+            // Derive scan directory from loweringConfigPath or fall back to Config.php constant
+            if ($loweringConfigPath !== null && strpos($loweringConfigPath, '<loweringID>') !== false) {
+                $parts = explode(DIRECTORY_SEPARATOR . '<loweringID>', $loweringConfigPath);
+                $loweringDataBaseDir = $cruiseDir . DIRECTORY_SEPARATOR . $parts[0];
+            } else {
+                $loweringDataBaseDir = $cruiseDir . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir();
+            }
 
             //Get the list of directories
             if (is_dir($loweringDataBaseDir)) {
@@ -452,17 +436,20 @@ class Warehouse extends Model {
                     {
                         if (is_dir($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue) && is_readable($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue))
                         {
-                            //Check each Directory for ovdmConfig.json
-                            $loweringList = scandir($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue);
-
-                            foreach ($loweringList as $loweringKey => $loweringValue) {
-                                if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
-                                    $loweringConfigContents = file_get_contents($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
-                                    $loweringConfigJSON = json_decode($loweringConfigContents,true);
-
-                                    //Get the the directory that holds the DashboardData
+                            if ($loweringConfigPath !== null) {
+                                // New format: resolve <loweringID> placeholder
+                                $resolvedPath = str_replace('<loweringID>', $rootValue, $loweringConfigPath);
+                                if (is_file($cruiseDir . DIRECTORY_SEPARATOR . $resolvedPath)) {
                                     $this->_lowerings[] = $rootValue;
-                                    break;
+                                }
+                            } else {
+                                // Legacy: scan directory for lowering config file
+                                $loweringList = scandir($loweringDataBaseDir . DIRECTORY_SEPARATOR . $rootValue);
+                                foreach ($loweringList as $loweringKey => $loweringValue) {
+                                    if (in_array($loweringValue, array($this->getLoweringConfigFn()))) {
+                                        $this->_lowerings[] = $rootValue;
+                                        break;
+                                    }
                                 }
                             }
                         }

@@ -39,23 +39,21 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin, NpEncoder
 from server.plugins.parsers.gga_parser   import GGAParser
-# from server.plugins.parsers.vtg_parser   import VTGParser
 # from server.plugins.parsers.hdt_parser   import HDTParser
 from server.plugins.parsers.met_parser   import MetParser
-from server.plugins.parsers.svp_parser   import SVPParser
-from server.plugins.parsers.tsg_parser   import SBE45TSGParser as TSGParser
+from server.plugins.parsers.ssv_parser   import SSVParser
+from server.plugins.parsers.tsg45_parser   import SBE45TSGParser as TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
+# from server.plugins.parsers.vtg_parser   import VTGParser
 
 # -------------------------------
 # File type filters
 # -------------------------------
 fileTypeFilters = [
-    # {"data_type":"gnsspo000045-gga",   "regex": "*gnsspo000045*",      "parser": "GGA",    'parser_options':{}},
-    # {"data_type":"gnsspo000045-vtg",   "regex": "*gnsspo000045*",      "parser": "VTG",    'parser_options':{}},
     {"data_type":"gga",   "regex": "*/raw/POSMV_GGA-*.txt",      "parser": "GGA",    'parser_options':{}},
     # {"data_type":"hdt",   "regex": "*/raw/POSMV-*.txt",      "parser": "HDT",    'parser_options':{}},
     {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
-    {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
+    {"data_type":"ssv",   "regex": "*/raw/SVP-*.txt",        "parser": "SSV",    'parser_options':{}},
     {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{'sbe38': True, 'col_names':True}},
     {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
     # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
@@ -69,7 +67,7 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         "GGA": GGAParser,
         # "HDT": HDTParser,
         "Met": MetParser,
-        "SVP": SVPParser,
+        "SSV": SSVParser,
         "TSG": TSGParser,
         "TWind": TWindParser,
         # "VTG": VTGParser,

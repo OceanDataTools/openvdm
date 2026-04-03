@@ -6,6 +6,17 @@ use Helpers\FormCustom;
 
 $_warehouseModel = new \Models\Warehouse();
 
+$_POST += [
+    'name' => '', 'longName' => '', 'destDir' => '', 'includeFilter' => '',
+    'excludeFilter' => '', 'ignoreFilter' => '', 'staleness' => '',
+    'removeSourceFiles' => '', 'useStartDate' => '', 'skipEmptyDirs' => '',
+    'skipEmptyFiles' => '', 'syncFromSource' => '', 'bandwidthLimit' => '',
+    'cruiseOrLowering' => '', 'transferType' => '', 'sourceDir' => '',
+    'localDirIsMountPoint' => '', 'rsyncServer' => '', 'rsyncUser' => '',
+    'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '', 'smbUser' => '',
+    'smbPass' => '', 'sshServer' => '', 'sshUser' => '', 'sshUseKey' => '', 'sshPass' => '',
+];
+
 ?>
 
     <div class="row">

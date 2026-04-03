@@ -1,6 +1,5 @@
 <?php
 use Helpers\Url;
-$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
 $loweringID  = ((!empty($_GET['loweringID']) && in_array($_GET['loweringID'], $data['loweringIDs'])) ? $_GET['loweringID'] : $data['loweringID']);
 rsort($data['loweringIDs']);
 ?>
@@ -47,7 +46,7 @@ rsort($data['loweringIDs']);
           $dataFiles = array_values($dataFiles);
           // echo '<pre>'; print_r($dataFiles); echo '</pre>';
 ?>
-                                <a id="<?php echo $dataFiles[0]['type']; ?>"></a>
+                                <a id="<?php echo (!empty($dataFiles) ? $dataFiles[0]['type'] : ''); ?>"></a>
 <?php
             $filecount += sizeof($dataFiles);
         }
@@ -55,7 +54,7 @@ rsort($data['loweringIDs']);
                                     <div class="panel-heading"><?php echo $data['placeholders'][$i]['heading'];?><?php echo ($data['placeholders'][$i]['plotType'] == 'chart'? '<i id="' . $data['placeholders'][$i]['id'] . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i>': ''); ?>
                                     </div>
                                     <div class="panel-body">
-                                        <div class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount > 0? $loadingImage: 'No Data Found.'); ?></div>
+                                        <div class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount == 0? 'No Data Found.': ''); ?></div>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">

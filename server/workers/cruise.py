@@ -122,12 +122,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         scrub_transfers(cruise_config.get('collectionSystemTransfersConfig', []))
         scrub_transfers(cruise_config.get('extraDirectoriesConfig', []))
 
+        cruise_config['cruiseConfigFn'] = cruise_config['warehouseConfig']['cruiseConfigFn']
+        cruise_config['loweringConfigFn'] = cruise_config['warehouseConfig']['loweringConfigFn']
+        cruise_config['dataDashboardManifestFn'] = cruise_config['warehouseConfig']['dataDashboardManifestFn']
         cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
         cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
+
+        # Full path to data dashboard manifest, relative to cruise directory
+        dashboard_data_dir = next(
+            (entry['destDir'] for entry in cruise_config.get('extraDirectoriesConfig', [])
+             if entry.get('name') == 'Dashboard_Data'),
+            None
+        )
+        if dashboard_data_dir:
+            cruise_config['dataDashboardManifestPath'] = os.path.join(
+                dashboard_data_dir, cruise_config['dataDashboardManifestFn']
+            )
+
+        # Full path to lowering config, relative to cruise directory, with loweringID placeholder.
+        # Only included if the vehicle base directory exists within the cruise data directory.
+        lowering_data_base_dir = cruise_config['warehouseConfig'].get('loweringDataBaseDir', '')
+        if lowering_data_base_dir and os.path.isdir(os.path.join(self.cruise_dir, lowering_data_base_dir)):
+            cruise_config['loweringConfigPath'] = os.path.join(
+                lowering_data_base_dir, '<loweringID>', cruise_config['loweringConfigFn']
+            )
 
         del cruise_config['warehouseConfig']
         del cruise_config['cruiseDataTransfersConfig']
         del cruise_config['shipToShoreTransfersConfig']
+        del cruise_config['cruiseConfigFn']
+        del cruise_config['loweringConfigFn']
+        del cruise_config['dataDashboardManifestFn']
 
         # Remove empty keys
         cruise_config = {k: v for k, v in cruise_config.items() if v not in ("", None)}

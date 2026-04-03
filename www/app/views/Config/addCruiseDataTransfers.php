@@ -4,13 +4,15 @@ use Core\Error;
 use Helpers\Form;
 use Helpers\FormCustom;
 
-if(!isset($_POST['excludedCollectionSystems'])) {
-    $_POST['excludedCollectionSystems'] = ["0"];
-}
-
-if(!isset($_POST['excludedExtraDirectories'])) {
-    $_POST['excludedExtraDirectories'] = ["0"];
-}
+$_POST += [
+    'excludedCollectionSystems' => ["0"], 'excludedExtraDirectories' => ["0"],
+    'name' => '', 'longName' => '', 'includeOVDMFiles' => '', 'skipEmptyDirs' => '',
+    'skipEmptyFiles' => '', 'syncToDest' => '', 'bandwidthLimit' => '',
+    'destDir' => '', 'localDirIsMountPoint' => '', 'rsyncServer' => '',
+    'rsyncUser' => '', 'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '',
+    'smbUser' => '', 'smbPass' => '', 'sshServer' => '', 'sshUser' => '',
+    'sshUseKey' => '', 'sshPass' => '',
+];
 
 ?>
     <div class="row">
