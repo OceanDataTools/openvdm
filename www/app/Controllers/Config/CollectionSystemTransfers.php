@@ -149,36 +149,37 @@ class CollectionSystemTransfers extends Controller {
         $data['useLocalMountPointOptions'] = $this->_buildUseLocalMountPointOptions();
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $transferType = $_POST['transferType'];
-            $sourceDir = $_POST['sourceDir'];
-            $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
-            $useStartDate = $_POST['useStartDate'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncFromSource = $_POST['syncFromSource'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $includeFilter = $_POST['includeFilter'];
-            $excludeFilter = $_POST['excludeFilter'];
-            $ignoreFilter = $_POST['ignoreFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $sourceDir = $_POST['sourceDir'] ?? '';
+            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            $staleness = (($_POST['staleness'] ?? '') != "0" && ($_POST['customStaleness'] ?? '') != "0") ? ($_POST['customStaleness'] ?? '') : "0";
+            $removeSourceFiles = (($_POST['staleness'] ?? '') != "0" && $transferType != '2') ? ($_POST['removeSourceFiles'] ?? '') : "0";
+            $useStartDate = $_POST['useStartDate'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncFromSource = $_POST['syncFromSource'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
+            $excludeFilter = $_POST['excludeFilter'] ?? '';
+            $ignoreFilter = $_POST['ignoreFilter'] ?? '';
             $status = 4;
             $enable = 0;
 
@@ -338,18 +339,18 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
-                    'transferType' => $transferType,
+                    'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
-                    'staleness' => $staleness,
-                    'removeSourceFiles' => $removeSourceFiles,
-                    'useStartDate' => $useStartDate,
-                    'skipEmptyDirs' => $skipEmptyDirs,
-                    'skipEmptyFiles' => $skipEmptyFiles,
-                    'syncFromSource' => $syncFromSource,
+                    'staleness' => (int)$staleness,
+                    'removeSourceFiles' => (int)$removeSourceFiles,
+                    'useStartDate' => (int)$useStartDate,
+                    'skipEmptyDirs' => (int)$skipEmptyDirs,
+                    'skipEmptyFiles' => (int)$skipEmptyFiles,
+                    'syncFromSource' => (int)$syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
-                    'cruiseOrLowering' => $cruiseOrLowering,
-                    'localDirIsMountPoint' => $localDirIsMountPoint,
+                    'cruiseOrLowering' => (int)$cruiseOrLowering,
+                    'localDirIsMountPoint' => (int)$localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
                     'rsyncUser' => $rsyncUser,
                     'rsyncPass' => $rsyncPass,
@@ -373,34 +374,34 @@ class CollectionSystemTransfers extends Controller {
                 Url::redirect('config/collectionSystemTransfers');
             }
         } else if(isset($_POST['inlineTest'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $transferType = $_POST['transferType'];
-            $sourceDir = $_POST['sourceDir'];
-            $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = $_POST['staleness'];
-            $removeSourceFiles = $_POST['removeSourceFiles'];
-            $useStartDate = $_POST['useStartDate'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncFromSource = $_POST['syncFromSource'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $includeFilter = $_POST['includeFilter'];
-            $excludeFilter = $_POST['excludeFilter'];
-            $ignoreFilter = $_POST['ignoreFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $sourceDir = $_POST['sourceDir'] ?? '';
+            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            $staleness = $_POST['staleness'] ?? '';
+            $removeSourceFiles = $_POST['removeSourceFiles'] ?? '';
+            $useStartDate = $_POST['useStartDate'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncFromSource = $_POST['syncFromSource'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
+            $excludeFilter = $_POST['excludeFilter'] ?? '';
+            $ignoreFilter = $_POST['ignoreFilter'] ?? '';
             $status = 4;
             $enable = 0;
 
@@ -409,7 +410,7 @@ class CollectionSystemTransfers extends Controller {
 	    }
 	    elseif( preg_match('/\s/',$name) ){
 		$error[] = 'Name cannot contain whitespace, underscores are acceptable';
-	    }	
+	    }
 
             if($longName == ''){
                 $error[] = 'Long name is required';
@@ -544,18 +545,18 @@ class CollectionSystemTransfers extends Controller {
                    # 'collectionSystemTransferID' => '0',
                     'name' => $name,
                     'longName' => $longName,
-                    'transferType' => $transferType,
+                    'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
-                    'staleness' => $staleness,
-                    'removeSourceFiles' => $removeSourceFiles,
-                    'useStartDate' => $useStartDate,
-                    'skipEmptyDirs' => $skipEmptyDirs,
-                    'skipEmptyFiles' => $skipEmptyFiles,
-                    'syncFromSource' => $syncFromSource,
+                    'staleness' => (int)$staleness,
+                    'removeSourceFiles' => (int)$removeSourceFiles,
+                    'useStartDate' => (int)$useStartDate,
+                    'skipEmptyDirs' => (int)$skipEmptyDirs,
+                    'skipEmptyFiles' => (int)$skipEmptyFiles,
+                    'syncFromSource' => (int)$syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
-                    'cruiseOrLowering' => $cruiseOrLowering,
-                    'localDirIsMountPoint' => $localDirIsMountPoint,
+                    'cruiseOrLowering' => (int)$cruiseOrLowering,
+                    'localDirIsMountPoint' => (int)$localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
                     'rsyncUser' => $rsyncUser,
                     'rsyncPass' => $rsyncPass,
@@ -565,13 +566,13 @@ class CollectionSystemTransfers extends Controller {
                     'smbDomain' => $smbDomain,
                     'sshServer' => $sshServer,
                     'sshUser' => $sshUser,
-                    'sshUseKey' => $sshUseKey,
+                    'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
-                    'status' => '4',
-                    'enable' => '0',
+                    'status' => 4,
+                    'enable' => 0,
                 );
 
                 # create the gearman client
@@ -611,36 +612,37 @@ class CollectionSystemTransfers extends Controller {
         $data['row'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);
 
         $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $transferType = $_POST['transferType'];
-            $sourceDir = $_POST['sourceDir'];
-            $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = ($_POST['staleness'] != "0" && $_POST['customStaleness'] != "0")? $_POST['customStaleness']: "0";
-            $removeSourceFiles = ($_POST['staleness'] != "0" && $_POST['transferType'] != '2')? $_POST['removeSourceFiles']: "0";
-            $useStartDate = $_POST['useStartDate'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncFromSource = $_POST['syncFromSource'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $includeFilter = $_POST['includeFilter'];
-            $excludeFilter = $_POST['excludeFilter'];
-            $ignoreFilter = $_POST['ignoreFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $sourceDir = $_POST['sourceDir'] ?? '';
+            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            $staleness = (($_POST['staleness'] ?? '') != "0" && ($_POST['customStaleness'] ?? '') != "0") ? ($_POST['customStaleness'] ?? '') : "0";
+            $removeSourceFiles = (($_POST['staleness'] ?? '') != "0" && $transferType != '2') ? ($_POST['removeSourceFiles'] ?? '') : "0";
+            $useStartDate = $_POST['useStartDate'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncFromSource = $_POST['syncFromSource'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
+            $excludeFilter = $_POST['excludeFilter'] ?? '';
+            $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -799,18 +801,18 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
-                    'transferType' => $transferType,
+                    'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
-                    'staleness' => $staleness,
-                    'removeSourceFiles' => $removeSourceFiles,
-                    'useStartDate' => $useStartDate,
-                    'skipEmptyDirs' => $skipEmptyDirs,
-                    'skipEmptyFiles' => $skipEmptyFiles,
-                    'syncFromSource' => $syncFromSource,
+                    'staleness' => (int)$staleness,
+                    'removeSourceFiles' => (int)$removeSourceFiles,
+                    'useStartDate' => (int)$useStartDate,
+                    'skipEmptyDirs' => (int)$skipEmptyDirs,
+                    'skipEmptyFiles' => (int)$skipEmptyFiles,
+                    'syncFromSource' => (int)$syncFromSource,
                     'bandwidthLimit' => (int)$bandwidthLimit,
-                    'cruiseOrLowering' => $cruiseOrLowering,
-                    'localDirIsMountPoint' => $localDirIsMountPoint,
+                    'cruiseOrLowering' => (int)$cruiseOrLowering,
+                    'localDirIsMountPoint' => (int)$localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
                     'rsyncUser' => $rsyncUser,
                     'rsyncPass' => $rsyncPass,
@@ -835,7 +837,7 @@ class CollectionSystemTransfers extends Controller {
                     $this->updateDestinationDirectory();
 		}
 
-                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+                $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
                 Session::set('message','Collection System Transfers Updated');
                 Url::redirect('config/collectionSystemTransfers'.$filter);
             } else {
@@ -871,34 +873,34 @@ class CollectionSystemTransfers extends Controller {
             }
         } else if(isset($_POST['inlineTest'])){
 
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $transferType = $_POST['transferType'];
-            $sourceDir = $_POST['sourceDir'];
-            $destDir = (strcmp($_POST['destDir'], '/') == 0)? $_POST['destDir']: ltrim($_POST['destDir'], '/');
-            $staleness = $_POST['staleness'];
-            $removeSourceFiles = $_POST['removeSourceFiles'];
-            $useStartDate = $_POST['useStartDate'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncFromSource = $_POST['syncFromSource'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $includeFilter = $_POST['includeFilter'];
-            $excludeFilter = $_POST['excludeFilter'];
-            $ignoreFilter = $_POST['ignoreFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $sourceDir = $_POST['sourceDir'] ?? '';
+            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            $staleness = $_POST['staleness'] ?? '';
+            $removeSourceFiles = $_POST['removeSourceFiles'] ?? '';
+            $useStartDate = $_POST['useStartDate'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncFromSource = $_POST['syncFromSource'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
+            $excludeFilter = $_POST['excludeFilter'] ?? '';
+            $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -1043,18 +1045,18 @@ class CollectionSystemTransfers extends Controller {
 
                 $gmData['collectionSystemTransfer']->name = $name;
                 $gmData['collectionSystemTransfer']->longName = $longName;
-                $gmData['collectionSystemTransfer']->transferType = $transferType;
+                $gmData['collectionSystemTransfer']->transferType = (int)$transferType;
                 $gmData['collectionSystemTransfer']->sourceDir = $sourceDir;
                 $gmData['collectionSystemTransfer']->destDir = $destDir;
-                $gmData['collectionSystemTransfer']->staleness = $staleness;
-                $gmData['collectionSystemTransfer']->removeSourceFiles = $removeSourceFiles;
-                $gmData['collectionSystemTransfer']->useStartDate = $useStartDate;
-                $gmData['collectionSystemTransfer']->skipEmptyDirs = $skipEmptyDirs;
-                $gmData['collectionSystemTransfer']->skipEmptyFiles = $skipEmptyFiles;
-                $gmData['collectionSystemTransfer']->syncFromSource = $syncFromSource;
-                $gmData['collectionSystemTransfer']->bandwidthLimit = $bandwidthLimit;
-                $gmData['collectionSystemTransfer']->cruiseOrLowering = $cruiseOrLowering;
-                $gmData['collectionSystemTransfer']->localDirIsMountPoint = $localDirIsMountPoint;
+                $gmData['collectionSystemTransfer']->staleness = (int)$staleness;
+                $gmData['collectionSystemTransfer']->removeSourceFiles = (int)$removeSourceFiles;
+                $gmData['collectionSystemTransfer']->useStartDate = (int)$useStartDate;
+                $gmData['collectionSystemTransfer']->skipEmptyDirs = (int)$skipEmptyDirs;
+                $gmData['collectionSystemTransfer']->skipEmptyFiles = (int)$skipEmptyFiles;
+                $gmData['collectionSystemTransfer']->syncFromSource = (int)$syncFromSource;
+                $gmData['collectionSystemTransfer']->bandwidthLimit = (int)$bandwidthLimit;
+                $gmData['collectionSystemTransfer']->cruiseOrLowering = (int)$cruiseOrLowering;
+                $gmData['collectionSystemTransfer']->localDirIsMountPoint = (int)$localDirIsMountPoint;
                 $gmData['collectionSystemTransfer']->rsyncServer = $rsyncServer;
                 $gmData['collectionSystemTransfer']->rsyncUser = $rsyncUser;
                 $gmData['collectionSystemTransfer']->rsyncPass = $rsyncPass;
@@ -1064,7 +1066,7 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->smbDomain = $smbDomain;
                 $gmData['collectionSystemTransfer']->sshServer = $sshServer;
                 $gmData['collectionSystemTransfer']->sshUser = $sshUser;
-                $gmData['collectionSystemTransfer']->sshUseKey = $sshUseKey;
+                $gmData['collectionSystemTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['collectionSystemTransfer']->sshPass = $sshPass;
                 $gmData['collectionSystemTransfer']->includeFilter = $includeFilter;
                 $gmData['collectionSystemTransfer']->excludeFilter = $excludeFilter;
@@ -1118,7 +1120,7 @@ class CollectionSystemTransfers extends Controller {
     }
 
     public function delete($id){
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         $where = array('collectionSystemTransferID' => $id);
         $this->_collectionSystemTransfersModel->deleteCollectionSystemTransfer($where);
         Session::set('message','Collection System Transfer Deleted');
@@ -1126,7 +1128,7 @@ class CollectionSystemTransfers extends Controller {
     }
 
     public function enable($id) {
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         $this->_collectionSystemTransfersModel->enableCollectionSystemTransfer($id);
 
         $this->updateDestinationDirectory();
@@ -1135,7 +1137,7 @@ class CollectionSystemTransfers extends Controller {
     }
 
     public function disable($id) {
-	$filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+	$filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
 	$this->_collectionSystemTransfersModel->disableCollectionSystemTransfer($id);
         Url::redirect('config/collectionSystemTransfers'.$filter);
     }
@@ -1174,7 +1176,7 @@ class CollectionSystemTransfers extends Controller {
 
     public function run($id) {
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
 
 	$collectionSystemTransfer = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0];
 
@@ -1202,7 +1204,7 @@ class CollectionSystemTransfers extends Controller {
 
     public function stop($id) {
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
 	
 	$gmData = array(
             'pid' => $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id)[0]->pid

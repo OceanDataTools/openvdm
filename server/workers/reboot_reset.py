@@ -37,18 +37,18 @@ def reboot_reset():
     logging.info("Setting all Collection System Transfers to idle.")
     collection_system_transfers = openVDM.get_collection_system_transfers()
     for collection_system_transfer in collection_system_transfers:
-        if not collection_system_transfer['status'] == '3':
+        if not collection_system_transfer['status'] == 3:
             openVDM.set_idle_collection_system_transfer(collection_system_transfer['collectionSystemTransferID'])
 
     logging.info("Setting all Cruise Data Transfers to idle.")
     cruise_data_transfers = openVDM.get_cruise_data_transfers()
     for cruise_data_transfer in cruise_data_transfers:
-        if not cruise_data_transfer['status'] == '3':
+        if not cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(cruise_data_transfer['cruiseDataTransferID'])
 
     required_cruise_data_transfers = openVDM.get_required_cruise_data_transfers()
     for required_cruise_data_transfer in required_cruise_data_transfers:
-        if not required_cruise_data_transfer['status'] == '3':
+        if not required_cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(required_cruise_data_transfer['cruiseDataTransferID'])
 
     logging.info("Clearing all jobs from Gearman.")

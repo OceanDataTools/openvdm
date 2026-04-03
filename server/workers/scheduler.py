@@ -85,7 +85,7 @@ def scheduler(interval=None):
         collection_system_transfers = ovdm.get_active_collection_system_transfers('longName')
         for collection_system_transfer in collection_system_transfers:
 
-            if collection_system_transfer['status'] == "1":
+            if collection_system_transfer['status'] == 1:
                 continue
 
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -103,7 +103,7 @@ def scheduler(interval=None):
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
 
-            if cruise_data_transfer['status'] == "1":
+            if cruise_data_transfer['status'] == 1:
                 continue
 
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
@@ -126,12 +126,12 @@ def scheduler(interval=None):
         else:
             now_utc = datetime.now(timezone.utc)
             delta = now_utc - last_s2s_xfer
-            if ssdw_transfer['status'] == '1' and delta > timedelta(hours=1):
+            if ssdw_transfer['status'] == 1 and delta > timedelta(hours=1):
                 logging.info("S2S tranfer has run for an hour, time to restart")
                 gmData = {'pid': ssdw_transfer['pid']}
                 gm_client.submit_job("stopJob", json.dumps(gmData))
 
-            if ssdw_transfer['enable'] == "1":
+            if ssdw_transfer['enable'] == 1:
                 logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
                 last_s2s_xfer = datetime.now(timezone.utc)
 

@@ -94,7 +94,7 @@ class Tasks extends Model {
     public function setIdleTask($id){
         $data = array();
         $row = $this->getTask($id);
-        if (strcmp($row[0]->enable,'1') === 0) {
+        if (isset($row[0]) && (int)$row[0]->enable === 1) {
             $data = array('status' => '2', 'pid' => '0');
         } else {
             $data = array('status' => '4', 'pid' => '0');
@@ -106,7 +106,7 @@ class Tasks extends Model {
     public function setOffTask($id){
         $data = array();
         $row = $this->getTask($id);
-        if (strcmp($row[0]->status,'2') === 0) {
+        if (isset($row[0]) && (int)$row[0]->status === 2) {
             $data['status'] = '4';
             $data['pid'] = '0';
         }
@@ -117,7 +117,7 @@ class Tasks extends Model {
     public function enableTask($id){
         $data = array('enable' => 1);
         $row = $this->getTask($id);
-        if (strcmp($row[0]->status,'4') === 0) {
+        if (isset($row[0]) && (int)$row[0]->status === 4) {
             $data['status'] = '2';
         }
         $where = array('taskID' => $id);
@@ -127,7 +127,7 @@ class Tasks extends Model {
     public function disableTask($id){
         $data = array('enable' => 0);
         $row = $this->getTask($id);
-        if (strcmp($row[0]->status,'2') === 0) {
+        if (isset($row[0]) && (int)$row[0]->status === 2) {
             $data['status'] = '4';
         }
         $where = array('taskID' => $id);

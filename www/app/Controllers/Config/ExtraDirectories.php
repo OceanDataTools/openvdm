@@ -73,11 +73,13 @@ class ExtraDirectories extends Controller {
         $data['cruiseOrLoweringOptions'] = $this->_buildCruiseOrLoweringOptions();
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
+        $error = [];
+
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $destDir = $_POST['destDir'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $destDir = $_POST['destDir'] ?? '';
             $enable = 0;
 
             if($name == ''){
@@ -122,12 +124,13 @@ class ExtraDirectories extends Controller {
         $data['showLoweringComponents'] = $_warehouseModel->getShowLoweringComponents();
 
         $data['row'] = $this->_extraDirectoriesModel->getExtraDirectory($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $cruiseOrLowering = isset($_POST['cruiseOrLowering']) ? $_POST['cruiseOrLowering'] : '0';
-            $destDir = $_POST['destDir'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
+            $destDir = $_POST['destDir'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';

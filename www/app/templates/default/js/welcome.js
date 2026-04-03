@@ -14,21 +14,21 @@ $(function () {
                 var output = '';
                 var i = 0;
                 for (i = 0; i < data.length; i++) {
-                    if (data[i].enable === "1") {
+                    if (data[i].enable === 1) {
                         output += '<div class="list-group-item ';
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             output += 'list-group-item-success">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-download"></i> Running</span></div>';
-                        } else if (data[i].status === "2") {
+                        } else if (data[i].status === 2) {
                             output += 'list-group-item-warning">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-moon-o"></i> Idle</span></div>';
-                        } else if (data[i].status === "3") {
+                        } else if (data[i].status === 3) {
                             output += 'list-group-item-danger">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-warning"></i> Error</span></div>';
-                        } else if (data[i].status === "4") {
+                        } else if (data[i].status === 4) {
                             output += 'disabled">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-times"></i> Disabled</span></div>\n';
@@ -53,21 +53,21 @@ $(function () {
                 var output = '';
                 var i = 0;
                 for (i = 0; i < data.length; i++) {
-                    if (data[i].enable === "1") {
+                    if (data[i].enable === 1) {
                         output += '<div class="list-group-item ';
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             output += 'list-group-item-success">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-download"></i> Running</span></div>';
-                        } else if (data[i].status === "2") {
+                        } else if (data[i].status === 2) {
                             output += 'list-group-item-warning">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-moon-o"></i> Idle</span></div>';
-                        } else if (data[i].status === "3") {
+                        } else if (data[i].status === 3) {
                             output += 'list-group-item-danger">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-warning"></i> Error</span></div>';
-                        } else if (data[i].status === "4") {
+                        } else if (data[i].status === 4) {
                             output += 'disabled">';
                             output += data[i].longName;
                             output += '<span class="pull-right"><i class="fa fa-times"></i> Disabled</span></div>\n';
@@ -92,19 +92,19 @@ $(function () {
                 var i = 0;
                 for (i = 0; i < data.length; i++) {
                     output += '<div class="list-group-item ';
-                    if (data[i].status === "1") {
+                    if (data[i].status === 1) {
                         output += 'list-group-item-success">';
                         output += data[i].longName;
                         output += '<span class="pull-right"><i class="fa fa-download"></i> Running</span></div>';
-                    } else if (data[i].status === "2") {
+                    } else if (data[i].status === 2) {
                         output += 'list-group-item-warning">';
                         output += data[i].longName;
                         output += '<span class="pull-right"><i class="fa fa-moon-o"></i> Idle</span></div>';
-                    } else if (data[i].status === "3") {
+                    } else if (data[i].status === 3) {
                         output += 'list-group-item-danger">';
                         output += data[i].longName;
                         output += '<span class="pull-right"><i class="fa fa-warning"></i> Error</span></div>';
-                    } else if (data[i].status === "4") {
+                    } else if (data[i].status === 4) {
                         output += 'disabled">';
                         output += data[i].longName;
                         output += '<span class="pull-right"><i class="fa fa-times"></i> Disabled</span></div>\n';

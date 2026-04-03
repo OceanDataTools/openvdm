@@ -96,7 +96,7 @@ class Data
          $key = '';
 
          for ($i = 0; $i < $length; $i++) {
-             $key .= $chars{rand(0, strlen($chars) - 1)};
+             $key .= $chars[rand(0, strlen($chars) - 1)];
          }
 
          return $key;

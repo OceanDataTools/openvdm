@@ -297,12 +297,12 @@ use Helpers\Hooks;
     $links = $_linksModel->getLinks();
     $_linksModel->processLinkURL($links);
     foreach ($links as $row) {
-        if (strcmp($row->enable, '1') == 0) {
-            if (strcmp($row->private, '0') == 0) {
+        if ($row->enable === 1) {
+            if ($row->private === 0) {
 ?>
                             <li><a href="<?php echo $row->url; ?>" target="_blank"><?php echo $row->name; ?></a></li>
 <?php
-            } else if((strcmp($row->private, '1') == 0) && Session::get('loggedin')){
+            } else if($row->private === 1 && Session::get('loggedin')){
 ?>
                             <li><a href="<?php echo $row->url; ?>" target="_blank"><?php echo $row->name; ?></a></li>
 <?php
@@ -345,7 +345,7 @@ use Helpers\Hooks;
     $systemStatusClass = 'panel-red';
 
     if($data['systemStatus'] === 'On') {
-        if($cruiseDates['cruiseStartDate'] > $nowDateStr || ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr)) {
+        if(isset($cruiseDates['cruiseStartDate']) && ($cruiseDates['cruiseStartDate'] > $nowDateStr || ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr))) {
             $systemStatusClass = 'panel-yellow';
         } else {
             $systemStatusClass = 'panel-green';

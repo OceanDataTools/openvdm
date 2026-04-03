@@ -2,15 +2,15 @@ $(function () {
     'use strict';
 
     var transferTypeOptions = [
-        {"value" : "1", "text" : "Local Directory"},
-        {"value" : "2", "text" : "Rsync Server"},
-        {"value" : "3", "text" : "SMB Share"},
-        {"value" : "4", "text" : "SSH Server"},
-        {"value" : "5", "text" : "NFS Share"},
+        {"value" : 1, "text" : "Local Directory"},
+        {"value" : 2, "text" : "Rsync Server"},
+        {"value" : 3, "text" : "SMB Share"},
+        {"value" : 4, "text" : "SSH Server"},
+        {"value" : 5, "text" : "NFS Share"},
     ];
 
     function setSSHUseKeyField(sshUseKey) {
-        if(sshUseKey == "1"){
+        if(sshUseKey == 1){
             $('input[name=sshPass]').val("");
             $('input[name=sshPass]').prop('disabled', true);
         } else {
@@ -75,7 +75,7 @@ $(function () {
         const staleness = $('input[name=staleness]:checked').val();
         const transferType = $('input[name=transferType]:checked').val();
 
-	if(staleness == "0" || transferType == "2"){
+	if(staleness == 0 || transferType == 2){
             $(".removeSource").hide();
         } else {
             $(".removeSource").show();

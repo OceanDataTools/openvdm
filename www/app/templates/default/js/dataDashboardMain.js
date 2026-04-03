@@ -2,7 +2,7 @@ $(function () {
     'use strict';
 
     var MAPPROXY_DIR = '/mapproxy';
-    var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
+    var TITILER_URL = '/titiler'
 
     var max_values = 5;
 
@@ -212,7 +212,6 @@ $(function () {
                         }).addTo(mapdb);
                     } else if ('tileURL' in data[0]) {
                         const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
-                        console.debug(url)
                         L.tileLayer(url, {
                             bounds:mapBounds
                         }).addTo(mapdb);

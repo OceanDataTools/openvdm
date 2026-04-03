@@ -25,7 +25,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connection_utils import test_cst_source
+from server.lib.connection_utils import normalize_transfer_config, test_cst_source
 
 TASK_NAMES = {
     'TEST_COLLECTION_SYSTEM_TRANSFER': 'testCollectionSystemTransfer'
@@ -76,7 +76,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         dest_dir = self.keyword_replace(self.collection_system_transfer['destDir']).lstrip('/')
 
-        if self.collection_system_transfer.get('cruiseOrLowering') == '1':
+        if self.collection_system_transfer.get('cruiseOrLowering') == 1:
             if self.lowering_id is None:
                 return None
 
@@ -147,6 +147,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         else:
             self.collection_system_transfer = cst_cfg
 
+        self.collection_system_transfer = normalize_transfer_config(self.collection_system_transfer)
+
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.collection_system_transfer['name']}: %(message)s"
@@ -161,7 +163,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if self.lowering_id is not None and len(self.lowering_id) == 0:
             self.lowering_id = None
 
-        if self.collection_system_transfer['cruiseOrLowering'] == '1' and self.lowering_id is None:
+        if self.collection_system_transfer['cruiseOrLowering'] == 1 and self.lowering_id is None:
             return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
@@ -182,7 +184,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
@@ -281,7 +283,7 @@ def task_test_collection_system_transfer(worker, current_job):
 
     job_results['parts'].extend(test_cst_source(cst_cfg, worker.source_dir))
 
-    if cst_cfg['enable'] == '1':
+    if cst_cfg['enable'] == 1:
         logging.info("Testing Destination")
         worker.send_job_status(current_job, 66, 100)
         job_results['parts'].extend(worker.test_destination_dir())

@@ -78,7 +78,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         lowerings = self.ovdm.get_lowerings() or []
 
         # Exclude OVDM-related files if flag is set
-        if cdt_cfg.get('includeOVDMFiles') == '0':
+        if cdt_cfg.get('includeOVDMFiles') == 0:
             exclude_filterlist.extend([
                 f"{wh_cfg['cruiseConfigFn']}",
                 f"{wh_cfg['md5SummaryFn']}",
@@ -91,13 +91,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         # Handle excluded collection systems
         ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
 
-        for cst_id in filter(lambda x: x and x != '0', ex_cst_ids):
+        for cst_id in filter(lambda x: x and x != 0, ex_cst_ids):
             try:
                 cst_cfg = self.ovdm.get_collection_system_transfer(cst_id)
                 cruise_or_lowering = cst_cfg.get('cruiseOrLowering')
                 dest_dir = cst_cfg.get('destDir')
 
-                if cruise_or_lowering == '0':
+                if cruise_or_lowering == 0:
                     # Cruise-level exclusion
                     exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/**")
                 else:
@@ -112,13 +112,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         # Handle excluded extra directories
         ex_ed_ids = cdt_cfg.get('excludedExtraDirectories', '').split(',') if cdt_cfg.get('excludedExtraDirectories') else []
 
-        for ed_id in filter(lambda x: x and x != '0', ex_ed_ids):
+        for ed_id in filter(lambda x: x and x != 0, ex_ed_ids):
             try:
                 ed_cfg = self.ovdm.get_extra_directory(ed_id)
                 cruise_or_lowering = ed_cfg.get('cruiseOrLowering')
                 dest_dir = ed_cfg.get('destDir')
 
-                if cruise_or_lowering == '0':
+                if cruise_or_lowering == 0:
                     # Cruise-level exclusion
                     exclude_filterlist.append(f"{dest_dir.replace('{cruiseID}', self.cruise_id)}/**")
                 else:
@@ -358,7 +358,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
             dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
-            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
+            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
                 dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
 
             logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg["sshPass"]}', '-p ****'))
@@ -416,13 +416,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
 
                 real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
-                if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == '0':
+                if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
                     real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
 
                 files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
 
             # === PERMISSIONS (local only) ===
-            if transfer_type == 'local' and ':' not in dest_dir and cdt_cfg.get('localDirIsMountPoint') == '0':
+            if transfer_type == 'local' and ':' not in dest_dir and cdt_cfg.get('localDirIsMountPoint') == 0:
                 logging.info("Setting file permissions")
                 output = set_owner_group_permissions(
                     self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'],
@@ -466,7 +466,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.cruise_data_transfer['status'] == "1":
+        if self.cruise_data_transfer['status'] == 1:
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
@@ -475,7 +475,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.cruise_data_transfer.update(payload_obj['cruiseDataTransfer'])
 
-        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == '0':
+        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == 0:
             logging.info("Transfer disabled for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
@@ -496,7 +496,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]

@@ -24,10 +24,38 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
 
+# Integer fields that PHP/PDO returns as strings but Python code compares with == 1 / == 0
+_TRANSFER_INT_FIELDS = frozenset([
+    'transferType', 'staleness', 'removeSourceFiles', 'useStartDate',
+    'skipEmptyDirs', 'skipEmptyFiles', 'syncFromSource', 'syncToDest',
+    'bandwidthLimit', 'cruiseOrLowering', 'localDirIsMountPoint',
+    'sshUseKey', 'includeOVDMFiles', 'status', 'enable',
+    'collectionSystemTransferID', 'cruiseDataTransferID',
+])
+
+
+def normalize_transfer_config(cfg):
+    """
+    Return a copy of cfg with known integer fields cast from string to int.
+    PHP/PDO returns all DB column values as strings; callers that compare
+    with == 1 / == 0 need proper Python ints.
+    """
+    result = dict(cfg)
+    for field in _TRANSFER_INT_FIELDS:
+        if field in result and isinstance(result[field], str):
+            try:
+                result[field] = int(result[field])
+            except (ValueError, TypeError):
+                pass
+    return result
+
+
 def get_transfer_type(transfer_type):
     """
     Return a human-readable transfer type
     """
+
+    transfer_type = str(transfer_type)
 
     if transfer_type == "1": # Local directory
         return 'local'
@@ -65,8 +93,9 @@ def check_darwin(cfg):
     Return true if server is MacOS (Darwin)
     """
 
+    cfg = normalize_transfer_config(cfg)
     cmd = ['ssh', f"{cfg['sshUser']}@{cfg['sshServer']}", "uname -s"]
-    if cfg['sshUseKey'] == '0':
+    if cfg['sshUseKey'] == 0:
         cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
 
     logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg["sshPass"]}', '-p ****'))
@@ -118,8 +147,9 @@ def mount_smb_share(cfg, mntpoint, smb_version):
     Mount the SMB Share to the mntpoint
     """
 
+    cfg = normalize_transfer_config(cfg)
     # Logic handles if cfg is a cst or cdt
-    read_write = 'rw' if cfg.get('removeSourceFiles', '1') == '1' else 'ro'
+    read_write = 'rw' if cfg.get('removeSourceFiles', 1) == 1 else 'ro'
 
     opts = f"{read_write},domain={cfg['smbDomain']},vers={smb_version}"
 
@@ -225,7 +255,8 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
     subprocess
     """
 
-    if (passwd is None or len(passwd) == 0) and use_pubkey is False:
+    passwd = passwd or ''
+    if (len(passwd) == 0) and use_pubkey is False:
         raise ValueError("Must specify either a passwd or use_pubkey")
 
     cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no','-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=5']
@@ -241,10 +272,15 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
 
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
 
-    logging.debug("test_ssh_connection cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
+    cmd_str = ' '.join(cmd)
+    if passwd and len(passwd) > 0:
+        cmd_str = cmd_str.replace(f'{passwd}', '****')
+
+    logging.debug("test_ssh_connection cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH connection test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH connection test failed: %s", str(exc))
@@ -257,12 +293,18 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
     Verify the presence of a directort on the ssh server
     """
 
+    passwd = passwd or ''
     cmd = build_ssh_command(None, user, server, f'ls "{remote_dir}"', passwd, use_pubkey)
 
-    logging.debug("test_ssh_destination cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
+    cmd_str = ' '.join(cmd)
+    if passwd and len(passwd) > 0:
+        cmd_str = cmd_str.replace(f'{passwd}', '****')
+
+    logging.debug("test_ssh_destination cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH destination test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH destination test failed: %s", str(exc))
@@ -275,12 +317,18 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     Verify write access to the directory on the remote ssh server.
     """
 
+    passwd = passwd or ''
     cmd = build_ssh_command(None, user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
-    logging.debug("test_ssh_write_access cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
+    cmd_str = ' '.join(cmd)
+    if passwd and len(passwd) > 0:
+        cmd_str = cmd_str.replace(f'{passwd}', '****')
+
+    logging.debug("test_ssh_write_access cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH write test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH write test failed: %s", str(exc))
@@ -288,10 +336,15 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
     cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
-    logging.debug("test_ssh_write_access cmd: %s", ' '.join(cmd).replace(f'{passwd}', '****'))
+    cmd_str = ' '.join(cmd)
+    if passwd and len(passwd) > 0:
+        cmd_str = cmd_str.replace(f'{passwd}', '****')
+
+    logging.debug("test_ssh_write_access cmd: %s", cmd_str)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
+            logging.error("SSH write test cleanup failed (exit %s): %s", proc.returncode, proc.stderr.strip())
             return False
     except Exception as exc:
         logging.error("SSH write test failed: %s", str(exc))
@@ -301,6 +354,7 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rclone_config_for_ssh(cfg, rclone_config):
+    cfg = normalize_transfer_config(cfg)
     ssh_config_path = os.path.expanduser("~/.ssh/config")
     identity_file = os.path.expanduser("~/.ssh/id_rsa")
     target_host = cfg["sshServer"]
@@ -327,7 +381,7 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     }
 
     # If password provided, obscure it; otherwise use key file
-    if cfg["sshUseKey"] == '0':
+    if cfg["sshUseKey"] == 0:
         try:
             result = subprocess.run(
                 ["rclone", "obscure", cfg["sshPass"]],
@@ -360,6 +414,7 @@ def build_rclone_options(cfg, mode='dry-run'):
     Build the relevant rsync options for the given transfer
     """
 
+    cfg = normalize_transfer_config(cfg)
     if ':' in cfg['destDir']:
         remote_name, _ = cfg['destDir'].split(':',1)
         remote_type = get_rclone_remote_type(remote_name)
@@ -367,12 +422,9 @@ def build_rclone_options(cfg, mode='dry-run'):
         remote_type = 'local'
 
     flags = ["--progress"]
-    copy_sync = "sync" if cfg.get('syncToDest', '0') == '1' else "copy"
+    copy_sync = "sync" if cfg.get('syncToDest', 0) == 1 else "copy"
 
-    #if cfg.get('skipEmptyFiles') == '1':
-    #    flags.extend(['--min-size', '1B'])
-
-    if cfg.get('skipEmptyDirs') == '0':
+    if cfg.get('skipEmptyDirs') == 0:
         flags.append('--create-empty-src-dirs')
 
     if mode == 'dry-run':
@@ -381,7 +433,7 @@ def build_rclone_options(cfg, mode='dry-run'):
     if remote_type == 'google cloud storage':
         flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
 
-    if cfg.get('bandwidthLimit') not in (None, '0'):
+    if cfg.get('bandwidthLimit') not in (None, 0):
         flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
 
     return copy_sync, flags
@@ -392,6 +444,7 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     Build the relevant rsync options for the given transfer
     """
 
+    cfg = normalize_transfer_config(cfg)
     transfer_type = get_transfer_type(cfg['transferType'])
 
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
@@ -399,10 +452,10 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     if not is_darwin:
         flags.insert(1, '--protect-args')
 
-    if cfg.get('skipEmptyFiles') == '1':
+    if cfg.get('skipEmptyFiles', 0) == 1:
         flags.insert(1, '--min-size=1')
 
-    if cfg.get('skipEmptyDirs') == '1':
+    if cfg.get('skipEmptyDirs', 0) == 1:
         flags.insert(1, '-m')
 
     if mode == 'dry-run':
@@ -413,21 +466,21 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
         if transfer_type == 'rsync':
             flags.append('--no-motd')
 
-        if cfg.get('bandwidthLimit') not in (None, '0'):
+        if cfg.get('bandwidthLimit') not in (None, 0):
             flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")
 
         # Logic handles if cfg is a cst or cdt
-        if cfg.get('removeSourceFiles', '0') == '1':
+        if cfg.get('removeSourceFiles', 0) == 1:
             flags.insert(2, '--remove-source-files')
 
         # Logic handles if cfg is a cst or cdt
-        if cfg.get('syncToDest', '0') == '1':
+        if cfg.get('syncToDest', 0) == 1:
             flags.insert(2, '--delete')
 
     return flags
 
 
-def test_local_destination(dest_dir, is_mountpoint='0'):
+def test_local_destination(dest_dir, is_mountpoint=0):
     results = []
 
     dest_dir_exists = os.path.isdir(dest_dir)
@@ -436,7 +489,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
         reason = f"Unable to find destination directory: {dest_dir} on the data warehouse"
         results.extend([{"partName": "Destination directory", "result": "Fail", "reason": reason}])
 
-        if is_mountpoint == '1':
+        if is_mountpoint == 1:
             results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
 
         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -445,7 +498,7 @@ def test_local_destination(dest_dir, is_mountpoint='0'):
 
     results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
-    if is_mountpoint == '1':
+    if is_mountpoint == 1:
         mnt_dir = os.sep + os.path.join(*dest_dir.strip(os.sep).split(os.sep)[:2])
         if not os.path.ismount(mnt_dir):
             results.extend([{
@@ -511,6 +564,8 @@ def test_cst_source(cst_cfg, source_dir):
     Test the connection to the collection system transfer
     """
 
+    cst_cfg = normalize_transfer_config(cst_cfg)
+
     results = []
 
     mntpoint = None
@@ -531,29 +586,29 @@ def test_cst_source(cst_cfg, source_dir):
                 reason = f"Unable to find source directory: {source_dir} on the data warehouse"
                 results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['localDirIsMountPoint'] == '1':
+                if cst_cfg['localDirIsMountPoint'] == 1:
                     results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if cst_cfg['removeSourceFiles'] == 1:
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
             results.extend([{"partName": "Source directory", "result": "Pass"}])
 
-            if cst_cfg['localDirIsMountPoint'] == '1':
+            if cst_cfg['localDirIsMountPoint'] == 1:
                 mnt_dir = os.sep + os.path.join(*source_dir.strip(os.sep).split(os.sep)[:2])
                 if not os.path.ismount(mnt_dir):
                     results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
 
-                    if cst_cfg['removeSourceFiles'] == '1':
+                    if cst_cfg['removeSourceFiles'] == 1:
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
                 results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
 
-            if cst_cfg['removeSourceFiles'] == '1':
+            if cst_cfg['removeSourceFiles'] == 1:
                 if not test_write_access(source_dir):
                     reason = f"Unable to delete source files from: {source_dir} on SMB share"
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -577,7 +632,7 @@ def test_cst_source(cst_cfg, source_dir):
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if cst_cfg['removeSourceFiles'] == 1:
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -592,7 +647,7 @@ def test_cst_source(cst_cfg, source_dir):
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if cst_cfg['removeSourceFiles'] == 1:
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
@@ -605,14 +660,14 @@ def test_cst_source(cst_cfg, source_dir):
                 reason = f"Unable to find source directory: {source_dir} on SMB share"
                 results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                if cst_cfg['removeSourceFiles'] == '1':
+                if cst_cfg['removeSourceFiles'] == 1:
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                 return results
 
             results.extend([{"partName": "Source directory", "result": "Pass"}])
 
-            if cst_cfg['removeSourceFiles'] == '1':
+            if cst_cfg['removeSourceFiles'] == 1:
                 if not test_write_access(smb_source_dir):
                     reason = f"Unable to delete source files from: {source_dir} on SMB share"
                     results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
@@ -666,7 +721,7 @@ def test_cst_source(cst_cfg, source_dir):
         # Tests for SSH
         if transfer_type == 'ssh':
 
-            use_pubkey = cst_cfg['sshUseKey'] == '1'
+            use_pubkey = cst_cfg['sshUseKey'] == 1
 
             contest_success = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
@@ -699,6 +754,8 @@ def test_cdt_destination(cdt_cfg):
     """
     Test the connection to the cruise data transfer
     """
+
+    cdt_cfg = normalize_transfer_config(cdt_cfg)
 
     results = []
 
@@ -788,7 +845,7 @@ def test_cdt_destination(cdt_cfg):
         # Tests for SSH
         if transfer_type == 'ssh':
 
-            use_pubkey = cdt_cfg['sshUseKey'] == '1'
+            use_pubkey = cdt_cfg['sshUseKey'] == 1
 
             contest_success = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
@@ -904,7 +961,7 @@ def test_cdt_rclone_destination(cfg):
     if ':' not in cfg['destDir']:
         remote_name = None
         remote_path = cfg['destDir']
-        remote_type = get_transfer_type(cfg)
+        remote_type = get_transfer_type(cfg['transferType'])
     else:
         remote_name, remote_path = cfg['destDir'].split(':')
         remote_type = get_rclone_remote_type(remote_name)
