@@ -6,7 +6,7 @@ use Core\Model;
 class Links extends Model {
 
     public function getLinks(){
-        return $this->db->select("SELECT * FROM ".PREFIX."Links ORDER BY private");
+        return $this->db->select("SELECT * FROM ".PREFIX."Links ORDER BY name");
     }
 
     public function getLink($id){
