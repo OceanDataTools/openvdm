@@ -25,9 +25,9 @@ class Auth extends Controller {
 
         if(isset($_POST['submit'])){
 
-            $username = $_POST['username'];
-            $password = $_POST['password'];
-            $referrer = $_POST['referrer'];
+            $username = $_POST['username'] ?? '';
+            $password = $_POST['password'] ?? '';
+            $referrer = $_POST['referrer'] ?? '';
 
             //validation
             if(Password::verify($password, $this->_model->getHash($username)) == false) {

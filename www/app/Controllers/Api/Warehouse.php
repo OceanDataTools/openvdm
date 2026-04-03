@@ -40,7 +40,7 @@ class Warehouse extends Controller {
             if(isset($cruiseDates['cruiseStartDate'])) {
                 if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
                     $response['warning'] = CRUISE_NAME . " has not started";
-                } elseif ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
+                } elseif (!empty($cruiseDates['cruiseEndDate']) && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
                     $response['warning'] = CRUISE_NAME . " has Ended";
                 }
             }

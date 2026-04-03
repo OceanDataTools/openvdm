@@ -92,8 +92,8 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'];
-            $shipboardDataWarehouseUsername = $_POST['shipboardDataWarehouseUsername'];
+            $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'] ?? '';
+            $shipboardDataWarehouseUsername = $_POST['shipboardDataWarehouseUsername'] ?? '';
 
             if($shipboardDataWarehouseIP == ''){
                 $error[] = 'Shipboard Data Warehouse IP is required';
@@ -151,7 +151,7 @@ class System extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
-            $destDir = $_POST['destDir'];
+            $destDir = $_POST['destDir'] ?? '';
 
             if($sshServer == ''){
                 $error[] = 'Shoreside Data Warehouse IP is required';
@@ -206,8 +206,8 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $longName = $_POST['longName'];
-            $destDir = $_POST['destDir'];
+            $longName = $_POST['longName'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
 
             if($longName == ''){
                 $error[] = 'Long name is required';
@@ -247,8 +247,8 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $longName = $_POST['longName'];
-            $includeFilter = $_POST['includeFilter'];
+            $longName = $_POST['longName'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
 
             if($longName == ''){
                 $error[] = 'Long name is required';
@@ -312,7 +312,7 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $shipToShoreBWLimit = $_POST['shipToShoreBWLimit'];
+            $shipToShoreBWLimit = $_POST['shipToShoreBWLimit'] ?? '';
 
             if($shipToShoreBWLimit == ''){
                 $shipToShoreBWLimit = '0';
@@ -360,7 +360,7 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $md5FilesizeLimit = $_POST['md5FilesizeLimit'];
+            $md5FilesizeLimit = $_POST['md5FilesizeLimit'] ?? '';
 
             if($md5FilesizeLimit == ''){
                 $error[] = 'MD5 filesize limit is required';
@@ -555,8 +555,8 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $url = $_POST['url'];
+            $name = $_POST['name'] ?? '';
+            $url = $_POST['url'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -592,8 +592,8 @@ class System extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $url = $_POST['url'];
+            $name = $_POST['name'] ?? '';
+            $url = $_POST['url'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';

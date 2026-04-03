@@ -25,7 +25,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connection_utils import test_cst_source
+from server.lib.connection_utils import normalize_transfer_config, test_cst_source
 
 TASK_NAMES = {
     'TEST_COLLECTION_SYSTEM_TRANSFER': 'testCollectionSystemTransfer'
@@ -146,6 +146,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         else:
             self.collection_system_transfer = cst_cfg
+
+        self.collection_system_transfer = normalize_transfer_config(self.collection_system_transfer)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(

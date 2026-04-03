@@ -32,8 +32,8 @@ class Users extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $username = $_POST['username'];
-            $password = $_POST['password'];
+            $username = $_POST['username'] ?? '';
+            $password = $_POST['password'] ?? '';
 
             if($username == ''){
                 $error[] = 'Username is required';
@@ -43,7 +43,7 @@ class Users extends Controller {
                 $error[] = 'Password is required';
             }
 
-            if(strcmp($password, $_POST['password2']) !== 0) {
+            if(strcmp($password, $_POST['password2'] ?? '') !== 0) {
                 $error[] = 'Passwords must match';
             }
 
@@ -70,8 +70,8 @@ class Users extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $username = $_POST['username'];
-            $password = $_POST['password'];
+            $username = $_POST['username'] ?? '';
+            $password = $_POST['password'] ?? '';
 
             if($username == ''){
                 $error[] = 'Username is required';
@@ -81,7 +81,7 @@ class Users extends Controller {
                 $error[] = 'Password is required';
             }
 
-            if(strcmp($password, $_POST['password2']) !== 0) {
+            if(strcmp($password, $_POST['password2'] ?? '') !== 0) {
                 $error[] = 'Passwords must match';
             }
 

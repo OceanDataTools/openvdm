@@ -72,14 +72,14 @@ class Main extends Controller {
                 $cruiseID = $this->_warehouseModel->getCruiseID();
             }
 
-            $cruiseName = $_POST['cruiseName'];
-            $cruisePI = $_POST['cruisePI'];
-            $cruiseLocation = $_POST['cruiseLocation'];
+            $cruiseName = $_POST['cruiseName'] ?? '';
+            $cruisePI = $_POST['cruisePI'] ?? '';
+            $cruiseLocation = $_POST['cruiseLocation'] ?? '';
 
-            $cruiseStartDate = $_POST['cruiseStartDate'];
-            $cruiseEndDate = $_POST['cruiseEndDate'];
-            $cruiseStartPort = $_POST['cruiseStartPort'];
-            $cruiseEndPort = $_POST['cruiseEndPort'];
+            $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
+            $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
+            $cruiseStartPort = $_POST['cruiseStartPort'] ?? '';
+            $cruiseEndPort = $_POST['cruiseEndPort'] ?? '';
 
 
             if (strcmp($cruiseID, $this->_warehouseModel->getCruiseID()) != 0) {
@@ -230,14 +230,14 @@ class Main extends Controller {
             $loweringID = null;
             $setLatestLowering = false;
 
-            if ($_POST['loweringID']) {
+            if (!empty($_POST['loweringID'])) {
                 $loweringID = $_POST['loweringID'];
             } else {
                 $loweringID = $this->_warehouseModel->getLoweringID();
             }
 
-	        $loweringStartDate = $_POST['loweringStartDate'];
-            $loweringEndDate = $_POST['loweringEndDate'];
+            $loweringStartDate = $_POST['loweringStartDate'] ?? '';
+            $loweringEndDate = $_POST['loweringEndDate'] ?? '';
 
             if (strcmp($loweringID, $this->_warehouseModel->getLoweringID()) != 0) {
                 $setLatestLowering = true;
@@ -459,14 +459,14 @@ class Main extends Controller {
         $error = [];
 
         if(isset($_POST['submit'])){
-            $cruiseID = $_POST['cruiseID'];
-            $cruiseName = $_POST['cruiseName'];
-            $cruisePI = $_POST['cruisePI'];
-            $cruiseLocation = $_POST['cruiseLocation'];
-            $cruiseStartDate = $_POST['cruiseStartDate'];
-            $cruiseEndDate = $_POST['cruiseEndDate'];
-            $cruiseStartPort = $_POST['cruiseStartPort'];
-            $cruiseEndPort = $_POST['cruiseEndPort'];
+            $cruiseID = $_POST['cruiseID'] ?? '';
+            $cruiseName = $_POST['cruiseName'] ?? '';
+            $cruisePI = $_POST['cruisePI'] ?? '';
+            $cruiseLocation = $_POST['cruiseLocation'] ?? '';
+            $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
+            $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
+            $cruiseStartPort = $_POST['cruiseStartPort'] ?? '';
+            $cruiseEndPort = $_POST['cruiseEndPort'] ?? '';
 
 
             if($cruiseID == ''){
@@ -620,9 +620,9 @@ class Main extends Controller {
         if(isset($_POST['submit'])){
             $cruiseID = $this->_warehouseModel->getCruiseID();
             $loweringDataBaseDir = $this->_warehouseModel->getLoweringDataBaseDir();
-            $loweringID = $_POST['loweringID'];
-            $loweringStartDate = $_POST['loweringStartDate'];
-            $loweringEndDate = $_POST['loweringEndDate'];
+            $loweringID = $_POST['loweringID'] ?? '';
+            $loweringStartDate = $_POST['loweringStartDate'] ?? '';
+            $loweringEndDate = $_POST['loweringEndDate'] ?? '';
 
             if($loweringID == ''){
                 $error[] = LOWERING_NAME . ' ID is required';

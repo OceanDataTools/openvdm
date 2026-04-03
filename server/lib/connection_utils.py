@@ -24,6 +24,32 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
 
+# Integer fields that PHP/PDO returns as strings but Python code compares with == 1 / == 0
+_TRANSFER_INT_FIELDS = frozenset([
+    'transferType', 'staleness', 'removeSourceFiles', 'useStartDate',
+    'skipEmptyDirs', 'skipEmptyFiles', 'syncFromSource', 'syncToDest',
+    'bandwidthLimit', 'cruiseOrLowering', 'localDirIsMountPoint',
+    'sshUseKey', 'includeOVDMFiles', 'status', 'enable',
+    'collectionSystemTransferID', 'cruiseDataTransferID',
+])
+
+
+def normalize_transfer_config(cfg):
+    """
+    Return a copy of cfg with known integer fields cast from string to int.
+    PHP/PDO returns all DB column values as strings; callers that compare
+    with == 1 / == 0 need proper Python ints.
+    """
+    result = dict(cfg)
+    for field in _TRANSFER_INT_FIELDS:
+        if field in result and isinstance(result[field], str):
+            try:
+                result[field] = int(result[field])
+            except (ValueError, TypeError):
+                pass
+    return result
+
+
 def get_transfer_type(transfer_type):
     """
     Return a human-readable transfer type
@@ -67,6 +93,7 @@ def check_darwin(cfg):
     Return true if server is MacOS (Darwin)
     """
 
+    cfg = normalize_transfer_config(cfg)
     cmd = ['ssh', f"{cfg['sshUser']}@{cfg['sshServer']}", "uname -s"]
     if cfg['sshUseKey'] == 0:
         cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
@@ -120,6 +147,7 @@ def mount_smb_share(cfg, mntpoint, smb_version):
     Mount the SMB Share to the mntpoint
     """
 
+    cfg = normalize_transfer_config(cfg)
     # Logic handles if cfg is a cst or cdt
     read_write = 'rw' if cfg.get('removeSourceFiles', 1) == 1 else 'ro'
 
@@ -326,6 +354,7 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rclone_config_for_ssh(cfg, rclone_config):
+    cfg = normalize_transfer_config(cfg)
     ssh_config_path = os.path.expanduser("~/.ssh/config")
     identity_file = os.path.expanduser("~/.ssh/id_rsa")
     target_host = cfg["sshServer"]
@@ -385,6 +414,7 @@ def build_rclone_options(cfg, mode='dry-run'):
     Build the relevant rsync options for the given transfer
     """
 
+    cfg = normalize_transfer_config(cfg)
     if ':' in cfg['destDir']:
         remote_name, _ = cfg['destDir'].split(':',1)
         remote_type = get_rclone_remote_type(remote_name)
@@ -414,6 +444,7 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     Build the relevant rsync options for the given transfer
     """
 
+    cfg = normalize_transfer_config(cfg)
     transfer_type = get_transfer_type(cfg['transferType'])
 
     flags = ['-trinv'] if mode == 'dry-run' else ['-triv', '--progress']
@@ -532,6 +563,8 @@ def test_cst_source(cst_cfg, source_dir):
     """
     Test the connection to the collection system transfer
     """
+
+    cst_cfg = normalize_transfer_config(cst_cfg)
 
     results = []
 
@@ -721,6 +754,8 @@ def test_cdt_destination(cdt_cfg):
     """
     Test the connection to the cruise data transfer
     """
+
+    cdt_cfg = normalize_transfer_config(cdt_cfg)
 
     results = []
 
@@ -926,7 +961,7 @@ def test_cdt_rclone_destination(cfg):
     if ':' not in cfg['destDir']:
         remote_name = None
         remote_path = cfg['destDir']
-        remote_type = get_transfer_type(cfg)
+        remote_type = get_transfer_type(cfg['transferType'])
     else:
         remote_name, remote_path = cfg['destDir'].split(':')
         remote_type = get_rclone_remote_type(remote_name)

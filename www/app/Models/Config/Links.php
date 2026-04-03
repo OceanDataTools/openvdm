@@ -57,7 +57,7 @@ class Links extends Model {
 
         $_warehouseModel = new \Models\Warehouse();
         $cruiseID = $_warehouseModel->getCruiseID();
-        $hostIP = $_SERVER['HTTP_HOST'];
+        $hostIP = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_ADDR'] ?? '';
 
         foreach($links as $row) {
             $row->url = str_replace("{cruiseID}", $cruiseID, $row->url);
