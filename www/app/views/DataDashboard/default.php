@@ -1,3 +1,7 @@
+<?php
+use Helpers\Url;
+$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
+?>
         <div class="row">
             <div class="col-lg-12">
                 <div class="panel">
@@ -9,9 +13,10 @@
 ?>
                                 <div class="panel panel-default">
 <?php
+        $filecount = 0;
         for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
 ?>
-                                <a id="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type']; ?>"></a>
+                                <a id="<?php echo (!empty($data['placeholders'][$i]['dataFiles'][$j]) ? $data['placeholders'][$i]['dataFiles'][$j][0]['type'] : ''); ?>"></a>
 <?php
             $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
         }

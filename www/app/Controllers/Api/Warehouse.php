@@ -376,12 +376,12 @@ class Warehouse extends Controller {
 
     public function setCruiseSize() {
 
-        $this->_warehouseModel->setCruiseSize(array('value' => $_POST['bytes']));
+        $this->_warehouseModel->setCruiseSize(array('value' => $_POST['bytes'] ?? null));
     }
 
     public function setLoweringSize() {
 
-        $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes']));
+        $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes'] ?? null));
     }
 
     public function getDataDashboardManifestFn() {

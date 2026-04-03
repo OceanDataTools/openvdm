@@ -253,7 +253,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         dest_dir = self.keyword_replace(self.collection_system_transfer['destDir']).lstrip('/')
 
-        if self.collection_system_transfer.get('cruiseOrLowering') == '1':
+        if self.collection_system_transfer.get('cruiseOrLowering') == 1:
             if self.lowering_id is None:
                 return None
 
@@ -357,10 +357,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     filepaths.append(os.path.join(root, filename))
         else:
             command = ['rsync', '-r']
-            if cst_cfg.get('skipEmptyFiles') == '1':
+            if cst_cfg.get('skipEmptyFiles') == 1:
                 command.append('--min-size=1')
 
-            if cst_cfg.get('skipEmptyDirs') == '1':
+            if cst_cfg.get('skipEmptyDirs') == 1:
                 command.append('-m')
 
             if transfer_type == 'rsync':
@@ -374,7 +374,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             f"{cst_cfg['sshServer']}:{self.source_dir}/"]
                 if not is_darwin:
                     command.insert(2, '--protect-args')
-                if cst_cfg.get('sshUseKey') == '0':
+                if cst_cfg.get('sshUseKey') == 0:
                     command = ['sshpass', '-p', cst_cfg['sshPass']] + command
 
             logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg["sshPass"]}', '-p ****'))
@@ -408,7 +408,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # Optional staleness check
         staleness = cst_cfg.get('staleness')
-        if staleness and staleness != '0':
+        if staleness and staleness != 0:
             logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
@@ -556,7 +556,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             # Build command
             rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
             cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
-            if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == '0':
+            if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
                 cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
 
             # Transfer files
@@ -565,7 +565,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             )
 
             # Delete files if sync'ing with source
-            if cst_cfg['syncFromSource'] == '1':
+            if cst_cfg['syncFromSource'] == 1:
                 files['deleted'] = delete_from_dest(dest_dir, files['include'])
 
         return {'verdict': True, 'files': files}
@@ -605,7 +605,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.collection_system_transfer['status'] == "1":
+        if self.collection_system_transfer['status'] == 1:
             logging.info("Transfer already in-progress")
             return self._ignore_job(current_job, "Transfer in-Progress", "Transfer is already in-progress")
 
@@ -617,7 +617,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
 
-        if system_status == "Off" or self.collection_system_transfer['enable'] == '0':
+        if system_status == "Off" or self.collection_system_transfer['enable'] == 0:
             logging.info("Transfer disabled for %s", self.collection_system_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
@@ -629,7 +629,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             self.lowering_id = None
 
         # fail if lowering ID is required but not found
-        if (self.collection_system_transfer.get('cruiseOrLowering') == '1'  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
+        if (self.collection_system_transfer.get('cruiseOrLowering') == 1  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
             return self._fail_job(current_job, "Verify lowering ID",
                                     "Lowering ID is undefined")
 
@@ -644,8 +644,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.data_end_date = "9999/12/31 23:59:59"
 
         # if requested, set to specified bounds for the corresponding cruise/lowering
-        if self.collection_system_transfer['useStartDate'] == '1':
-            if self.collection_system_transfer['cruiseOrLowering'] == "0":
+        if self.collection_system_transfer['useStartDate'] == 1:
+            if self.collection_system_transfer['cruiseOrLowering'] == 0:
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
                 cruise_end = self.ovdm.get_cruise_end_date()
@@ -656,7 +656,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 lowering_end = self.ovdm.get_lowering_end_date()
                 self.data_end_date = f"{lowering_end}:59" if lowering_end else "9999/12/31 23:59:59"
 
-            if self.collection_system_transfer['staleness'] != "0":
+            if self.collection_system_transfer['staleness'] != 0:
                 staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
                 data_end_dt = datetime.strptime(f"{self.data_end_date}+0000", "%Y/%m/%d %H:%M:%S%z")
                 if staleness_dt < data_end_dt:
@@ -678,7 +678,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
@@ -857,7 +857,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     if job_results['files']['new'] or job_results['files']['updated']:
-        if cst_cfg['localDirIsMountPoint'] == '0':
+        if cst_cfg['localDirIsMountPoint'] == 0:
             logging.info("Setting file permissions")
             worker.send_job_status(current_job, 96, 100)
 

@@ -134,7 +134,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             for t in transfers:
 
                 #filters transfers
-                if t['priority'] != priority or t['enable'] != '1':
+                if t['priority'] != priority or t['enable'] != 1:
                     continue
 
                 # replace {cruiseID}
@@ -144,23 +144,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 rare_filters = []
 
                 #if transfer is from a cst
-                if t['collectionSystem'] != "0":
+                if t['collectionSystem'] != 0:
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
-                    if cs['cruiseOrLowering'] == '1':
+                    if cs['cruiseOrLowering'] == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{cs['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if transfer is from an ed
-                if t['extraDirectory'] != "0":
+                if t['extraDirectory'] != 0:
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
-                    if ed['cruiseOrLowering'] == '1':
+                    if ed['cruiseOrLowering'] == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{ed['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if neither
-                if t['collectionSystem'] == "0" and t['extraDirectory'] == "0":
+                if t['collectionSystem'] == 0 and t['extraDirectory'] == 0:
                     path_prefix = base_path
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
@@ -379,7 +379,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 extra_args = ['-e', 'ssh']
                 cmd = _build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
 
-                if cdt_cfg.get('sshUseKey') == '0':
+                if cdt_cfg.get('sshUseKey') == 0:
                     cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
 
             files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
@@ -411,7 +411,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             logging.debug('bandwidthLimitStatus: %s', payload_obj.get('bandwidthLimitStatus', self.ovdm.get_ship_to_shore_bw_limit_status()))
             if not payload_obj.get('bandwidthLimitStatus', self.ovdm.get_ship_to_shore_bw_limit_status()):
-                self.cruise_data_transfer['bandwidthLimit'] = '0'
+                self.cruise_data_transfer['bandwidthLimit'] = 0
 
         except Exception:
             logging.exception("Failed to retrieve cruise data transfer config")
@@ -424,7 +424,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.cruise_data_transfer['status'] == "1":
+        if self.cruise_data_transfer['status'] == 1:
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
@@ -435,7 +435,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
 
-        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == '0':
+        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == 0:
             logging.info("Transfer disabled for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
@@ -457,7 +457,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]

@@ -152,7 +152,7 @@ use Helpers\Session;
 </div> <!-- /.modal -->
 
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">

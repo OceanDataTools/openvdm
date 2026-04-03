@@ -38,7 +38,7 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['UPDATE_DATA_DASHBOARD'],
         "longName": "Updating data dashboard",
     }
@@ -383,7 +383,7 @@ def task_rebuild_data_dashboard(worker, current_job):
             continue
 
         # Build file list
-        if cst['cruiseOrLowering'] == "0":
+        if cst['cruiseOrLowering'] == 0:
             cst_dir = os.path.join(worker.cruise_dir, cst['destDir'])
             filelist = build_filelist(cst_dir).get('include', [])
             filelist = [os.path.join(cst['destDir'], f) for f in filelist]

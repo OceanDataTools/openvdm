@@ -2,7 +2,7 @@ $(function () {
     'use strict';
 
     function setSSHUseKeyField(sshUseKey) {
-        if(sshUseKey == "1"){
+        if(sshUseKey == 1){
             $('input[name=sshPass]').val("");
             $('input[name=sshPass]').prop('disabled', true);
         } else {

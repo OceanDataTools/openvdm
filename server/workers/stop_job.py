@@ -51,17 +51,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         cruise_data_transfers = self.ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != "0":
+            if cruise_data_transfer['pid'] != 0:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         cruise_data_transfers = self.ovdm.get_required_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != "0":
+            if cruise_data_transfer['pid'] != 0:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         tasks = self.ovdm.get_tasks()
         for task in tasks:
-            if task['pid'] != "0":
+            if task['pid'] != 0:
                 return {'type': 'task', 'id': task['taskID'], 'name': task['name'], 'pid': task['pid']}
 
         return {'type':'unknown'}
@@ -98,7 +98,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]

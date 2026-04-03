@@ -29,6 +29,7 @@ class Users extends Controller {
 
     public function addUser(){
         $data['title'] = 'Add User';
+        $error = [];
 
         if(isset($_POST['submit'])){
             $username = $_POST['username'];
@@ -66,6 +67,7 @@ class Users extends Controller {
     public function editUser($id){
         $data['title'] = 'Edit User';
         $data['row'] = $this->_usersModel->getUser($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
             $username = $_POST['username'];

@@ -1,5 +1,7 @@
 <?php
-$loweringID  = (($_GET['loweringID'] && in_array($_GET['loweringID'], $data['loweringIDs'])) ? $_GET['loweringID'] : $data['loweringID']);    // returns whether the input integer is odd
+use Helpers\Url;
+$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
+$loweringID  = ((!empty($_GET['loweringID']) && in_array($_GET['loweringID'], $data['loweringIDs'])) ? $_GET['loweringID'] : $data['loweringID']);
 rsort($data['loweringIDs']);
 ?>
 

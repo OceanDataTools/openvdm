@@ -56,7 +56,7 @@ fileTypeFilters = [
     # {"data_type":"hdt",   "regex": "*/raw/POSMV-*.txt",      "parser": "HDT",    'parser_options':{}},
     {"data_type":"met",   "regex": "*/raw/MET-*.txt",        "parser": "Met",    'parser_options':{}},
     {"data_type":"svp",   "regex": "*/raw/SVP-*.txt",        "parser": "SVP",    'parser_options':{}},
-    {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{}},
+    {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{'sbe38': True, 'col_names':True}},
     {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
     # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
 ]

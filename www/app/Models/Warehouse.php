@@ -382,8 +382,9 @@ class Warehouse extends Model {
 
     public function getCruises() {
 
-        if (!$this->_cruises || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
+        if (!isset($this->_cruises) || (is_array($this->_cruises) && sizeof($this->_cruises) == 0)) {
 
+            $this->_cruises = array();
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
             //Get the list of directories
@@ -437,7 +438,7 @@ class Warehouse extends Model {
     }
 
     public function getLowerings() {
-        if (!$this->_lowerings || (is_array($this->_lowerings) && sizeof($this->_lowerings) == 0)) {
+        if (!isset($this->_lowerings) || (is_array($this->_lowerings) && sizeof($this->_lowerings) == 0)) {
             $baseDir = $this->getShipboardDataWarehouseBaseDir();
             $cruiseDir = $baseDir . DIRECTORY_SEPARATOR . $this->getCruiseID();
             $loweringDataBaseDir = $cruiseDir . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir();
@@ -470,7 +471,7 @@ class Warehouse extends Model {
             }
 
             //If there are no lowerings
-            if(!$this->_lowerings) {
+            if(empty($this->_lowerings)) {
                 return array();
             }
 
@@ -485,7 +486,8 @@ class Warehouse extends Model {
     }
 
     public function getLatestCruise() {
-        return $this->getCruises()[0];
+        $cruises = $this->getCruises();
+        return isset($cruises[0]) ? $cruises[0] : null;
     }
 
     public function getCruiseName($cruiseID = '') {
@@ -504,7 +506,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return $ovdmConfigJSON['cruiseName'];
+                    if ($ovdmConfigJSON !== null) {
+                        return $ovdmConfigJSON['cruiseName'];
+                    }
                 }
             }
             return "Could not find cruise config file.";
@@ -529,7 +533,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return $ovdmConfigJSON['cruisePI'];
+                    if ($ovdmConfigJSON !== null) {
+                        return $ovdmConfigJSON['cruisePI'];
+                    }
                 }
             }
             return "Could not find cruise config file.";
@@ -554,7 +560,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return $ovdmConfigJSON['cruiseLocation'];
+                    if ($ovdmConfigJSON !== null) {
+                        return $ovdmConfigJSON['cruiseLocation'];
+                    }
                 }
             }
             return "Could not find cruise config file.";
@@ -578,7 +586,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']);
+                    if ($ovdmConfigJSON !== null) {
+                        return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']);
+                    }
                 }
             }
             return array("Error"=>"Could not find cruise config file.");
@@ -602,7 +612,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']);
+                    if ($ovdmConfigJSON !== null) {
+                        return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']);
+                    }
                 }
             }
             return array("Error"=>"Could not find cruise config file.");
@@ -626,7 +638,9 @@ class Warehouse extends Model {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                    return array('cruiseFinalizedOn' => $ovdmConfigJSON['cruiseFinalizedOn']);
+                    if ($ovdmConfigJSON !== null) {
+                        return array('cruiseFinalizedOn' => $ovdmConfigJSON['cruiseFinalizedOn'] ?? null);
+                    }
                 }
             }
             return array("Error"=>"Could not find cruise config file.", 'cruiseFinalizedOn' => null);
@@ -637,7 +651,8 @@ class Warehouse extends Model {
     }
 
     public function getLatestLowering() {
-        return $this->getLowerings()[0];
+        $lowerings = $this->getLowerings();
+        return isset($lowerings[0]) ? $lowerings[0] : null;
     }
 
     public function getLoweringDates($loweringID = '') {
@@ -654,7 +669,9 @@ class Warehouse extends Model {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
                     $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
-                    return array('loweringStartDate' => $loweringConfigJSON['loweringStartDate'],'loweringEndDate' => $loweringConfigJSON['loweringEndDate']);
+                    if ($loweringConfigJSON !== null) {
+                        return array('loweringStartDate' => $loweringConfigJSON['loweringStartDate'],'loweringEndDate' => $loweringConfigJSON['loweringEndDate']);
+                    }
                 }
             }
             return array("Error"=>"Could not find lowering config file.");
@@ -678,7 +695,9 @@ class Warehouse extends Model {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
                     $loweringConfigContents = file_get_contents($loweringDir . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn());
                     $loweringConfigJSON = json_decode($loweringConfigContents,true);
-                    return array('loweringFinalizedOn' => $loweringConfigJSON['loweringFinalizedOn']);
+                    if ($loweringConfigJSON !== null) {
+                        return array('loweringFinalizedOn' => $loweringConfigJSON['loweringFinalizedOn'] ?? null);
+                    }
                 }
             }
             return array("Error"=>"Could not find lowering config file.", 'loweringFinalizedOn' => null);

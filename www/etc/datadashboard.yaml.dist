@@ -204,8 +204,8 @@
     - dataType: tsg
       visType: json
   - plotType: chart
-    id: svp
-    heading: Sound Velocity Probe
+    id: ssv
+    heading: Surface Sound Velocity
     dataArray:
-    - dataType: svp
+    - dataType: ssv
       visType: json

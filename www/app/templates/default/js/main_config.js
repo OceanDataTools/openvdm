@@ -9,21 +9,21 @@ $(function () {
                 var output = '';
                 var i = 0;
                 for (i = 0; i < data.length; i++) {
-                    if (data[i].enable === "1") {
+                    if (data[i].enable === 1) {
                         output += '<div class="list-group-item ';
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             output += 'list-group-item-success"><i class="fa fa-download"></i> ';
                             output += data[i].longName;
                             output += '<span class="pull-right">Running</span></div>';
-                        } else if (data[i].status === "2") {
+                        } else if (data[i].status === 2) {
                             output += 'list-group-item-warning"><i class="fa fa-moon-o"></i> ';
                             output += data[i].longName;
                             output += '<span class="pull-right">Idle</span></div>';
-                        } else if (data[i].status === "3") {
+                        } else if (data[i].status === 3) {
                             output += 'list-group-item-danger"><i class="fa fa-warning"></i> ';
                             output += data[i].longName;
                             output += '<span class="pull-right">Error</span></div>';
-                        } else if (data[i].status === "4") {
+                        } else if (data[i].status === 4) {
                             output += 'disabled"><i class="fa fa-times"></i> ';
                             output += data[i].longName;
                             output += '<span class="pull-right">Disabled</span></div>\n';
@@ -41,7 +41,7 @@ $(function () {
     }
 
     function updateFinalizedCruiseButton(status) {
-        if (status === "3") {
+        if (status === 3) {
             $('#finalizeCurrentCruise').html('<i class="fa fa-warning"></i> Run End-of-' + cruise_name + ' Tasks');
         } else {
             var finalizedStatusURL = siteRoot + 'api/warehouse/getCruiseFinalizedDate'
@@ -60,7 +60,7 @@ $(function () {
     }
 
     function updateFinalizedLoweringButton(status) {
-        if (status === "3") {
+        if (status === 3) {
             $('#finalizeCurrentLowering').html('<i class="fa fa-warning"></i> Run End-of-' + lowering_name + ' Tasks');
         } else {
             var finalizedStatusURL = siteRoot + 'api/warehouse/getLoweringFinalizedDate'
@@ -88,15 +88,15 @@ $(function () {
                     if((data[i].name != 'setupNewCruise') && (data[i].name != 'finalizeCurrentCruise') && (data[i].name != 'setupNewLowering') && (data[i].name != 'finalizeCurrentLowering')) {
                         output += '<div class="list-group-item">';
                         output += data[i].longName;
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             output += '<span class="pull-right btn btn-outline btn-default btn-xs disabled">Wait</span></div>';
-                        } else if (data[i].status === "2") {
+                        } else if (data[i].status === 2) {
                             output += '<a href="' + siteRoot + 'config/' + data[i].name + '" class="pull-right btn btn-outline btn-primary btn-xs">Run</a>';
-                        } else if (data[i].status === "3") {
+                        } else if (data[i].status === 3) {
                             output += '<span class="pull-right"><i class="fa fa-warning text-danger"></i>&nbsp;&nbsp;<a href="' + siteRoot + 'config/' + data[i].name + '" class="btn btn-outline btn-primary btn-xs">Run</a></span>';
                         }
                     } else if (data[i].name === 'finalizeCurrentCruise') {
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             $('#finalizeCurrentCruise').addClass('disabled');
                             $('#finalizeCurrentCruise').html("Running End-of-" + cruise_name + " Tasks... please standby.")
                         } else {
@@ -104,7 +104,7 @@ $(function () {
                             updateFinalizedCruiseButton(data[i].status);
                         }
                     } else if (data[i].name === 'finalizeCurrentLowering') {
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             $('#finalizeCurrentLowering').addClass('disabled');
                             $('#finalizeCurrentLowering').html("Running End-of-" + lowering_name + " Tasks... please standby.")
                         } else {
@@ -130,21 +130,21 @@ $(function () {
             if (status === 'success' && data !== null) {
                 var output = '';
                 for (var i = 0; i < data.length; i++) {
-                    if (data[i].enable === "1") {
+                    if (data[i].enable === 1) {
                         output += '<div class="list-group-item ';
-                        if(data[i].status == "1") {
+                        if(data[i].status == 1) {
                             output += 'list-group-item-success"><i class="fa fa-download"></i> '
                             output += data[i].longName
                             output += '<span class="pull-right">Running</span></div>'
-                        } else if(data[i].status == "2") {
+                        } else if(data[i].status == 2) {
                             output += 'list-group-item-warning"><i class="fa fa-moon-o"></i> '
                             output += data[i].longName
                             output += '<span class="pull-right">Idle</span></div>'
-                        } else if (data[i].status == "3") {
+                        } else if (data[i].status == 3) {
                             output += 'list-group-item-danger"><i class="fa fa-warning"></i> '
                             output += data[i].longName
                             output += '<span class="pull-right">Error</span></div>'
-                        } else if (data[i].status == "4") {
+                        } else if (data[i].status == 4) {
                             output += 'disabled"><i class="fa fa-times"></i> '
                             output += data[i].longName
                             output += '<span class="pull-right">Disabled</span></div>\n'
@@ -168,19 +168,19 @@ $(function () {
                 var output = '';
                 for (var i = 0; i < data.length; i++) {
                     output += '<div class="list-group-item ';
-                    if(data[i].status == "1") {
+                    if(data[i].status == 1) {
                         output += 'list-group-item-success"><i class="fa fa-download"></i> '
                         output += data[i].longName
                         output += '<span class="pull-right">Running</span></div>'
-                    } else if(data[i].status == "2") {
+                    } else if(data[i].status == 2) {
                         output += 'list-group-item-warning"><i class="fa fa-moon-o"></i> '
                         output += data[i].longName
                         output += '<span class="pull-right">Idle</span></div>'
-                    } else if (data[i].status == "3") {
+                    } else if (data[i].status == 3) {
                         output += 'list-group-item-danger"><i class="fa fa-warning"></i> '
                         output += data[i].longName
                         output += '<span class="pull-right">Error</span></div>'
-                    } else if (data[i].status == "4") {
+                    } else if (data[i].status == 4) {
                         output += 'disabled"><i class="fa fa-times"></i> '
                         output += data[i].longName
                         output += '<span class="pull-right">Disabled</span></div>\n'
