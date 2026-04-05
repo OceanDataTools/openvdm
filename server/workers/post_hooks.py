@@ -157,7 +157,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             '{cruiseID}': self.cruise_id,
             '{loweringID}': self.lowering_id,
             '{collectionSystemTransferID}':
-                cst_cfg.get('collectionSystemTransferID') if isinstance(cst_cfg, dict) else None,
+                str(cst_cfg.get('collectionSystemTransferID')) if isinstance(cst_cfg, dict) else None,
 
             '{collectionSystemTransferName}':
                 cst_cfg.get('name') if isinstance(cst_cfg, dict) else None,
