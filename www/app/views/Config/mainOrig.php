@@ -6,7 +6,7 @@ use Helpers\Session;
 $enableSSDW = false;
 foreach($data['requiredCruiseDataTransfers'] as $row){
     if (strcmp($row->name, "SSDW") == 0) {
-        if (strcmp($row->enable, "1") == 0) {
+        if ($row->enable === 1) {
             $enableSSDW = true;
         }
         break;
@@ -112,7 +112,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>
@@ -179,7 +179,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>

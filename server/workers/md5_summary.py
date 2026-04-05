@@ -37,7 +37,7 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['UPDATE_MD5_SUMMARY'],
         "longName": "Updating MD5 summary",
     }
@@ -225,7 +225,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
@@ -447,7 +447,7 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    exclude_transfer_logs = f"{worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir']}/"
+    exclude_transfer_logs = f"{worker.ovdm.get_transfer_log_dir()}/"
 
     filelist = build_filelist(worker.cruise_dir).get('include', [])
     filtered_filelist = [

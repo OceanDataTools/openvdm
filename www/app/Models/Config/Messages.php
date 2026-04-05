@@ -43,7 +43,7 @@ class Messages extends Model {
             $data['messageViewed'] = 0;
         }
 
-        if(strlen($data['messageBody'] > 10000)){
+        if(strlen($data['messageBody']) > 10000){
             $data['messageBody'] = substr($data['messageBody'], 0, 10000);
         }
 

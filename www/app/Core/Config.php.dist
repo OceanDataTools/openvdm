@@ -50,6 +50,11 @@ class Config
         define('PUBLICDATA_DIR', '/data/PublicData');
 
         /*
+         * Define directory where transfer log files are stored
+         */
+        define('TRANSFER_LOG_DIR', '/var/log/openvdm');
+
+        /*
          * Define location/name of the data dashboard configuration file
          */
         define('DASHBOARD_CONF', '/opt/openvdm/www/etc/datadashboard.yaml');
@@ -161,7 +166,7 @@ class Config
         /*
          * Optional create a constant for the name of the site.
          */
-        define('SITETITLE', 'Open Vessel Data Management v2.14.1');
+        define('SITETITLE', 'Open Vessel Data Management v2.15.0');
 
         /*
          * Optionall set a site email address.

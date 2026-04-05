@@ -47,7 +47,8 @@ FIELDS = [
     'temp_c',
     'cond_Sm',
     'sal_PSU',
-    'sv_ms'
+    'sv_ms',
+    'sbe38_temp_c'
 ]
 
 ROUNDING = {
@@ -65,14 +66,15 @@ class SBE45TSGParser(OpenVDMCSVParser):
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, sbe38=False):
+                 skip_header=False, use_openvdm_api=False, sbe38=False,
+                 col_names=False):
         self.sbe38 = sbe38
+        self.col_names = col_names
         proc_cols = PROC_COLS
         if sbe38:
-            fields.append('sbe38_temp_c')
             proc_cols.append('sbe38_temp_c')
 
-        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
+        super().__init__(proc_cols, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
 
@@ -91,11 +93,11 @@ class SBE45TSGParser(OpenVDMCSVParser):
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    temp_c = float(field_data['temp_c']) if field_data['temp_c'] else None
-                    cond_Sm = float(field_data['cond_Sm']) if field_data['cond_Sm'] else None
-                    sal_PSU = float(field_data['sal_PSU']) if field_data['sal_PSU'] else None
-                    sv_ms = float(field_data['sv_ms']) if field_data['sv_ms'] else None
-                    sbe38_temp_c = float(field_data['sbe38_temp_c']) if (self.sbe38 and field_data['sbe38_temp_c']) else None
+                    temp_c = float(field_data['temp_c'].split('=')[1] if self.col_names else field_data['temp_c'] ) if field_data['temp_c'] else None
+                    cond_Sm = float(field_data['cond_Sm'].split('=')[1] if self.col_names else field_data['cond_Sm']) if field_data['cond_Sm'] else None
+                    sal_PSU = float(field_data['sal_PSU'].split('=')[1] if self.col_names else field_data['sal_PSU']) if field_data['sal_PSU'] else None
+                    sv_ms = float(field_data['sv_ms'].split('=')[1] if self.col_names else field_data['sv_ms']) if field_data['sv_ms'] else None
+                    sbe38_temp_c = float(field_data['sbe38_temp_c'].split('=')[1] if self.col_names else field_data['sbe38_temp_c']) if (self.sbe38 and field_data['sbe38_temp_c']) else None
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['temp_c'].append(temp_c)
@@ -221,10 +223,14 @@ class SBE45TSGParser(OpenVDMCSVParser):
     @classmethod
     def add_cli_arguments(cls, parser):
         parser.add_argument('--sbe38', action='store_true', default=False, help='File includes temp data from external SBE38')
+        parser.add_argument('--col_names', action='store_true', default=False, help='Data rows includes column names')
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'sbe38': getattr(args, 'sbe38', False)}
+        return {
+            'sbe38': getattr(args, 'sbe38', False),
+            'col_names': getattr(args, 'col_names', False)
+        }
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI

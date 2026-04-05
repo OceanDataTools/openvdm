@@ -25,7 +25,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connection_utils import get_transfer_type, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import get_transfer_type, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 
 TASK_NAMES = {
     'TEST_CRUISE_DATA_TRANSFER': 'testCruiseDataTransfer'
@@ -80,6 +80,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         else:
             self.cruise_data_transfer = cdt_cfg
 
+        self.cruise_data_transfer = normalize_transfer_config(self.cruise_data_transfer)
+
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
@@ -122,7 +124,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
@@ -209,7 +211,7 @@ def task_test_cruise_data_transfer(worker, current_job):
     """
 
     cdt_cfg = worker.cruise_data_transfer
-    transfer_type = get_transfer_type(cdt_cfg)
+    transfer_type = get_transfer_type(cdt_cfg['transferType'])
 
     job_results = {'parts':[]}
 

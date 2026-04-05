@@ -6,6 +6,17 @@ use Helpers\FormCustom;
 
 $_warehouseModel = new \Models\Warehouse();
 
+$_POST += [
+    'name' => '', 'longName' => '', 'destDir' => '', 'includeFilter' => '',
+    'excludeFilter' => '', 'ignoreFilter' => '', 'staleness' => '',
+    'removeSourceFiles' => '', 'useStartDate' => '', 'skipEmptyDirs' => '',
+    'skipEmptyFiles' => '', 'syncFromSource' => '', 'bandwidthLimit' => '',
+    'cruiseOrLowering' => '', 'transferType' => '', 'sourceDir' => '',
+    'localDirIsMountPoint' => '', 'rsyncServer' => '', 'rsyncUser' => '',
+    'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '', 'smbUser' => '',
+    'smbPass' => '', 'sshServer' => '', 'sshUser' => '', 'sshUseKey' => '', 'sshPass' => '',
+];
+
 ?>
 
     <div class="row">
@@ -144,7 +155,7 @@ $_warehouseModel = new \Models\Warehouse();
     </div>
 
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog" aria-labelledby="Test Results" aria-hidden="true">
     <div class="modal-dialog">

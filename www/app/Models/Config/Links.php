@@ -6,7 +6,7 @@ use Core\Model;
 class Links extends Model {
 
     public function getLinks(){
-        return $this->db->select("SELECT * FROM ".PREFIX."Links ORDER BY private");
+        return $this->db->select("SELECT * FROM ".PREFIX."Links ORDER BY name");
     }
 
     public function getLink($id){
@@ -57,11 +57,11 @@ class Links extends Model {
 
         $_warehouseModel = new \Models\Warehouse();
         $cruiseID = $_warehouseModel->getCruiseID();
-	$shipboardDataWarehouseIP = $_warehouseModel->getShipboardDataWarehouseConfig()['shipboardDataWarehouseIP'];
+        $hostIP = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_ADDR'] ?? '';
 
         foreach($links as $row) {
             $row->url = str_replace("{cruiseID}", $cruiseID, $row->url);
-            $row->url = str_replace("{hostIP}", $shipboardDataWarehouseIP, $row->url);
+            $row->url = str_replace("{hostIP}", $hostIP, $row->url);
         }
     }
 

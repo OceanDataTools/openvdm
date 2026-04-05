@@ -36,12 +36,12 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
         "longName": "Creating cruise directory",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
         "longName": "Setting CruiseData directory permissions",
     }
@@ -133,7 +133,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # Retrieve active extra directories
         extra_directories = self.ovdm.get_active_extra_directories(lowering=False)
-        extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == '0']
+        extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == 0]
 
         # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
         if not self.lowering_id:
@@ -190,7 +190,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         exc_type, _, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
 
         self.send_job_data(current_job, json.dumps(
             [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]

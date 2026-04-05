@@ -5,7 +5,6 @@ use Core\Error;
 use Helpers\Session;
 use Helpers\Url;
 
-$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
 ?>
 
         <div class="row">

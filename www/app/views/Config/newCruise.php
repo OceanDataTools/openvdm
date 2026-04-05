@@ -107,10 +107,10 @@ use Helpers\Form;
         foreach($data['collectionSystemTransfers'] as $row){
 ?>
                                     <tr>
-                                        <td><?php echo $row->longName; echo ($row->status === "3"? '<span class="pull-right"><i class="fa fa-warning text-danger"></i></span>': ''); ?></td>
+                                        <td><?php echo $row->longName; echo ($row->status === 3 ? '<span class="pull-right"><i class="fa fa-warning text-danger"></i></span>': ''); ?></td>
                                         <td style='text-align:center'>
 <?php
-            if($row->enable === "0"){
+            if($row->enable === 0){
                 echo '                                            ' . Form::submit(array('name'=>'enableCS' . $row->collectionSystemTransferID, 'class'=>'btn btn-xs btn-primary btn-danger', 'value'=>'Off'));
             } else {
                 echo '                                            ' . Form::submit(array('name'=>'disableCS' . $row->collectionSystemTransferID, 'class'=>'btn btn-xs btn-primary btn-success', 'value'=>'On'));

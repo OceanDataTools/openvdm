@@ -136,6 +136,7 @@ Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
 Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');
 Router::any('api/warehouse/getCruiseDataURLPath', 'Controllers\Api\Warehouse@getCruiseDataURLPath');
 Router::any('api/warehouse/getDataWarehouseBaseDir', 'Controllers\Api\Warehouse@getDataWarehouseBaseDir');
+Router::any('api/warehouse/getTransferLogDir', 'Controllers\Api\Warehouse@getTransferLogDir');
 Router::any('api/warehouse/getLoweringConfig', 'Controllers\Api\Warehouse@getLoweringConfig');
 Router::any('api/warehouse/getLoweringID', 'Controllers\Api\Warehouse@getLoweringID');
 Router::any('api/warehouse/getLoweringSize', 'Controllers\Api\Warehouse@getLoweringSize');

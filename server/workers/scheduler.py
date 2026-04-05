@@ -22,7 +22,6 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
  REVISION:  2025-07-06
 """
 
-import os
 import sys
 import time
 import json
@@ -51,7 +50,6 @@ def scheduler(interval=None):
     gm_client = GearmanClient([ovdm.get_gearman_server()])
     time.sleep(10)
 
-    cruise_basedir = ovdm.get_cruisedata_path()
     logfile_purge_timedelta = ovdm.get_logfile_purge_timedelta()
     last_s2s_xfer = datetime.now(timezone.utc)
 
@@ -62,8 +60,7 @@ def scheduler(interval=None):
 
         # purge old transfer logs:
         logging.info("Purging old transfer logs")
-        cruiseID = ovdm.get_cruise_id()
-        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        transfer_log_dir = ovdm.get_transfer_log_dir()
         purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
 
         # Run on the minute
@@ -85,7 +82,7 @@ def scheduler(interval=None):
         collection_system_transfers = ovdm.get_active_collection_system_transfers('longName')
         for collection_system_transfer in collection_system_transfers:
 
-            if collection_system_transfer['status'] == "1":
+            if collection_system_transfer['status'] == 1:
                 continue
 
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -103,7 +100,7 @@ def scheduler(interval=None):
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
 
-            if cruise_data_transfer['status'] == "1":
+            if cruise_data_transfer['status'] == 1:
                 continue
 
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
@@ -126,12 +123,12 @@ def scheduler(interval=None):
         else:
             now_utc = datetime.now(timezone.utc)
             delta = now_utc - last_s2s_xfer
-            if ssdw_transfer['status'] == '1' and delta > timedelta(hours=1):
+            if ssdw_transfer['status'] == 1 and delta > timedelta(hours=1):
                 logging.info("S2S tranfer has run for an hour, time to restart")
                 gmData = {'pid': ssdw_transfer['pid']}
                 gm_client.submit_job("stopJob", json.dumps(gmData))
 
-            if ssdw_transfer['enable'] == "1":
+            if ssdw_transfer['enable'] == 1:
                 logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
                 last_s2s_xfer = datetime.now(timezone.utc)
 

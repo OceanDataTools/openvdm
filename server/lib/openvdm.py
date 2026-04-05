@@ -12,7 +12,7 @@ DESCRIPTION:  OpenVDM python module
  REVISION:  2025-04-12
 """
 
-import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from os.path import dirname, realpath, join
@@ -136,7 +136,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve cruise configuration from OpenVDM API")
@@ -153,7 +153,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve lowering configuration from OpenVDM API")
@@ -272,6 +272,21 @@ class OpenVDM():
         """
 
         return self.config.get('transferInterval')
+
+    def get_transfer_log_dir(self):
+        """
+        Return the directory where transfer log files are stored
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/getTransferLogDir"
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return return_obj.get('transferLogDir', '/var/log/openvdm')
+        except Exception as exc:
+            logging.error("Unable to retrieve transferLogDir from OpenVDM API")
+            raise exc
 
     def get_logfile_purge_timedelta(self):
         """
@@ -567,9 +582,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
-                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "0", return_obj))
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != 0, return_obj))
             if not lowering:
-                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "1", return_obj))
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != 1, return_obj))
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve active extra directories from OpenVDM API")
@@ -798,9 +813,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "0", return_obj))
+                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != 0, return_obj))
             if not lowering:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "1", return_obj))
+                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != 1, return_obj))
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve active collection system transfers from OpenVDM API")
@@ -884,7 +899,7 @@ class OpenVDM():
         """
 
         return_obj = self.get_cruise_data_transfers()
-        return list(filter(lambda transfer: transfer['enable'] == "1", return_obj))
+        return list(filter(lambda transfer: transfer['enable'] == 1, return_obj))
 
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):
@@ -956,7 +971,7 @@ class OpenVDM():
         id
         """
 
-        if job_status != "3":
+        if job_status != 3:
             return
 
         # Clear Error for current tranfer in DB via API
@@ -975,7 +990,7 @@ class OpenVDM():
         """
 
         # Ignore request if transfer does not have a error status
-        if job_status != "3":
+        if job_status != 3:
             return
 
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"

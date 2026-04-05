@@ -100,21 +100,21 @@ VALUES
   (1,'shipboardDataWarehouseIP','127.0.0.1'),
   (2,'shipboardDataWarehouseUsername','survey'),
   (3,'shipboardDataWarehouseStatus','2'),
-  (4,'cruiseID','Test_Cruise'),
+  (4,'cruiseID','ODT2601'),
   (5,'cruiseName','Explore the Deep'),
-  (6,'cruiseStartDate','2022/01/01 00:00'),
+  (6,'cruiseStartDate','2026/01/01 00:00'),
   (7,'cruiseStartPort','Newport, RI'),
-  (8,'cruiseEndDate','2022/02/01 00:00'),
+  (8,'cruiseEndDate','2026/02/01 00:00'),
   (9,'cruiseEndPort','Norfolk, VA'),
   (10,'cruisePI','Dave Lovalvo'),
   (11,'cruiseLocation','New England Seamounts'),
   (12,'cruiseSize','0'),
-  (13,'cruiseSizeUpdated','2022/01/01 00:00:00'),
-  (14,'loweringID','Test_Lowering'),
-  (15,'loweringStartDate','2022/01/01 00:00'),
+  (13,'cruiseSizeUpdated','2026/01/01 00:00:00'),
+  (14,'loweringID','ROV0001'),
+  (15,'loweringStartDate','2026/01/01 00:00'),
   (16,'loweringEndDate',''),
   (17,'loweringSize','0'),
-  (18,'loweringSizeUpdated','2022/01/01 00:00:00'),
+  (18,'loweringSizeUpdated','2026/01/01 00:00:00'),
   (19,'systemStatus','Off'),
   (20,'shipToShoreBWLimitStatus','Off'),
   (21,'md5FilesizeLimit','10'),
@@ -199,9 +199,8 @@ LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 
 INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
 VALUES
-  (1,'Transfer_Logs','Transfer Logs',0,'OpenVDM/TransferLogs',1,1),
-  (2,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
-  (3,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
+  (1,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
+  (2,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;

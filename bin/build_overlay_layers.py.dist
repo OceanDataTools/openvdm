@@ -42,7 +42,7 @@ DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
 OUTPUT_DIR = '/var/www/openvdm'
 OUTPUT_FN = 'overlay_layers.json'
 
-TITILER_URL = 'http://localhost:8000'
+TITILER_URL = 'http://localhost/titiler'
 
 AllGeoTiffSources = [
     {
