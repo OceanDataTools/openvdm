@@ -244,15 +244,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             if not results['verdict']:
                 return {'verdict': False, 'reason': results['reason']}
 
-            logfile_filename = f"PublicData_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.log"
-            logfile_filepath = os.path.join(self.build_logfile_dirpath(), logfile_filename)
-            logfile_contents = {
-                'files': {
-                    'new': files['new'],
-                    'updated': files['updated']
+            if len(files['new']) or files['updated']:
+                logfile_filename = f"{self.cruise_id}_PublicData_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.log"
+                logfile_filepath = os.path.join(self.build_logfile_dirpath(), logfile_filename)
+                logfile_contents = {
+                    'files': {
+                        'new': files['new'],
+                        'updated': files['updated']
+                    }
                 }
-            }
-            results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
+                results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
 
             if not results['verdict']:
                 return {'verdict': False, "reason": f"Error writing transfer logfile {logfile_filename}"}
