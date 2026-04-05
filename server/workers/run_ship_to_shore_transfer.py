@@ -213,7 +213,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the path for saving the transfer logfile
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def test_destination(self):

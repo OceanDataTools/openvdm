@@ -283,7 +283,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Build the path to save transfer logfiles
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
