@@ -19,7 +19,7 @@ ARGUMENTS: --interval <interval> The minimum interval in second between director
 """
 
 import argparse
-import datetime
+from datetime import datetime, timezone
 import logging
 import subprocess
 import sys
@@ -39,7 +39,7 @@ def size_cacher(interval):
     ovdm = OpenVDM()
 
     def loop_delay(start_dt, interval_s):
-        elapsed = (datetime.datetime.utcnow() - start_dt).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
         delay = interval_s - elapsed
         logging.debug("Elapsed Time: %.2f seconds", elapsed)
 
@@ -80,7 +80,7 @@ def size_cacher(interval):
 
 
     while True:
-        start = datetime.datetime.utcnow()
+        start = datetime.now(timezone.utc)
 
         try:
             warehouse_config = ovdm.get_shipboard_data_warehouse_config()

@@ -25,10 +25,9 @@ import signal
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from random import randint
-import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -659,7 +658,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 self.data_end_date = f"{lowering_end}:59" if lowering_end else "9999/12/31 23:59:59"
 
             if self.collection_system_transfer['staleness'] != 0:
-                staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
+                staleness_dt = datetime.now(timezone.utc) - timedelta(seconds=int(self.collection_system_transfer['staleness']))
                 data_end_dt = datetime.strptime(f"{self.data_end_date}+0000", "%Y/%m/%d %H:%M:%S%z")
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")

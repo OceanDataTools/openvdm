@@ -12,7 +12,7 @@ DESCRIPTION:  OpenVDM python module
  REVISION:  2025-04-12
 """
 
-import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from os.path import dirname, realpath, join
@@ -136,7 +136,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve cruise configuration from OpenVDM API")
@@ -153,7 +153,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve lowering configuration from OpenVDM API")
