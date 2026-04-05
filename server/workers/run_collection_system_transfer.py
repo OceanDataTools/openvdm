@@ -16,6 +16,7 @@ DESCRIPTION:  Gearman worker that handles the transfer of data from the Collecti
 import argparse
 import calendar
 import fnmatch
+import glob as glob_module
 import json
 import logging
 import os
@@ -32,7 +33,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
+from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -287,9 +288,85 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return log_dir
 
 
-    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
+    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False):
+        """
+        Enumerate concrete source directories when source_dir contains glob wildcard characters.
+        Returns a list of (concrete_source_dir, dest_basename) tuples.
+        dest_basename is the directory name to create under dest_dir; None if no wildcard.
+        Returns an empty list if wildcards are present but no directories match.
+        """
+
+        if not has_wildcard(source_dir):
+            return [(source_dir, None)]
+
+        parent = os.path.dirname(source_dir)
+        pattern = os.path.basename(source_dir)
+
+        if not parent or has_wildcard(parent):
+            logging.warning("Wildcard expansion only supported in the last path component: %s", source_dir)
+            return [(source_dir, None)]
+
+        cst_cfg = self.collection_system_transfer
+
+        if transfer_type in ['local', 'smb']:
+            local_parent = os.path.join(prefix, parent.lstrip('/')) if prefix else parent
+            matched = sorted([
+                d for d in glob_module.glob(os.path.join(local_parent, pattern))
+                if os.path.isdir(d)
+            ])
+            if not matched:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, os.path.basename(m)), os.path.basename(m)) for m in matched]
+
+        if transfer_type == 'rsync':
+            cmd = ['rsync', '--no-motd', f'--password-file={password_file}',
+                   f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            matches = []
+            for line in proc.stdout.splitlines():
+                parts = line.strip().split(None, 4)
+                if len(parts) < 5:
+                    continue
+                file_or_dir, _, _, _, name = parts
+                if file_or_dir.startswith('d') and name not in ('.', '..') and fnmatch.fnmatch(name, pattern):
+                    matches.append(name)
+            matches.sort()
+            if not matches:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, m), m) for m in matches]
+
+        if transfer_type == 'ssh':
+            user = cst_cfg['sshUser']
+            host = cst_cfg['sshServer']
+            cmd = ['rsync', '-e', 'ssh', f"{user}@{host}:{parent}/"]
+            if not is_darwin:
+                cmd.insert(2, '--protect-args')
+            if cst_cfg.get('sshUseKey') == 0:
+                cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            matches = []
+            for line in proc.stdout.splitlines():
+                parts = line.strip().split(None, 4)
+                if len(parts) < 5:
+                    continue
+                file_or_dir, _, _, _, name = parts
+                if file_or_dir.startswith('d') and name not in ('.', '..') and fnmatch.fnmatch(name, pattern):
+                    matches.append(name)
+            matches.sort()
+            if not matches:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, m), m) for m in matches]
+
+        return [(source_dir, None)]
+
+
+    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None):
         """
         Build the list of files to include, exclude, ignore for the given transfer.
+        override_source_dir, when provided, is used instead of self.source_dir.
         """
 
         def _build_filters(cst_cfg, cruise_id, lowering_id):
@@ -339,7 +416,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             return verified
 
 
-        source_dir = os.path.join(prefix, self.source_dir.lstrip('/')) if prefix else self.source_dir
+        raw_source_dir = override_source_dir if override_source_dir is not None else self.source_dir
+        source_dir = os.path.join(prefix, raw_source_dir.lstrip('/')) if prefix else raw_source_dir
         cst_cfg = self.collection_system_transfer
         transfer_type = get_transfer_type(cst_cfg['transferType'])
         filters = _build_filters(cst_cfg, self.cruise_id, self.lowering_id)
@@ -368,11 +446,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 command += [f'--password-file={rsync_password_filepath}', '--no-motd',
                             f"rsync://{cst_cfg['rsyncUser']}@"
                             f"{cst_cfg['rsyncServer']}"
-                            f"{self.source_dir}/"]
+                            f"{raw_source_dir}/"]
             elif transfer_type == 'ssh':
                 command += ['-e', 'ssh',
                             f"{cst_cfg['sshUser']}@"
-                            f"{cst_cfg['sshServer']}:{self.source_dir}/"]
+                            f"{cst_cfg['sshServer']}:{raw_source_dir}/"]
                 if not is_darwin:
                     command.insert(2, '--protect-args')
                 if cst_cfg.get('sshUseKey') == 0:
@@ -520,56 +598,89 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if transfer_type == 'ssh':
                 is_darwin = check_darwin(cst_cfg)
 
-            # Build filelist (from local, SMB mount, etc.)
-            filelist_result = self.build_cst_filelist(prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
+            # Enumerate source directories (expands wildcards if present)
+            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin)
 
-            if not filelist_result['verdict']:
-                return {'verdict': False, 'reason': filelist_result.get('reason', 'Unknown'), 'files': []}
+            if not source_pairs:
+                return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
 
-            files = filelist_result['files']
-
-            # Write file list
-            if not build_include_file(files['include'], include_file):
-                return {'verdict': False, 'reason': 'Error writing file list', 'files': []}
-
-            # Build rsync command
-            if transfer_type == 'local':
-                source_path = source_dir if source_dir == '/' else source_dir.rstrip('/')
-            elif transfer_type == 'rsync':
-                source_path = f"rsync://{cst_cfg['rsyncUser']}@" \
-                              f"{cst_cfg['rsyncServer']}" \
-                              f"{source_dir}"
-            elif transfer_type == 'ssh':
-                user = cst_cfg['sshUser']
-                host = cst_cfg['sshServer']
-                source_path = f"{user}@{host}:{source_dir}"
-            elif transfer_type == 'smb':
-                source_path = os.path.join(mntpoint, source_dir.lstrip('/').rstrip('/'))
-
-            source_path += '/'
-
-            extra_args = []
-            if transfer_type == 'ssh':
-                extra_args = ['-e', 'ssh']
-            elif transfer_type == 'rsync':
-                extra_args = [f"--password-file={password_file}"]
-
-            # Build command
-            rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
-            cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
-            if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
-                cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
-
-            # Transfer files
-            files['new'], files['updated'] = run_transfer_command(
-                self, current_job, cmd, len(files['include'])
-            )
-
-            # Delete files if sync'ing with source
+            all_files = {'new': [], 'updated': [], 'exclude': []}
             if cst_cfg['syncFromSource'] == 1:
-                files['deleted'] = delete_from_dest(dest_dir, files['include'])
+                all_files['deleted'] = []
 
-        return {'verdict': True, 'files': files}
+            rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
+
+            for src_dir, dest_name in source_pairs:
+                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
+                if dest_name:
+                    os.makedirs(effective_dest, exist_ok=True)
+
+                # Build filelist for this source directory
+                filelist_result = self.build_cst_filelist(
+                    prefix=prefix,
+                    rsync_password_filepath=password_file,
+                    is_darwin=is_darwin,
+                    override_source_dir=src_dir
+                )
+
+                if not filelist_result['verdict']:
+                    logging.warning("Filelist build failed for %s: %s", src_dir, filelist_result.get('reason', 'Unknown'))
+                    continue
+
+                files = filelist_result['files']
+
+                # Write file list
+                if not build_include_file(files['include'], include_file):
+                    logging.warning("Error writing file list for %s, skipping", src_dir)
+                    continue
+
+                # Build rsync source path
+                if transfer_type == 'local':
+                    source_path = src_dir if src_dir == '/' else src_dir.rstrip('/')
+                elif transfer_type == 'rsync':
+                    source_path = f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{src_dir}"
+                elif transfer_type == 'ssh':
+                    source_path = f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}:{src_dir}"
+                elif transfer_type == 'smb':
+                    source_path = os.path.join(mntpoint, src_dir.lstrip('/').rstrip('/'))
+
+                source_path += '/'
+
+                extra_args = []
+                if transfer_type == 'ssh':
+                    extra_args = ['-e', 'ssh']
+                elif transfer_type == 'rsync':
+                    extra_args = [f"--password-file={password_file}"]
+
+                cmd = build_rsync_command(rsync_flags, extra_args, source_path, effective_dest, include_file)
+                if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
+                    cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
+
+                new_files, updated_files = run_transfer_command(
+                    self, current_job, cmd, len(files['include'])
+                )
+                files['new'] = new_files
+                files['updated'] = updated_files
+
+                # Delete files if sync'ing with source
+                if cst_cfg['syncFromSource'] == 1:
+                    deleted = delete_from_dest(effective_dest, files['include'])
+                    if dest_name:
+                        all_files['deleted'].extend([os.path.join(dest_name, f) for f in deleted])
+                    else:
+                        all_files['deleted'].extend(deleted)
+
+                # Accumulate results, prefixing paths with dest_name for wildcard expansions
+                if dest_name:
+                    all_files['new'].extend([os.path.join(dest_name, f) for f in files['new']])
+                    all_files['updated'].extend([os.path.join(dest_name, f) for f in files['updated']])
+                    all_files['exclude'].extend([os.path.join(dest_name, f) for f in files['exclude']])
+                else:
+                    all_files['new'].extend(files['new'])
+                    all_files['updated'].extend(files['updated'])
+                    all_files['exclude'].extend(files['exclude'])
+
+        return {'verdict': True, 'files': all_files}
 
 
     def on_job_execute(self, current_job):

@@ -12,6 +12,7 @@ DESCRIPTION:  utilities used to connect with remote systems
  REVISION:  2025-08-18
 """
 
+import glob
 import os
 import sys
 import uuid
@@ -32,6 +33,11 @@ _TRANSFER_INT_FIELDS = frozenset([
     'sshUseKey', 'includeOVDMFiles', 'status', 'enable',
     'collectionSystemTransferID', 'cruiseDataTransferID',
 ])
+
+
+def has_wildcard(s):
+    """Return True if string contains glob special characters (* ? [)."""
+    return any(c in s for c in ('*', '?', '['))
 
 
 def normalize_transfer_config(cfg):
@@ -576,46 +582,83 @@ def test_cst_source(cst_cfg, source_dir):
         results.extend([{"partName": "Transfer type", "result": "Fail", "reason": "Unknown transfer type"}])
         return results
 
+    source_has_wildcard = has_wildcard(source_dir)
+    wildcard_parent = os.path.dirname(source_dir) if source_has_wildcard else None
+    wildcard_pattern = os.path.basename(source_dir) if source_has_wildcard else None
+
     with temporary_directory() as tmpdir:
         password_file = os.path.join(tmpdir, 'passwordFile')
 
         # Tests for local
         if transfer_type == 'local':
-            source_dir_exists = os.path.isdir(source_dir)
-            if not source_dir_exists:
-                reason = f"Unable to find source directory: {source_dir} on the data warehouse"
-                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
-
+            if source_has_wildcard:
+                if not os.path.isdir(wildcard_parent):
+                    reason = f"Unable to find parent directory: {wildcard_parent} on the data warehouse"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                    if cst_cfg['localDirIsMountPoint'] == 1:
+                        results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
+                    if cst_cfg['removeSourceFiles'] == 1:
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    return results
+                matches = sorted([d for d in glob.glob(os.path.join(wildcard_parent, wildcard_pattern)) if os.path.isdir(d)])
+                if not matches:
+                    reason = f"No directories matching wildcard pattern: {source_dir}"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                    if cst_cfg['removeSourceFiles'] == 1:
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    return results
+                results.extend([{"partName": "Source directory", "result": "Pass"}])
                 if cst_cfg['localDirIsMountPoint'] == 1:
-                    results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
-
+                    mnt_dir = os.sep + os.path.join(*matches[0].strip(os.sep).split(os.sep)[:2])
+                    if not os.path.ismount(mnt_dir):
+                        reason = f"{mnt_dir} is not a mount point on the data warehouse"
+                        results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
+                        if cst_cfg['removeSourceFiles'] == 1:
+                            results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                        return results
+                    results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
                 if cst_cfg['removeSourceFiles'] == 1:
-                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    if not test_write_access(matches[0]):
+                        reason = f"Unable to delete source files from: {matches[0]} on the data warehouse"
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                        return results
+                    results.extend([{"partName": "Write test", "result": "Pass"}])
+            else:
+                source_dir_exists = os.path.isdir(source_dir)
+                if not source_dir_exists:
+                    reason = f"Unable to find source directory: {source_dir} on the data warehouse"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                return results
-
-            results.extend([{"partName": "Source directory", "result": "Pass"}])
-
-            if cst_cfg['localDirIsMountPoint'] == 1:
-                mnt_dir = os.sep + os.path.join(*source_dir.strip(os.sep).split(os.sep)[:2])
-                if not os.path.ismount(mnt_dir):
-                    results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
+                    if cst_cfg['localDirIsMountPoint'] == 1:
+                        results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": reason}])
 
                     if cst_cfg['removeSourceFiles'] == 1:
                         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
-                results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
+                results.extend([{"partName": "Source directory", "result": "Pass"}])
 
-            if cst_cfg['removeSourceFiles'] == 1:
-                if not test_write_access(source_dir):
-                    reason = f"Unable to delete source files from: {source_dir} on SMB share"
-                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                if cst_cfg['localDirIsMountPoint'] == 1:
+                    mnt_dir = os.sep + os.path.join(*source_dir.strip(os.sep).split(os.sep)[:2])
+                    if not os.path.ismount(mnt_dir):
+                        results.extend([{"partName": "Source directory is a mount point", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
 
-                    return results
+                        if cst_cfg['removeSourceFiles'] == 1:
+                            results.extend([{"partName": "Write test", "result": "Fail", "reason": f"{mnt_dir} is not a mount point on the data warehouse"}])
 
-                results.extend([{"partName": "Write test", "result": "Pass"}])
+                        return results
+
+                    results.extend([{"partName": "Source directory is a mount point", "result": "Pass"}])
+
+                if cst_cfg['removeSourceFiles'] == 1:
+                    if not test_write_access(source_dir):
+                        reason = f"Unable to delete source files from: {source_dir} on the data warehouse"
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+                        return results
+
+                    results.extend([{"partName": "Write test", "result": "Pass"}])
 
         # Tests for smb
         if transfer_type == 'smb':
@@ -654,27 +697,50 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SMB share", "result": "Pass"}])
 
-            smb_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
-            source_dir_exists = os.path.isdir(smb_source_dir)
-            if not source_dir_exists:
-                reason = f"Unable to find source directory: {source_dir} on SMB share"
-                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
-
+            if source_has_wildcard:
+                smb_parent = os.path.join(mntpoint, wildcard_parent.lstrip('/'))
+                if not os.path.isdir(smb_parent):
+                    reason = f"Unable to find parent directory: {wildcard_parent} on SMB share"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                    if cst_cfg['removeSourceFiles'] == 1:
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    return results
+                matches = sorted([d for d in glob.glob(os.path.join(smb_parent, wildcard_pattern)) if os.path.isdir(d)])
+                if not matches:
+                    reason = f"No directories matching wildcard pattern: {source_dir} on SMB share"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                    if cst_cfg['removeSourceFiles'] == 1:
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    return results
+                results.extend([{"partName": "Source directory", "result": "Pass"}])
                 if cst_cfg['removeSourceFiles'] == 1:
-                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    if not test_write_access(matches[0]):
+                        reason = f"Unable to delete source files from: {matches[0]} on SMB share"
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                        return results
+                    results.extend([{"partName": "Write test", "result": "Pass"}])
+            else:
+                smb_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
+                source_dir_exists = os.path.isdir(smb_source_dir)
+                if not source_dir_exists:
+                    reason = f"Unable to find source directory: {source_dir} on SMB share"
+                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
 
-                return results
-
-            results.extend([{"partName": "Source directory", "result": "Pass"}])
-
-            if cst_cfg['removeSourceFiles'] == 1:
-                if not test_write_access(smb_source_dir):
-                    reason = f"Unable to delete source files from: {source_dir} on SMB share"
-                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    if cst_cfg['removeSourceFiles'] == 1:
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
                     return results
 
-                results.extend([{"partName": "Write test", "result": "Pass"}])
+                results.extend([{"partName": "Source directory", "result": "Pass"}])
+
+                if cst_cfg['removeSourceFiles'] == 1:
+                    if not test_write_access(smb_source_dir):
+                        reason = f"Unable to delete source files from: {source_dir} on SMB share"
+                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+                        return results
+
+                    results.extend([{"partName": "Write test", "result": "Pass"}])
 
         # Tests for rsync
         if transfer_type == 'rsync':
@@ -707,9 +773,13 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success = test_rsync_connection(f"{cst_cfg['rsyncServer']}{source_dir}", cst_cfg['rsyncUser'], password_file)
+            check_dir = wildcard_parent if source_has_wildcard else source_dir
+            contest_success = test_rsync_connection(f"{cst_cfg['rsyncServer']}{check_dir}", cst_cfg['rsyncUser'], password_file)
             if not contest_success:
-                reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
+                if source_has_wildcard:
+                    reason = f"Unable to find parent directory: {wildcard_parent} on the Rsync Server: {cst_cfg['rsyncServer']}"
+                else:
+                    reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
                 results.extend([
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
@@ -736,10 +806,14 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
-            contest_success = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], source_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+            check_dir = wildcard_parent if source_has_wildcard else source_dir
+            contest_success = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], check_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
-                reason = f"Unable to find destination directory: {source_dir}"
+                if source_has_wildcard:
+                    reason = f"Unable to find parent directory: {wildcard_parent}"
+                else:
+                    reason = f"Unable to find source directory: {source_dir}"
                 results.extend([
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
