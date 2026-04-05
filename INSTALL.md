@@ -1,7 +1,7 @@
 # Open Vessel Data Management
 
 ## Installation Guide
-At the time of this writing OpenVDM was built and tested against the Ubuntu 22.04/24.04 LTS and Rocky 8.5 operating systems.  There are distro-specific install scripts so use the one appropriate for the distro being installed to.  It may be possible to build against other linux-based operating systems however for the purposes of this guide the instructions will assume Ubuntu 22.04 LTS is used.
+At the time of this writing OpenVDM was built and tested against Debian 12/13, Ubuntu 22.04/24.04, Rocky 8/9 and AlmaLinux 8/9 operating systems.
 
 ### Operating Systems
  - Debian 12: <https://wiki.debian.org/DebianBookworm>
@@ -43,7 +43,7 @@ curl -L -o install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvd
 
 Run the install script
 ```
-bash ./install_openvdm.sh
+bash ./install-openvdm.sh
 ```
 
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
@@ -136,20 +136,44 @@ Cache data directory /data/cache_data does not exist... create it?  (yes)
 
 ```
 #####################################################################
+Optionally install TiTiler, a dynamic tile server for Cloud Optimized
+GeoTIFFs (COGs). TiTiler is required for the geotiff_titiler_parser
+plugin used by the sample data configuration.
+
+Install TiTiler?  (no) yes
+Port for TiTiler service? (8000)
+```
+
+```
+#####################################################################
 Setup a PublicData SMB Share for scientists and crew to share files,
-pictures, etc. These files will be copied to the cruise data 
+pictures, etc. These files will be copied to the cruise data
 directory at the end of the cruise. This behavior can be disabled in
 the /opt/openvdm/server/etc/openvdm.yaml file.
 
-Setup PublicData Share?  (yes) 
+Setup PublicData Share?  (yes)
 ```
- 
+
 ```
 #####################################################################
-Setup a VistorInformation SMB Share for sharing documentation, print
+Setup a VisitorInformation SMB Share for sharing documentation, print
 drivers, etc with crew and scientists.
 
-Setup VisitorInformation Share?  (no) 
+Setup VisitorInformation Share?  (no)
+```
+
+```
+#####################################################################
+Optionally install sample data from the openvdm_sample_data repository.
+This configures demonstration collection systems, cruise data transfers,
+and ship-to-shore transfers using local sample instrument data.
+WARNING: This will replace any existing transfer configuration in the
+OpenVDM database.
+
+Install sample data?  (no) yes
+Root directory for sample data? (/data/sample_data)
+Sample data repository? (https://github.com/oceandatatools/openvdm_sample_data)
+Sample data branch? (master)
 ```
 
 ### All done... almost ###
