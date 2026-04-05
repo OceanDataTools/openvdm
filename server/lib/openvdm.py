@@ -273,6 +273,21 @@ class OpenVDM():
 
         return self.config.get('transferInterval')
 
+    def get_transfer_log_dir(self):
+        """
+        Return the directory where transfer log files are stored
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/getTransferLogDir"
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return return_obj.get('transferLogDir', '/var/log/openvdm')
+        except Exception as exc:
+            logging.error("Unable to retrieve transferLogDir from OpenVDM API")
+            raise exc
+
     def get_logfile_purge_timedelta(self):
         """
         Return the logfile purge time delta

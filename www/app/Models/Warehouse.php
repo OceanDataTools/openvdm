@@ -163,6 +163,10 @@ class Warehouse extends Model {
         return CRUISEDATA_BASEDIR;
     }
 
+    public function getTransferLogDir() {
+        return TRANSFER_LOG_DIR;
+    }
+
     public function getShipboardDataWarehouseApacheDir() {
         return CRUISEDATA_APACHEDIR;
     }

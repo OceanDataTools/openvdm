@@ -22,7 +22,6 @@ ARGUMENTS: --interval <interval> The interval in minutes between transfer job
  REVISION:  2025-07-06
 """
 
-import os
 import sys
 import time
 import json
@@ -51,7 +50,6 @@ def scheduler(interval=None):
     gm_client = GearmanClient([ovdm.get_gearman_server()])
     time.sleep(10)
 
-    cruise_basedir = ovdm.get_cruisedata_path()
     logfile_purge_timedelta = ovdm.get_logfile_purge_timedelta()
     last_s2s_xfer = datetime.now(timezone.utc)
 
@@ -62,8 +60,7 @@ def scheduler(interval=None):
 
         # purge old transfer logs:
         logging.info("Purging old transfer logs")
-        cruiseID = ovdm.get_cruise_id()
-        transfer_log_dir = os.path.join(cruise_basedir, cruiseID, ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        transfer_log_dir = ovdm.get_transfer_log_dir()
         purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
 
         # Run on the minute
