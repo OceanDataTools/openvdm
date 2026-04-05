@@ -873,7 +873,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.info("Writing transfer logfile")
         worker.send_job_status(current_job, 97, 100)
 
-        logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
+        logfile_filename = f"{worker.cruise_id}_{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
             'files': {
                 'new': job_results['files']['new'],
@@ -899,7 +899,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 98, 100)
 
-    logfile_filename = f"{cst_cfg['name']}_Exclude.log"
+    logfile_filename = f"{worker.cruise_id}_{cst_cfg['name']}_Exclude.log"
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']

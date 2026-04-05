@@ -609,7 +609,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
         logging.info("Writing transfer logfile")
         worker.send_job_status(current_job, 96, 100)
 
-        logfile_filename = f"{cdt_cfg['name']}_{worker.transfer_start_date}.log"
+        logfile_filename = f"{worker.cruise_id}_{cdt_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
             'files': {
                 'new': [file.lstrip(f'{worker.cruise_id}/') for file in job_results['files']['new']],
@@ -635,7 +635,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 98, 100)
 
-    logfile_filename = f"{cdt_cfg['name']}_Exclude.log"
+    logfile_filename = f"{worker.cruise_id}_{cdt_cfg['name']}_Exclude.log"
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']
