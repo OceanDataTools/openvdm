@@ -447,7 +447,7 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    exclude_transfer_logs = f"{worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir']}/"
+    exclude_transfer_logs = f"{worker.ovdm.get_transfer_log_dir()}/"
 
     filelist = build_filelist(worker.cruise_dir).get('include', [])
     filtered_filelist = [
