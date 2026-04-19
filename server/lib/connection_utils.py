@@ -168,15 +168,16 @@ def mount_smb_share(cfg, mntpoint, smb_version):
 
     logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cfg["smbPass"]}', 'password=****'))
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
-        return True
+        return True, ""
     except subprocess.CalledProcessError as exc:
-        logging.error("Failed to mount SMB share: %s.  Are you running as root?", str(exc))
+        detail = exc.stderr.strip() if exc.stderr else str(exc)
+        logging.error("Failed to mount SMB share: %s.  Are you running as root?", detail)
 
         # Try to unmount in case of partial mount
         subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return False
+        return False, detail
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
@@ -198,7 +199,8 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
 
 def test_rsync_connection(server, user, password_file=None):
     """
-    Test the connection to a rsync server
+    Test the connection to a rsync server.
+    Returns (success: bool, detail: str).
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -213,12 +215,14 @@ def test_rsync_connection(server, user, password_file=None):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode not in [0, 24]:
-            logging.error("rsync connection test failed: %s", proc.stderr.strip())
-            return False
-        return True
+            detail = proc.stderr.strip()
+            logging.error("rsync connection test failed: %s", detail)
+            return False, detail
+        return True, ""
     except Exception as exc:
-        logging.error("rsync connection test failed: %s", str(exc))
-        return False
+        detail = str(exc)
+        logging.error("rsync connection test failed: %s", detail)
+        return False, detail
 
 
 def test_rsync_write_access(server, user, tmpdir, password_file=None):
@@ -226,6 +230,7 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     Verify the transfer has write access to the rsync server.  This is done via
     a write_test.txt file.  Currently there is no way to delete this file after
     completing the test.
+    Returns (success: bool, detail: str).
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -246,13 +251,15 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode not in [0, 24]:
-            logging.error("rsync write test failed: %s", proc.stderr.strip())
-            return False
+            detail = proc.stderr.strip()
+            logging.error("rsync write test failed: %s", detail)
+            return False, detail
     except Exception as exc:
-        logging.error("rsync write test failed: %s", str(exc))
-        return False
+        detail = str(exc)
+        logging.error("rsync write test failed: %s", detail)
+        return False, detail
 
-    return True
+    return True, ""
 
 
 def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
@@ -273,7 +280,8 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
     """
-    Test the connection to a ssh server
+    Test the connection to a ssh server.
+    Returns (success: bool, detail: str).
     """
 
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
@@ -286,17 +294,20 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            logging.error("SSH connection test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
-            return False
+            detail = proc.stderr.strip()
+            logging.error("SSH connection test failed (exit %s): %s", proc.returncode, detail)
+            return False, detail
     except Exception as exc:
-        logging.error("SSH connection test failed: %s", str(exc))
-        return False
-    return True
+        detail = str(exc)
+        logging.error("SSH connection test failed: %s", detail)
+        return False, detail
+    return True, ""
 
 
 def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
     """
-    Verify the presence of a directort on the ssh server
+    Verify the presence of a directory on the ssh server.
+    Returns (success: bool, detail: str).
     """
 
     passwd = passwd or ''
@@ -310,17 +321,20 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            logging.error("SSH destination test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
-            return False
+            detail = proc.stderr.strip()
+            logging.error("SSH destination test failed (exit %s): %s", proc.returncode, detail)
+            return False, detail
     except Exception as exc:
-        logging.error("SSH destination test failed: %s", str(exc))
-        return False
-    return True
+        detail = str(exc)
+        logging.error("SSH destination test failed: %s", detail)
+        return False, detail
+    return True, ""
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     """
     Verify write access to the directory on the remote ssh server.
+    Returns (success: bool, detail: str).
     """
 
     passwd = passwd or ''
@@ -334,11 +348,13 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            logging.error("SSH write test failed (exit %s): %s", proc.returncode, proc.stderr.strip())
-            return False
+            detail = proc.stderr.strip()
+            logging.error("SSH write test failed (exit %s): %s", proc.returncode, detail)
+            return False, detail
     except Exception as exc:
-        logging.error("SSH write test failed: %s", str(exc))
-        return False
+        detail = str(exc)
+        logging.error("SSH write test failed: %s", detail)
+        return False, detail
 
     cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
 
@@ -350,13 +366,15 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            logging.error("SSH write test cleanup failed (exit %s): %s", proc.returncode, proc.stderr.strip())
-            return False
+            detail = proc.stderr.strip()
+            logging.error("SSH write test cleanup failed (exit %s): %s", proc.returncode, detail)
+            return False, detail
     except Exception as exc:
-        logging.error("SSH write test failed: %s", str(exc))
-        return False
+        detail = str(exc)
+        logging.error("SSH write test failed: %s", detail)
+        return False, detail
 
-    return True
+    return True, ""
 
 
 def build_rclone_config_for_ssh(cfg, rclone_config):
@@ -545,9 +563,11 @@ def test_smb_destination(cdt_cfg, mntpoint, smb_version):
 
     results.extend([{"partName": "SMB server", "result": "Pass"}])
 
-    mnt_success = mount_smb_share(cdt_cfg, mntpoint, smb_version)
+    mnt_success, mnt_detail = mount_smb_share(cdt_cfg, mntpoint, smb_version)
     if not mnt_success:
         reason = f"Could not connect to SMB share: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+        if mnt_detail:
+            reason += f" — {mnt_detail}"
         logging.error(reason)
         results.extend([
             {"partName": "SMB share", "result": "Fail", "reason": reason},
@@ -682,9 +702,11 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SMB server", "result": "Pass"}])
 
-            mnt_success = mount_smb_share(cst_cfg, mntpoint, smb_version)
+            mnt_success, mnt_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
             if not mnt_success:
                 reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                if mnt_detail:
+                    reason += f" — {mnt_detail}"
                 results.extend([
                     {"partName": "SMB share", "result": "Fail", "reason": reason},
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
@@ -762,9 +784,11 @@ def test_cst_source(cst_cfg, source_dir):
             else:
                 password_file = None
 
-            contest_success = test_rsync_connection(cst_cfg['rsyncServer'], cst_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(cst_cfg['rsyncServer'], cst_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Could not connect to rsync server: {cst_cfg['rsyncServer']} as {cst_cfg['rsyncUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Rsync connection", "result": "Fail", "reason": reason},
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
@@ -774,12 +798,14 @@ def test_cst_source(cst_cfg, source_dir):
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
             check_dir = wildcard_parent if source_has_wildcard else source_dir
-            contest_success = test_rsync_connection(f"{cst_cfg['rsyncServer']}{check_dir}", cst_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(f"{cst_cfg['rsyncServer']}{check_dir}", cst_cfg['rsyncUser'], password_file)
             if not contest_success:
                 if source_has_wildcard:
                     reason = f"Unable to find parent directory: {wildcard_parent} on the Rsync Server: {cst_cfg['rsyncServer']}"
                 else:
                     reason = f"Unable to find source directory: {source_dir} on the Rsync Server: {cst_cfg['rsyncServer']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
@@ -793,10 +819,12 @@ def test_cst_source(cst_cfg, source_dir):
 
             use_pubkey = cst_cfg['sshUseKey'] == 1
 
-            contest_success = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to connect to SSH server: {cst_cfg['sshServer']} as {cst_cfg['sshUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "SSH connection", "result": "Fail", "reason": reason},
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
@@ -807,13 +835,15 @@ def test_cst_source(cst_cfg, source_dir):
             results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
             check_dir = wildcard_parent if source_has_wildcard else source_dir
-            contest_success = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], check_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], check_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 if source_has_wildcard:
                     reason = f"Unable to find parent directory: {wildcard_parent}"
                 else:
                     reason = f"Unable to find source directory: {source_dir}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
                 ])
@@ -883,9 +913,11 @@ def test_cdt_destination(cdt_cfg):
             else:
                 password_file = None
 
-            contest_success = test_rsync_connection(cdt_cfg['rsyncServer'], cdt_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(cdt_cfg['rsyncServer'], cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Could not connect to rsync server: {cdt_cfg['rsyncServer']} as {cdt_cfg['rsyncUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Rsync connection", "result": "Fail", "reason": reason},
                     {"partName": "Destination directory", "result": "Fail", "reason": reason}
@@ -894,9 +926,11 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success = test_rsync_connection(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
-                reason = f"Unable to find source directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
+                reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Destination directory", "result": "Fail", "reason": reason}
                 ])
@@ -905,9 +939,11 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Destination directory", "result": "Pass"})
 
-            contest_success = test_rsync_write_access(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], tmpdir, password_file)
+            contest_success, contest_detail = test_rsync_write_access(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], tmpdir, password_file)
             if not contest_success:
                 reason = f"Unable to write to: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])
@@ -921,10 +957,12 @@ def test_cdt_destination(cdt_cfg):
 
             use_pubkey = cdt_cfg['sshUseKey'] == 1
 
-            contest_success = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to connect to SSH server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "SSH connection", "result": "Fail", "reason": reason},
                     {"partName": "Destination directory", "result": "Fail", "reason": reason},
@@ -935,10 +973,12 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
-            contest_success = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Destination directory", "result": "Fail", "reason": reason},
                     {"partName": "Write test", "result": "Fail", "reason": reason}
@@ -948,11 +988,12 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
-
-            contest_success = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"No write access on ssh server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']} at {cdt_cfg['destDir']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
                 results.extend([
                     {"partName": "Write test", "result": "Fail", "reason": reason}
                 ])

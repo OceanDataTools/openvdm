@@ -577,9 +577,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 mntpoint = os.path.join(tmpdir, 'mntpoint')
                 os.mkdir(mntpoint, 0o755)
                 smb_version = detect_smb_version(cst_cfg)
-                success = mount_smb_share(cst_cfg, mntpoint, smb_version)
+                success, mount_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
                 if not success:
-                    return {'verdict': False, 'reason': 'Failed to mount SMB share'}
+                    reason = 'Failed to mount SMB share'
+                    if mount_detail:
+                        reason += f' — {mount_detail}'
+                    return {'verdict': False, 'reason': reason}
                 prefix = mntpoint
 
             # Adjustments for RSYNC
@@ -788,18 +791,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error("%s in %s line %s", exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
