@@ -186,7 +186,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 remaining = int(match.group(1))
                 total = int(match.group(2))
                 if total > 0:
-                    percent = int(100 * (total - remaining) / total)
+                    percent = max(last_percent, min(100, int(100 * (total - remaining) / total)))
 
                     if percent != last_percent:
                         logging.info("Progress Update: %d%%", percent)
@@ -199,7 +199,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # Try to extract progress percentage from rclone's output
             match = RCLONE_PROGRESS_RE.search(line)
             if match:
-                percent = int(match.group(1))
+                percent = max(last_percent, min(100, int(match.group(1))))
 
                 if percent != last_percent:
                     logging.info("Progress Update: %d%%", percent)
