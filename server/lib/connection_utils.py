@@ -135,17 +135,19 @@ def detect_smb_version(cfg):
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
         if proc.returncode != 0 or "NT_STATUS" in proc.stderr or "failed" in proc.stderr.lower():
-            logging.error("Failed to connect to SMB server: %s", proc.stderr.strip())
-            return None
+            detail = proc.stderr.strip()
+            logging.error("Failed to connect to SMB server: %s", detail)
+            return None, detail
 
         for line in proc.stdout.splitlines():
             if line.startswith('OS=[Windows 5.1]'):
-                return '1.0'
-        return '2.1'
+                return '1.0', ""
+        return '2.1', ""
 
     except subprocess.SubprocessError as exc:
-        logging.error("SMB version detection failed: %s", str(exc))
-        return None
+        detail = str(exc)
+        logging.error("SMB version detection failed: %s", detail)
+        return None, detail
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
@@ -546,11 +548,13 @@ def test_local_destination(dest_dir, is_mountpoint=0):
     return results
 
 
-def test_smb_destination(cdt_cfg, mntpoint, smb_version):
+def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
     results = []
 
     if not smb_version:
         reason = f"Could not connect to SMB server: {cdt_cfg['smbServer']} as {cdt_cfg['smbUser']}"
+        if smb_detail:
+            reason += f" — {smb_detail}"
         logging.error(reason)
         results.extend([
             {"partName": "SMB server", "result": "Fail", "reason": reason},
@@ -685,10 +689,12 @@ def test_cst_source(cst_cfg, source_dir):
 
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(cst_cfg)
+            smb_version, smb_detail = detect_smb_version(cst_cfg)
 
             if not smb_version:
                 reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                if smb_detail:
+                    reason += f" — {smb_detail}"
                 results.extend([
                     {"partName": "SMB server", "result": "Fail", "reason": reason},
                     {"partName": "SMB share", "result": "Fail", "reason": reason},
@@ -887,9 +893,9 @@ def test_cdt_destination(cdt_cfg):
 
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(cdt_cfg)
+            smb_version, smb_detail = detect_smb_version(cdt_cfg)
 
-            results.extend(test_smb_destination(cdt_cfg, mntpoint, smb_version))
+            results.extend(test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail))
             if results[-1].get('result') == 'Fail':
                 return results
 
@@ -1098,9 +1104,9 @@ def test_cdt_rclone_destination(cfg):
         with temporary_directory() as tmpdir:
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            smb_version = detect_smb_version(cfg)
+            smb_version, smb_detail = detect_smb_version(cfg)
 
-            results.extend(test_smb_destination(cfg, mntpoint, smb_version))
+            results.extend(test_smb_destination(cfg, mntpoint, smb_version, smb_detail))
 
     if remote_type == 'google cloud storage':
         if '/' not in remote_path:
