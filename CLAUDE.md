@@ -106,6 +106,21 @@ pre-commit run --all-files
 
 The `connection_utils.py` module handles five transfer types: local directory, rsync server, SMB (Samba) share, SSH server, and rclone (cloud storage). Transfer type logic branches on these in workers.
 
+### connection_utils.py return conventions
+
+Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `test_rsync_connection`, `test_rsync_write_access`, `test_ssh_connection`, `test_ssh_remote_directory`, `test_ssh_write_access`) return `(bool, str)` tuples — success flag plus stderr detail. The higher-level functions (`test_cst_source`, `test_cdt_destination`, `test_smb_destination`) return `list[dict]` with `partName`/`result`/`reason` keys. Maintain this distinction when adding new connection tests.
+
+### rclone destination convention
+
+A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+
+### CDT destDir semantics
+
+For cruise data transfers, `destDir` interpretation depends on transfer type:
+- **Local Directory, no `:`** — absolute path on the local filesystem (leading `/` required)
+- **Local Directory, contains `:`** — rclone `remote:path` (no leading slash on remote name)
+- **All other transfer types** — relative path within the cruise directory (no leading slash)
+
 ## Database
 
 - MySQL; schema: `database/openvdm_db.sql`
