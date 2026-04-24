@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 
 SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
 REPO_ROOT    = os.path.dirname(SCRIPT_DIR)
-BACKUP_DIR   = os.path.join(SCRIPT_DIR, "backups")
+BACKUP_DIR   = os.path.join(REPO_ROOT, "database", "backups")
 CONFIG_PHP   = os.path.join(REPO_ROOT, "www", "app", "Core", "Config.php")
 
 # Tables whose rows should NOT be included in the backup (structure only).
@@ -242,11 +242,12 @@ def _select_backup_file(backup_dir: str) -> str:
     print("\nAvailable backups:")
     for i, name in enumerate(files, 1):
         print(f"  {i}) {name}")
+    print("  0) Cancel")
 
     try:
-        raw = input(f"\nSelect backup to restore [1-{len(files)}]: ").strip()
+        raw = input(f"\nSelect backup to restore [0-{len(files)}]: ").strip()
         choice = int(raw)
-        if not 1 <= choice <= len(files):
+        if not 0 <= choice <= len(files):
             raise ValueError
     except (ValueError, EOFError):
         print("Invalid selection. Aborting.")
@@ -254,6 +255,10 @@ def _select_backup_file(backup_dir: str) -> str:
     except KeyboardInterrupt:
         print("\nAborted.")
         sys.exit(1)
+
+    if choice == 0:
+        print("Cancelled.")
+        sys.exit(0)
 
     return os.path.join(backup_dir, files[choice - 1])
 
