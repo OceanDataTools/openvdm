@@ -95,6 +95,23 @@ pre-commit run --all-files
 - **PHP**: follows existing MVC conventions in `www/app/`
 - Ruff is configured to auto-fix on commit via `.pre-commit-config.yaml`
 
+### Python documentation standard
+
+All Python files (including `.py.dist` templates) must use **pdoc-compatible inline documentation**:
+
+- Every module must have a concise summary line as the first sentence of its module docstring, followed by a blank line and any extended description. pdoc uses the summary line as the module's one-line description in index pages.
+- Every public class, function, and method must have a docstring.
+- Use **Google-style** docstrings with `Args:`, `Returns:`, `Raises:`, and `Attributes:` sections where applicable.
+- Include Python type annotations on function signatures; this allows pdoc to render types without duplicating them in the docstring.
+- The legacy `FILE: / DESCRIPTION: / AUTHOR: / REVISION:` header block must **not** be used — replace it with a proper module docstring.
+- Private helpers (names starting with `_`) should have docstrings when their purpose is non-obvious.
+
+## Testing
+
+### Known false-positive pytest errors
+
+`test_cst_source`, `test_cdt_destination`, and `test_cdt_rclone_destination` in `server/lib/connection_utils.py` are **not pytest tests** — they are OpenVDM connection-testing functions whose names happen to match pytest's default collection pattern. pytest will report them as errors (missing fixture) when running the full suite. These errors are pre-existing and expected; they do not indicate a regression.
+
 ## Git Workflow
 
 - `master` — production releases

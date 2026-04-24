@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
-"""
-FILE:  reboot_reset.py
+"""Reset OpenVDM state in the database after an unscheduled system reboot.
 
-DESCRIPTION:  This program resets OVDM state information in the database.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-06-22
- REVISION:  2025-07-06
+Sets all Gearman tasks, collection system transfers, and cruise data transfers
+back to idle, then clears any stale Gearman job records from the database.
+Intended to be run automatically by Supervisor/systemd on startup, or manually
+after an ungraceful shutdown.
 """
 
 import argparse
@@ -23,8 +18,11 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 def reboot_reset():
-    """
-    Set all tasks and transfer to idle.
+    """Reset all OpenVDM tasks and transfers to idle and clear stale Gearman jobs.
+
+    Connects to the OpenVDM API, marks every task and every non-disabled
+    collection system and cruise data transfer as idle, then removes any
+    lingering Gearman job entries from the database.
     """
 
     openVDM = OpenVDM()

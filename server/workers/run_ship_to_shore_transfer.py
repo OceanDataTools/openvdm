@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  run_ship_to_shore_transfer.py
+"""Gearman worker that transfers cruise data from the Shipboard Data Warehouse to a Shoreside Data Warehouse.
 
-DESCRIPTION:  Gearman worker that handles the transfer of data from the
-    Shipboard Data Warehouse to a Shoreside Data Warehouse.
+Registers the ``runShipToShoreTransfer`` Gearman task.  The shoreside
+destination (SSDW) is the special required cruise data transfer named
+``"SSDW"`` in the OpenVDM database.  Supported destination types are rsync
+server, SSH (via rclone), and generic rclone remote.
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2017-09-30
- REVISION:  2025-08-08
+Key responsibilities:
+
+- Test the shoreside destination before transferring.
+- Apply per-file include/exclude filters in parallel batches.
+- Report real-time transfer progress to the Gearman job.
+- Restart automatically every hour (via ``stopJob`` submitted by the
+  :py:mod:`scheduler` worker).
 """
 
 import argparse
@@ -40,9 +42,22 @@ TASK_NAMES = {
     'RUN_SHIP_TO_SHORE_TRANSFER': 'runShipToShoreTransfer'
 }
 
-def process_batch(batch, filters):
-    """
-    Process a batch of file paths
+def process_batch(batch: list, filters: dict) -> list:
+    """Filter a batch of file paths against ship-to-shore transfer criteria.
+
+    Each file is evaluated for default-ignore status, ASCII filename
+    requirement, and priority-ordered include/exclude filter patterns.
+
+    Args:
+        batch: List of absolute file paths to evaluate.
+        filters: Ordered dict mapping priority keys to lists of glob patterns.
+            Files are matched against patterns in priority order; the first
+            match determines the action.
+
+    Returns:
+        List of ``(action, filepath, priority)`` tuples where *action* is
+        ``"include"`` or ``"exclude"``.  Symlinks, default-ignored files, and
+        unmatched files are omitted.
     """
 
     def _process_filepath(filepath, filters):
@@ -80,8 +95,16 @@ def process_batch(batch, filters):
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Class for the current Gearman worker
+    """Gearman worker for ship-to-shore data transfers.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        cruise_id: Current cruise identifier.
+        system_status: Cached system status string.
+        cruise_data_transfer: Configuration dict for the SSDW transfer.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_dir: Absolute path to the cruise data directory.
     """
 
     def __init__(self):

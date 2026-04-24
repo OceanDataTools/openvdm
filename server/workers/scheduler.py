@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
-"""
-FILE:  scheduler.py
+"""Periodic scheduler that submits OpenVDM transfer jobs to Gearman.
 
-DESCRIPTION:  This program handles the scheduling of the transfer-related Gearman
-    tasks.
+Runs as a long-lived daemon (managed by Supervisor in production).  On each
+cycle it submits background Gearman jobs for every active and non-running
+collection system transfer and cruise data transfer, then evaluates the
+ship-to-shore (SSDW) transfer — restarting it if it has been running longer
+than one hour, and queuing a new run if it is enabled.  Old transfer log files
+are also purged based on the configured retention period.
 
-USAGE: scheduler.py [--interval <interval>] <siteRoot>
+Usage::
 
-ARGUMENTS: --interval <interval> The interval in minutes between transfer job
-            submissions.  If this argument is not provided the default inteval
-            is 5 minutes
-
-            <siteRoot> The base URL to the OpenVDM installation on the Shipboard
-             Data Warehouse.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2017-09-30
- REVISION:  2025-07-06
+    scheduler.py [--interval MINUTES] [-v ...]
 """
 
 import sys
@@ -39,9 +30,25 @@ from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASKS_NAMES
 from server.workers.run_ship_to_shore_transfer import TASK_NAMES as S2ST_TASKS_NAMES
 
-def scheduler(interval=None):
-    """
-    Schedule transfers to occur at the defined interval
+def scheduler(interval: int = None) -> None:
+    """Submit Gearman transfer jobs on a recurring interval.
+
+    Runs an infinite loop.  Each iteration:
+
+    1. Purges transfer log files older than the configured retention period.
+    2. Waits until the next full minute boundary.
+    3. Skips the rest of the cycle if the system status is ``'Off'``.
+    4. Submits a background ``runCollectionSystemTransfer`` job for each
+       active, non-running collection system transfer.
+    5. Submits a background ``runCruiseDataTransfer`` job for each
+       non-running cruise data transfer.
+    6. Manages the ship-to-shore (SSDW) transfer: stops it if it has been
+       running for more than one hour, and starts a new run if enabled.
+    7. Sleeps until the next interval boundary.
+
+    Args:
+        interval: Scheduling interval in minutes.  When ``None`` the value is
+            retrieved from the OpenVDM API (``getTransferInterval``).
     """
 
     ovdm = OpenVDM()

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-FILE:  lowering.py
+"""Gearman worker that initializes and finalizes OpenVDM lowerings.
 
-DESCRIPTION:  Gearman worker the handles the tasks of initializing a new
-lowering and finalizing the current lowering.
+Registers three Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``setupNewLowering`` — create the lowering directory tree, initialize the
+  MD5 summary for the lowering, set directory permissions, and export the
+  lowering configuration.
+- ``finalizeCurrentLowering`` — run pre-finalize hooks, update the MD5
+  summary, apply directory permissions, export the lowering config, and run
+  post-finalize hooks.
+- ``exportLoweringConfig`` — write the current lowering configuration as JSON
+  into the lowering directory.
 """
 
 import argparse
@@ -39,8 +39,17 @@ TASK_NAMES = {
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for lowering setup and finalization.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        lowering_id: Current lowering identifier.
+        lowering_start_date: Start date of the current lowering.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        lowering_dir: Absolute path to the lowering data directory.
     """
 
     def __init__(self):

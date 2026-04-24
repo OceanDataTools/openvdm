@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-FILE:  md5_summary.py
+"""Gearman worker that builds and updates the cruise MD5 checksum summary.
 
-DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
-    checksum summary.
+Registers two Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``rebuildMD5Summary`` — compute MD5 checksums for every file in the cruise
+  directory and write a complete ``MD5Summary.md5`` file and its own checksum
+  (``MD5Summary.md5.md5``).
+- ``updateMD5Summary`` — incrementally update the summary for files that have
+  been added or changed since the last run.
+
+Files are read in 64 KiB chunks (``BUF_SIZE``) to keep memory usage bounded
+for large data sets.
 """
 
 import argparse
@@ -44,8 +44,19 @@ CUSTOM_TASKS = [
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise MD5 checksum summary generation.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        md5_summary_filepath: Absolute path to the ``MD5Summary.md5`` output
+            file.
+        md5_summary_md5_filepath: Absolute path to the checksum-of-checksum
+            file (``MD5Summary.md5.md5``).
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):

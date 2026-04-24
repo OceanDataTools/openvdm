@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  data_dashboard.py
+"""Gearman worker that builds and updates the OpenVDM data-dashboard objects.
 
-DESCRIPTION:  Gearman worker that handles the creation and update of OVDM data
-    dashboard objects.
+Registers two Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-12-30
+- ``updateDataDashboard`` — run every plugin that matches the new or updated
+  files reported by a collection system transfer and write the resulting
+  dashboard JSON to the cruise directory.
+- ``rebuildDataDashboard`` — walk the entire cruise directory, run all matching
+  plugins against every file, and fully regenerate all dashboard objects.
+
+Plugins are discovered at start-up from the ``pluginDir`` path in
+``openvdm.yaml``.  Each plugin module is imported via ``importlib`` and must
+expose a class that subclasses
+:py:class:`~server.lib.openvdm_plugin.OpenVDMPlugin`.
 """
 
 import argparse
@@ -45,8 +47,18 @@ CUSTOM_TASKS = [
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Gearman worker for processing OVDM data dashboard tasks.
+    """Gearman worker for data-dashboard generation and updates.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_id: Current lowering identifier, or ``None``.
+        lowering_dir: Absolute path to the lowering data directory, or
+            ``None`` when no lowering is active.
     """
 
     def __init__(self):

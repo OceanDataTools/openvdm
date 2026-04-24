@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
-"""
-FILE:  condense_ranges.py
+"""Utilities for building and converting GeoJSON and KML track files.
 
-DESCRIPTION:  Utilities for working with geojson and kml files.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2024-06-01
+Used by the ``build_cruise_tracks`` and ``build_lowering_tracks`` utilities and
+the data-dashboard worker to aggregate per-file GeoJSON LineString data into a
+single FeatureCollection and optionally export it to KML 2.2 format.
 """
 
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-def combine_geojson_files(input_files, prefix, device_name):
-    """
-    Combine GeoJSON LineString data from OpenVDM dashboard files.
+def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> Optional[dict]:
+    """Combine GeoJSON LineString data from a list of OpenVDM dashboard files.
 
-    - Supports legacy and new (multi-datatype) dashboard formats
-    - Ignores non-GeoJSON visualizerData entries (timeseries, plots, stats)
-    - Returns None if no usable GeoJSON data is found or on error
+    Reads each file, extracts ``visualizerData`` entries that are GeoJSON
+    ``FeatureCollection`` objects containing ``LineString`` features, and
+    merges their coordinates and ``coordTimes`` into a single
+    ``FeatureCollection``.
+
+    Supports both the legacy dashboard format (top-level ``visualizerData``
+    key) and the newer multi-datatype format (nested per-datatype dicts).
+
+    Args:
+        input_files: List of absolute paths to OpenVDM dashboard JSON files.
+        prefix: Prefix string used to name the output feature
+            (``"{prefix}_{device_name}"``).
+        device_name: Name of the device or collection system.
+
+    Returns:
+        A GeoJSON ``FeatureCollection`` dict on success, or ``None`` if no
+        usable GeoJSON track data was found or a file could not be parsed.
     """
 
     def iter_visualizer_entries(data: dict):
@@ -116,10 +125,22 @@ def combine_geojson_files(input_files, prefix, device_name):
 
 
 
-def convert_to_kml(geojson_obj):
-    """
-    Convert a GeoJSON FeatureCollection with coordTimes into a KML 2.2 string.
-    Adds a <TimeSpan> to the Placemark using the first and last coordTimes.
+def convert_to_kml(geojson_obj: dict) -> str:
+    """Convert a GeoJSON FeatureCollection to a KML 2.2 XML string.
+
+    Reads the first feature's ``LineString`` geometry and ``coordTimes``
+    property to build a KML ``Placemark`` with a ``<TimeSpan>`` element
+    derived from the first and last coordinate timestamps.
+
+    ``coordTimes`` values may be ISO 8601 strings, epoch milliseconds, or
+    epoch seconds — all are normalised to ISO 8601 for KML output.
+
+    Args:
+        geojson_obj: A GeoJSON ``FeatureCollection`` dict as produced by
+            :func:`combine_geojson_files`.
+
+    Returns:
+        A KML 2.2 XML string with an ``<?xml?>`` declaration.
     """
 
     def _to_kml_time(value):

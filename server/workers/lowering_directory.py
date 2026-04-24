@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-FILE:  lowering_directory.py
+"""Gearman worker that creates and rebuilds the lowering data directory structure.
 
-DESCRIPTION:  Gearman worker the handles the tasks of creating a new lowering
-data directory and updating the lowering directory structure when additional
-subdirectories must be added.
+Registers three Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``createLoweringDirectory`` — build the per-lowering directory tree from
+  scratch, including active collection system transfer destinations that are
+  scoped to lowerings.
+- ``rebuildLoweringDirectory`` — re-create any missing directories in an
+  existing lowering directory.
+- ``setLoweringDataDirectoryPermissions`` — apply ownership and permissions
+  to the lowering data directory.
 """
 
 import argparse
@@ -49,8 +47,17 @@ CUSTOM_TASKS = [
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for lowering directory creation and permission management.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        lowering_id: Current lowering identifier.
+        lowering_start_date: Start date of the current lowering.
+        lowering_dir: Absolute path to the lowering data directory.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):

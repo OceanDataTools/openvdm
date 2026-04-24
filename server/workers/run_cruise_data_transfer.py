@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""
-FILE:  run_cruise_data_transfer.py
+"""Gearman worker that transfers all cruise data from the Shipboard Data Warehouse to a second location.
 
-DESCRIPTION:  Gearman worker that handles the transfer of all cruise data from
-    the Shipboard Data Warehouse to a second location.
+Registers the ``runCruiseDataTransfer`` Gearman task.  Supports five
+destination types (local directory, rsync server, SMB share, SSH server via
+rclone, generic rclone remote) as determined by the cruise data transfer
+configuration stored in the OpenVDM database.
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-08-18
+Key responsibilities:
+
+- Test the destination before transferring and report a human-readable error
+  on failure.
+- Mount SMB shares and unmount them on completion.
+- Apply cruise-level exclude filters when building the rsync or rclone command.
+- Report real-time transfer progress back to the Gearman job.
+- Set correct file ownership and permissions after the transfer completes.
 """
 
 import argparse
@@ -39,8 +42,16 @@ TASK_NAMES = {
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Gearman worker for OpenVDM-based cruise data transfers.
+    """Gearman worker for cruise data transfers to a secondary destination.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        cruise_id: Current cruise identifier.
+        system_status: Cached system status string (``'On'`` or ``'Off'``).
+        cruise_data_transfer: Configuration dict for the active transfer.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_dir: Absolute path to the cruise data directory.
     """
 
     def __init__(self):

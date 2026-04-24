@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  run_collection_system_transfer.py
+"""Gearman worker that transfers data from collection systems to the Shipboard Data Warehouse.
 
-DESCRIPTION:  Gearman worker that handles the transfer of data from the Collection
-    System to the Shipboard Data Warehouse.
+Registers the ``runCollectionSystemTransfer`` Gearman task.  Supports five
+transfer types (local directory, rsync server, SMB share, SSH server, rclone)
+as determined by the collection system transfer configuration stored in the
+OpenVDM database.
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+Key responsibilities:
+
+- Mount SMB shares and unmount them on completion.
+- Apply per-transfer include/exclude filename filters and date-range filters.
+- Handle wildcard source directories.
+- Submit a ``updateDataDashboard`` job after a successful transfer.
+- Log transferred file counts and sizes.
 """
 
 import argparse
@@ -42,9 +44,26 @@ TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
-def process_batch(batch, filters, data_start_time, data_end_time):
-    """
-    Process a batch of file paths
+def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
+    """Filter a batch of local file paths against transfer criteria.
+
+    Each file is evaluated against date-range bounds (modification time),
+    default-ignore patterns, ASCII filename requirement, and the configured
+    include/exclude filter lists.
+
+    Args:
+        batch: List of absolute file paths to evaluate.
+        filters: Dict with ``ignore_filters``, ``include_filters``, and
+            ``exclude_filters`` keys, each containing a list of glob patterns.
+        data_start_time: Earliest allowed modification time as a Unix epoch
+            float (inclusive).
+        data_end_time: Latest allowed modification time as a Unix epoch float
+            (inclusive).
+
+    Returns:
+        List of ``(action, filepath, size_str)`` tuples where *action* is
+        ``"include"`` or ``"exclude"``.  Files that are skipped entirely
+        (symlinks, default-ignored, out-of-range) are omitted from the result.
     """
 
     def _process_filepath(filepath, filters, data_start_time, data_end_time):
@@ -150,9 +169,25 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
-def run_transfer_command(worker, current_job, cmd, file_count):
-    """
-    Run the rsync command and return the list of new and updated files
+def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
+    """Execute an rsync transfer command and collect new/updated file lists.
+
+    Streams rsync item-change output (``>f+++++++++`` / ``>f.``) to classify
+    files as new or updated, and reports percentage progress to the Gearman
+    job via ``to-chk=`` lines.  Honours ``worker.stop`` to allow graceful
+    early termination.
+
+    Args:
+        worker: The active :py:class:`OVDMGearmanWorker` instance.
+        current_job: The Gearman job object, or ``None`` when called outside
+            a Gearman context (e.g. from ``cruise.py``).
+        cmd: The rsync command as a list of strings.
+        file_count: Expected number of files to transfer; when 0 the command
+            is skipped entirely.
+
+    Returns:
+        A two-tuple ``(new_files, updated_files)`` where each element is a
+        list of relative file paths.
     """
 
     if file_count == 0:
@@ -205,8 +240,19 @@ def run_transfer_command(worker, current_job, cmd, file_count):
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-many-instance-attributes
-    """
-    Gearman worker for OpenVDM-based collection system transfers.
+    """Gearman worker for collection system data ingestion.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        cruise_id: Current cruise identifier.
+        lowering_id: Current lowering identifier, or ``None``.
+        system_status: Cached system status string.
+        collection_system_transfer: Configuration dict for the active transfer.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_dir: Absolute path to the lowering data directory, or
+            ``None``.
     """
 
     def __init__(self):

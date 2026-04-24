@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""
-FILE:  cruise.py
+"""Gearman worker that initializes and finalizes OpenVDM cruises.
 
-DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
-    and finalizing the current cruise.  This includes initializing/finalizing
-    the data dashboard, MD5summary and transfer log summary.
+Registers four Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``setupNewCruise`` — create the cruise directory tree, initialize the data
+  dashboard and MD5 summary, sync public data, and run post-setup hooks.
+- ``finalizeCurrentCruise`` — run pre-finalize hooks, update the data dashboard
+  and MD5 summary, apply directory permissions, export the OpenVDM config, and
+  run post-finalize hooks.
+- ``exportOVDMConfig`` — write the current OpenVDM configuration as JSON into
+  the cruise directory.
+- ``rsyncPublicDataToCruiseData`` — sync the ``/mnt/PublicData`` volume into
+  the ``From_PublicData`` collection system transfer directory.
 """
 
 import argparse
@@ -46,8 +46,16 @@ TASK_NAMES = {
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise setup and finalization.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        cruise_start_date: Start date of the current cruise.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):

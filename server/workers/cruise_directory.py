@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-FILE:  cruise_directory.py
+"""Gearman worker that creates and rebuilds the cruise data directory structure.
 
-DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
-    data directory and updating the cruise directory structure when additional
-    subdirectories must be added.
+Registers three Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``createCruiseDirectory`` — build the cruise directory tree from scratch,
+  including required extra directories, collection system transfer destination
+  directories, and (when enabled) the lowering base directory.
+- ``rebuildCruiseDirectory`` — re-create any missing directories in an existing
+  cruise directory, applying the same logic as ``createCruiseDirectory``.
+- ``setCruiseDataDirectoryPermissions`` — apply lockdown ownership and
+  permissions to the cruise data directory.
 """
 
 import argparse
@@ -48,8 +46,17 @@ CUSTOM_TASKS = [
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise directory creation and permission management.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_id: Current lowering identifier, or ``None`` when no lowering
+            is active.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):
@@ -73,9 +80,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
-    def keyword_replace(self, s):
-        """
-        Find/replace function used to build directory names containing wildcards
+    def keyword_replace(self, s: str) -> str:
+        """Substitute OpenVDM template tokens in a directory path string.
+
+        Replaces ``{cruiseID}``, ``{loweringDataBaseDir}``, and ``{loweringID}``
+        with their runtime values.  When no lowering is active the
+        ``{loweringID}`` token is left as-is.
+
+        Args:
+            s: Directory path string, possibly containing template tokens.
+
+        Returns:
+            The substituted string with trailing slashes stripped, or ``None``
+            if *s* is not a string.
         """
 
         if not isinstance(s, str):

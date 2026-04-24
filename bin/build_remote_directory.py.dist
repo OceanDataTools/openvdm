@@ -1,60 +1,34 @@
 #!/usr/bin/env python3
-"""
-FILE:  build_remote_directory.py
+"""Create directories and seed files on remote data-acquisition workstations.
 
-USAGE:  buildRemoteDirectory.py [-h] [-s] [-t directory] collection_system
+Designed to be called from the ``postSetupNewCruise`` hook when a new cruise
+is created.  For each active collection system transfer whose name matches a
+top-level subdirectory in the template directory, the script connects to the
+remote workstation (using the transfer's configured credentials) and replicates
+the subdirectory tree beneath it, substituting ``{cruiseID}`` tokens in path
+names with the current cruise identifier.
 
-REQUIRED ARGUMENTS:
-    collection_system  name of OpenVDM-defined collection system to process
+Only active collection system transfers are processed.  Optionally, the script
+can also create the collection system's configured source directory on the
+remote host before copying the template.
 
-OPTIONAL ARGUMENTS:
-    -h, --help               show this help message and exit
-    -v[+]                    increase verbosity of script (DEFAULT: Warning)
-    -s, --create_source      create the source directory
-    -t, --template directory the directory structure to create on the remote
-                             server
-    -c, --collection_system  Create the remote directory/file just for the
-                             specified collection system'
+Example template layout for cruise ``RV1001``::
 
-DESCRIPTION:
-    This script is designed to be called from the postSetupNewCruise hook to
-    create directories and files on remote workstations when a new cruise is
-    setup.
+    /template_directory/
+        XBT/
+            {cruiseID}/
+                raw_data/
+                {cruiseID}_XBT_log.csv   ← empty seed file
 
-    This script will only create directories on remote machines if the
-    corresponding collection system transfer is active when the cruise is
-    created.
+    → remote host creates:
+        <source_dir>/RV1001/
+        <source_dir>/RV1001/raw_data/
+        <source_dir>/RV1001/RV1001_XBT_log.csv
 
-    The template directory structure must include top-level subdirectories
-    whose names match the short-names for the collection system transfers.
+Usage::
 
-    Any files or directories below the top-level subdirectory will be copied
-    to the remote workstation using the connection details provided in the
-    corresponding collection system transfer.  The current cruiseID can be
-    used in a remote directory or file name by adding "{cruiseID}" to the
-    directory/file in the template directory.
-
-    i.e.
-    /template_directory
-        /XBT
-            /{cruiseID}
-                /raw_data
-                /{cruiseID}_XBT_log.csv
-
-    For the example template directory struction and a current cruiseID of
-    RV1001, this script will create the following directory structure within
-    the source directory defined for the XBT workstation.
-
-    <source dir>/RV1001
-    <source dir>/RV1001/raw_data
-    <source dir>/RV1001/RV1001_XBT_log.csv
-
-    BUGS:
-   NOTES:
-  AUTHOR:  Webb Pinner
- VERSION:  2.12
- CREATED:  2020-11-19
-REVISION:  2025-04-12
+    build_remote_directory.py [-h] [-v ...] [-s] [-t TEMPLATE_DIR]
+                              [-c COLLECTION_SYSTEM]
 """
 
 import os

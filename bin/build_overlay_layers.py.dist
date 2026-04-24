@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  build_overlay_layers.py
+"""Build a Leaflet-compatible JSON overlay layer definition from GeoTIFF dashboard data.
 
-USAGE:  build_map_overlay_layers.py [-h] [-v+] [-o output_dir] collectionSystem
+Reads dashboard data JSON files (produced by the OpenVDM data-dashboard worker)
+for one or more collection systems that generate GeoTIFF outputs, and writes a
+single ``overlay_layers.json`` file that can be imported by the Leaflet-based
+OpenVDM web UI to display raster tile overlays via a TiTiler server.
 
-REQUIRED ARGUMENTS:
-    collectionSystem  name of OpenVDM-defined collection system to process
+GeoTIFF collection system mappings are defined in the ``AllGeoTiffSources``
+list at the top of the script — edit this list to add additional sonar or
+imagery sources.
 
-OPTIONAL ARGUMENTS:
-    -h, --help        show this help message and exit
-    -v[+]             increase verbosity of script (DEFAULT: Warning)
-    -o output_dir     output directory for json file
+Usage::
 
-DESCRIPTION:
-    Creates a leaflet-compatible json object for defining overlay tile layers fhat
-    can be imported into leaflet based on the geotiff files that were processed as
-    part of the data-dashboard task.
-
-    BUGS:
-   NOTES:
-  AUTHOR:  Webb Pinner
- VERSION:  2.12
- CREATED:  2025-03-24
-REVISION:  2025-04-12
+    build_overlay_layers.py [-h] [-v ...] [-o OUTPUT_DIR] collectionSystem
 """
 
 import argparse
