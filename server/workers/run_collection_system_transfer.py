@@ -622,7 +622,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # Mount SMB Share
                 mntpoint = os.path.join(tmpdir, 'mntpoint')
                 os.mkdir(mntpoint, 0o755)
-                smb_version = detect_smb_version(cst_cfg)
+                smb_version, smb_detail = detect_smb_version(cst_cfg)
                 success, mount_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
                 if not success:
                     reason = 'Failed to mount SMB share'

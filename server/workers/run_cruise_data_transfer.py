@@ -336,7 +336,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # Mount SMB Share
                 mntpoint = os.path.join(tmpdir, 'mntpoint')
                 os.mkdir(mntpoint, 0o755)
-                smb_version = detect_smb_version(cdt_cfg)
+                smb_version, smb_detail = detect_smb_version(cdt_cfg)
                 success, mount_detail = mount_smb_share(cdt_cfg, mntpoint, smb_version)
                 if not success:
                     reason = 'Failed to mount SMB share'
