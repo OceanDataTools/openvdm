@@ -644,6 +644,16 @@ class CollectionSystemTransfers extends Controller {
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
+            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
+                $rsyncPass = $data['row'][0]->rsyncPass;
+            }
+            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
+                $smbPass = $data['row'][0]->smbPass;
+            }
+            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
+                $sshPass = $data['row'][0]->sshPass;
+            }
+
             if($name == ''){
                 $error[] = 'Name is required';
             }
@@ -858,15 +868,12 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
                 $data['row'][0]->rsyncServer = $rsyncServer;
                 $data['row'][0]->rsyncUser = $rsyncUser;
-                $data['row'][0]->rsyncPass = $rsyncPass;
                 $data['row'][0]->smbServer = $smbServer;
                 $data['row'][0]->smbUser = $smbUser;
-                $data['row'][0]->smbPass = $smbPass;
                 $data['row'][0]->smbDomain = $smbDomain;
                 $data['row'][0]->sshServer = $sshServer;
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
-                $data['row'][0]->sshPass = $sshPass;
                 $data['row'][0]->includeFilter = $includeFilter;
                 $data['row'][0]->excludeFilter = $excludeFilter;
                 $data['row'][0]->ignoreFilter = $ignoreFilter;
@@ -901,6 +908,16 @@ class CollectionSystemTransfers extends Controller {
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
+
+            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
+                $rsyncPass = $data['row'][0]->rsyncPass;
+            }
+            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
+                $smbPass = $data['row'][0]->smbPass;
+            }
+            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
+                $sshPass = $data['row'][0]->sshPass;
+            }
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -1100,15 +1117,12 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
             $data['row'][0]->rsyncServer = $rsyncServer;
             $data['row'][0]->rsyncUser = $rsyncUser;
-            $data['row'][0]->rsyncPass = $rsyncPass;
             $data['row'][0]->smbServer = $smbServer;
             $data['row'][0]->smbUser = $smbUser;
-            $data['row'][0]->smbPass = $smbPass;
             $data['row'][0]->smbDomain = $smbDomain;
             $data['row'][0]->sshServer = $sshServer;
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
-            $data['row'][0]->sshPass = $sshPass;
             $data['row'][0]->includeFilter = $includeFilter;
             $data['row'][0]->excludeFilter = $excludeFilter;
             $data['row'][0]->ignoreFilter = $ignoreFilter;

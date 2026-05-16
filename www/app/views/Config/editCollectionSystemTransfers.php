@@ -63,15 +63,15 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group localDir"><label>Source Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $data['row'][0]->localDirIsMountPoint); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'value'=> $data['row'][0]->rsyncServer)); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncUser', 'value'=> $data['row'][0]->rsyncUser)); ?></div>
-                                <div class="form-group rsyncServer"><label>Rsync Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncPass', 'value'=> $data['row'][0]->rsyncPass, 'type'=>'password')); ?></div>
+                                <div class="form-group rsyncServer"><label>Rsync Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncPass', 'type'=>'password', 'placeholder'=>'(leave blank to keep existing)')); ?></div>
                                 <div class="form-group smbShare"><label>SMB Server/Share</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbServer', 'value'=> $data['row'][0]->smbServer)); ?></div>
                                 <div class="form-group smbShare"><label>SMB Domain</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbDomain', 'value'=> $data['row'][0]->smbDomain)); ?></div>
                                 <div class="form-group smbShare"><label>SMB Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbUser', 'value'=> $data['row'][0]->smbUser)); ?></div>
-                                <div class="form-group smbShare"><label>SMB Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbPass', 'value'=> $data['row'][0]->smbPass, 'type'=>'password')); ?></div>
+                                <div class="form-group smbShare"><label>SMB Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbPass', 'type'=>'password', 'placeholder'=>'(leave blank to keep existing)')); ?></div>
                                 <div class="form-group sshServer"><label>SSH Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshServer', 'value'=> $data['row'][0]->sshServer)); ?></div>
                                 <div class="form-group sshServer"><label>SSH Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshUser', 'value'=> $data['row'][0]->sshUser)); ?></div>
                                 <div class="form-group sshServer"><label>Use SSH Public/Private key?</label><?php echo FormCustom::radioInline($data['useSSHKeyOptions'], $data['row'][0]->sshUseKey); ?></div>
-                                <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'value'=> $data['row'][0]->sshPass, 'type'=>'password')); ?></div>
+                                <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'type'=>'password', 'placeholder'=>'(leave blank to keep existing)')); ?></div>
                             </div>
                         </div>
                         <div class="row">
