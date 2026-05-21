@@ -143,3 +143,20 @@ For cruise data transfers, `destDir` interpretation depends on transfer type:
 - MySQL; schema: `database/openvdm_db.sql`
 - Migration scripts for version upgrades are in `database/`
 - The Python backend communicates with MySQL exclusively through the PHP REST API (via `server/lib/openvdm.py`), not via direct DB connections
+
+## Security
+
+### Password fields in edit forms
+
+Edit forms for records with credentials (CST, CDT, Ship-to-Shore) must **not** pre-populate password inputs via `value=`. Embedding stored credentials in the HTML response exposes them in page source and browser dev tools.
+
+Convention (established in issue #99):
+- Render password inputs without a `value=` attribute; use `placeholder="(leave blank to keep existing)"`.
+- In the Config controller's `edit()` handler, after reading password fields from `$_POST`, apply a fallback before validation: if the submitted value is empty and `$data['row'][0]->{field}` is non-empty, preserve the stored value. Apply this in both the `submit` and `inlineTest` branches.
+- In error re-render blocks, do not assign password fields back to `$data['row'][0]`.
+
+### Known open issue: REST API exposes passwords in JSON (issue #99)
+
+The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers use `SELECT *`, so endpoints like `getCollectionSystemTransfer/{id}` return `rsyncPass`, `smbPass`, and `sshPass` in plaintext JSON.
+
+This is not yet fixed because the Python workers (`server/lib/openvdm.py`) fetch per-transfer configuration — including credentials — from these same endpoints. Fixing it requires splitting into a privileged endpoint variant (protected by a shared secret from `openvdm.yaml`) for worker use, with passwords stripped from the public endpoints.
