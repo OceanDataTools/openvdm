@@ -82,7 +82,7 @@ class Config
         define('CRUISE_CONFIG_FN', 'cruise_config.json');
 
         /*
-         * Define what to name the cruise config file. (i.e. 'lowering_config.json')
+         * Define what to name the lowering config file. (i.e. 'lowering_config.json')
          */
         define('LOWERING_CONFIG_FN', 'lowering_config.json');
 
