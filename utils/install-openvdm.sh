@@ -443,6 +443,51 @@ function _install_packages_debian {
 
 ###########################################################################
 ###########################################################################
+# Build gearmand + libgearman from source.
+# Used on RHEL/Alma/Rocky 10+ where neither package is in EPEL yet.
+function _build_gearmand_from_source {
+    local GEARMAND_VERSION="1.1.21"
+    local BUILD_DIR
+    BUILD_DIR=$(mktemp -d)
+
+    echo "Building gearmand ${GEARMAND_VERSION} from source (not in EPEL 10)..."
+    dnf install -y boost-devel cmake libevent-devel libuuid-devel openssl-devel
+
+    curl -fsSL \
+        "https://github.com/gearman/gearmand/releases/download/${GEARMAND_VERSION}/gearmand-${GEARMAND_VERSION}.tar.gz" \
+        | tar -xz -C "${BUILD_DIR}"
+
+    cd "${BUILD_DIR}/gearmand-${GEARMAND_VERSION}"
+    cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+    make -j"$(nproc)"
+    make install
+    ldconfig
+
+    # Create a systemd unit if make install did not provide one
+    if ! systemctl cat gearmand &>/dev/null; then
+        cat > /etc/systemd/system/gearmand.service <<'GEARUNIT'
+[Unit]
+Description=Gearman Job Server
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+ExecStart=/usr/sbin/gearmand
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+GEARUNIT
+        systemctl daemon-reload
+    fi
+
+    rm -rf "${BUILD_DIR}"
+    cd /
+}
+
+###########################################################################
+###########################################################################
 # RHEL/Rocky/Alma package installation
 function _install_packages_rhel {
 
@@ -468,16 +513,14 @@ function _install_packages_rhel {
         dnf module reset php -y 2>/dev/null || true
         dnf module enable php:8.3 -y 2>/dev/null || true
         dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip
-        # libgearman-devel may not be in EPEL 10 yet — best-effort
-        if dnf install -y libgearman-devel 2>/dev/null; then
-            echo "Building php-gearman extension via PECL..."
-            if printf "\n" | pecl install gearman; then
-                echo "extension=gearman.so" > /etc/php.d/gearman.ini
-            else
-                echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
-            fi
+        # gearmand and libgearman are not in EPEL 10 — build from source so that
+        # both the daemon and the headers needed for the PECL extension are available.
+        _build_gearmand_from_source
+        echo "Building php-gearman extension via PECL..."
+        if printf "\n" | pecl install gearman; then
+            echo "extension=gearman.so" > /etc/php.d/gearman.ini
         else
-            echo "WARNING: libgearman-devel not available in repos; skipping php-gearman build"
+            echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
     elif [ "$OS_VERSION_MAJOR" -ge 9 ]; then
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
@@ -530,9 +573,7 @@ function _install_packages_rhel {
             openssh-server policycoreutils-python-utils proj proj-devel \
             rsync samba samba-client samba-common samba-common-tools \
             setroubleshoot sshpass supervisor unzip zlib-devel
-        # gearmand: may not be in EPEL 10 yet — best-effort
-        dnf install -y gearmand || \
-            echo "WARNING: gearmand not available in repos; Gearman workers will not function"
+        # gearmand was already built from source in the PHP section above
     else
         dnf -y install \
             cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
