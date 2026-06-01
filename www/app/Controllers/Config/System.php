@@ -119,10 +119,8 @@ class System extends Controller {
                 Session::set('message','Shipboard Data Warehouse Updated');
                 Url::redirect('config/system');
             } else {
-                $data['shipboardDataWarehouseConfig'] = array(
-                    'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
-                    'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
-                );
+                $data['shipboardDataWarehouseConfig']['shipboardDataWarehouseIP'] = $shipboardDataWarehouseIP;
+                $data['shipboardDataWarehouseConfig']['shipboardDataWarehouseUsername'] = $shipboardDataWarehouseUsername;
             }
         }
 
