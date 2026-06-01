@@ -94,6 +94,22 @@ class OpenVDM():
             raise exc
 
 
+    def _worker_headers(self) -> dict:
+        """Return HTTP headers that authenticate this process as a trusted worker.
+
+        Includes the ``X-Worker-Token`` header when ``workerApiKey`` is present
+        in the YAML config, allowing the PHP API to return credential fields that
+        are otherwise stripped from public responses.
+
+        Returns:
+            A dict suitable for passing as *headers* to :mod:`requests` calls.
+        """
+        token = self.config.get('workerApiKey', '')
+        if token:
+            return {'X-Worker-Token': token}
+        return {}
+
+
     def clear_gearman_jobs_from_db(self):
         """
         Clear the current Gearman job request queue.
@@ -815,7 +831,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve collection system transfers from OpenVDM API")
@@ -832,7 +848,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getActiveCollectionSystemTransfers/{sort}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
                 return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != 0, return_obj))
@@ -854,7 +870,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:
@@ -878,7 +894,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve cruise data transfers from OpenVDM API")
@@ -893,7 +909,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve required cruise data transfers from OpenVDM API")
@@ -908,7 +924,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:
@@ -932,7 +948,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:

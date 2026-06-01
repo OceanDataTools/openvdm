@@ -155,8 +155,12 @@ Convention (established in issue #99):
 - In the Config controller's `edit()` handler, after reading password fields from `$_POST`, apply a fallback before validation: if the submitted value is empty and `$data['row'][0]->{field}` is non-empty, preserve the stored value. Apply this in both the `submit` and `inlineTest` branches.
 - In error re-render blocks, do not assign password fields back to `$data['row'][0]`.
 
-### Known open issue: REST API exposes passwords in JSON (issue #99)
+### REST API credential gating (shared-secret header)
 
-The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers use `SELECT *`, so endpoints like `getCollectionSystemTransfer/{id}` return `rsyncPass`, `smbPass`, and `sshPass` in plaintext JSON.
+The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers strip `rsyncPass`, `smbPass`, and `sshPass` from all responses unless the request includes a valid `X-Worker-Token` header.
 
-This is not yet fixed because the Python workers (`server/lib/openvdm.py`) fetch per-transfer configuration — including credentials — from these same endpoints. Fixing it requires splitting into a privileged endpoint variant (protected by a shared secret from `openvdm.yaml`) for worker use, with passwords stripped from the public endpoints.
+- The expected token is `WORKER_API_KEY` defined in `www/app/Core/Config.php`.
+- The same value must be set as `workerApiKey` in `server/etc/openvdm.yaml`.
+- Python workers send the header automatically via `OpenVDM._worker_headers()`, which reads the key from the YAML config.
+- `hash_equals()` is used for the comparison to prevent timing attacks.
+- When deploying, change the placeholder value (`change-me-to-a-strong-random-value`) to a strong random string in both files (e.g. `openssl rand -hex 32`).

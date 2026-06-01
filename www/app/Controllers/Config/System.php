@@ -101,6 +101,12 @@ class System extends Controller {
 
             if($shipboardDataWarehouseUsername == ''){
                 $error[] = 'Shipboard Data Warehouse Username is required';
+            } else {
+                $command = 'getent passwd ' . escapeshellarg($shipboardDataWarehouseUsername);
+                exec($command, $output, $returnVar);
+                if($returnVar !== 0){
+                    $error[] = 'User "' . htmlspecialchars($shipboardDataWarehouseUsername) . '" does not exist on this system';
+                }
             }
 
             if(!$error){
