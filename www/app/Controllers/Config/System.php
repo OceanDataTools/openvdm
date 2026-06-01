@@ -439,7 +439,7 @@ class System extends Controller {
 
         array_push($parts, $publicDataDirectoryTest);
 
-        $command = 'getent passwd ' . $shipboardDataWarehouseConfig['shipboardDataWarehouseUsername'];
+        $command = 'getent passwd ' . escapeshellarg($shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']);
         exec($command,$op);
 
         $usernameTest->partName = 'Username';
