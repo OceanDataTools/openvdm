@@ -146,7 +146,7 @@ function detect_os {
         SUPERVISOR_CONF_D="/etc/supervisord.d"
         SUPERVISOR_PROG_EXT="ini"
         SUPERVISOR_SERVICE="supervisord"
-        MYSQL_SERVICE="mysqld"
+        MYSQL_SERVICE=$([ "${OS_VERSION_MAJOR}" -ge 10 ] && echo "mariadb" || echo "mysqld")
         GEARMAN_SERVICE="gearmand"
         SAMBA_SERVICES="smb nmb"
         RSYNC_SERVICE="rsyncd"
@@ -463,15 +463,22 @@ function _install_packages_rhel {
     if [ "$OS_VERSION_MAJOR" -ge 10 ]; then
         # AlmaLinux/Rocky/RHEL 10+ ships PHP 8.3 natively in AppStream.
         # php-gearman is not packaged, so build it via PECL.
-        # libgearman-devel is pulled in here (ahead of the core-packages block)
-        # so the PECL build has its compile-time dependency available.
+        # Install PHP first (separate from libgearman-devel so a missing library
+        # does not prevent PHP itself from being installed).
         dnf module reset php -y 2>/dev/null || true
         dnf module enable php:8.3 -y 2>/dev/null || true
-        dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip \
-            libgearman-devel
-        echo "Building php-gearman extension via PECL..."
-        printf "\n" | pecl install gearman
-        echo "extension=gearman.so" > /etc/php.d/gearman.ini
+        dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip
+        # libgearman-devel may not be in EPEL 10 yet — best-effort
+        if dnf install -y libgearman-devel 2>/dev/null; then
+            echo "Building php-gearman extension via PECL..."
+            if printf "\n" | pecl install gearman; then
+                echo "extension=gearman.so" > /etc/php.d/gearman.ini
+            else
+                echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
+            fi
+        else
+            echo "WARNING: libgearman-devel not available in repos; skipping php-gearman build"
+        fi
     elif [ "$OS_VERSION_MAJOR" -ge 9 ]; then
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
         dnf module reset php -y
@@ -484,8 +491,9 @@ function _install_packages_rhel {
         dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
     fi
 
-    # On RHEL 9+, MySQL is delivered as an AppStream module; enable it before install.
-    if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
+    # On RHEL 9, MySQL is delivered as an AppStream module; enable it before install.
+    # On RHEL 10+, MySQL AppStream is removed — MariaDB is the default instead.
+    if [ "$OS_VERSION_MAJOR" -ge 9 ] && [ "$OS_VERSION_MAJOR" -lt 10 ]; then
         dnf module reset mysql -y
         dnf module enable mysql:8.0 -y
     fi
@@ -511,15 +519,30 @@ function _install_packages_rhel {
         fi
     fi
 
-    # Core packages
-    dnf -y install \
-        cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
-        gdal-devel libgearman-devel geos-devel libjpeg-devel make redhat-rpm-config \
-        mysql-server nodejs npm \
-        openssh-server policycoreutils-python-utils proj proj-devel \
-        python3-pyproj \
-        rsync samba samba-client samba-common samba-common-tools \
-        setroubleshoot sshpass supervisor unzip zlib-devel
+    # Core packages (AlmaLinux/Rocky/RHEL 10+ differences noted inline)
+    if [ "$OS_VERSION_MAJOR" -ge 10 ]; then
+        # v10+: mariadb-server replaces mysql-server; gearmand/libgearman-devel/
+        # python3-pyproj not available in base/EPEL 10 repos — handled separately.
+        dnf -y install \
+            cifs-utils curl gcc gcc-c++ gdal git httpd httpd-devel \
+            gdal-devel geos-devel libjpeg-devel make redhat-rpm-config \
+            mariadb-server nodejs npm \
+            openssh-server policycoreutils-python-utils proj proj-devel \
+            rsync samba samba-client samba-common samba-common-tools \
+            setroubleshoot sshpass supervisor unzip zlib-devel
+        # gearmand: may not be in EPEL 10 yet — best-effort
+        dnf install -y gearmand || \
+            echo "WARNING: gearmand not available in repos; Gearman workers will not function"
+    else
+        dnf -y install \
+            cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
+            gdal-devel libgearman-devel geos-devel libjpeg-devel make redhat-rpm-config \
+            mysql-server nodejs npm \
+            openssh-server policycoreutils-python-utils proj proj-devel \
+            python3-pyproj \
+            rsync samba samba-client samba-common samba-common-tools \
+            setroubleshoot sshpass supervisor unzip zlib-devel
+    fi
 
     # rclone is not in RHEL/AlmaLinux repos — install from official script
     if ! command -v rclone > /dev/null 2>&1; then
@@ -824,6 +847,10 @@ EOF
 # Install and configure gearman
 function configure_gearman {
     echo "Starting Gearman Job Server"
+    if ! systemctl cat "${GEARMAN_SERVICE}" &>/dev/null; then
+        echo "WARNING: ${GEARMAN_SERVICE} service not found; skipping (gearmand may not be packaged for this OS version)"
+        return
+    fi
     systemctl start "${GEARMAN_SERVICE}"
     systemctl enable "${GEARMAN_SERVICE}"
 }
@@ -834,14 +861,29 @@ function configure_gearman {
 function configure_samba {
 
     echo "Creating SMB user: ${OPENVDM_USER}, password set to same as OpenVDM DB user"
-    (echo "${OPENVDM_DATABASE_PASSWORD}"; echo "${OPENVDM_DATABASE_PASSWORD}") | smbpasswd -s -a "${OPENVDM_USER}"
+    if command -v smbpasswd &>/dev/null; then
+        (echo "${OPENVDM_DATABASE_PASSWORD}"; echo "${OPENVDM_DATABASE_PASSWORD}") | smbpasswd -s -a "${OPENVDM_USER}"
+    else
+        echo "WARNING: smbpasswd not found; Samba user setup skipped"
+    fi
 
+    # Ensure the Samba config directory and base config file exist.
+    # On some distros the samba package does not create smb.conf automatically.
+    mkdir -p /etc/samba
     if [ -e /etc/samba/smb.conf ]; then
         mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
 
         sed -e 's/obey pam restrictions = yes/obey pam restrictions = no/' /etc/samba/smb.conf.orig |
         sed -e '/### Added by OpenVDM install script ###/,/### Added by OpenVDM install script ###/d' |
         sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > /etc/samba/smb.conf
+    else
+        # Create a minimal default config so subsequent appends succeed
+        cat > /etc/samba/smb.conf <<'SMBDEFAULT'
+[global]
+   workgroup = WORKGROUP
+   security = user
+   passdb backend = tdbsam
+SMBDEFAULT
     fi
 
     cat >> /etc/samba/smb.conf <<EOF
