@@ -8,7 +8,7 @@ class Messages extends Model {
     public function getMessages($limit, $search=''){
         if($search !== ''){
             $like = '%' . $search . '%';
-            return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageTitle LIKE :search OR messageBody LIKE :search ORDER BY messageID DESC " . $limit, array(':search' => $like));
+            return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageTitle LIKE :title OR messageBody LIKE :body ORDER BY messageID DESC " . $limit, array(':title' => $like, ':body' => $like));
         }
         return $this->db->select("SELECT * FROM ".PREFIX."Messages ORDER BY messageID DESC " . $limit);
     }
@@ -16,7 +16,7 @@ class Messages extends Model {
     public function getMessagesTotal($search=''){
         if($search !== ''){
             $like = '%' . $search . '%';
-            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageTitle LIKE :search OR messageBody LIKE :search", array(':search' => $like)));
+            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageTitle LIKE :title OR messageBody LIKE :body", array(':title' => $like, ':body' => $like)));
         }
         return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages"));
     }
@@ -24,7 +24,7 @@ class Messages extends Model {
     public function getNewMessages($limit, $search='') {
         if($search !== ''){
             $like = '%' . $search . '%';
-            return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :search OR messageBody LIKE :search) ORDER BY messageID DESC " . $limit, array(':search' => $like));
+            return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :title OR messageBody LIKE :body) ORDER BY messageID DESC " . $limit, array(':title' => $like, ':body' => $like));
         }
         return $this->db->select("SELECT * FROM ".PREFIX."Messages WHERE messageViewed = 0 ORDER BY messageID DESC " . $limit);
     }
@@ -32,7 +32,7 @@ class Messages extends Model {
     public function getNewMessagesTotal($search=''){
         if($search !== ''){
             $like = '%' . $search . '%';
-            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :search OR messageBody LIKE :search)", array(':search' => $like)));
+            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :title OR messageBody LIKE :body)", array(':title' => $like, ':body' => $like)));
         }
         return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0"));
     }
