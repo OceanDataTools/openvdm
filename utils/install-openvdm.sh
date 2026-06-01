@@ -4,9 +4,9 @@
 #   https://github.com/oceandatatools/openvdm
 #
 # This script installs and configures OpenVDM.  It supports:
-#   - Ubuntu 22.04 (Jammy) and 24.04 (Noble)
+#   - Ubuntu 22.04 (Jammy), 24.04 (Noble), and 26.04 (Resolute)
 #   - Debian 12 (Bookworm) and 13 (Trixie)
-#   - AlmaLinux 8/9, Rocky Linux 8/9, RHEL 8/9
+#   - AlmaLinux 8/9/10, Rocky Linux 8/9/10, RHEL 8/9/10
 #
 # It is designed to be run as root. It should take a (relatively) clean
 # installation and install and configure all the components to run the
@@ -457,15 +457,32 @@ function _install_packages_rhel {
 
     dnf -y update --nobest
 
-    # Install Remi PHP 8.2 repository
-    if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
+    # PHP installation varies by major version:
+    #   v10+  — native PHP 8.3 AppStream; php-gearman built via PECL
+    #   v8/9  — Remi repo for PHP 8.2 (includes a packaged php-gearman)
+    if [ "$OS_VERSION_MAJOR" -ge 10 ]; then
+        # AlmaLinux/Rocky/RHEL 10+ ships PHP 8.3 natively in AppStream.
+        # php-gearman is not packaged, so build it via PECL.
+        # libgearman-devel is pulled in here (ahead of the core-packages block)
+        # so the PECL build has its compile-time dependency available.
+        dnf module reset php -y 2>/dev/null || true
+        dnf module enable php:8.3 -y 2>/dev/null || true
+        dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip \
+            libgearman-devel
+        echo "Building php-gearman extension via PECL..."
+        printf "\n" | pecl install gearman
+        echo "extension=gearman.so" > /etc/php.d/gearman.ini
+    elif [ "$OS_VERSION_MAJOR" -ge 9 ]; then
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+        dnf module reset php -y
+        dnf module enable php:remi-8.2 -y
+        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
     else
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
+        dnf module reset php -y
+        dnf module enable php:remi-8.2 -y
+        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
     fi
-    dnf module reset php -y
-    dnf module enable php:remi-8.2 -y
-    dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
 
     # On RHEL 9+, MySQL is delivered as an AppStream module; enable it before install.
     if [ "$OS_VERSION_MAJOR" -ge 9 ]; then

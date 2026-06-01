@@ -1,17 +1,22 @@
 # Open Vessel Data Management
 
 ## Installation Guide
-At the time of this writing OpenVDM was built and tested against Debian 12/13, Ubuntu 22.04/24.04, Rocky 8/9 and AlmaLinux 8/9 operating systems.
+At the time of this writing OpenVDM was built and tested against Debian 12/13, Ubuntu 22.04/24.04/26.04, Rocky 8/9/10 and AlmaLinux 8/9/10 operating systems.
 
 ### Operating Systems
  - Debian 12: <https://wiki.debian.org/DebianBookworm>
  - Debian 13: <https://wiki.debian.org/DebianTrixie>
  - Ubuntu 22.04: <https://releases.ubuntu.com/22.04/>
  - Ubuntu 24.04: <https://releases.ubuntu.com/24.04/>
- - Rocky 8 <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
- - Rocky 9 <https://rockylinux.org/news/rocky-linux-9-7-ga-release>
- - AlmaLinux 8 <https://almalinux.org/get-almalinux/>
- - AlmaLinux 9 <https://almalinux.org/get-almalinux/>
+ - Ubuntu 26.04: <https://releases.ubuntu.com/26.04/>
+ - Rocky 8: <https://rockylinux.org/news/rocky-linux-8-10-ga-release>
+ - Rocky 9: <https://rockylinux.org/news/rocky-linux-9-8-ga-release>
+ - Rocky 10: <https://rockylinux.org/news/rocky-linux-10-2-ga-release>
+ - AlmaLinux 8: <https://almalinux.org/get-almalinux/>
+ - AlmaLinux 9: <https://almalinux.org/get-almalinux/>
+ - AlmaLinux 10: <https://almalinux.org/get-almalinux/>
+
+> **Note for Rocky/AlmaLinux/RHEL 10:** These releases ship PHP 8.3 natively so the Remi repository is not used. The `php-gearman` extension is not packaged and is built automatically from source via PECL during installation. This requires an active internet connection and adds a few minutes to the install time.
 
 ### If you are installing OpenVDM remotely
 
