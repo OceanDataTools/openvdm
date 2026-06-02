@@ -1030,10 +1030,19 @@ EOF
     if [ "$OS_FAMILY" = "rhel" ]; then
         echo "Updating firewall rules for samba"
         firewall_cmd_if_available --add-service=samba --zone=public --permanent
+
+        # Allow Samba to serve directories with any SELinux type (e.g. httpd_sys_content_t
+        # which configure_apache sets on DATA_ROOT after configure_samba runs).
+        setsebool -P samba_export_all_ro=1 2>/dev/null || true
+        setsebool -P samba_export_all_rw=1 2>/dev/null || true
     fi
 
-    echo "Restarting Samba Service"
+    echo "Starting Samba Service"
     for svc in $SAMBA_SERVICES; do
+        if ! systemctl cat "${svc}" &>/dev/null; then
+            echo "WARNING: ${svc} service not found; skipping"
+            continue
+        fi
         systemctl start "${svc}"
         systemctl enable "${svc}"
     done
@@ -1738,7 +1747,17 @@ function install_sample_data {
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
 
     if [ "$HAS_SELINUX" = true ]; then
-        chcon -R -t samba_share_t "${SAMPLEDATA_ROOT}" 2>/dev/null || true
+        # Samba shares need samba_share_t; rsync daemon (rsync_t) needs
+        # public_content_t (read) / public_content_rw_t (write) — setting
+        # samba_share_t on rsync dirs would silently block the daemon.
+        for _d in auth_source auth_destination anon_source anon_destination \
+                  local_source local_destination ssdw ssh_source ssh_destination; do
+            [ -d "${SAMPLEDATA_ROOT}/${_d}" ] && \
+                chcon -R -t samba_share_t "${SAMPLEDATA_ROOT}/${_d}" 2>/dev/null || true
+        done
+        chcon -R -t public_content_t    "${SAMPLEDATA_ROOT}/rsync_source"      2>/dev/null || true
+        chcon -R -t public_content_rw_t "${SAMPLEDATA_ROOT}/rsync_destination"  2>/dev/null || true
+        setsebool -P allow_rsync_anon_write=1 2>/dev/null || true
     fi
 
     # Build customized SQL: substitute default paths/user/password with local values.
@@ -1847,6 +1866,10 @@ EOF
 EOF
 
     for svc in $SAMBA_SERVICES; do
+        if ! systemctl cat "${svc}" &>/dev/null; then
+            echo "WARNING: ${svc} service not found; skipping"
+            continue
+        fi
         systemctl restart "${svc}"
     done
 
@@ -1890,8 +1913,12 @@ EOF
         "${OPENVDM_USER}" >> /etc/rsyncd.passwd
     chmod 600 /etc/rsyncd.passwd
 
-    systemctl enable "${RSYNC_SERVICE}"
-    systemctl restart "${RSYNC_SERVICE}"
+    if ! systemctl cat "${RSYNC_SERVICE}" &>/dev/null; then
+        echo "WARNING: ${RSYNC_SERVICE} service not found; rsync daemon not started"
+    else
+        systemctl enable "${RSYNC_SERVICE}"
+        systemctl restart "${RSYNC_SERVICE}"
+    fi
 
     echo "Sample data installation complete"
 
