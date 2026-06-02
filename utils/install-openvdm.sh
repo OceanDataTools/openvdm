@@ -447,18 +447,42 @@ function _install_packages_debian {
 # Used on RHEL/Alma/Rocky 10+ where neither package is in EPEL yet.
 function _build_gearmand_from_source {
     local GEARMAND_VERSION="1.1.21"
-    local BUILD_DIR
+    local BUILD_DIR TARBALL SRC_DIR
     BUILD_DIR=$(mktemp -d)
+    TARBALL="${BUILD_DIR}/gearmand-${GEARMAND_VERSION}.tar.gz"
 
     echo "Building gearmand ${GEARMAND_VERSION} from source (not in EPEL 10)..."
-    dnf install -y boost-devel cmake libevent-devel libuuid-devel openssl-devel
+    # gearmand 1.1.21 uses autotools, not cmake
+    dnf install -y autoconf automake boost-devel gcc-c++ libevent-devel libtool \
+        libuuid-devel openssl-devel
 
-    curl -fsSL \
-        "https://github.com/gearman/gearmand/releases/download/${GEARMAND_VERSION}/gearmand-${GEARMAND_VERSION}.tar.gz" \
-        | tar -xz -C "${BUILD_DIR}"
+    # Download to file so curl errors are detectable
+    if ! curl -fsSL \
+            "https://github.com/gearman/gearmand/releases/download/${GEARMAND_VERSION}/gearmand-${GEARMAND_VERSION}.tar.gz" \
+            -o "${TARBALL}"; then
+        echo "ERROR: failed to download gearmand tarball" >&2
+        rm -rf "${BUILD_DIR}"
+        return 1
+    fi
 
-    cd "${BUILD_DIR}/gearmand-${GEARMAND_VERSION}"
-    cmake . -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+    tar -xzf "${TARBALL}" -C "${BUILD_DIR}"
+
+    # Find the extracted source directory (handles any naming variation)
+    SRC_DIR=$(find "${BUILD_DIR}" -maxdepth 1 -mindepth 1 -type d | head -1)
+    if [ -z "${SRC_DIR}" ]; then
+        echo "ERROR: could not find extracted gearmand source directory" >&2
+        rm -rf "${BUILD_DIR}"
+        return 1
+    fi
+
+    cd "${SRC_DIR}"
+
+    # Run autoreconf if configure is absent (some release tarballs omit it)
+    if [ ! -f configure ]; then
+        autoreconf -fi
+    fi
+
+    ./configure --prefix=/usr
     make -j"$(nproc)"
     make install
     ldconfig
