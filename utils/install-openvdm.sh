@@ -452,8 +452,8 @@ function _build_gearmand_from_source {
     TARBALL="${BUILD_DIR}/gearmand-${GEARMAND_VERSION}.tar.gz"
 
     echo "Building gearmand ${GEARMAND_VERSION} from source (not in EPEL 10)..."
-    # gearmand 1.1.21 uses autotools, not cmake
-    dnf install -y autoconf automake boost-devel gcc-c++ libevent-devel libtool \
+    # gearmand 1.1.21 uses autotools, not cmake; gperf required by configure
+    dnf install -y autoconf automake boost-devel gcc-c++ gperf libevent-devel libtool \
         libuuid-devel openssl-devel
 
     # Download to file so curl errors are detectable
@@ -482,7 +482,8 @@ function _build_gearmand_from_source {
         autoreconf -fi
     fi
 
-    ./configure --prefix=/usr
+    # --libdir=/usr/lib64 ensures .so and .pc land where RHEL/Alma 64-bit tools expect them
+    ./configure --prefix=/usr --libdir=/usr/lib64
     make -j"$(nproc)"
     make install
     ldconfig
