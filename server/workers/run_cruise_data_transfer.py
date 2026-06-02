@@ -373,9 +373,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
             dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                dry_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + dry_cmd
+                dry_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + dry_cmd
 
-            logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg["sshPass"]}', '-p ****'))
+            logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg.get("sshPass", "")}', '-p ****'))
             proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
 
             file_count = 0
@@ -431,7 +431,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
                 if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                    real_cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + real_cmd
+                    real_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + real_cmd
 
                 files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
 

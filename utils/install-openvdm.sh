@@ -1649,7 +1649,14 @@ EOF
         cp ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml.dist ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml
     fi
 
-    WORKER_API_KEY=$(openssl rand -hex 32)
+    # Re-use the key already in openvdm.yaml on re-runs so Config.php and
+    # openvdm.yaml always agree. Only generate a new key on a fresh install.
+    _YAML="${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml"
+    if [ -e "${_YAML}" ]; then
+        WORKER_API_KEY=$(grep 'workerApiKey:' "${_YAML}" | sed 's/.*"\(.*\)".*/\1/')
+    else
+        WORKER_API_KEY=$(openssl rand -hex 32)
+    fi
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \

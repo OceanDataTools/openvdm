@@ -102,9 +102,9 @@ def check_darwin(cfg):
     cfg = normalize_transfer_config(cfg)
     cmd = ['ssh', f"{cfg['sshUser']}@{cfg['sshServer']}", "uname -s"]
     if cfg['sshUseKey'] == 0:
-        cmd = ['sshpass', '-p', cfg['sshPass']] + cmd
+        cmd = ['sshpass', '-p', cfg.get('sshPass', '')] + cmd
 
-    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg["sshPass"]}', '-p ****'))
+    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg.get("sshPass", "")}', '-p ****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
@@ -127,10 +127,10 @@ def detect_smb_version(cfg):
         cmd = [
             'smbclient', '-L', cfg['smbServer'],
             '-W', cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{cfg['smbUser']}%{cfg['smbPass']}"
+            '-U', f"{cfg['smbUser']}%{cfg.get('smbPass', '')}"
         ]
 
-    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'%{cfg["smbPass"]}', '%****'))
+    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'%{cfg.get("smbPass", "")}', '%****'))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
@@ -164,11 +164,11 @@ def mount_smb_share(cfg, mntpoint, smb_version):
     if cfg['smbUser'] == 'guest':
         opts += ",guest"
     else:
-        opts += f",username={cfg['smbUser']},password={cfg['smbPass']}"
+        opts += f",username={cfg['smbUser']},password={cfg.get('smbPass', '')}"
 
     cmd = ['mount', '-t', 'cifs', cfg['smbServer'], mntpoint, '-o', opts]
 
-    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cfg["smbPass"]}', 'password=****'))
+    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cfg.get("smbPass", "")}', 'password=****'))
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
@@ -687,6 +687,16 @@ def test_cst_source(cst_cfg, source_dir):
         # Tests for smb
         if transfer_type == 'smb':
 
+            if cst_cfg.get('smbUser') != 'guest' and cst_cfg.get('smbPass') is None:
+                reason = ("smbPass not available — worker API token may be misconfigured "
+                          "or the password is not set for this transfer")
+                results.extend([
+                    {"partName": "SMB server", "result": "Fail", "reason": reason},
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
+                ])
+                return results
+
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
             smb_version, smb_detail = detect_smb_version(cst_cfg)
@@ -773,10 +783,20 @@ def test_cst_source(cst_cfg, source_dir):
         # Tests for rsync
         if transfer_type == 'rsync':
             if cst_cfg['rsyncUser'] != 'anonymous':
+                rsync_pass = cst_cfg.get('rsyncPass')
+                if rsync_pass is None:
+                    reason = ("rsyncPass not available — worker API token may be misconfigured "
+                              "or the password is not set for this transfer")
+                    results.extend([
+                        {"partName": "Writing temporary rsync password file", "result": "Fail", "reason": reason},
+                        {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                        {"partName": "Source directory", "result": "Fail", "reason": reason}
+                    ])
+                    return results
                 # Build password file
                 try:
                     with open(password_file, 'w', encoding='utf-8') as f:
-                        f.write(cst_cfg['rsyncPass'])
+                        f.write(rsync_pass)
                     os.chmod(password_file, 0o600)
                 except IOError:
                     reason = f"Unable to create temporary rsync password file: {password_file}"
@@ -824,8 +844,17 @@ def test_cst_source(cst_cfg, source_dir):
         if transfer_type == 'ssh':
 
             use_pubkey = cst_cfg['sshUseKey'] == 1
+            ssh_pass = cst_cfg.get('sshPass')
+            if not use_pubkey and ssh_pass is None:
+                reason = ("sshPass not available — worker API token may be misconfigured "
+                          "or the password is not set for this transfer")
+                results.extend([
+                    {"partName": "SSH connection", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
+                ])
+                return results
 
-            contest_success, contest_detail = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_connection(cst_cfg['sshServer'], cst_cfg['sshUser'], passwd=ssh_pass, use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to connect to SSH server: {cst_cfg['sshServer']} as {cst_cfg['sshUser']}"
@@ -841,7 +870,7 @@ def test_cst_source(cst_cfg, source_dir):
             results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
             check_dir = wildcard_parent if source_has_wildcard else source_dir
-            contest_success, contest_detail = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], check_dir, passwd=cst_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_remote_directory(cst_cfg['sshServer'], cst_cfg['sshUser'], check_dir, passwd=ssh_pass, use_pubkey=use_pubkey)
 
             if not contest_success:
                 if source_has_wildcard:
@@ -891,6 +920,17 @@ def test_cdt_destination(cdt_cfg):
         # Tests for smb
         if transfer_type == 'smb':
 
+            if cdt_cfg.get('smbUser') != 'guest' and cdt_cfg.get('smbPass') is None:
+                reason = ("smbPass not available — worker API token may be misconfigured "
+                          "or the password is not set for this transfer")
+                results.extend([
+                    {"partName": "SMB server", "result": "Fail", "reason": reason},
+                    {"partName": "SMB share", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
+
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
             smb_version, smb_detail = detect_smb_version(cdt_cfg)
@@ -902,10 +942,20 @@ def test_cdt_destination(cdt_cfg):
         # Tests for rsync
         if transfer_type == 'rsync':
             if cdt_cfg['rsyncUser'] != 'anonymous':
+                rsync_pass = cdt_cfg.get('rsyncPass')
+                if rsync_pass is None:
+                    reason = ("rsyncPass not available — worker API token may be misconfigured "
+                              "or the password is not set for this transfer")
+                    results.extend([
+                        {"partName": "Writing temporary rsync password file", "result": "Fail", "reason": reason},
+                        {"partName": "Rsync connection", "result": "Fail", "reason": reason},
+                        {"partName": "Destination directory", "result": "Fail", "reason": reason}
+                    ])
+                    return results
                 # Build password file
                 try:
                     with open(password_file, 'w', encoding='utf-8') as f:
-                        f.write(cdt_cfg['rsyncPass'])
+                        f.write(rsync_pass)
                     os.chmod(password_file, 0o600)
                 except IOError:
                     reason = f"Unable to create temporary rsync password file: {password_file}"
@@ -962,8 +1012,18 @@ def test_cdt_destination(cdt_cfg):
         if transfer_type == 'ssh':
 
             use_pubkey = cdt_cfg['sshUseKey'] == 1
+            ssh_pass = cdt_cfg.get('sshPass')
+            if not use_pubkey and ssh_pass is None:
+                reason = ("sshPass not available — worker API token may be misconfigured "
+                          "or the password is not set for this transfer")
+                results.extend([
+                    {"partName": "SSH connection", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
 
-            contest_success, contest_detail = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_connection(cdt_cfg['sshServer'], cdt_cfg['sshUser'], passwd=ssh_pass, use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to connect to SSH server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']}"
@@ -979,7 +1039,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "SSH connection", "result": "Pass"}])
 
-            contest_success, contest_detail = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_remote_directory(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=ssh_pass, use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']}"
@@ -994,7 +1054,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "Destination directory", "result": "Pass"}])
 
-            contest_success, contest_detail = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=cdt_cfg['sshPass'], use_pubkey=use_pubkey)
+            contest_success, contest_detail = test_ssh_write_access(cdt_cfg['sshServer'], cdt_cfg['sshUser'], cdt_cfg['destDir'], passwd=ssh_pass, use_pubkey=use_pubkey)
 
             if not contest_success:
                 reason = f"No write access on ssh server: {cdt_cfg['sshServer']} as {cdt_cfg['sshUser']} at {cdt_cfg['destDir']}"

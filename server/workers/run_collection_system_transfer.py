@@ -390,7 +390,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if not is_darwin:
                 cmd.insert(2, '--protect-args')
             if cst_cfg.get('sshUseKey') == 0:
-                cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
+                cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
             matches = []
             for line in proc.stdout.splitlines():
@@ -500,9 +500,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if not is_darwin:
                     command.insert(2, '--protect-args')
                 if cst_cfg.get('sshUseKey') == 0:
-                    command = ['sshpass', '-p', cst_cfg['sshPass']] + command
+                    command = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + command
 
-            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg["sshPass"]}', '-p ****'))
+            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg.get("sshPass", "")}', '-p ****'))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
@@ -633,10 +633,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             # Adjustments for RSYNC
             if transfer_type == 'rsync':
+                rsync_pass = cst_cfg.get('rsyncPass')
+                if rsync_pass is None:
+                    return {'verdict': False,
+                            'reason': 'rsyncPass not available — worker API token may be '
+                                      'misconfigured or password not set for this transfer',
+                            'files': []}
                 # Build password file
                 try:
                     with open(password_file, 'w', encoding='utf-8') as f:
-                        f.write(cst_cfg['rsyncPass'])
+                        f.write(rsync_pass)
                     os.chmod(password_file, 0o600)
                 except IOError:
                     return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
@@ -703,7 +709,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
                 cmd = build_rsync_command(rsync_flags, extra_args, source_path, effective_dest, include_file)
                 if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
-                    cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
+                    cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
 
                 new_files, updated_files = run_transfer_command(
                     self, current_job, cmd, len(files['include'])
