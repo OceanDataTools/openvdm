@@ -540,14 +540,20 @@ function _install_packages_rhel {
         dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip
         # gearmand and libgearman are not in EPEL 10 — build from source so that
         # both the daemon and the headers needed for the PECL extension are available.
-        _build_gearmand_from_source
+        if command -v gearmand &>/dev/null; then
+            echo "gearmand already installed, skipping source build"
+        else
+            _build_gearmand_from_source
+        fi
         # On RHEL 10+, PHP runs via PHP-FPM (not mod_php). Start it now so the
         # PECL build environment matches the runtime environment, and so that
         # the extension is active as soon as Apache starts.
         systemctl enable php-fpm
         systemctl start php-fpm
         echo "Building php-gearman extension via PECL..."
-        if printf "\n" | pecl install gearman; then
+        if php -m | grep -q gearman; then
+            echo "php-gearman extension already installed, skipping PECL build"
+        elif printf "\n" | pecl install gearman; then
             echo "extension=gearman.so" > /etc/php.d/gearman.ini
             # Restart PHP-FPM so the new extension is loaded
             systemctl restart php-fpm
