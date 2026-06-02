@@ -541,9 +541,16 @@ function _install_packages_rhel {
         # gearmand and libgearman are not in EPEL 10 — build from source so that
         # both the daemon and the headers needed for the PECL extension are available.
         _build_gearmand_from_source
+        # On RHEL 10+, PHP runs via PHP-FPM (not mod_php). Start it now so the
+        # PECL build environment matches the runtime environment, and so that
+        # the extension is active as soon as Apache starts.
+        systemctl enable php-fpm
+        systemctl start php-fpm
         echo "Building php-gearman extension via PECL..."
         if printf "\n" | pecl install gearman; then
             echo "extension=gearman.so" > /etc/php.d/gearman.ini
+            # Restart PHP-FPM so the new extension is loaded
+            systemctl restart php-fpm
         else
             echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
@@ -1163,6 +1170,13 @@ EOF
     # configure_mapproxy will do the final restart once everything is in place.
     systemctl enable "${APACHE_SERVICE}"
     if [ "$INSTALL_MAPPROXY" != "yes" ]; then
+        # On RHEL 10+, PHP runs via PHP-FPM; restart it alongside Apache so any
+        # extensions installed earlier in this script are active.
+        if [ "$OS_FAMILY" = "rhel" ] && [ "$OS_VERSION_MAJOR" -ge 10 ]; then
+            echo "Starting PHP-FPM"
+            systemctl enable php-fpm
+            systemctl restart php-fpm
+        fi
         echo "Starting Apache Web Server"
         systemctl restart "${APACHE_SERVICE}"
     fi
