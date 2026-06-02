@@ -1920,12 +1920,29 @@ EOF
         "${OPENVDM_USER}" >> /etc/rsyncd.passwd
     chmod 600 /etc/rsyncd.passwd
 
+    # On RHEL 10+, rsyncd.service is not shipped by the rsync package.
+    # Create a minimal unit so the daemon can be managed by systemd.
     if ! systemctl cat "${RSYNC_SERVICE}" &>/dev/null; then
-        echo "WARNING: ${RSYNC_SERVICE} service not found; rsync daemon not started"
-    else
-        systemctl enable "${RSYNC_SERVICE}"
-        systemctl restart "${RSYNC_SERVICE}"
+        echo "Creating ${RSYNC_SERVICE}.service unit (not provided by rsync package on this OS)..."
+        cat > "/etc/systemd/system/${RSYNC_SERVICE}.service" <<'RSYNCUNIT'
+[Unit]
+Description=fast remote file copy program daemon
+After=network.target
+ConditionPathExists=/etc/rsyncd.conf
+
+[Service]
+ExecStart=/usr/bin/rsync --no-detach --daemon --config /etc/rsyncd.conf
+StandardOutput=syslog
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+RSYNCUNIT
+        systemctl daemon-reload
     fi
+
+    systemctl enable "${RSYNC_SERVICE}"
+    systemctl restart "${RSYNC_SERVICE}"
 
     echo "Sample data installation complete"
 
