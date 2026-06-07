@@ -5,3 +5,4 @@
 -- (default: /var/log/openvdm) and purged after 12 hours (unchanged).
 
 DELETE FROM `OVDM_ExtraDirectories` WHERE `name` = 'Transfer_Logs';
+DELETE FROM `OVDM_ShipToShoreTransfers` WHERE `name` = 'TransferLogs';
