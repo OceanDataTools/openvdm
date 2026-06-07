@@ -640,10 +640,11 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
         worker.send_job_status(current_job, 96, 100)
 
         logfile_filename = f"{worker.cruise_id}_{cdt_cfg['name']}_{worker.transfer_start_date}.log"
+        _cruise_prefix = f'{worker.cruise_id}/'
         logfile_contents = {
             'files': {
-                'new': [file.lstrip(f'{worker.cruise_id}/') for file in job_results['files']['new']],
-                'updated': [file.lstrip(f'{worker.cruise_id}/') for file in job_results['files']['updated']]
+                'new': [file.removeprefix(_cruise_prefix) for file in job_results['files']['new']],
+                'updated': [file.removeprefix(_cruise_prefix) for file in job_results['files']['updated']]
             }
         }
 
