@@ -32,6 +32,7 @@ _TRANSFER_INT_FIELDS = frozenset([
     'bandwidthLimit', 'cruiseOrLowering', 'localDirIsMountPoint',
     'sshUseKey', 'includeOVDMFiles', 'status', 'enable',
     'collectionSystemTransferID', 'cruiseDataTransferID',
+    'collectionSystem', 'extraDirectory',
 ])
 
 

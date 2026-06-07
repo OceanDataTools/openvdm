@@ -74,7 +74,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the path to save transfer logfiles
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_transfer_log_dir())
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def update_md5_summary(self, files):

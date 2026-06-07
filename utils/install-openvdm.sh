@@ -235,6 +235,7 @@ DEFAULT_SAMPLEDATA_BRANCH=$SAMPLEDATA_BRANCH
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
 EOF
+    chmod 600 "$PREFERENCES_FILE"
 }
 
 ###########################################################################
@@ -1460,17 +1461,17 @@ function configure_mysql {
     done
 
     # Set the new root password
-    cat > /tmp/set_pwd <<EOF
+    if [ -z "$CURRENT_ROOT_DATABASE_PASSWORD" ]; then
+        mysql -u root <<EOF
 ALTER USER 'root'@'localhost' $MYSQL_AUTH_CLAUSE '$NEW_ROOT_DATABASE_PASSWORD';
 FLUSH PRIVILEGES;
 EOF
-
-    # If there's a current root password
-    [ -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root -p$CURRENT_ROOT_DATABASE_PASSWORD 2> /dev/null < /tmp/set_pwd
-
-    # If there's no current root password
-    [ ! -z $CURRENT_ROOT_DATABASE_PASSWORD ] || mysql -u root < /tmp/set_pwd
-    rm -f /tmp/set_pwd
+    else
+        mysql -u root -p"$CURRENT_ROOT_DATABASE_PASSWORD" 2>/dev/null <<EOF
+ALTER USER 'root'@'localhost' $MYSQL_AUTH_CLAUSE '$NEW_ROOT_DATABASE_PASSWORD';
+FLUSH PRIVILEGES;
+EOF
+    fi
 
     if [ "$OS_FAMILY" = "debian" ]; then
         # Ensure mysql starts on boot via update-rc.d
@@ -1649,12 +1650,29 @@ EOF
         cp ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml.dist ${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml
     fi
 
-    # Re-use the key already in openvdm.yaml on re-runs so Config.php and
-    # openvdm.yaml always agree. Only generate a new key on a fresh install.
+    # Resolve WORKER_API_KEY: prefer the live value already deployed so
+    # re-runs never rotate a key that 3rd-party tools depend on.
+    # Priority: openvdm.yaml > existing Config.php > generate new.
+    _PLACEHOLDER="change-me-to-a-strong-random-value"
     _YAML="${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml"
+    _PHP="${INSTALL_ROOT}/openvdm/www/app/Core/Config.php"
+    WORKER_API_KEY=""
+
     if [ -e "${_YAML}" ]; then
-        WORKER_API_KEY=$(grep 'workerApiKey:' "${_YAML}" | sed 's/.*"\(.*\)".*/\1/')
-    else
+        _extracted=$(grep 'workerApiKey:' "${_YAML}" | sed 's/.*"\(.*\)".*/\1/')
+        if [ -n "${_extracted}" ] && [ "${_extracted}" != "${_PLACEHOLDER}" ]; then
+            WORKER_API_KEY="${_extracted}"
+        fi
+    fi
+
+    if [ -z "${WORKER_API_KEY}" ] && [ -e "${_PHP}" ]; then
+        _extracted=$(grep "define('WORKER_API_KEY'" "${_PHP}" | sed "s/.*define('WORKER_API_KEY', '\(.*\)');.*/\1/")
+        if [ -n "${_extracted}" ] && [ "${_extracted}" != "${_PLACEHOLDER}" ]; then
+            WORKER_API_KEY="${_extracted}"
+        fi
+    fi
+
+    if [ -z "${WORKER_API_KEY}" ]; then
         WORKER_API_KEY=$(openssl rand -hex 32)
     fi
 
@@ -1670,8 +1688,9 @@ EOF
     fi
 
     touch ${INSTALL_ROOT}/openvdm/www/errorlog.html
-    chmod 777 ${INSTALL_ROOT}/openvdm/www/errorlog.html
     chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
+    chown ${OPENVDM_USER}:${APACHE_USER} ${INSTALL_ROOT}/openvdm/www/errorlog.html
+    chmod 664 ${INSTALL_ROOT}/openvdm/www/errorlog.html
 
     echo "Installing web-app"
 
@@ -1682,7 +1701,7 @@ EOF
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
         sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | \
-        sed -e "s/workerApiKey: \"change-me-to-a-strong-random-value\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
+        sed -e "s/workerApiKey: \"${_PLACEHOLDER}\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
         > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 
         if [ "$INSTALL_PUBLICDATA" = "no" ]; then
@@ -1690,6 +1709,10 @@ EOF
         fi
 
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+    else
+        # On re-runs, update the key in-place if it is still the placeholder
+        sed -i -e "s/workerApiKey: \"${_PLACEHOLDER}\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
+            ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
     fi
 
     cd ${startingDir}

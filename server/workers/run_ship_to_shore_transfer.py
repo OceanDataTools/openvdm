@@ -32,7 +32,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -155,9 +155,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         proc_filters = {'1':[],'2':[],'3':[],'4':[],'5':[]}
         for priority in map(str, range(1, 6)):
             for t in transfers:
+                t = normalize_transfer_config(t)
 
                 #filters transfers
-                if t['priority'] != priority or t['enable'] != 1:
+                if str(t['priority']) != priority or t['enable'] != 1:
                     continue
 
                 # replace {cruiseID}
@@ -169,7 +170,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 #if transfer is from a cst
                 if t['collectionSystem'] != 0:
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
-                    if cs['cruiseOrLowering'] == 1:
+                    if int(cs.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{cs['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
@@ -177,7 +178,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 #if transfer is from an ed
                 if t['extraDirectory'] != 0:
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
-                    if ed['cruiseOrLowering'] == 1:
+                    if int(ed.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{ed['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
@@ -405,7 +406,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 cmd = _build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
 
                 if cdt_cfg.get('sshUseKey') == 0:
-                    cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
+                    cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + cmd
 
             files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             return {'verdict': True, 'files': files}

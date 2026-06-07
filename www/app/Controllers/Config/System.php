@@ -136,6 +136,7 @@ class System extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
+        $storedSshPass = '';
         $error = [];
 
         foreach($data['requiredCruiseDataTransfers'] as $row) {
@@ -144,7 +145,7 @@ class System extends Controller {
                 $data['shoresideDataWarehouseConfig']['sshServer'] = $row->sshServer;
                 $data['shoresideDataWarehouseConfig']['sshUser'] = $row->sshUser;
                 $data['shoresideDataWarehouseConfig']['sshUseKey'] = $row->sshUseKey;
-                $data['shoresideDataWarehouseConfig']['sshPass'] = $row->sshPass;
+                $storedSshPass = $row->sshPass;
                 $data['shoresideDataWarehouseConfig']['destDir'] = $row->destDir;
                 break;
             }
@@ -156,6 +157,10 @@ class System extends Controller {
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
             $destDir = $_POST['destDir'] ?? '';
+
+            if ($sshPass === '' && $storedSshPass !== '') {
+                $sshPass = $storedSshPass;
+            }
 
             if($sshServer == ''){
                 $error[] = 'Shoreside Data Warehouse IP is required';
@@ -192,7 +197,6 @@ class System extends Controller {
                     'sshServer' => $sshServer,
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
-                    'sshPass' => $sshPass,
                     'destDir' => $destDir,
                 );
             }

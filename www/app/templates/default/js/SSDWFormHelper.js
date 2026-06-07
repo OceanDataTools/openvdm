@@ -98,8 +98,11 @@ $(function () {
     });
 
     $('form').on('submit', function () {
-        // Re-enable disabled fields so their values are included in the POST
-        $('input').prop('disabled', false);
+        // Re-enable disabled fields so their values are included in the POST.
+        // sshPass is intentionally excluded: if it was disabled (rclone or key-auth
+        // mode) it should not POST an empty value; the server preserves the stored
+        // password when the field is absent from the POST.
+        $('input:not([name=sshPass])').prop('disabled', false);
         $('input[type="text"], input[type="password"], input:not([type])').each(function () {
             $(this).val($(this).val().trim());
         });

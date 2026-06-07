@@ -851,9 +851,9 @@ class OpenVDM():
             req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != 0, return_obj))
+                return_obj = list(filter(lambda transfer: int(transfer['cruiseOrLowering']) != 0, return_obj))
             if not lowering:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != 1, return_obj))
+                return_obj = list(filter(lambda transfer: int(transfer['cruiseOrLowering']) != 1, return_obj))
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve active collection system transfers from OpenVDM API")
@@ -937,7 +937,7 @@ class OpenVDM():
         """
 
         return_obj = self.get_cruise_data_transfers()
-        return list(filter(lambda transfer: transfer['enable'] == 1, return_obj))
+        return list(filter(lambda transfer: int(transfer['enable']) == 1, return_obj))
 
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):

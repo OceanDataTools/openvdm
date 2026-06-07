@@ -48,7 +48,7 @@ use Helpers\FormCustom;
                                     <label>Use SSH Public/Private key?</label><?php echo FormCustom::radioInline($data['useSSHKeyOptions'], $data['shoresideDataWarehouseConfig']['sshUseKey']); ?>
                                 </div>
                                 <div class="form-group">
-                                    <label>Server Password</label><?php echo Form::input(array('class'=>'form-control', 'type'=>'password', 'name'=>'sshPass', 'value'=>$data['shoresideDataWarehouseConfig']['sshPass'])); ?>
+                                    <label>Server Password</label><?php echo Form::input(array('class'=>'form-control', 'type'=>'password', 'name'=>'sshPass', 'placeholder'=>'(leave blank to keep existing)')); ?>
                                 </div>
                             </div>
                         </div>

@@ -366,8 +366,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             return [(os.path.join(parent, os.path.basename(m)), os.path.basename(m)) for m in matched]
 
         if transfer_type == 'rsync':
-            cmd = ['rsync', '--no-motd', f'--password-file={password_file}',
-                   f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
+            rsync_flags = ['--no-motd']
+            if password_file is not None:
+                rsync_flags.append(f'--password-file={password_file}')
+            cmd = ['rsync'] + rsync_flags + [f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
             matches = []
             for line in proc.stdout.splitlines():

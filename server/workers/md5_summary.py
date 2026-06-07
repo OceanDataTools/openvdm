@@ -464,12 +464,10 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    exclude_transfer_logs = f"{worker.ovdm.get_transfer_log_dir()}/"
-
     filelist = build_filelist(worker.cruise_dir).get('include', [])
     filtered_filelist = [
         f for f in filelist
-        if f not in exclude_set and not f.startswith(exclude_transfer_logs)
+        if f not in exclude_set
     ]
 
     logging.debug("File list:\n%s", json.dumps(filtered_filelist, indent=2))
