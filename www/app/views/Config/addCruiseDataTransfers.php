@@ -51,7 +51,7 @@ $_POST += [
                                 <div class="form-group"><label>Skip empty files (--min-size=0)?</label><?php echo FormCustom::radioInline($data['skipEmptyFilesOptions'], $_POST['skipEmptyFiles']); ?></div>
                                 <div class="form-group"><label>Sync with source directory (--delete)?</label><?php echo FormCustom::radioInline($data['syncToDestOptions'], $_POST['syncToDest']); ?></div>
                                 <div class="form-group"><label>Transfer bandwidth limit (in kB/s): <?php echo Form::input( array('name'=>'bandwidthLimit', 'value'=> $_POST['bandwidthLimit'], 'size'=>'7', 'length'=>'8')); ?></label></div>
-                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType']); ?></div>
+                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType'] ?? ''); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=> $_POST['destDir'])); ?></div>
                                 <div class="form-group localDir"><label>Destination Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $_POST['localDirIsMountPoint']); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'value'=> $_POST['rsyncServer'])); ?></div>
