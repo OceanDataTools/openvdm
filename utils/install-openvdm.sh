@@ -1615,6 +1615,10 @@ EOF
 
         if [ "$INSTALL_PUBLICDATA" = "no" ]; then
             sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+            cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<'EOSQL'
+DELETE FROM `OVDM_ExtraDirectories` WHERE `name` = 'From_PublicData';
+DELETE FROM `OVDM_Tasks` WHERE `name` = 'rsyncPublicDataToCruiseData';
+EOSQL
         fi
 
         if [ "$INSTALL_VISITORINFORMATION" = "no" ]; then

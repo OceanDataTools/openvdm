@@ -220,7 +220,7 @@ class OpenVDM():
         data directory when finalizing the cruise
         """
 
-        return self.config['transferPubicData']
+        return self.config['transferPublicData']
 
 
     def get_md5_filesize_limit(self):
