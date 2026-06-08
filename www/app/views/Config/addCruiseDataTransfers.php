@@ -153,7 +153,7 @@ $_POST += [
             <p class="sshServer">The <strong>SSH Username</strong> is the SSH username with permission to access the data on the Destination SSH Server (i.e. "shipTech").</p>
             <p class="sshServer">The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p class="sshServer">The <strong>SSH Password</strong> is the SSH password for the Rsync Username.</p>
-            <p>The <strong>Select any Collection Systems to EXCLUDE</strong> and <strong>Select any Collection Systems to EXCLUDE</strong> multi-selection boxes are for specifying if the data stored in the selected collection system directories and/or extra directories within the cruise data directory should be excluded from this transfer.  (i.e if the operator wants to make a copy of all cruise data EXCEPT the 10TB of HD/4K video files)</p>
+            <p>The <strong>Select any Collection Systems to EXCLUDE</strong> and <strong>Select any Extra Directories to EXCLUDE</strong> multi-selection boxes are for specifying if the data stored in the selected collection system directories and/or extra directories within the cruise data directory should be excluded from this transfer.  (i.e if the operator wants to make a copy of all cruise data EXCEPT the 10TB of HD/4K video files)</p>
             <p>Click the <strong>Add</strong> button to add the new cruise data transfer to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>
