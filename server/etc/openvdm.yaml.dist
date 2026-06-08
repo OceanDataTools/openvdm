@@ -36,7 +36,7 @@ showOnlyCurrentCruiseDir: False
 
 # Whether or not to move the contents of the PublicData share to the cruise data
 # directory. (True|False)
-transferPubicData: True
+transferPublicData: True
 
 # maximum age of transfer log files to retain. String must conform with the python
 # datetime.timedelta standard

@@ -1203,34 +1203,42 @@ EOF
 # Install and configure MapProxy
 function configure_mapproxy {
 
-    if [ "$INSTALL_MAPPROXY" = "yes" ] && [ ! -e "${INSTALL_ROOT}/mapproxy/config/mapproxy.yaml" ]; then
+    if [ "$INSTALL_MAPPROXY" != "yes" ]; then
+        return
+    fi
 
-        startingDir=${PWD}
+    if [ -e "${INSTALL_ROOT}/mapproxy/config/mapproxy.yaml" ]; then
+        echo "MapProxy already installed, skipping"
+        return
+    fi
 
-        # On Debian, use system python3 so the venv matches libapache2-mod-wsgi-py3.
-        # On RHEL, system python3 may be too old for MapProxy 6.x (requires 3.9+),
-        # so use ${PYTHON_CMD} (3.11+) and pip-compile mod_wsgi to match.
-        if [ "$OS_FAMILY" = "debian" ]; then
-            python3 -m venv --clear /opt/mapproxy
-        else
-            ${PYTHON_CMD} -m venv --clear /opt/mapproxy
-        fi
-        source /opt/mapproxy/bin/activate
-        pip install --upgrade pip --quiet
-        _GDAL_VER=$(gdal-config --version)
-        _GDAL_MAJOR=$(echo "$_GDAL_VER" | cut -d. -f1)
-        _GDAL_MINOR=$(echo "$_GDAL_VER" | cut -d. -f2)
-        if [ "$_GDAL_MAJOR" -gt 3 ] || { [ "$_GDAL_MAJOR" -eq 3 ] && [ "$_GDAL_MINOR" -ge 3 ]; }; then
-            pip install gdal==${_GDAL_VER}
-        else
-            echo "WARNING: System GDAL ${_GDAL_VER} < 3.3; Python GDAL bindings skipped for MapProxy venv."
-        fi
-        pip install MapProxy
+    echo "Installing/Configuring MapProxy"
+    startingDir=${PWD}
 
-        # Create a starter config
-        mapproxy-util create -t base-config /opt/mapproxy/config
+    # On Debian, use system python3 so the venv matches libapache2-mod-wsgi-py3.
+    # On RHEL, system python3 may be too old for MapProxy 6.x (requires 3.9+),
+    # so use ${PYTHON_CMD} (3.11+) and pip-compile mod_wsgi to match.
+    if [ "$OS_FAMILY" = "debian" ]; then
+        python3 -m venv --clear /opt/mapproxy
+    else
+        ${PYTHON_CMD} -m venv --clear /opt/mapproxy
+    fi
+    source /opt/mapproxy/bin/activate
+    pip install --upgrade pip --quiet
+    _GDAL_VER=$(gdal-config --version)
+    _GDAL_MAJOR=$(echo "$_GDAL_VER" | cut -d. -f1)
+    _GDAL_MINOR=$(echo "$_GDAL_VER" | cut -d. -f2)
+    if [ "$_GDAL_MAJOR" -gt 3 ] || { [ "$_GDAL_MAJOR" -eq 3 ] && [ "$_GDAL_MINOR" -ge 3 ]; }; then
+        pip install gdal==${_GDAL_VER}
+    else
+        echo "WARNING: System GDAL ${_GDAL_VER} < 3.3; Python GDAL bindings skipped for MapProxy venv."
+    fi
+    pip install MapProxy
 
-        cat > /opt/mapproxy/config/mapproxy.yaml <<EOF
+    # Create a starter config
+    mapproxy-util create -t base-config /opt/mapproxy/config
+
+    cat > /opt/mapproxy/config/mapproxy.yaml <<EOF
 # -------------------------------
 # MapProxy configuration.
 # -------------------------------
@@ -1299,41 +1307,40 @@ globals:
     lock_dir: ${MAPPROXY_CACHE}/locks
 EOF
 
-        mkdir -p "${MAPPROXY_CACHE}/locks"
-        chown -R "${APACHE_USER}:${APACHE_USER}" "${MAPPROXY_CACHE}"
-        chmod -R 755 /opt/mapproxy/config
+    mkdir -p "${MAPPROXY_CACHE}/locks"
+    chown -R "${APACHE_USER}:${APACHE_USER}" "${MAPPROXY_CACHE}"
+    chmod -R 755 /opt/mapproxy/config
 
-        mkdir -p /var/log/mapproxy
-        chown "${APACHE_USER}:${APACHE_USER}" /var/log/mapproxy
+    mkdir -p /var/log/mapproxy
+    chown "${APACHE_USER}:${APACHE_USER}" /var/log/mapproxy
 
-        mapproxy-util create -t wsgi-app -f /opt/mapproxy/config/mapproxy.yaml /opt/mapproxy/config/mapproxy.wsgi
-        mapproxy-util create -t log-ini /opt/mapproxy/config/log.ini
-        sed -i -e "s|# from logging.config import fileConfig|from logging.config import fileConfig|" /opt/mapproxy/config/mapproxy.wsgi
-        sed -i -e "s|# import os.path|import os.path|" /opt/mapproxy/config/mapproxy.wsgi
-        sed -i -e "s|# fileConfig(r'/opt/mapproxy/config/log.ini', {'here': os.path.dirname(__file__)})|fileConfig(r'/opt/mapproxy/config/log.ini', {'here': '/var/log/mapproxy'})|" /opt/mapproxy/config/mapproxy.wsgi
+    mapproxy-util create -t wsgi-app -f /opt/mapproxy/config/mapproxy.yaml /opt/mapproxy/config/mapproxy.wsgi
+    mapproxy-util create -t log-ini /opt/mapproxy/config/log.ini
+    sed -i -e "s|# from logging.config import fileConfig|from logging.config import fileConfig|" /opt/mapproxy/config/mapproxy.wsgi
+    sed -i -e "s|# import os.path|import os.path|" /opt/mapproxy/config/mapproxy.wsgi
+    sed -i -e "s|# fileConfig(r'/opt/mapproxy/config/log.ini', {'here': os.path.dirname(__file__)})|fileConfig(r'/opt/mapproxy/config/log.ini', {'here': '/var/log/mapproxy'})|" /opt/mapproxy/config/mapproxy.wsgi
 
-        if [ "$OS_FAMILY" = "debian" ]; then
-            # Use the system mod_wsgi package (libapache2-mod-wsgi-py3), which is
-            # compiled for the same system python3 used by the venv above.
-            a2enmod wsgi-py3
-        else
-            # RHEL: pip-compile mod_wsgi for the same Python used by the venv,
-            # then load it as an Apache module.
-            pip install mod_wsgi --quiet
-            _MODWSGI_SO=$(/opt/mapproxy/bin/mod_wsgi-express module-location)
-            echo "LoadModule wsgi_module ${_MODWSGI_SO}" > /etc/httpd/conf.modules.d/10-wsgi-openvdm.conf
-        fi
-
-        if [ "$OS_FAMILY" = "rhel" ]; then
-            chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /opt/mapproxy
-            chcon -R -t httpd_sys_rw_content_t "${MAPPROXY_CACHE}" 2>/dev/null || true
-        fi
-
-        systemctl restart "${APACHE_SERVICE}"
-        deactivate
-
-        cd "${startingDir}"
+    if [ "$OS_FAMILY" = "debian" ]; then
+        # Use the system mod_wsgi package (libapache2-mod-wsgi-py3), which is
+        # compiled for the same system python3 used by the venv above.
+        a2enmod wsgi-py3
+    else
+        # RHEL: pip-compile mod_wsgi for the same Python used by the venv,
+        # then load it as an Apache module.
+        pip install mod_wsgi --quiet
+        _MODWSGI_SO=$(/opt/mapproxy/bin/mod_wsgi-express module-location)
+        echo "LoadModule wsgi_module ${_MODWSGI_SO}" > /etc/httpd/conf.modules.d/10-wsgi-openvdm.conf
     fi
+
+    if [ "$OS_FAMILY" = "rhel" ]; then
+        chcon -R system_u:object_r:httpd_sys_script_exec_t:s0 /opt/mapproxy
+        chcon -R -t httpd_sys_rw_content_t "${MAPPROXY_CACHE}" 2>/dev/null || true
+    fi
+
+    systemctl restart "${APACHE_SERVICE}"
+    deactivate
+
+    cd "${startingDir}"
 }
 
 ###########################################################################
@@ -1345,7 +1352,7 @@ function configure_titiler {
         return
     fi
 
-    echo "Installing TiTiler in /opt/titiler"
+    echo "Installing/Configuring TiTiler"
 
     ${PYTHON_CMD} -m venv /opt/titiler
     source /opt/titiler/bin/activate
@@ -1615,6 +1622,10 @@ EOF
 
         if [ "$INSTALL_PUBLICDATA" = "no" ]; then
             sed -i -e "/Public Data/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
+            cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<'EOSQL'
+DELETE FROM `OVDM_ExtraDirectories` WHERE `name` = 'From_PublicData';
+DELETE FROM `OVDM_Tasks` WHERE `name` = 'rsyncPublicDataToCruiseData';
+EOSQL
         fi
 
         if [ "$INSTALL_VISITORINFORMATION" = "no" ]; then
@@ -1676,10 +1687,14 @@ EOF
         WORKER_API_KEY=$(openssl rand -hex 32)
     fi
 
+    _SHOW_PUBLICDATA='true'
+    [ "$INSTALL_PUBLICDATA" = "no" ] && _SHOW_PUBLICDATA='false'
+
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
     sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
     sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" | \
+    sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
     sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
@@ -2265,7 +2280,6 @@ configure_apache
 echo
 
 echo "#####################################################################"
-echo "Installing/Configuring MapProxy"
 configure_mapproxy
 echo
 
@@ -2275,7 +2289,6 @@ configure_supervisor
 echo
 
 echo "#####################################################################"
-echo "Installing/Configuring TiTiler"
 configure_titiler
 echo
 

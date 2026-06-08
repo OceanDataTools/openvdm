@@ -45,9 +45,11 @@ use Helpers\Form;
                                 <div class="form-group">
                                     <label>Server Username</label><?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'shipboardDataWarehouseUsername', 'value'=>$data['shipboardDataWarehouseConfig']['shipboardDataWarehouseUsername'])); ?>
                                 </div>
+                                <?php if (SHOW_PUBLICDATA): ?>
                                 <div class="form-group">
                                     <label>Public Data Directory</label><?php echo Form::input(array('class'=>'form-control', 'type'=>'text', 'name'=>'shipboardDataWarehousePublicDataDir', 'value'=>$data['shipboardDataWarehouseConfig']['shipboardDataWarehousePublicDataDir'], 'disabled'=>'disabled')); ?>
                                 </div>
+                                <?php endif; ?>
 
                             </div>
                         </div>
@@ -68,7 +70,7 @@ use Helpers\Form;
             <p>The <strong><?php echo CRUISE_NAME; ?> Data Base Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories on the SBDW (i.e. "/mnt/data/CruiseData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
             <p>The <strong><?php echo CRUISE_NAME; ?> Data Apache Directory</strong> is the location of the parent directory to the <?php echo CRUISE_NAME; ?> Data Directories as defined within the webserver. (i.e. "/CruiseData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
             <p>The <strong>Server Username</strong> is the username on the SBDW with read/write permission to the files/folders in the <?php echo CRUISE_NAME; ?> Data Directories (i.e. "shipTech").</p>
-            <p>The <strong>Public Data Directory</strong> is the location of the PublicData directory on the SBDW. (i.e. "/mnt/data/PublicData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p>
+            <?php if (SHOW_PUBLICDATA): ?><p>The <strong>Public Data Directory</strong> is the location of the PublicData directory on the SBDW. (i.e. "/mnt/data/PublicData").  This is defined in the OpenVDM web-application configuration file and can not be edited here.</p><?php endif; ?>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>

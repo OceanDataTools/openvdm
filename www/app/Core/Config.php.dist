@@ -50,6 +50,11 @@ class Config
         define('PUBLICDATA_DIR', '/data/PublicData');
 
         /*
+         * Set to false when the PublicData share is not installed
+         */
+        define('SHOW_PUBLICDATA', true);
+
+        /*
          * Define directory where transfer log files are stored
          */
         define('TRANSFER_LOG_DIR', '/var/log/openvdm');

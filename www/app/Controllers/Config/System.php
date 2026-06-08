@@ -433,15 +433,17 @@ class System extends Controller {
 
         array_push($parts, $baseDirectoryTest);
 
-        $publicDataDirectoryTest->partName = 'Public Data Directory';
-        if(is_dir( $shipboardDataWarehouseConfig['shipboardDataWarehousePublicDataDir'] )) {
-            $publicDataDirectoryTest->result = 'Pass';
-        } else {
-            $publicDataDirectoryTest->result = 'Fail';
-            $finalVerdict->result = 'Fail';
-        }
+        if (SHOW_PUBLICDATA) {
+            $publicDataDirectoryTest->partName = 'Public Data Directory';
+            if(is_dir( $shipboardDataWarehouseConfig['shipboardDataWarehousePublicDataDir'] )) {
+                $publicDataDirectoryTest->result = 'Pass';
+            } else {
+                $publicDataDirectoryTest->result = 'Fail';
+                $finalVerdict->result = 'Fail';
+            }
 
-        array_push($parts, $publicDataDirectoryTest);
+            array_push($parts, $publicDataDirectoryTest);
+        }
 
         $command = 'getent passwd ' . escapeshellarg($shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']);
         exec($command,$op);
