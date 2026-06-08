@@ -136,7 +136,8 @@ A `:` character in a destination directory field signals an rclone remote path (
 For cruise data transfers, `destDir` interpretation depends on transfer type:
 - **Local Directory, no `:`** — absolute path on the local filesystem (leading `/` required)
 - **Local Directory, contains `:`** — rclone `remote:path` (no leading slash on remote name)
-- **All other transfer types** — relative path within the cruise directory (no leading slash)
+- **SSH Server** — absolute path on the remote server (leading `/` required; used as `user@host:destDir/cruiseID`)
+- **Rsync / SMB** — relative path within the cruise directory (no leading slash)
 
 ## Database
 

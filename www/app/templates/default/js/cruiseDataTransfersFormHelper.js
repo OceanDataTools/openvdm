@@ -79,7 +79,17 @@ $(function () {
             }
             return val;
         }
-        // All other transfer types: dest dir is relative within cruise dir
+        if (currentTransferTypeText() === 'SSH Server') {
+            // SSH dest is an absolute path on the remote server (user@host:/path)
+            if (val.length > 0 && !val.startsWith('/')) {
+                val = '/' + val;
+            }
+            if (val.length > 1) {
+                val = val.replace(/\/+$/, '');
+            }
+            return val;
+        }
+        // Rsync and SMB: dest dir is relative within the cruise directory
         val = val.replace(/^\/+/, '').replace(/\/+$/, '');
         return val;
     }
