@@ -177,10 +177,10 @@ $(function () {
     }
 
     function setMountpointFieldForDestDir(destDirVal) {
-        if (currentTransferTypeText() === 'Local Directory' && isRcloneDest(destDirVal)) {
-            $('input[name=localDirIsMountPoint]').closest('.form-group').hide();
-        } else {
+        if (currentTransferTypeText() === 'Local Directory' && !isRcloneDest(destDirVal)) {
             $('input[name=localDirIsMountPoint]').closest('.form-group').show();
+        } else {
+            $('input[name=localDirIsMountPoint]').closest('.form-group').hide();
         }
     }
 
@@ -190,6 +190,7 @@ $(function () {
 
     $('input[name=transferType]').change(function () {
         setTransferTypeFields($(this).val());
+        setMountpointFieldForDestDir($('input[name=destDir]').val());
     });
 
     $('input[name=sshUseKey]').change(function () {
