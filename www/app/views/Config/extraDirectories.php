@@ -52,7 +52,7 @@ use Helpers\Session;
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->enable == "0"){
+            if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/extraDirectories/enable/<?php echo $row->extraDirectoryID; ?>'>Off</a>
 <?php

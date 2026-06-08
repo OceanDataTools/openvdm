@@ -89,10 +89,11 @@ class System extends Controller {
         $data['title'] = 'Configuration';
         $data['javascript'] = array();
         $data['shipboardDataWarehouseConfig'] = $this->_warehouseModel->getShipboardDataWarehouseConfig();
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'];
-            $shipboardDataWarehouseUsername = $_POST['shipboardDataWarehouseUsername'];
+            $shipboardDataWarehouseIP = $_POST['shipboardDataWarehouseIP'] ?? '';
+            $shipboardDataWarehouseUsername = $_POST['shipboardDataWarehouseUsername'] ?? '';
 
             if($shipboardDataWarehouseIP == ''){
                 $error[] = 'Shipboard Data Warehouse IP is required';
@@ -100,6 +101,12 @@ class System extends Controller {
 
             if($shipboardDataWarehouseUsername == ''){
                 $error[] = 'Shipboard Data Warehouse Username is required';
+            } else {
+                $command = 'getent passwd ' . escapeshellarg($shipboardDataWarehouseUsername);
+                exec($command, $output, $returnVar);
+                if($returnVar !== 0){
+                    $error[] = 'User "' . htmlspecialchars($shipboardDataWarehouseUsername) . '" does not exist on this system';
+                }
             }
 
             if(!$error){
@@ -112,10 +119,8 @@ class System extends Controller {
                 Session::set('message','Shipboard Data Warehouse Updated');
                 Url::redirect('config/system');
             } else {
-                $data['shipboardDataWarehouseConfig'] = array(
-                    'shipboardDataWarehouseIP' => $shipboardDataWarehouseIP,
-                    'shipboardDataWarehouseUsername' => $shipboardDataWarehouseUsername,
-                );
+                $data['shipboardDataWarehouseConfig']['shipboardDataWarehouseIP'] = $shipboardDataWarehouseIP;
+                $data['shipboardDataWarehouseConfig']['shipboardDataWarehouseUsername'] = $shipboardDataWarehouseUsername;
             }
         }
 
@@ -131,7 +136,8 @@ class System extends Controller {
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
-
+        $storedSshPass = '';
+        $error = [];
 
         foreach($data['requiredCruiseDataTransfers'] as $row) {
             if(strcmp($row->name, 'SSDW') === 0 ) {
@@ -139,18 +145,22 @@ class System extends Controller {
                 $data['shoresideDataWarehouseConfig']['sshServer'] = $row->sshServer;
                 $data['shoresideDataWarehouseConfig']['sshUser'] = $row->sshUser;
                 $data['shoresideDataWarehouseConfig']['sshUseKey'] = $row->sshUseKey;
-                $data['shoresideDataWarehouseConfig']['sshPass'] = $row->sshPass;
+                $storedSshPass = $row->sshPass;
                 $data['shoresideDataWarehouseConfig']['destDir'] = $row->destDir;
                 break;
             }
         }
 
         if(isset($_POST['submit'])){
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $destDir = $_POST['destDir'];
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
+
+            if ($sshPass === '' && $storedSshPass !== '') {
+                $sshPass = $storedSshPass;
+            }
 
             if($sshServer == ''){
                 $error[] = 'Shoreside Data Warehouse IP is required';
@@ -187,7 +197,6 @@ class System extends Controller {
                     'sshServer' => $sshServer,
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
-                    'sshPass' => $sshPass,
                     'destDir' => $destDir,
                 );
             }
@@ -202,10 +211,11 @@ class System extends Controller {
         $data['title'] = 'Edit Extra Directory';
         $data['javascript'] = array('extraDirectoriesFormHelper');
         $data['row'] = $this->_extraDirectoriesModel->getExtraDirectory($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $longName = $_POST['longName'];
-            $destDir = $_POST['destDir'];
+            $longName = $_POST['longName'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
 
             if($longName == ''){
                 $error[] = 'Long name is required';
@@ -228,7 +238,6 @@ class System extends Controller {
                 Url::redirect('config/system');
             } else {
 
-                $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
                 $data['row'][0]->destDir = $destDir;
             }
@@ -243,10 +252,11 @@ class System extends Controller {
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
         $data['row'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $longName = $_POST['longName'];
-            $includeFilter = $_POST['includeFilter'];
+            $longName = $_POST['longName'] ?? '';
+            $includeFilter = $_POST['includeFilter'] ?? '';
 
             if($longName == ''){
                 $error[] = 'Long name is required';
@@ -306,10 +316,11 @@ class System extends Controller {
             }
         }
 
-        $data['shipToShoreBWLimit'] = $ssdw->bandwidthLimit;
+        $data['shipToShoreBWLimit'] = $ssdw->bandwidthLimit ?? 0;
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $shipToShoreBWLimit = $_POST['shipToShoreBWLimit'];
+            $shipToShoreBWLimit = $_POST['shipToShoreBWLimit'] ?? '';
 
             if($shipToShoreBWLimit == ''){
                 $shipToShoreBWLimit = '0';
@@ -354,9 +365,10 @@ class System extends Controller {
         $data['title'] = 'Edit MD5 Checksum Filesize Limit';
         $data['javascript'] = array();
         $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $md5FilesizeLimit = $_POST['md5FilesizeLimit'];
+            $md5FilesizeLimit = $_POST['md5FilesizeLimit'] ?? '';
 
             if($md5FilesizeLimit == ''){
                 $error[] = 'MD5 filesize limit is required';
@@ -431,7 +443,7 @@ class System extends Controller {
 
         array_push($parts, $publicDataDirectoryTest);
 
-        $command = 'getent passwd ' . $shipboardDataWarehouseConfig['shipboardDataWarehouseUsername'];
+        $command = 'getent passwd ' . escapeshellarg($shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']);
         exec($command,$op);
 
         $usernameTest->partName = 'Username';
@@ -521,6 +533,7 @@ class System extends Controller {
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['requiredShipToShoreTransfers'] = $this->_shipToShoreTransfersModel->getRequiredShipToShoreTransfers();
         $data['requiredExtraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true, true);
+        $data['shipboardDataWarehouseStatus'] = $this->_warehouseModel->getShipboardDataWarehouseStatus();
         $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
         $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
         $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
@@ -548,10 +561,11 @@ class System extends Controller {
     public function addLink(){
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $url = $_POST['url'];
+            $name = $_POST['name'] ?? '';
+            $url = $_POST['url'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -569,7 +583,7 @@ class System extends Controller {
                     'enable' => '0',
                 );
 
-                $this->_linksModel->insertLink($postdata,$where);
+                $this->_linksModel->insertLink($postdata);
                 Session::set('message','Link Added');
                 Url::redirect('config/system');
             }
@@ -584,10 +598,11 @@ class System extends Controller {
         $data['title'] = 'Edit Link';
         $data['javascript'] = array('LinksFormHelper');
         $data['row'] = $this->_linksModel->getLink($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $url = $_POST['url'];
+            $name = $_POST['name'] ?? '';
+            $url = $_POST['url'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';

@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""
-FILE:  run_collection_system_transfer.py
+"""Gearman worker that transfers data from collection systems to the Shipboard Data Warehouse.
 
-DESCRIPTION:  Gearman worker that handles the transfer of data from the Collection
-    System to the Shipboard Data Warehouse.
+Registers the ``runCollectionSystemTransfer`` Gearman task.  Supports five
+transfer types (local directory, rsync server, SMB share, SSH server, rclone)
+as determined by the collection system transfer configuration stored in the
+OpenVDM database.
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+Key responsibilities:
+
+- Mount SMB shares and unmount them on completion.
+- Apply per-transfer include/exclude filename filters and date-range filters.
+- Handle wildcard source directories.
+- Submit a ``updateDataDashboard`` job after a successful transfer.
+- Log transferred file counts and sizes.
 """
 
 import argparse
 import calendar
 import fnmatch
+import glob as glob_module
 import json
 import logging
 import os
@@ -25,15 +28,14 @@ import signal
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from random import randint
-import pytz
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cst_source
+from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -42,9 +44,26 @@ TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
-def process_batch(batch, filters, data_start_time, data_end_time):
-    """
-    Process a batch of file paths
+def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
+    """Filter a batch of local file paths against transfer criteria.
+
+    Each file is evaluated against date-range bounds (modification time),
+    default-ignore patterns, ASCII filename requirement, and the configured
+    include/exclude filter lists.
+
+    Args:
+        batch: List of absolute file paths to evaluate.
+        filters: Dict with ``ignore_filters``, ``include_filters``, and
+            ``exclude_filters`` keys, each containing a list of glob patterns.
+        data_start_time: Earliest allowed modification time as a Unix epoch
+            float (inclusive).
+        data_end_time: Latest allowed modification time as a Unix epoch float
+            (inclusive).
+
+    Returns:
+        List of ``(action, filepath, size_str)`` tuples where *action* is
+        ``"include"`` or ``"exclude"``.  Files that are skipped entirely
+        (symlinks, default-ignored, out-of-range) are omitted from the result.
     """
 
     def _process_filepath(filepath, filters, data_start_time, data_end_time):
@@ -150,9 +169,25 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
-def run_transfer_command(worker, current_job, cmd, file_count):
-    """
-    Run the rsync command and return the list of new and updated files
+def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
+    """Execute an rsync transfer command and collect new/updated file lists.
+
+    Streams rsync item-change output (``>f+++++++++`` / ``>f.``) to classify
+    files as new or updated, and reports percentage progress to the Gearman
+    job via ``to-chk=`` lines.  Honours ``worker.stop`` to allow graceful
+    early termination.
+
+    Args:
+        worker: The active :py:class:`OVDMGearmanWorker` instance.
+        current_job: The Gearman job object, or ``None`` when called outside
+            a Gearman context (e.g. from ``cruise.py``).
+        cmd: The rsync command as a list of strings.
+        file_count: Expected number of files to transfer; when 0 the command
+            is skipped entirely.
+
+    Returns:
+        A two-tuple ``(new_files, updated_files)`` where each element is a
+        list of relative file paths.
     """
 
     if file_count == 0:
@@ -205,8 +240,19 @@ def run_transfer_command(worker, current_job, cmd, file_count):
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-many-instance-attributes
-    """
-    Gearman worker for OpenVDM-based collection system transfers.
+    """Gearman worker for collection system data ingestion.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        cruise_id: Current cruise identifier.
+        lowering_id: Current lowering identifier, or ``None``.
+        system_status: Cached system status string.
+        collection_system_transfer: Configuration dict for the active transfer.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_dir: Absolute path to the lowering data directory, or
+            ``None``.
     """
 
     def __init__(self):
@@ -253,7 +299,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         dest_dir = self.keyword_replace(self.collection_system_transfer['destDir']).lstrip('/')
 
-        if self.collection_system_transfer.get('cruiseOrLowering') == '1':
+        if self.collection_system_transfer.get('cruiseOrLowering') == 1:
             if self.lowering_id is None:
                 return None
 
@@ -283,12 +329,92 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Build the path to save transfer logfiles
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
-    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16):
+    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False):
+        """
+        Enumerate concrete source directories when source_dir contains glob wildcard characters.
+        Returns a list of (concrete_source_dir, dest_basename) tuples.
+        dest_basename is the directory name to create under dest_dir; None if no wildcard.
+        Returns an empty list if wildcards are present but no directories match.
+        """
+
+        if not has_wildcard(source_dir):
+            return [(source_dir, None)]
+
+        parent = os.path.dirname(source_dir)
+        pattern = os.path.basename(source_dir)
+
+        if not parent or has_wildcard(parent):
+            logging.warning("Wildcard expansion only supported in the last path component: %s", source_dir)
+            return [(source_dir, None)]
+
+        cst_cfg = self.collection_system_transfer
+
+        if transfer_type in ['local', 'smb']:
+            local_parent = os.path.join(prefix, parent.lstrip('/')) if prefix else parent
+            matched = sorted([
+                d for d in glob_module.glob(os.path.join(local_parent, pattern))
+                if os.path.isdir(d)
+            ])
+            if not matched:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, os.path.basename(m)), os.path.basename(m)) for m in matched]
+
+        if transfer_type == 'rsync':
+            rsync_flags = ['--no-motd']
+            if password_file is not None:
+                rsync_flags.append(f'--password-file={password_file}')
+            cmd = ['rsync'] + rsync_flags + [f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            matches = []
+            for line in proc.stdout.splitlines():
+                parts = line.strip().split(None, 4)
+                if len(parts) < 5:
+                    continue
+                file_or_dir, _, _, _, name = parts
+                if file_or_dir.startswith('d') and name not in ('.', '..') and fnmatch.fnmatch(name, pattern):
+                    matches.append(name)
+            matches.sort()
+            if not matches:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, m), m) for m in matches]
+
+        if transfer_type == 'ssh':
+            user = cst_cfg['sshUser']
+            host = cst_cfg['sshServer']
+            cmd = ['rsync', '-e', 'ssh', f"{user}@{host}:{parent}/"]
+            if not is_darwin:
+                cmd.insert(2, '--protect-args')
+            if cst_cfg.get('sshUseKey') == 0:
+                cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            matches = []
+            for line in proc.stdout.splitlines():
+                parts = line.strip().split(None, 4)
+                if len(parts) < 5:
+                    continue
+                file_or_dir, _, _, _, name = parts
+                if file_or_dir.startswith('d') and name not in ('.', '..') and fnmatch.fnmatch(name, pattern):
+                    matches.append(name)
+            matches.sort()
+            if not matches:
+                logging.warning("No directories matched wildcard: %s", source_dir)
+                return []
+            return [(os.path.join(parent, m), m) for m in matches]
+
+        return [(source_dir, None)]
+
+
+    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None):
         """
         Build the list of files to include, exclude, ignore for the given transfer.
+        override_source_dir, when provided, is used instead of self.source_dir.
         """
 
         def _build_filters(cst_cfg, cruise_id, lowering_id):
@@ -338,7 +464,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             return verified
 
 
-        source_dir = os.path.join(prefix, self.source_dir.lstrip('/')) if prefix else self.source_dir
+        raw_source_dir = override_source_dir if override_source_dir is not None else self.source_dir
+        source_dir = os.path.join(prefix, raw_source_dir.lstrip('/')) if prefix else raw_source_dir
         cst_cfg = self.collection_system_transfer
         transfer_type = get_transfer_type(cst_cfg['transferType'])
         filters = _build_filters(cst_cfg, self.cruise_id, self.lowering_id)
@@ -357,27 +484,27 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     filepaths.append(os.path.join(root, filename))
         else:
             command = ['rsync', '-r']
-            if cst_cfg.get('skipEmptyFiles') == '1':
+            if cst_cfg.get('skipEmptyFiles') == 1:
                 command.append('--min-size=1')
 
-            if cst_cfg.get('skipEmptyDirs') == '1':
+            if cst_cfg.get('skipEmptyDirs') == 1:
                 command.append('-m')
 
             if transfer_type == 'rsync':
                 command += [f'--password-file={rsync_password_filepath}', '--no-motd',
                             f"rsync://{cst_cfg['rsyncUser']}@"
                             f"{cst_cfg['rsyncServer']}"
-                            f"{self.source_dir}/"]
+                            f"{raw_source_dir}/"]
             elif transfer_type == 'ssh':
                 command += ['-e', 'ssh',
                             f"{cst_cfg['sshUser']}@"
-                            f"{cst_cfg['sshServer']}:{self.source_dir}/"]
+                            f"{cst_cfg['sshServer']}:{raw_source_dir}/"]
                 if not is_darwin:
                     command.insert(2, '--protect-args')
-                if cst_cfg.get('sshUseKey') == '0':
-                    command = ['sshpass', '-p', cst_cfg['sshPass']] + command
+                if cst_cfg.get('sshUseKey') == 0:
+                    command = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + command
 
-            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg["sshPass"]}', '-p ****'))
+            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg.get("sshPass", "")}', '-p ****'))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
@@ -408,7 +535,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # Optional staleness check
         staleness = cst_cfg.get('staleness')
-        if staleness and staleness != '0':
+        if staleness and staleness != 0:
             logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
@@ -497,18 +624,27 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 # Mount SMB Share
                 mntpoint = os.path.join(tmpdir, 'mntpoint')
                 os.mkdir(mntpoint, 0o755)
-                smb_version = detect_smb_version(cst_cfg)
-                success = mount_smb_share(cst_cfg, mntpoint, smb_version)
+                smb_version, smb_detail = detect_smb_version(cst_cfg)
+                success, mount_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
                 if not success:
-                    return {'verdict': False, 'reason': 'Failed to mount SMB share'}
+                    reason = 'Failed to mount SMB share'
+                    if mount_detail:
+                        reason += f' — {mount_detail}'
+                    return {'verdict': False, 'reason': reason}
                 prefix = mntpoint
 
             # Adjustments for RSYNC
             if transfer_type == 'rsync':
+                rsync_pass = cst_cfg.get('rsyncPass')
+                if rsync_pass is None:
+                    return {'verdict': False,
+                            'reason': 'rsyncPass not available — worker API token may be '
+                                      'misconfigured or password not set for this transfer',
+                            'files': []}
                 # Build password file
                 try:
                     with open(password_file, 'w', encoding='utf-8') as f:
-                        f.write(cst_cfg['rsyncPass'])
+                        f.write(rsync_pass)
                     os.chmod(password_file, 0o600)
                 except IOError:
                     return {'verdict': False, 'reason': 'Error writing rsync password file', 'files': []}
@@ -519,56 +655,89 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             if transfer_type == 'ssh':
                 is_darwin = check_darwin(cst_cfg)
 
-            # Build filelist (from local, SMB mount, etc.)
-            filelist_result = self.build_cst_filelist(prefix=prefix, rsync_password_filepath=password_file, is_darwin=is_darwin)
+            # Enumerate source directories (expands wildcards if present)
+            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin)
 
-            if not filelist_result['verdict']:
-                return {'verdict': False, 'reason': filelist_result.get('reason', 'Unknown'), 'files': []}
+            if not source_pairs:
+                return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
 
-            files = filelist_result['files']
+            all_files = {'new': [], 'updated': [], 'exclude': []}
+            if cst_cfg['syncFromSource'] == 1:
+                all_files['deleted'] = []
 
-            # Write file list
-            if not build_include_file(files['include'], include_file):
-                return {'verdict': False, 'reason': 'Error writing file list', 'files': []}
-
-            # Build rsync command
-            if transfer_type == 'local':
-                source_path = source_dir if source_dir == '/' else source_dir.rstrip('/')
-            elif transfer_type == 'rsync':
-                source_path = f"rsync://{cst_cfg['rsyncUser']}@" \
-                              f"{cst_cfg['rsyncServer']}" \
-                              f"{source_dir}"
-            elif transfer_type == 'ssh':
-                user = cst_cfg['sshUser']
-                host = cst_cfg['sshServer']
-                source_path = f"{user}@{host}:{source_dir}"
-            elif transfer_type == 'smb':
-                source_path = os.path.join(mntpoint, source_dir.lstrip('/').rstrip('/'))
-
-            source_path += '/'
-
-            extra_args = []
-            if transfer_type == 'ssh':
-                extra_args = ['-e', 'ssh']
-            elif transfer_type == 'rsync':
-                extra_args = [f"--password-file={password_file}"]
-
-            # Build command
             rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
-            cmd = build_rsync_command(rsync_flags, extra_args, source_path, dest_dir, include_file)
-            if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == '0':
-                cmd = ['sshpass', '-p', cst_cfg['sshPass']] + cmd
 
-            # Transfer files
-            files['new'], files['updated'] = run_transfer_command(
-                self, current_job, cmd, len(files['include'])
-            )
+            for src_dir, dest_name in source_pairs:
+                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
+                if dest_name:
+                    os.makedirs(effective_dest, exist_ok=True)
 
-            # Delete files if sync'ing with source
-            if cst_cfg['syncFromSource'] == '1':
-                files['deleted'] = delete_from_dest(dest_dir, files['include'])
+                # Build filelist for this source directory
+                filelist_result = self.build_cst_filelist(
+                    prefix=prefix,
+                    rsync_password_filepath=password_file,
+                    is_darwin=is_darwin,
+                    override_source_dir=src_dir
+                )
 
-        return {'verdict': True, 'files': files}
+                if not filelist_result['verdict']:
+                    logging.warning("Filelist build failed for %s: %s", src_dir, filelist_result.get('reason', 'Unknown'))
+                    continue
+
+                files = filelist_result['files']
+
+                # Write file list
+                if not build_include_file(files['include'], include_file):
+                    logging.warning("Error writing file list for %s, skipping", src_dir)
+                    continue
+
+                # Build rsync source path
+                if transfer_type == 'local':
+                    source_path = src_dir if src_dir == '/' else src_dir.rstrip('/')
+                elif transfer_type == 'rsync':
+                    source_path = f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{src_dir}"
+                elif transfer_type == 'ssh':
+                    source_path = f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}:{src_dir}"
+                elif transfer_type == 'smb':
+                    source_path = os.path.join(mntpoint, src_dir.lstrip('/').rstrip('/'))
+
+                source_path += '/'
+
+                extra_args = []
+                if transfer_type == 'ssh':
+                    extra_args = ['-e', 'ssh']
+                elif transfer_type == 'rsync':
+                    extra_args = [f"--password-file={password_file}"]
+
+                cmd = build_rsync_command(rsync_flags, extra_args, source_path, effective_dest, include_file)
+                if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
+                    cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
+
+                new_files, updated_files = run_transfer_command(
+                    self, current_job, cmd, len(files['include'])
+                )
+                files['new'] = new_files
+                files['updated'] = updated_files
+
+                # Delete files if sync'ing with source
+                if cst_cfg['syncFromSource'] == 1:
+                    deleted = delete_from_dest(effective_dest, files['include'])
+                    if dest_name:
+                        all_files['deleted'].extend([os.path.join(dest_name, f) for f in deleted])
+                    else:
+                        all_files['deleted'].extend(deleted)
+
+                # Accumulate results, prefixing paths with dest_name for wildcard expansions
+                if dest_name:
+                    all_files['new'].extend([os.path.join(dest_name, f) for f in files['new']])
+                    all_files['updated'].extend([os.path.join(dest_name, f) for f in files['updated']])
+                    all_files['exclude'].extend([os.path.join(dest_name, f) for f in files['exclude']])
+                else:
+                    all_files['new'].extend(files['new'])
+                    all_files['updated'].extend(files['updated'])
+                    all_files['exclude'].extend(files['exclude'])
+
+        return {'verdict': True, 'files': all_files}
 
 
     def on_job_execute(self, current_job):
@@ -605,7 +774,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.collection_system_transfer['status'] == "1":
+        if self.collection_system_transfer['status'] == 1:
             logging.info("Transfer already in-progress")
             return self._ignore_job(current_job, "Transfer in-Progress", "Transfer is already in-progress")
 
@@ -617,7 +786,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
         self.collection_system_transfer.update(payload_obj['collectionSystemTransfer'])
 
-        if system_status == "Off" or self.collection_system_transfer['enable'] == '0':
+        if system_status == "Off" or self.collection_system_transfer['enable'] == 0:
             logging.info("Transfer disabled for %s", self.collection_system_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
@@ -629,7 +798,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             self.lowering_id = None
 
         # fail if lowering ID is required but not found
-        if (self.collection_system_transfer.get('cruiseOrLowering') == '1'  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
+        if (self.collection_system_transfer.get('cruiseOrLowering') == 1  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
             return self._fail_job(current_job, "Verify lowering ID",
                                     "Lowering ID is undefined")
 
@@ -644,8 +813,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         self.data_end_date = "9999/12/31 23:59:59"
 
         # if requested, set to specified bounds for the corresponding cruise/lowering
-        if self.collection_system_transfer['useStartDate'] == '1':
-            if self.collection_system_transfer['cruiseOrLowering'] == "0":
+        if self.collection_system_transfer['useStartDate'] == 1:
+            if self.collection_system_transfer['cruiseOrLowering'] == 0:
                 logging.debug("Using cruise Time bounds")
                 self.data_start_date = self.ovdm.get_cruise_start_date() or "1970/01/01 00:00"
                 cruise_end = self.ovdm.get_cruise_end_date()
@@ -656,8 +825,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 lowering_end = self.ovdm.get_lowering_end_date()
                 self.data_end_date = f"{lowering_end}:59" if lowering_end else "9999/12/31 23:59:59"
 
-            if self.collection_system_transfer['staleness'] != "0":
-                staleness_dt = (datetime.utcnow() - timedelta(seconds=int(self.collection_system_transfer['staleness']))).replace(tzinfo=pytz.UTC)
+            if self.collection_system_transfer['staleness'] != 0:
+                staleness_dt = datetime.now(timezone.utc) - timedelta(seconds=int(self.collection_system_transfer['staleness']))
                 data_end_dt = datetime.strptime(f"{self.data_end_date}+0000", "%Y/%m/%d %H:%M:%S%z")
                 if staleness_dt < data_end_dt:
                     self.data_end_date = staleness_dt.strftime("%Y/%m/%d %H:%M:%S")
@@ -676,18 +845,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -857,7 +1032,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     if job_results['files']['new'] or job_results['files']['updated']:
-        if cst_cfg['localDirIsMountPoint'] == '0':
+        if cst_cfg['localDirIsMountPoint'] == 0:
             logging.info("Setting file permissions")
             worker.send_job_status(current_job, 96, 100)
 
@@ -872,7 +1047,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.info("Writing transfer logfile")
         worker.send_job_status(current_job, 97, 100)
 
-        logfile_filename = f"{cst_cfg['name']}_{worker.transfer_start_date}.log"
+        logfile_filename = f"{worker.cruise_id}_{cst_cfg['name']}_{worker.transfer_start_date}.log"
         logfile_contents = {
             'files': {
                 'new': job_results['files']['new'],
@@ -898,7 +1073,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 98, 100)
 
-    logfile_filename = f"{cst_cfg['name']}_Exclude.log"
+    logfile_filename = f"{worker.cruise_id}_{cst_cfg['name']}_Exclude.log"
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']

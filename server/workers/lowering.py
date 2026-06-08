@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-FILE:  lowering.py
+"""Gearman worker that initializes and finalizes OpenVDM lowerings.
 
-DESCRIPTION:  Gearman worker the handles the tasks of initializing a new
-lowering and finalizing the current lowering.
+Registers three Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``setupNewLowering`` — create the lowering directory tree, initialize the
+  MD5 summary for the lowering, set directory permissions, and export the
+  lowering configuration.
+- ``finalizeCurrentLowering`` — run pre-finalize hooks, update the MD5
+  summary, apply directory permissions, export the lowering config, and run
+  post-finalize hooks.
+- ``exportLoweringConfig`` — write the current lowering configuration as JSON
+  into the lowering directory.
 """
 
 import argparse
@@ -39,8 +39,17 @@ TASK_NAMES = {
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for lowering setup and finalization.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        lowering_id: Current lowering identifier.
+        lowering_start_date: Start date of the current lowering.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        lowering_dir: Absolute path to the lowering data directory.
     """
 
     def __init__(self):
@@ -61,7 +70,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         Build the path to save transfer logfiles
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def update_md5_summary(self, files):
@@ -227,18 +238,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 

@@ -20,14 +20,14 @@ class shipToShoreTransfers extends Controller {
 
         for( $i=1; $i<=5; $i++){
             $option = array('id'=>(string)$i, 'name'=>'priority', 'value'=>(string)$i, 'label'=>(string)$i);
-            if(strcmp($checkedType, (string)$i) === 0) {
+            if(isset($checkedType) && strcmp($checkedType, (string)$i) === 0) {
                 $option['checked']='1';
             }
             array_push($output, $option);
         }
 
         if(!isset($checkedType)) {
-            $output[sizeOf($output)-1]['checked']='1';
+            $output[count($output)-1]['checked']='1';
         }
         return $output;
     }
@@ -112,17 +112,18 @@ class shipToShoreTransfers extends Controller {
     public function add(){
         $data['title'] = 'Add Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
-        $data['transferPriorityOptions'] = $this->_buildTransferPriorityOptions($_POST['priority']);
-        $data['collectionSystemOptions'] = $this->_buildCollectionSystemOptions($_POST['collectionSystemTransfer']);
-        $data['extraDirectoryOptions'] = $this->_buildExtraDirectoryOptions($_POST['extraDirectory']);
+        $data['transferPriorityOptions'] = $this->_buildTransferPriorityOptions($_POST['priority'] ?? '');
+        $data['collectionSystemOptions'] = $this->_buildCollectionSystemOptions($_POST['collectionSystemTransfer'] ?? '');
+        $data['extraDirectoryOptions'] = $this->_buildExtraDirectoryOptions($_POST['extraDirectory'] ?? '');
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $priority = $_POST['priority'];
-            $collectionSystem = $_POST['collectionSystemTransfer'];
-            $extraDirectory = $_POST['extraDirectory'];
-            $includeFilter = $_POST['includeFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $priority = $_POST['priority'] ?? '';
+            $collectionSystem = $_POST['collectionSystemTransfer'] ?? '0';
+            $extraDirectory = $_POST['extraDirectory'] ?? '0';
+            $includeFilter = $_POST['includeFilter'] ?? '';
             $enable = 0;
 
             if($name == ''){
@@ -173,14 +174,15 @@ class shipToShoreTransfers extends Controller {
         $data['title'] = 'Edit Ship-to-Shore Transfer';
         $data['javascript'] = array('shipToShoreTransfersFormHelper');
         $data['row'] = $this->_shipToShoreTransfersModel->getShipToShoreTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $priority = $_POST['priority'];
-            $collectionSystem = $_POST['collectionSystemTransfer'];
-            $extraDirectory = $_POST['extraDirectory'];
-            $includeFilter = $_POST['includeFilter'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $priority = $_POST['priority'] ?? '';
+            $collectionSystem = $_POST['collectionSystemTransfer'] ?? '0';
+            $extraDirectory = $_POST['extraDirectory'] ?? '0';
+            $includeFilter = $_POST['includeFilter'] ?? '';
 
             if($name == ''){
                 $error[] = 'Name is required';

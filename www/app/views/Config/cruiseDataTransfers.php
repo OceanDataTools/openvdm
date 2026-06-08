@@ -55,15 +55,15 @@ use Helpers\Session;
                             <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="<?php echo CRUISE_NAME; ?> Data Transfer" data-delete-url="<?php echo DIR; ?>config/cruiseDataTransfers/delete/<?php echo $row->cruiseDataTransferID; ?>">Delete</a> /
                             <a href='<?php echo DIR; ?>config/cruiseDataTransfers/test/<?php echo $row->cruiseDataTransferID; ?>'>Test</a> /
 <?php
-            if($row->status === "1") {
+            if($row->status === 1) {
 ?>
                             <a id="runStop<?php echo $row->cruiseDataTransferID ?>" href='<?php echo DIR; ?>config/cruiseDataTransfers/stop/<?php echo $row->cruiseDataTransferID; ?>'>Stop</a>
 <?php
-            } else if($row->status === "5") {
+            } else if($row->status === 5) {
 ?>
                             <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Stopping</a>
 <?php
-            } else if($row->status === "6") {
+            } else if($row->status === 6) {
 ?>
                             <a class="text-muted" id="runStop<?php echo $row->cruiseDataTransferID ?>" href='#'>Starting</a>
  <?php
@@ -73,7 +73,7 @@ use Helpers\Session;
                             <span id="testFail<?php echo $row->cruiseDataTransferID ?>" class="pull-right">
 <?php
             }
-            if($row->status === "3") {
+            if($row->status === 3) {
 ?>
                                 <i class="fa fa-warning text-danger"></i>
 <?php
@@ -83,7 +83,7 @@ use Helpers\Session;
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->enable == "0"){
+            if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/cruiseDataTransfers/enable/<?php echo $row->cruiseDataTransferID; ?>'>Off</a>
 <?php
@@ -132,7 +132,7 @@ use Helpers\Session;
     </div> <!-- /.modal-dialog -->
 </div> <!-- /.modal -->
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog" aria-labelledby="Test Results" aria-hidden="true">
     <div class="modal-dialog">

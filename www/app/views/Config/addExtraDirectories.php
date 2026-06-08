@@ -4,6 +4,8 @@ use Core\Error;
 use Helpers\Form;
 use Helpers\FormCustom;
 
+$_POST += ['name' => '', 'longName' => '', 'destDir' => '', 'cruiseOrLowering' => ''];
+
 ?>
     <div class="row">
         <div class="col-lg-12">

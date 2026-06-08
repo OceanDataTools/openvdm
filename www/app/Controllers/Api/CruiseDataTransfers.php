@@ -19,24 +19,48 @@ class CruiseDataTransfers extends Controller {
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
     }
 
-    public function getCruiseDataTransfers(){
+    private function _is_worker_request(): bool {
+        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
+        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
+    }
 
-        echo json_encode($this->_cruiseDataTransfersModel->getCruiseDataTransfers());
+    private function _strip_credentials(array $rows): array {
+        return array_map(function($row) {
+            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
+            return $row;
+        }, $rows);
+    }
+
+    public function getCruiseDataTransfers(){
+        $result = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getCruiseDataTransfer($id){
-
-        echo json_encode($this->_cruiseDataTransfersModel->getCruiseDataTransfer($id));
+        $result = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id);
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getRequiredCruiseDataTransfers(){
-
-        echo json_encode($this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers());
+        $result = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getRequiredCruiseDataTransfer($id){
-
-        echo json_encode($this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfer($id));
+        $result = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfer($id);
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     // getCruiseDataTransfersStatuses - return the names and statuses of the cruise data transfers.

@@ -16,6 +16,18 @@ class Warehouse extends Controller {
 
     private $_warehouseModel;
 
+    private function _is_worker_request(): bool {
+        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
+        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
+    }
+
+    private function _strip_credentials(array $rows): array {
+        return array_map(function($row) {
+            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
+            return $row;
+        }, $rows);
+    }
+
     private function translateOVDMVariables($text) {
 
         $returnText = $text;
@@ -37,10 +49,12 @@ class Warehouse extends Controller {
             $nowDateStr = gmdate('Y/m/d H:i');
             $cruiseDates = $this->_warehouseModel->getCruiseDates();
 
-            if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
-                $response['warning'] = CRUISE_NAME . " has not started";
-            } elseif ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
-                $response['warning'] = CRUISE_NAME . " has Ended";
+            if(isset($cruiseDates['cruiseStartDate'])) {
+                if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
+                    $response['warning'] = CRUISE_NAME . " has not started";
+                } elseif (!empty($cruiseDates['cruiseEndDate']) && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
+                    $response['warning'] = CRUISE_NAME . " has Ended";
+                }
             }
 
         } else {
@@ -187,6 +201,12 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    public function getTransferLogDir() {
+
+        $response['transferLogDir'] = $this->_warehouseModel->getTransferLogDir();
+        echo json_encode($response);
+    }
+
     public function getCruiseDataURLPath() {
 
         $response['cruiseDataURLPath'] = $this->_warehouseModel->getCruiseDataURLPath();
@@ -264,19 +284,7 @@ class Warehouse extends Controller {
 
     public function getTransferLogSummary() {
 
-        $warehouseBaseDir = $this->_warehouseModel->getShipboardDataWarehouseBaseDir();
-        $cruiseID = $this->_warehouseModel->getCruiseID();
-        $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
-        $requiredExtraDirectories = $extraDirectoriesModel->getExtraDirectories(true, true);
-        $transferLogDir ='';
-        foreach($requiredExtraDirectories as $row) {
-            if(strcmp($row->name, "Transfer_Logs") === 0) {
-                $transferLogDir = $row->destDir;
-                break;
-            }
-        }
-
-        $filename = $warehouseBaseDir . '/' . $cruiseID . '/' . $transferLogDir . '/' . 'TransferLogSummary.json';
+        $filename = $this->_warehouseModel->getTransferLogDir() . '/TransferLogSummary.json';
         if (file_exists($filename) && is_readable($filename)) {
             echo file_get_contents($filename);
         } else {
@@ -339,6 +347,11 @@ class Warehouse extends Controller {
         $response['cruiseDataTransfersConfig'] = $cruiseDataTransfersModel->getCruiseDataTransfersConfig();
         $response['shipToShoreTransfersConfig'] = $shipToShoreTransfersModel->getShipToShoreTransfersConfig();
 
+        if (!$this->_is_worker_request()) {
+            $response['collectionSystemTransfersConfig'] = $this->_strip_credentials($response['collectionSystemTransfersConfig']);
+            $response['cruiseDataTransfersConfig'] = $this->_strip_credentials($response['cruiseDataTransfersConfig']);
+        }
+
         if($this->_warehouseModel->getShowLoweringComponents()) {
             $response['loweringDataBaseDir'] = $this->_warehouseModel->getLoweringDataBaseDir();
         }
@@ -365,6 +378,10 @@ class Warehouse extends Controller {
         $response['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getLoweringOnlyCollectionSystemTransfers();
 
+        if (!$this->_is_worker_request()) {
+            $response['collectionSystemTransfersConfig'] = $this->_strip_credentials($response['collectionSystemTransfersConfig']);
+        }
+
         foreach ($response['collectionSystemTransfersConfig'] as $key => $collectionSystemTransfersConfig) {
             $collectionSystemTransfersConfig->sourceDir = $this->translateOVDMVariables($collectionSystemTransfersConfig->sourceDir);
             $collectionSystemTransfersConfig->destDir = $this->translateOVDMVariables($collectionSystemTransfersConfig->destDir);
@@ -376,12 +393,12 @@ class Warehouse extends Controller {
 
     public function setCruiseSize() {
 
-        $this->_warehouseModel->setCruiseSize(array('value' => $_POST['bytes']));
+        $this->_warehouseModel->setCruiseSize(array('value' => $_POST['bytes'] ?? null));
     }
 
     public function setLoweringSize() {
 
-        $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes']));
+        $this->_warehouseModel->setLoweringSize(array('value' => $_POST['bytes'] ?? null));
     }
 
     public function getDataDashboardManifestFn() {

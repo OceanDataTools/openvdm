@@ -14,7 +14,7 @@ $(function () {
                 for (i = 0; i < data.length; i++) {
                     if (data[i].name === "SSDW") {
 
-                        if (data[i].status === "1") {
+                        if (data[i].status === 1) {
                             output = 'Stop Ship-to-Shore Transfer';
                             classes = 'btn btn-sm btn-danger';
                             href = siteRoot + 'config/shipToShoreTransfers/stop';

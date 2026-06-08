@@ -51,7 +51,7 @@ use Helpers\Session;
                             <a href='<?php echo DIR; ?>config/collectionSystemTransfers/edit/<?php echo $row->collectionSystemTransferID; ?>'>Edit</a> /
                             <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Collection System Transfer" data-delete-url="<?php echo DIR; ?>config/collectionSystemTransfers/delete/<?php echo $row->collectionSystemTransferID; ?>">Delete</a> /
 <?php
-            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
+            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === 1) {
 ?>
                             <span class="text-muted">Test</span> /
 <?php
@@ -63,13 +63,13 @@ use Helpers\Session;
 ?>
 
 <?php
-            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
+            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === 1) {
 ?>
                             <span class="text-muted">Run</span>
 <?php
             } else {
 
-                if($row->status === "1"){
+                if($row->status === 1){
 ?>
                                 <a id="runStop<?php echo $row->collectionSystemTransferID; ?>" href='<?php echo DIR; ?>config/collectionSystemTransfers/stop/<?php echo $row->collectionSystemTransferID; ?>'>Stop</a>
  <?php
@@ -80,7 +80,7 @@ use Helpers\Session;
                 }
             }
 
-            if($row->status === "3") {
+            if($row->status === 3) {
 ?>
                             <span class="pull-right"><i class="fa fa-warning text-danger"></i></span>
 <?php
@@ -89,8 +89,8 @@ use Helpers\Session;
                         </td>
                         <td style='text-align:center'>
 <?php
-            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === '1') {
-                if($row->enable === "0"){
+            if ( !$data['showLoweringComponents'] && $row->cruiseOrLowering === 1) {
+                if($row->enable === 0){
 ?>
                             <div class="btn btn-xs btn-danger disabled">Off</div>
 <?php
@@ -102,7 +102,7 @@ use Helpers\Session;
 
             } else {
 
-                if($row->enable === "0"){
+                if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/collectionSystemTransfers/enable/<?php echo $row->collectionSystemTransferID;?> '>Off</a>
 <?php
@@ -152,7 +152,7 @@ use Helpers\Session;
 </div> <!-- /.modal -->
 
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">

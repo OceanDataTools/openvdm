@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""
-FILE:  openvdm_plugin.py
+"""Base classes and helpers for OpenVDM data parsers and plugins.
 
-DESCRIPTION:  OpenVDM parser/plugin python module
+This module provides the class hierarchy used to build OpenVDM instrument
+parsers and data-dashboard plugins:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2016-02-02
- REVISION:  2025-12-30
+- :class:`OpenVDMParserQualityTest` and its subclasses represent individual
+  QA/QC test results (Failed / Warning / Passed).
+- :class:`OpenVDMParserStat` and its subclasses represent computed statistics
+  (bounds, geographic bounds, row validity, time bounds, total value, and
+  value validity).
+- :class:`OpenVDMParser` is the base class for all parsers; subclass
+  :class:`OpenVDMCSVParser` adds helpers for CSV/NMEA-style log files.
+- :class:`OpenVDMPlugin` is the entry point used by the data-dashboard worker
+  to discover and invoke parsers for a given file type.
+
+Parsers are discovered at runtime from the plugin directory defined in
+``openvdm.yaml`` via the suffix configured in the same file.
 """
 
 import fnmatch
@@ -45,11 +51,23 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 
 
 class OpenVDMParserQualityTest():
-    """
-    Defines data object and methods for OpenVDM parser QA tests
+    """Data object representing the result of a single OpenVDM QA/QC test.
+
+    Attributes:
+        test_data: Dict with keys ``'testName'`` and ``'results'``.
     """
 
-    def __init__(self, test_name, test_value):
+    def __init__(self, test_name: str, test_value: str) -> None:
+        """Initialise the quality test result.
+
+        Args:
+            test_name: Human-readable name for the test.
+            test_value: Result — must be one of
+                ``'Failed'``, ``'Warning'``, or ``'Passed'``.
+
+        Raises:
+            ValueError: If *test_value* is not a recognised result type.
+        """
 
         if test_value not in QUALITY_TEST_RESULT_TYPES:
             raise ValueError(f"Invalid test result type: type must be one of: {', '.join(QUALITY_TEST_RESULT_TYPES)}")
@@ -104,11 +122,29 @@ class OpenVDMParserQualityTestPassed(OpenVDMParserQualityTest):
 
 
 class OpenVDMParserStat():
-    """
-    Defines data object and methods for OpenVDM plugin statistic
+    """Data object representing a computed statistic produced by an OpenVDM parser.
+
+    Attributes:
+        stat_data: Dict with keys ``'statName'``, ``'statType'``,
+            ``'statUnit'``, and ``'statValue'``.
     """
 
-    def __init__(self, stat_name, stat_type, stat_value, stat_uom=''): # pylint: disable=too-many-branches
+    def __init__(self, stat_name: str, stat_type: str, stat_value, stat_uom: str = '') -> None: # pylint: disable=too-many-branches
+        """Initialise a parser statistic.
+
+        Args:
+            stat_name: Human-readable name for the statistic.
+            stat_type: One of ``'bounds'``, ``'geoBounds'``,
+                ``'rowValidity'``, ``'timeBounds'``, ``'totalValue'``,
+                or ``'valueValidity'``.
+            stat_value: Value appropriate for *stat_type* (see type-specific
+                subclasses for expected shapes).
+            stat_uom: Unit of measure string (e.g. ``'ddeg'``, ``'seconds'``).
+
+        Raises:
+            ValueError: If *stat_type* is unrecognised or *stat_value* does
+                not match the expected shape for the given type.
+        """
 
         if stat_type not in STAT_TYPES:
             raise ValueError(f"Invalid stat type, must be one of: {', '.join(STAT_TYPES)}")
@@ -231,11 +267,27 @@ class OpenVDMParserValueValidityStat(OpenVDMParserStat):
 
 
 class OpenVDMParser():
-    """
-    Root Class for a OpenVDM parser object
+    """Base class for all OpenVDM instrument data parsers.
+
+    Subclass this (or the more feature-rich :class:`OpenVDMCSVParser`) to
+    create a parser for a specific instrument.  Override :meth:`parse` (or the
+    legacy :meth:`process_file`) to implement the parsing logic.
+
+    Attributes:
+        openvdm: :class:`~server.lib.openvdm.OpenVDM` instance used to post
+            error messages, or ``None`` when API access is disabled.
+        plugin_data: Accumulated output dict with keys ``'visualizerData'``,
+            ``'qualityTests'``, and ``'stats'``.
     """
 
-    def __init__(self, use_openvdm_api=False):
+    def __init__(self, use_openvdm_api: bool = False) -> None:
+        """Initialise the parser.
+
+        Args:
+            use_openvdm_api: If ``True``, instantiate an
+                :class:`~server.lib.openvdm.OpenVDM` connection so that
+                parsing errors can be posted as messages to the web UI.
+        """
         self.openvdm = OpenVDM() if use_openvdm_api else None
         self.plugin_data = {
             'visualizerData': [],
@@ -291,9 +343,12 @@ class OpenVDMParser():
         )
 
 
-    def add_visualization_data(self, data):
-        """
-        Add the visualization data to the
+    def add_visualization_data(self, data) -> None:
+        """Append *data* to the ``visualizerData`` list in :attr:`plugin_data`.
+
+        Args:
+            data: A GeoJSON FeatureCollection dict or other visualiser-
+                compatible data structure.
         """
 
         self.plugin_data['visualizerData'].append(data)
@@ -396,8 +451,20 @@ class OpenVDMParser():
 
 
 class OpenVDMCSVParser(OpenVDMParser):
-    """
-    OpenVDM parser for a CSV-style input file
+    """OpenVDM parser base class for CSV and NMEA-style log files.
+
+    Extends :class:`OpenVDMParser` with helpers for reading timestamped lines,
+    cropping data to a time window, resampling, and rounding.
+
+    Attributes:
+        raw_cols: Column names as they appear in the raw data file.
+        proc_cols: Column names used in the processed output.
+        start_dt: Optional start :class:`~datetime.datetime` for cropping.
+        stop_dt: Optional stop :class:`~datetime.datetime` for cropping.
+        time_format: ``strptime``-compatible format string for timestamps.
+        skip_header: If ``True``, the first line of each file is skipped.
+        timestamp_separator: Character(s) separating the timestamp from the
+            payload field(s).  Defaults to ``','``.
     """
 
     TIMESTAMP_RE = re.compile(
@@ -407,6 +474,21 @@ class OpenVDMCSVParser(OpenVDMParser):
     def __init__(self, raw_cols, proc_cols, start_dt=None, stop_dt=None,
                  time_format=None, skip_header=False, timestamp_separator=None,
                  use_openvdm_api=False):
+        """Initialise the CSV parser.
+
+        Args:
+            raw_cols: Column names as they appear in the raw data.
+            proc_cols: Column names for the processed output DataFrame.
+            start_dt: Optional crop start :class:`~datetime.datetime`.
+            stop_dt: Optional crop stop :class:`~datetime.datetime`.
+            time_format: ``strptime`` format for timestamps.  Defaults to
+                ISO 8601 (``%Y-%m-%dT%H:%M:%S.%fZ``).
+            skip_header: Skip the first line of each data file when ``True``.
+            timestamp_separator: Separator between the timestamp and the rest
+                of the line.  Defaults to ``','``.
+            use_openvdm_api: Pass ``True`` to enable OpenVDM API message
+                posting (see :class:`OpenVDMParser`).
+        """
 
         self.raw_cols = raw_cols
         self.proc_cols = proc_cols
@@ -424,6 +506,15 @@ class OpenVDMCSVParser(OpenVDMParser):
         super().__init__(use_openvdm_api=use_openvdm_api)
 
     def _sanitize_for_json(self, obj):
+        """Recursively convert NumPy types and datetimes to JSON-native types.
+
+        Args:
+            obj: Object to sanitise (dict, list, NumPy scalar, datetime, or
+                any JSON-native type).
+
+        Returns:
+            A JSON-serialisable equivalent of *obj*.
+        """
         if isinstance(obj, dict):
             return {k: self._sanitize_for_json(v) for k, v in obj.items()}
         if isinstance(obj, list):
@@ -582,7 +673,17 @@ class OpenVDMCSVParser(OpenVDMParser):
 
         return timestamp_str, payload.strip()
 
-    def send_error_msg(self, errors, filepath):
+    def send_error_msg(self, errors: list, filepath: str) -> None:
+        """Log a parsing-error message and optionally post it to the OpenVDM API.
+
+        Condenses the list of bad row numbers using
+        :func:`~server.lib.condense_to_ranges.condense_to_ranges` before
+        formatting the message.
+
+        Args:
+            errors: List of line numbers (int) where parsing errors occurred.
+            filepath: Path to the file being parsed (used in the message text).
+        """
 
         error_msg = ''
         if len(errors) > 0:
@@ -604,7 +705,17 @@ class OpenVDMCSVParser(OpenVDMParser):
         return json.dumps(self.get_plugin_data(), cls=NpEncoder)
 
     @classmethod
-    def run_cli(cls):
+    def run_cli(cls) -> None:
+        """Entry point for running the parser from the command line.
+
+        Parses standard OpenVDM CLI arguments (``-v``, ``--startDT``,
+        ``--stopDT``, ``--timeFormat``, and ``dataFile``), instantiates the
+        parser, calls :meth:`process_file`, and prints the JSON result to
+        stdout.
+
+        Subclasses can extend the argument set by overriding
+        :meth:`add_cli_arguments` and ``_extract_custom_cli_kwargs``.
+        """
         import argparse
         import logging
         from datetime import datetime
@@ -659,11 +770,25 @@ class OpenVDMCSVParser(OpenVDMParser):
 
 
 class OpenVDMPlugin():
-    """
-    OpenVDM plugin object
+    """Entry point class used by the data-dashboard worker to invoke parsers.
+
+    Subclass this to create a plugin that maps file patterns to parser
+    instances.  The data-dashboard worker calls :meth:`get_json_str` for each
+    file it needs to process.
+
+    Attributes:
+        file_type_filters: List of dicts, each with ``'regex'`` (glob pattern)
+            and ``'data_type'`` (string) keys, used to match files to data
+            types.
     """
 
-    def __init__(self, file_type_filters):
+    def __init__(self, file_type_filters: list) -> None:
+        """Initialise the plugin with a list of file-type filter dicts.
+
+        Args:
+            file_type_filters: List of dicts with ``'regex'`` and
+                ``'data_type'`` keys defining which files this plugin handles.
+        """
         self.file_type_filters = file_type_filters
 
 

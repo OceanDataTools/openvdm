@@ -50,6 +50,11 @@ class Config
         define('PUBLICDATA_DIR', '/data/PublicData');
 
         /*
+         * Define directory where transfer log files are stored
+         */
+        define('TRANSFER_LOG_DIR', '/var/log/openvdm');
+
+        /*
          * Define location/name of the data dashboard configuration file
          */
         define('DASHBOARD_CONF', '/opt/openvdm/www/etc/datadashboard.yaml');
@@ -77,7 +82,7 @@ class Config
         define('CRUISE_CONFIG_FN', 'cruise_config.json');
 
         /*
-         * Define what to name the cruise config file. (i.e. 'lowering_config.json')
+         * Define what to name the lowering config file. (i.e. 'lowering_config.json')
          */
         define('LOWERING_CONFIG_FN', 'lowering_config.json');
 
@@ -161,12 +166,20 @@ class Config
         /*
          * Optional create a constant for the name of the site.
          */
-        define('SITETITLE', 'Open Vessel Data Management v2.14.1');
+        define('SITETITLE', 'Open Vessel Data Management v2.15.0');
 
         /*
          * Optionall set a site email address.
          */
         //define('SITEEMAIL', '');
+
+        /*
+         * Shared secret that Gearman workers include in the X-Worker-Token header
+         * to receive credential fields from the REST API.  Must match workerApiKey
+         * in server/etc/openvdm.yaml.  Change this before deploying
+         * (e.g. openssl rand -hex 32).
+         */
+        define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');
 
         /*
          * Turn on custom error handling.

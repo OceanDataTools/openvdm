@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  data_dashboard.py
+"""Gearman worker that builds and updates the OpenVDM data-dashboard objects.
 
-DESCRIPTION:  Gearman worker that handles the creation and update of OVDM data
-    dashboard objects.
+Registers two Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-12-30
+- ``updateDataDashboard`` — run every plugin that matches the new or updated
+  files reported by a collection system transfer and write the resulting
+  dashboard JSON to the cruise directory.
+- ``rebuildDataDashboard`` — walk the entire cruise directory, run all matching
+  plugins against every file, and fully regenerate all dashboard objects.
+
+Plugins are discovered at start-up from the ``pluginDir`` path in
+``openvdm.yaml``.  Each plugin module is imported via ``importlib`` and must
+expose a class that subclasses
+:py:class:`~server.lib.openvdm_plugin.OpenVDMPlugin`.
 """
 
 import argparse
@@ -38,15 +40,25 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['UPDATE_DATA_DASHBOARD'],
         "longName": "Updating data dashboard",
     }
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Gearman worker for processing OVDM data dashboard tasks.
+    """Gearman worker for data-dashboard generation and updates.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_id: Current lowering identifier, or ``None``.
+        lowering_dir: Absolute path to the lowering data directory, or
+            ``None`` when no lowering is active.
     """
 
     def __init__(self):
@@ -209,18 +221,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        lineno = exc_tb.tb_lineno
-        logging.error("Exception: %s in %s at line %s", exc_value, fname, lineno)
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_value)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_value)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_value)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -383,7 +400,7 @@ def task_rebuild_data_dashboard(worker, current_job):
             continue
 
         # Build file list
-        if cst['cruiseOrLowering'] == "0":
+        if cst['cruiseOrLowering'] == 0:
             cst_dir = os.path.join(worker.cruise_dir, cst['destDir'])
             filelist = build_filelist(cst_dir).get('include', [])
             filelist = [os.path.join(cst['destDir'], f) for f in filelist]

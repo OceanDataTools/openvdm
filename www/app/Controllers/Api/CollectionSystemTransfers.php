@@ -46,24 +46,56 @@ class CollectionSystemTransfers extends Controller {
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
     }
 
+    private function _is_worker_request(): bool {
+        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
+        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
+    }
+
+    private function _strip_credentials(array $rows): array {
+        return array_map(function($row) {
+            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
+            return $row;
+        }, $rows);
+    }
+
     public function getCollectionSystemTransfers(){
-        echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfers());
+        $result = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getActiveCollectionSystemTransfers($sortField = 'name'){
-        echo json_encode($this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers($sortField));
+        $result = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers($sortField);
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getCruiseOnlyCollectionSystemTransfers(){
-        echo json_encode($this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers());
+        $result = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getLoweringOnlyCollectionSystemTransfers(){
-        echo json_encode($this->_collectionSystemTransfersModel->getLoweringOnlyCollectionSystemTransfers());
+        $result = $this->_collectionSystemTransfersModel->getLoweringOnlyCollectionSystemTransfers();
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     public function getCollectionSystemTransfer($id){
-        echo json_encode($this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id));
+        $result = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);
+        if (!$this->_is_worker_request()) {
+            $result = $this->_strip_credentials($result);
+        }
+        echo json_encode($result);
     }
 
     // getCollectionSystemTransfersStatuses - return the names and statuses of the collection system transfers.

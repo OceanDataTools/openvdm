@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""
-FILE:  post_hooks.py
+"""Gearman worker that runs user-defined post-hook shell commands.
 
-DESCRIPTION:  Gearman worker that runs user-defined scripts following the
-    completion of the setupNewCruise, setupNewLowering,
-    postCollectionSystemTransfer, postDataDashboard, finalizeCurrentCruise and
-    finalizeCurrentLowering tasks.
+Registers eight Gearman tasks that fire after key OpenVDM lifecycle events:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-02-09
- REVISION:  2025-07-06
+- ``postCollectionSystemTransfer`` — after a collection system transfer
+- ``postDataDashboard`` — after the data-dashboard update
+- ``postSetupNewCruise`` / ``postSetupNewLowering`` — after cruise/lowering creation
+- ``preFinalizeCurrentCruise`` / ``postFinalizeCurrentCruise`` — around cruise finalization
+- ``preFinalizeCurrentLowering`` / ``postFinalizeCurrentLowering`` — around lowering finalization
+
+Hook commands are configured in ``openvdm.yaml`` under ``postHookCommands``.
+Token substitution (``{cruiseID}``, ``{loweringID}``, ``{newFiles}``,
+``{updatedFiles}``, etc.) is applied before each command is executed.
 """
 
 import argparse
@@ -43,50 +42,63 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK'],
         "longName": "Post collection system transfer",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_UPDATE_DATA_DASHBOARD_HOOK'],
         "longName": "Post data dashboard processing",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_CREATE_CRUISE_HOOK'],
         "longName": "Post setup new cruise",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_CREATE_LOWERING_HOOK'],
         "longName": "Post setup new lowering",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'],
         "longName": "Pre-finalize current cruise",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
         "longName": "Post-finalize current cruise",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'],
         "longName": "Pre-finalize current lowering",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
         "longName": "Post-finalize current lowering",
     }
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker that executes configured post-hook shell commands.
+
+    Attributes:
+        stop: Flag set to ``True`` when the worker should halt after the
+            current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        files: Dict with ``new`` and ``updated`` file-path lists from the
+            triggering transfer, used for ``{newFiles}``/``{updatedFiles}``
+            token substitution.
+        cruise_id: Current cruise identifier, used for ``{cruiseID}`` tokens.
+        lowering_id: Current lowering identifier, used for ``{loweringID}``
+            tokens.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        job_data: Parsed JSON payload from the incoming Gearman job.
     """
 
     def __init__(self):
@@ -137,9 +149,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return {"verdict": True}
 
 
-    def _build_commands(self, command_list, cst_cfg=None):
-        """
-        Process the provided command_list to replace any wildcard strings
+    def _build_commands(self, command_list: list, cst_cfg: dict = None) -> list:
+        """Apply token substitution to a list of command dicts.
+
+        Replaces placeholder tokens in each command argument with runtime
+        values (cruise ID, lowering ID, transfer ID/name, new/updated file
+        lists).  Empty arguments produced by substitution are dropped.
+
+        Args:
+            command_list: List of command dicts, each with ``name`` and
+                ``command`` (list of argument strings) keys.
+            cst_cfg: Optional collection system transfer config dict; required
+                to resolve ``{collectionSystemTransferID}`` and
+                ``{collectionSystemTransferName}`` tokens.
+
+        Returns:
+            A deep-copied command list with tokens substituted, or ``None``
+            if *command_list* is falsy.
         """
 
         if not command_list:
@@ -157,7 +183,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             '{cruiseID}': self.cruise_id,
             '{loweringID}': self.lowering_id,
             '{collectionSystemTransferID}':
-                cst_cfg.get('collectionSystemTransferID') if isinstance(cst_cfg, dict) else None,
+                str(cst_cfg.get('collectionSystemTransferID')) if isinstance(cst_cfg, dict) else None,
 
             '{collectionSystemTransferName}':
                 cst_cfg.get('name') if isinstance(cst_cfg, dict) else None,
@@ -261,18 +287,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -345,9 +377,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }))
 
 
-def task_post_hook(worker, current_job):
-    """
-    Run the post-hook tasks
+def task_post_hook(worker: OVDMGearmanWorker, current_job) -> str:
+    """Gearman task handler: retrieve and execute configured post-hook commands.
+
+    Fetches the command list for the active hook, performs token substitution
+    via :py:meth:`OVDMGearmanWorker.get_command_list`, then runs each command
+    in sequence.  A job is marked ``Ignore`` when no commands are configured,
+    ``Fail`` if any command exits with an error, and ``Pass`` otherwise.
+
+    Args:
+        worker: The active :py:class:`OVDMGearmanWorker` instance.
+        current_job: The Gearman job object provided by the framework.
+
+    Returns:
+        JSON-encoded results dict with a ``parts`` list indicating Pass/Fail/Ignore
+        for each step.
     """
 
     job_results = {'parts':[]}

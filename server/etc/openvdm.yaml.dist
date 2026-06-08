@@ -7,7 +7,7 @@
 #         BUGS:
 #        NOTES:
 #       AUTHOR:  Webb Pinner
-#      VERSION:  2.14
+#      VERSION:  2.15
 #      CREATED:  2016-02-02
 #     REVISION:  2025-04-12
 #
@@ -15,6 +15,12 @@
 
 # The siteRoot for the OpenVDM web-application/API
 siteRoot: "http://127.0.0.1/"
+
+# Shared secret sent by Gearman workers in the X-Worker-Token request header.
+# API endpoints that return credentials will only include password fields when
+# this token is present and matches WORKER_API_KEY in www/app/Core/Config.php.
+# Change this to a strong random value before deploying (e.g. openssl rand -hex 32).
+workerApiKey: "change-me-to-a-strong-random-value"
 
 # The transferInterval defines the interval for performing collectionSystemTransfer.
 # The unit is in minutes.

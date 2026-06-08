@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""
-FILE:  md5_summary.py
+"""Gearman worker that builds and updates the cruise MD5 checksum summary.
 
-DESCRIPTION:  Gearman worker tha handles the creation and update of an MD5
-    checksum summary.
+Registers two Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``rebuildMD5Summary`` — compute MD5 checksums for every file in the cruise
+  directory and write a complete ``MD5Summary.md5`` file and its own checksum
+  (``MD5Summary.md5.md5``).
+- ``updateMD5Summary`` — incrementally update the summary for files that have
+  been added or changed since the last run.
+
+Files are read in 64 KiB chunks (``BUF_SIZE``) to keep memory usage bounded
+for large data sets.
 """
 
 import argparse
@@ -37,15 +37,26 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['UPDATE_MD5_SUMMARY'],
         "longName": "Updating MD5 summary",
     }
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise MD5 checksum summary generation.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        md5_summary_filepath: Absolute path to the ``MD5Summary.md5`` output
+            file.
+        md5_summary_md5_filepath: Absolute path to the checksum-of-checksum
+            file (``MD5Summary.md5.md5``).
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):
@@ -223,18 +234,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -447,12 +464,10 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
         worker.shipboard_data_warehouse_config['md5SummaryMd5Fn']
     }
 
-    exclude_transfer_logs = f"{worker.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir']}/"
-
     filelist = build_filelist(worker.cruise_dir).get('include', [])
     filtered_filelist = [
         f for f in filelist
-        if f not in exclude_set and not f.startswith(exclude_transfer_logs)
+        if f not in exclude_set
     ]
 
     logging.debug("File list:\n%s", json.dumps(filtered_filelist, indent=2))

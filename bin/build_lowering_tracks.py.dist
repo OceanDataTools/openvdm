@@ -1,56 +1,22 @@
 #!/usr/bin/env python3
-"""
-FILE:  build_lowering_tracks.py
+"""Build GeoJSON and KML trackline files for a lowering.
 
-USAGE:  build_lowering_tracks.py [-h] [-v+] [-l loweringID] collectionSystem
+Analogous to ``build_cruise_tracks.py`` but scoped to a single lowering.
+Reads dashboard data files for one or more navigation/positioning sources
+(e.g. USBL-PRI, USBL-SEC, SPRINT) that were processed by the OpenVDM plugin
+for the specified collection system, concatenates their ``LineString``
+coordinates, and writes per-device trackline outputs into the ``Tracklines``
+extra directory.
 
-REQUIRED ARGUMENTS:
-    collectionSystem  name of OpenVDM-defined collection system to process
+Navigation sources are defined in the ``AllGPSSources`` list at the top of the
+script — each entry maps a collection system name to a list of GPS source
+dicts with ``device`` and ``regex`` keys.
 
-OPTIONAL ARGUMENTS:
-    -h, --help        show this help message and exit
-    -v[+]             increase verbosity of script (DEFAULT: Warning)
-    -l loweringID     the loweringID to process
+Usage::
 
-DESCRIPTION:
-    Creates geoJSON and kml representations of the track for the specified
-    lowering based on the geoJSON data created as part on the OpenVDM plugins.
-
-    In this example there is an OpenVDM plugin for the OpenRVDAS collection
-    system.  That plugin created json-formatted dashboardData files for three
-    sensors: USBL-PRI, USBL-SEC and SPRINT.  These datasets are defined within
-    the "GPSSources" array.
-
-    Each element within the "GPSSources" array includes the name of the device
-    (used in the final filename) and a regex string coreponding to the
-    dashboardData files for that GPS source within the top-level directory
-    containing the OpenRVDAS dashboardData files. In most cases the
-    dashboardData files reside in the exact same directory structure as the raw
-    data files.
-
-    i.e.
-        Raw Files:
-            /<cruiseID>/Vehicle/<loweringID>/OpenRVDAS/SBNAV/UDP-SB-USBL-PRI-GGA-RAW_*.Raw
-            /<cruiseID>/Vehicle/<loweringID>/OpenRVDAS/SBNAV/UDP-SB-USBL-SEC-GGA-RAW_*.Raw
-            /<cruiseID>/Vehicle/<loweringID>/OpenRVDAS/SUBASTIAN/UDP-SB-SPRINT-RAW_*.Raw
-        DataDashboard Files:
-            /<cruiseID>/OpenVDM/DashboardData/Vehicle/<loweringID>/OpenRVDAS/SBNAV/UDP-SB-USBL-PRI-GGA-RAW_*.json
-            /<cruiseID>/OpenVDM/DashboardData/Vehicle/<loweringID>/OpenRVDAS/SBNAV/UDP-SB-USBL-SEC-GGA-RAW_*.json
-            /<cruiseID>/OpenVDM/DashboardData/Vehicle/<loweringID>/OpenRVDAS/SUBASTIAN/UDP-SB-SPRINT-RAW_*.json
-        Trackline Files:
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_USBL-PRI_Trackline.json
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_USBL-PRI_Trackline.kml
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_USBL-SEC_Trackline.json
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_USBL-SEC_Trackline.kml
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_SB-SPRINT_Trackline.json
-            /<cruiseID>/OpenVDM/Tracklines/<loweringID>_SB-SPRINT_Trackline.kml
-
-    BUGS:
-   NOTES:
-  AUTHOR:  Webb Pinner
- VERSION:  2.12
- CREATED:  2016-03-06
-REVISION:  2025-04-12
+    build_lowering_tracks.py [-h] [-v ...] [-l LOWERINGID]
+                             [--output-dir DIR] [--username USER]
+                             collectionSystem
 """
 
 import argparse

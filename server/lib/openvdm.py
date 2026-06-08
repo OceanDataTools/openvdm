@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""
-FILE:  openvdm.py
+"""Python wrapper around the OpenVDM REST API and YAML configuration.
 
-DESCRIPTION:  OpenVDM python module
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2016-02-02
- REVISION:  2025-04-12
+The :class:`OpenVDM` class is the primary interface used by all Gearman
+workers and utility scripts to read configuration, query cruise/lowering
+state, update transfer statuses, and post messages — all via HTTP calls
+to the OpenVDM web API rather than direct database connections.
 """
 
-import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from os.path import dirname, realpath, join
@@ -28,19 +23,46 @@ DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'serve
 TIMEOUT = 5
 
 class OpenVDM():
-    """
-    Class is a python wrapper around the OpenVDM API
+    """Python wrapper around the OpenVDM REST API and YAML configuration file.
+
+    All database interaction is performed indirectly through HTTP calls to the
+    OpenVDM web API.  The YAML configuration file supplies connection settings
+    (site root URL, Gearman server address, plugin directories, hooks, etc.).
+
+    Attributes:
+        config: Parsed contents of the OpenVDM YAML configuration file.
     """
 
-    def __init__(self, config_file = DEFAULT_CONFIG_FILE):
+    def __init__(self, config_file: str = DEFAULT_CONFIG_FILE) -> None:
+        """Initialise the wrapper by loading *config_file*.
 
+        Args:
+            config_file: Path to ``openvdm.yaml``.  Defaults to the file
+                located at ``server/etc/openvdm.yaml`` relative to the
+                repository root.
+
+        Raises:
+            IOError: If the configuration file cannot be opened.
+            yaml.YAMLError: If the file content is not valid YAML.
+            ImportError: If PyYAML is not installed.
+        """
         self.config = self.read_config(config_file)
 
 
     @staticmethod
-    def read_config(filename):
-        """Read the passed text/stream assuming it's a valid OpenVDM configuration
-        file
+    def read_config(filename: str) -> dict:
+        """Parse an OpenVDM YAML configuration file into a Python dict.
+
+        Args:
+            filename: Path to the YAML configuration file.
+
+        Returns:
+            Parsed configuration as a nested dict.
+
+        Raises:
+            IOError: If the file cannot be opened.
+            yaml.YAMLError: If the file content is not valid YAML.
+            ImportError: If PyYAML is not installed.
         """
 
         def _parse_yaml(source):
@@ -70,6 +92,22 @@ class OpenVDM():
             raise exc
         except Exception as exc: # handle other exceptions such as attribute errors
             raise exc
+
+
+    def _worker_headers(self) -> dict:
+        """Return HTTP headers that authenticate this process as a trusted worker.
+
+        Includes the ``X-Worker-Token`` header when ``workerApiKey`` is present
+        in the YAML config, allowing the PHP API to return credential fields that
+        are otherwise stripped from public responses.
+
+        Returns:
+            A dict suitable for passing as *headers* to :mod:`requests` calls.
+        """
+        token = self.config.get('workerApiKey', '')
+        if token:
+            return {'X-Worker-Token': token}
+        return {}
 
 
     def clear_gearman_jobs_from_db(self):
@@ -136,7 +174,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve cruise configuration from OpenVDM API")
@@ -153,7 +191,7 @@ class OpenVDM():
         try:
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
-            return_obj['configCreatedOn'] = datetime.datetime.utcnow().strftime("%Y/%m/%dT%H:%M:%SZ")
+            return_obj['configCreatedOn'] = datetime.now(timezone.utc).strftime("%Y/%m/%dT%H:%M:%SZ")
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve lowering configuration from OpenVDM API")
@@ -272,6 +310,21 @@ class OpenVDM():
         """
 
         return self.config.get('transferInterval')
+
+    def get_transfer_log_dir(self):
+        """
+        Return the directory where transfer log files are stored
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/getTransferLogDir"
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            return_obj = json.loads(req.text)
+            return return_obj.get('transferLogDir', '/var/log/openvdm')
+        except Exception as exc:
+            logging.error("Unable to retrieve transferLogDir from OpenVDM API")
+            raise exc
 
     def get_logfile_purge_timedelta(self):
         """
@@ -567,9 +620,9 @@ class OpenVDM():
             req = requests.get(url, timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
-                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "0", return_obj))
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != 0, return_obj))
             if not lowering:
-                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != "1", return_obj))
+                return_obj = list(filter(lambda directory: directory['cruiseOrLowering'] != 1, return_obj))
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve active extra directories from OpenVDM API")
@@ -778,7 +831,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve collection system transfers from OpenVDM API")
@@ -795,12 +848,12 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getActiveCollectionSystemTransfers/{sort}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             if not cruise:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "0", return_obj))
+                return_obj = list(filter(lambda transfer: int(transfer['cruiseOrLowering']) != 0, return_obj))
             if not lowering:
-                return_obj = list(filter(lambda transfer: transfer['cruiseOrLowering'] != "1", return_obj))
+                return_obj = list(filter(lambda transfer: int(transfer['cruiseOrLowering']) != 1, return_obj))
             return return_obj
         except Exception as exc:
             logging.error("Unable to retrieve active collection system transfers from OpenVDM API")
@@ -817,7 +870,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/getCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:
@@ -841,7 +894,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve cruise data transfers from OpenVDM API")
@@ -856,7 +909,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfers"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return json.loads(req.text)
         except Exception as exc:
             logging.error("Unable to retrieve required cruise data transfers from OpenVDM API")
@@ -871,7 +924,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:
@@ -884,7 +937,7 @@ class OpenVDM():
         """
 
         return_obj = self.get_cruise_data_transfers()
-        return list(filter(lambda transfer: transfer['enable'] == "1", return_obj))
+        return list(filter(lambda transfer: int(transfer['enable']) == 1, return_obj))
 
 
     def get_required_cruise_data_transfer(self, cruise_data_transfer_id):
@@ -895,7 +948,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/getRequiredCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            req = requests.get(url, timeout=TIMEOUT)
+            req = requests.get(url, headers=self._worker_headers(), timeout=TIMEOUT)
             return_obj = json.loads(req.text)
             return next(iter(return_obj), None)
         except Exception as exc:
@@ -956,7 +1009,7 @@ class OpenVDM():
         id
         """
 
-        if job_status != "3":
+        if job_status != 3:
             return
 
         # Clear Error for current tranfer in DB via API
@@ -975,7 +1028,7 @@ class OpenVDM():
         """
 
         # Ignore request if transfer does not have a error status
-        if job_status != "3":
+        if job_status != 3:
             return
 
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"

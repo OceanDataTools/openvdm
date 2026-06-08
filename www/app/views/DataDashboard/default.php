@@ -1,3 +1,7 @@
+<?php
+use Helpers\Url;
+$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
+?>
         <div class="row">
             <div class="col-lg-12">
                 <div class="panel">
@@ -9,9 +13,10 @@
 ?>
                                 <div class="panel panel-default">
 <?php
+        $filecount = 0;
         for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
 ?>
-                                <a id="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type']; ?>"></a>
+                                <a id="<?php echo (!empty($data['placeholders'][$i]['dataFiles'][$j]) ? $data['placeholders'][$i]['dataFiles'][$j][0]['type'] : ''); ?>"></a>
 <?php
             $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
         }
@@ -21,7 +26,7 @@
                                     </div>
                                     <div class="panel-body">
                                     <<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?> class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;">
-                                    <?php echo ($filecount > 0? $loadingImage: 'No Data Found.'); ?></<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
+                                    <?php echo ($filecount == 0? 'No Data Found.': ''); ?></<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">
@@ -64,7 +69,7 @@
                     for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
 ?>
                                                     <div class='col-lg-4 col-sm-6'>
-                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
+                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
                                                     </div>
 <?php

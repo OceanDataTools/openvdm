@@ -104,7 +104,7 @@
         </div>
     </div>
 <?php
-    if($data['stats']) {
+    if(!empty($data['stats'])) {
 ?>
 <div class="modal fade" id="statsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">
@@ -120,7 +120,7 @@
     for($i=0; $i<(sizeof($data['stats'])); $i++){
 ?>
                         <tr>
-                            <td><?php echo $data['stats'][$i]->statName; ?>:</td>
+                            <td><?php echo $data['stats'][$i]->statName ?? ''; ?>:</td>
                             <td>
 <?php
         if(strcmp($data['stats'][$i]->statType, 'bounds') === 0){

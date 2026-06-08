@@ -11,7 +11,7 @@ $(function () {
                 var i;
 
                 for (i = 0; i < data.length; i++) {
-                    if (data[i].status === "1") {
+                    if (data[i].status === 1) {
                         output = 'Stop';
                         href = siteRoot + 'config/collectionSystemTransfers/stop/' + data[i].collectionSystemTransferID;
                     } else {

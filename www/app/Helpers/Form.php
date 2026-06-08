@@ -76,7 +76,7 @@ class Form
         $o .= (isset($params['style']))     ? " style='{$params['style']}'"                     : '';
         $o .= (isset($params['required']))     ? " required='required'"                     : '';
         $o .= '>';
-        $o .= (isset($params['value']))     ? $params['value']                                  : '';
+        $o .= (isset($params['value']))     ? htmlspecialchars($params['value'], ENT_QUOTES, 'UTF-8') : '';
         $o .= "</textarea>\n";
 
         return $o;
@@ -100,7 +100,7 @@ class Form
         $o .= (isset($params['class']))     ? " class='form-input text {$params['class']}'" : '';
         $o .= (isset($params['onclick']))   ? " onclick='{$params['onclick']}'"             : '';
         $o .= (isset($params['onkeypress'])) ? " onkeypress='{$params['onkeypress']}'"       : '';
-        $o .= (isset($params['value']))     ? ' value="'.$params['value'].'"'           : '';
+        $o .= (isset($params['value']))     ? ' value="'.htmlspecialchars($params['value'], ENT_QUOTES, 'UTF-8').'"' : '';
         $o .= (isset($params['length']))    ? " maxlength='{$params['length']}'"            : '';
         $o .= (isset($params['size']))    ? " size='{$params['size']}'"            : '';
         $o .= (isset($params['width']))     ? " style='width:{$params['width']}px;'"        : '';
@@ -145,9 +145,9 @@ class Form
         if (isset($params['data']) && is_array($params['data'])) {
             foreach ($params['data'] as $k => $v) {
                 if (isset($params['value']) && $params['value'] == $k) {
-                    $o .= "<option value='{$k}' selected='selected'>{$v}</option>\n";
+                    $o .= "<option value='".htmlspecialchars($k, ENT_QUOTES, 'UTF-8')."' selected='selected'>".htmlspecialchars($v, ENT_QUOTES, 'UTF-8')."</option>\n";
                 } else {
-                    $o .= "<option value='{$k}'>{$v}</option>\n";
+                    $o .= "<option value='".htmlspecialchars($k, ENT_QUOTES, 'UTF-8')."'>".htmlspecialchars($v, ENT_QUOTES, 'UTF-8')."</option>\n";
                 }
             }
         }
@@ -195,13 +195,13 @@ class Form
                 $o .= "<input type='checkbox'";
                 $o .= (isset($v['id']))             ? " id='{$v['id']}'"                                : '';
                 $o .= (isset($v['name']))           ? " name='{$v['name']}'"                            : '';
-                $o .= (isset($v['value']))          ? " value='{$v['value']}'"                          : '';
+                $o .= (isset($v['value']))          ? " value='".htmlspecialchars($v['value'], ENT_QUOTES, 'UTF-8')."'" : '';
                 $o .= (isset($v['class']))          ? " class='{$v['class']}'"                          : '';
                 $o .= (isset($v['checked']))        ? " checked='checked'"                              : '';
                 $o .= (isset($v['disabled']))       ? " disabled='{$v['disabled']}'"                    : '';
                 $o .= (isset($params['style']))     ? " style='{$params['style']}'"                 : '';
                 $o .= " />\n";
-                $o .= (isset($v['label']))          ? "<label for='{$v['id']}'>{$v['label']}</label> "  : '';
+                $o .= (isset($v['label']))          ? "<label for='".htmlspecialchars($v['id'], ENT_QUOTES, 'UTF-8')."'>".htmlspecialchars($v['label'], ENT_QUOTES, 'UTF-8')."</label> " : '';
                 $x++;
             }
         }
@@ -230,7 +230,7 @@ class Form
                 $o .= "<input type='radio'";
                 $o .= (isset($v['id']))             ? " id='{$v['id']}'"                                : '';
                 $o .= (isset($v['name']))           ? " name='{$v['name']}'"                            : '';
-                $o .= (isset($v['value']))          ? " value='{$v['value']}'"                          : '';
+                $o .= (isset($v['value']))          ? " value='".htmlspecialchars($v['value'], ENT_QUOTES, 'UTF-8')."'" : '';
                 $o .= (isset($v['class']))          ? " class='{$v['class']}'"                          : '';
 
                 $o .= (isset($v['value']) &&
@@ -240,7 +240,7 @@ class Form
                 $o .= (isset($v['disabled']))       ? " disabled='{$v['disabled']}'"                    : '';
                 $o .= (isset($params['style']))     ? " style='{$params['style']}'"                 : '';
                 $o .= " />\n";
-                $o .= (isset($v['label']))          ? "<label for='{$v['id']}'>{$v['label']}</label> "  : '';
+                $o .= (isset($v['label']))          ? "<label for='".htmlspecialchars($v['id'], ENT_QUOTES, 'UTF-8')."'>".htmlspecialchars($v['label'], ENT_QUOTES, 'UTF-8')."</label> " : '';
                 $x++;
             }
         }
@@ -266,7 +266,7 @@ class Form
         $o .= (isset($params['style']))     ? " style='{$params['style']}'"                 : '';
         $o .= '>';
         $o .= (isset($params['iclass']))    ? "<i class='fa {$params['iclass']}'></i> "         : '';
-        $o .= (isset($params['value']))     ? "{$params['value']}"                              : '';
+        $o .= (isset($params['value']))     ? htmlspecialchars($params['value'], ENT_QUOTES, 'UTF-8') : '';
         $o .= "</button>\n";
 
         return $o;
@@ -286,7 +286,7 @@ class Form
         $o .= (isset($params['name']))      ? " name='{$params['name']}'"                       : '';
         $o .= (isset($params['class']))     ? " class='{$params['class']}'"                     : '';
         $o .= (isset($params['onclick']))   ? " onclick='{$params['onclick']}'"                 : '';
-        $o .= (isset($params['value']))     ? " value='{$params['value']}'"                     : '';
+        $o .= (isset($params['value']))     ? " value='".htmlspecialchars($params['value'], ENT_QUOTES, 'UTF-8')."'" : '';
         $o .= (isset($params['disabled']))  ? " disabled='{$params['disabled']}'"               : '';
         $o .= (isset($params['style']))     ? " style='{$params['style']}'"                 : '';
         $o .= " />\n";
@@ -307,7 +307,7 @@ class Form
         $o .= (isset($params['id']))        ? " id='{$params['id']}'"                           : '';
         $o .= (isset($params['name']))      ? " name='{$params['name']}'"                       : '';
         $o .= (isset($params['class']))     ? " class='{$params['class']}'"   : '';
-        $o .= (isset($params['value']))     ? " value='{$params['value']}'"                     : '';
+        $o .= (isset($params['value']))     ? " value='".htmlspecialchars($params['value'], ENT_QUOTES, 'UTF-8')."'" : '';
         $o .= " />\n";
 
         return $o;

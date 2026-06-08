@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""Backup and restore the OpenVDM MySQL database.
+
+Creates timestamped SQL dump files in the backup directory and restores from
+a specified file.  All tables are backed up with structure and data, with the
+exception of ``OVDM_Messages`` — its structure is preserved but its rows are
+not exported (message history is considered ephemeral).
+
+Database credentials are read directly from ``www/app/Core/Config.php``, so
+no separate credentials file is required.
+
+Usage::
+
+    db_backup_restore.py backup  [-v ...] [--output-dir DIR]
+    db_backup_restore.py restore [-v ...] <backup_file>
+"""
+
+import argparse
+import logging
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
+REPO_ROOT    = os.path.dirname(SCRIPT_DIR)
+BACKUP_DIR   = os.path.join(REPO_ROOT, "database", "backups")
+CONFIG_PHP   = os.path.join(REPO_ROOT, "www", "app", "Core", "Config.php")
+
+# Tables whose rows should NOT be included in the backup (structure only).
+NO_DATA_TABLES = ["OVDM_Messages"]
+
+# ---------------------------------------------------------------------------
+# Credentials
+# ---------------------------------------------------------------------------
+
+def _load_credentials(config_php: str) -> dict:
+    """Extract database credentials from ``www/app/Core/Config.php``.
+
+    Parses ``define('KEY', 'value');`` lines for ``DB_HOST``, ``DB_NAME``,
+    ``DB_USER``, and ``DB_PASS``.
+
+    Args:
+        config_php: Absolute path to the installed ``Config.php`` file.
+
+    Returns:
+        Dict with keys ``host``, ``name``, ``user``, and ``password``.
+
+    Raises:
+        SystemExit: When the file is missing or a required define is absent.
+    """
+    if not os.path.isfile(config_php):
+        logging.error(
+            "Config.php not found: %s\n"
+            "Run the OpenVDM install script to generate it from Config.php.dist.",
+            config_php,
+        )
+        sys.exit(1)
+
+    with open(config_php, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = re.compile(r"define\(\s*'(\w+)'\s*,\s*'([^']*)'\s*\)")
+    defines = dict(pattern.findall(content))
+
+    mapping = {
+        "host":     "DB_HOST",
+        "name":     "DB_NAME",
+        "user":     "DB_USER",
+        "password": "DB_PASS",
+    }
+
+    creds = {}
+    missing = []
+    for key, php_const in mapping.items():
+        if php_const in defines:
+            creds[key] = defines[php_const]
+        else:
+            missing.append(php_const)
+
+    if missing:
+        logging.error("Missing define(s) in %s: %s", config_php, ", ".join(missing))
+        sys.exit(1)
+
+    return creds
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _mysql_env(password: str) -> dict:
+    """Return an environment dict with MYSQL_PWD set to avoid password prompts.
+
+    Args:
+        password: The database user's password.
+
+    Returns:
+        Copy of the current environment with ``MYSQL_PWD`` set.
+    """
+    env = os.environ.copy()
+    env["MYSQL_PWD"] = password
+    return env
+
+
+def _base_args(creds: dict) -> list:
+    """Return the common mysqldump/mysql host/user/db argument list.
+
+    Args:
+        creds: Credentials dict as returned by :func:`_load_credentials`.
+
+    Returns:
+        List of argument strings: ``["-h", host, "-u", user, name]``.
+    """
+    return ["-h", creds["host"], "-u", creds["user"], creds["name"]]
+
+
+def _run(cmd: list, password: str, **kwargs) -> subprocess.CompletedProcess:
+    """Run *cmd* with the MySQL password pre-set in the environment.
+
+    Args:
+        cmd: Command and arguments as a list of strings.
+        password: Database password injected via ``MYSQL_PWD``.
+        **kwargs: Extra keyword arguments forwarded to ``subprocess.run``.
+
+    Returns:
+        The completed process object.
+    """
+    return subprocess.run(cmd, env=_mysql_env(password), **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+
+def backup(output_dir: str, creds: dict) -> int:
+    """Dump the OpenVDM database to a timestamped SQL file.
+
+    Dumps all tables with full structure and data, then appends a
+    data-suppressed dump for tables listed in ``NO_DATA_TABLES`` so their
+    ``CREATE TABLE`` statements are still present but no ``INSERT`` rows are
+    written.
+
+    Args:
+        output_dir: Directory in which to create the backup file.  Created
+            automatically if it does not exist.
+        creds: Database credentials dict as returned by
+            :func:`_load_credentials`.
+
+    Returns:
+        ``0`` on success, ``1`` on failure.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(output_dir, f"{creds['name']}_{timestamp}.sql")
+
+    logging.info("Backing up database '%s' to %s", creds["name"], backup_path)
+
+    try:
+        # --- Full dump (all tables, with data) ---
+        ignore_flags = []
+        for table in NO_DATA_TABLES:
+            ignore_flags += ["--ignore-table", f"{creds['name']}.{table}"]
+
+        cmd_data = ["mysqldump"] + _base_args(creds) + ignore_flags
+        logging.debug("Running: %s", " ".join(cmd_data))
+
+        result = _run(cmd_data, creds["password"], capture_output=True, text=True)
+        if result.returncode != 0:
+            logging.error("mysqldump failed: %s", result.stderr.strip())
+            return 1
+
+        sql_output = result.stdout
+
+        # --- Structure-only dump for no-data tables ---
+        if NO_DATA_TABLES:
+            cmd_struct = ["mysqldump", "--no-data"] + _base_args(creds) + NO_DATA_TABLES
+            logging.debug("Running: %s", " ".join(cmd_struct))
+
+            result_struct = _run(cmd_struct, creds["password"], capture_output=True, text=True)
+            if result_struct.returncode != 0:
+                logging.error(
+                    "mysqldump (structure-only) failed: %s",
+                    result_struct.stderr.strip(),
+                )
+                return 1
+
+            sql_output += "\n" + result_struct.stdout
+
+        with open(backup_path, "w", encoding="utf-8") as f:
+            f.write(sql_output)
+
+        size_kb = os.path.getsize(backup_path) / 1024
+        logging.info("Backup complete: %s (%.1f KB)", backup_path, size_kb)
+        print(f"Backup saved to: {backup_path}")
+        return 0
+
+    except FileNotFoundError:
+        logging.error("mysqldump not found — is the MySQL client installed?")
+        return 1
+    except OSError as exc:
+        logging.error("Failed to write backup file: %s", exc)
+        return 1
+
+
+# ---------------------------------------------------------------------------
+# Restore
+# ---------------------------------------------------------------------------
+
+def _select_backup_file(backup_dir: str) -> str:
+    """Interactively prompt the user to choose a backup file.
+
+    Lists all ``.sql`` files in *backup_dir* sorted newest-first and asks the
+    user to enter a number.  Repeats until a valid selection is made or the
+    user cancels with Ctrl-C / Ctrl-D.
+
+    Args:
+        backup_dir: Directory to search for ``.sql`` backup files.
+
+    Returns:
+        Absolute path to the selected backup file.
+
+    Raises:
+        SystemExit: When no backup files exist in *backup_dir*, or the user
+            cancels the prompt.
+    """
+    files = sorted(
+        [f for f in os.listdir(backup_dir) if f.endswith(".sql")],
+        reverse=True,
+    ) if os.path.isdir(backup_dir) else []
+
+    if not files:
+        logging.error("No backup files found in %s", backup_dir)
+        sys.exit(1)
+
+    print("\nAvailable backups:")
+    for i, name in enumerate(files, 1):
+        print(f"  {i}) {name}")
+    print("  0) Cancel")
+
+    try:
+        raw = input(f"\nSelect backup to restore [0-{len(files)}]: ").strip()
+        choice = int(raw)
+        if not 0 <= choice <= len(files):
+            raise ValueError
+    except (ValueError, EOFError):
+        print("Invalid selection. Aborting.")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        sys.exit(1)
+
+    if choice == 0:
+        print("Cancelled.")
+        sys.exit(0)
+
+    return os.path.join(backup_dir, files[choice - 1])
+
+
+def restore(backup_file: str | None, creds: dict, backup_dir: str) -> int:
+    """Restore the OpenVDM database from a SQL backup file.
+
+    Pipes the backup file directly into the ``mysql`` client.  The target
+    database must already exist.  When *backup_file* is ``None`` the user is
+    presented with an interactive list of files from *backup_dir*.
+
+    Args:
+        backup_file: Absolute or relative path to the ``.sql`` backup file,
+            or ``None`` to select interactively.
+        creds: Database credentials dict as returned by
+            :func:`_load_credentials`.
+        backup_dir: Directory searched when *backup_file* is ``None``.
+
+    Returns:
+        ``0`` on success, ``1`` on failure.
+    """
+    if backup_file is None:
+        backup_file = _select_backup_file(backup_dir)
+
+    if not os.path.isfile(backup_file):
+        logging.error("Backup file not found: %s", backup_file)
+        return 1
+
+    logging.info("Restoring database '%s' from %s", creds["name"], backup_file)
+
+    try:
+        cmd = ["mysql"] + _base_args(creds)
+        logging.debug("Running: %s < %s", " ".join(cmd), backup_file)
+
+        with open(backup_file, "r", encoding="utf-8") as f:
+            result = _run(cmd, creds["password"], stdin=f, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            logging.error("mysql restore failed: %s", result.stderr.strip())
+            return 1
+
+        logging.info("Restore complete.")
+        print(f"Database restored from: {backup_file}")
+        return 0
+
+    except FileNotFoundError:
+        logging.error("mysql client not found — is the MySQL client installed?")
+        return 1
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Backup and restore the OpenVDM MySQL database."
+    )
+    parser.add_argument(
+        "-v", "--verbosity",
+        dest="verbosity",
+        default=0,
+        action="count",
+        help="Increase output verbosity (repeat for more detail)",
+    )
+    parser.add_argument(
+        "--config",
+        default=CONFIG_PHP,
+        metavar="CONFIG_PHP",
+        help=f"Path to Config.php (default: {CONFIG_PHP})",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    backup_parser = subparsers.add_parser("backup", help="Create a database backup")
+    backup_parser.add_argument(
+        "--output-dir",
+        default=BACKUP_DIR,
+        metavar="DIR",
+        help=f"Directory to write the backup file (default: {BACKUP_DIR})",
+    )
+
+    restore_parser = subparsers.add_parser("restore", help="Restore from a backup file")
+    restore_parser.add_argument(
+        "backup_file",
+        metavar="BACKUP_FILE",
+        nargs="?",
+        default=None,
+        help="Path to the .sql backup file to restore (omit to choose interactively)",
+    )
+
+    parsed_args = parser.parse_args()
+
+    LOGGING_FORMAT = "%(asctime)-15s %(levelname)s - %(message)s"
+    logging.basicConfig(format=LOGGING_FORMAT)
+
+    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
+    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+
+    creds = _load_credentials(parsed_args.config)
+
+    if parsed_args.command == "backup":
+        sys.exit(backup(parsed_args.output_dir, creds))
+    elif parsed_args.command == "restore":
+        sys.exit(restore(parsed_args.backup_file, creds, BACKUP_DIR))

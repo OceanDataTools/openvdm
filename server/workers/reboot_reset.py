@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
-"""
-FILE:  reboot_reset.py
+"""Reset OpenVDM state in the database after an unscheduled system reboot.
 
-DESCRIPTION:  This program resets OVDM state information in the database.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.14
-  CREATED:  2015-06-22
- REVISION:  2025-07-06
+Sets all Gearman tasks, collection system transfers, and cruise data transfers
+back to idle, then clears any stale Gearman job records from the database.
+Intended to be run automatically by Supervisor/systemd on startup, or manually
+after an ungraceful shutdown.
 """
 
 import argparse
@@ -23,8 +18,11 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 def reboot_reset():
-    """
-    Set all tasks and transfer to idle.
+    """Reset all OpenVDM tasks and transfers to idle and clear stale Gearman jobs.
+
+    Connects to the OpenVDM API, marks every task and every non-disabled
+    collection system and cruise data transfer as idle, then removes any
+    lingering Gearman job entries from the database.
     """
 
     openVDM = OpenVDM()
@@ -37,18 +35,18 @@ def reboot_reset():
     logging.info("Setting all Collection System Transfers to idle.")
     collection_system_transfers = openVDM.get_collection_system_transfers()
     for collection_system_transfer in collection_system_transfers:
-        if not collection_system_transfer['status'] == '3':
+        if not collection_system_transfer['status'] == 3:
             openVDM.set_idle_collection_system_transfer(collection_system_transfer['collectionSystemTransferID'])
 
     logging.info("Setting all Cruise Data Transfers to idle.")
     cruise_data_transfers = openVDM.get_cruise_data_transfers()
     for cruise_data_transfer in cruise_data_transfers:
-        if not cruise_data_transfer['status'] == '3':
+        if not cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(cruise_data_transfer['cruiseDataTransferID'])
 
     required_cruise_data_transfers = openVDM.get_required_cruise_data_transfers()
     for required_cruise_data_transfer in required_cruise_data_transfers:
-        if not required_cruise_data_transfer['status'] == '3':
+        if not required_cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(required_cruise_data_transfer['cruiseDataTransferID'])
 
     logging.info("Clearing all jobs from Gearman.")

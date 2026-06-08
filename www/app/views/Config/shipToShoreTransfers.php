@@ -79,7 +79,7 @@ use Helpers\Session;
                         </td>
                         <td style='text-align:center'>
 <?php
-            if($row->enable == "0"){
+            if($row->enable === 0){
 ?>
                             <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/shipToShoreTransfers/enable/<?php echo $row->shipToShoreTransferID; ?>'>Off</a>
 <?php
