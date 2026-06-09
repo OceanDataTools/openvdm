@@ -70,15 +70,15 @@ AllGPSSources = [
         "GPSSources": [
             {
                 "device":"DPS122",
-                "regex":"*_dspi1_gga-*.json"
+                "regex":"*_dpsi1_gga-*.json"
             },
             {
                 "device":"POSMV",
-                "regex":"*_posmv_gga-*.json"
+                "regex":"*_posmv_nav_gga-*.json"
             },
             {
                 "device":"Seapath",
-                "regex":"*_seapath330_gga-*.json"
+                "regex":"*_seapath380_gga-*.json"
             },
         ]
     }
