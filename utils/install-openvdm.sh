@@ -172,7 +172,7 @@ function set_default_variables {
     DEFAULT_OPENVDM_BRANCH=openvdm-soi
     DEFAULT_OPENVDM_SITEROOT=127.0.0.1
 
-    DEFAULT_OPENVDM_USER=survey
+    DEFAULT_OPENVDM_USER=mt
 
     DEFAULT_INSTALL_MAPPROXY=no
     DEFAULT_MAPPROXY_CACHE=
@@ -180,7 +180,7 @@ function set_default_variables {
     DEFAULT_INSTALL_PUBLICDATA=yes
     DEFAULT_INSTALL_VISITORINFORMATION=no
 
-    DEFAULT_INSTALL_TITILER=no
+    DEFAULT_INSTALL_TITILER=yes
     DEFAULT_TITILER_PORT=8000
 
     DEFAULT_INSTALL_SAMPLEDATA=no
@@ -188,8 +188,8 @@ function set_default_variables {
     DEFAULT_SAMPLEDATA_REPO=https://github.com/oceandatatools/openvdm_sample_data
     DEFAULT_SAMPLEDATA_BRANCH=master
 
-    DEFAULT_SUPERVISORD_WEBINTERFACE=no
-    DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
+    DEFAULT_SUPERVISORD_WEBINTERFACE=yes
+    DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=yes
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
@@ -1012,9 +1012,9 @@ EOF
     if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
         cat >> /etc/samba/openvdm.conf <<EOF
 
-[PublicData]
-  comment=Public Data, read/write access to all
-  path=${DATA_ROOT}/PublicData
+[ParticipantData]
+  comment=Participant Data, read/write access to all
+  path=${DATA_ROOT}/ParticipantData
   browseable = yes
   public = yes
   guest ok = yes
@@ -1114,8 +1114,8 @@ EOF
     if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
         cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /PublicData/ $DATA_ROOT/PublicData/
-    <Directory "$DATA_ROOT/PublicData">
+    Alias /ParticipantData/ $DATA_ROOT/ParticipantData/
+    <Directory "$DATA_ROOT/ParticipantData">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1506,8 +1506,8 @@ function configure_directories {
         mkdir -p ${DATA_ROOT}/CruiseData
 
         if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
-            mkdir -p ${DATA_ROOT}/PublicData
-            chmod -R 777 ${DATA_ROOT}/PublicData
+            mkdir -p ${DATA_ROOT}/ParticipantData
+            chmod -R 777 ${DATA_ROOT}/ParticipantData
         fi
 
         if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
@@ -1693,7 +1693,7 @@ EOF
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
     sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
-    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" | \
+    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/ParticipantData');|" | \
     sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
     sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
@@ -2164,14 +2164,14 @@ fi
 echo
 
 #########################################################################
-# Install PublicData?
+# Install ParticipantData?
 echo "#####################################################################"
-echo "Setup a PublicData SMB Share for scientists and crew to share files,"
-echo "pictures, etc. These files will be copied to the cruise data "
+echo "Setup a ParticipantData SMB Share for scientists and crew to share"
+echo "files, pictures, etc. These files will be copied to the cruise data"
 echo "directory at the end of the cruise. This behavior can be disabled in"
 echo "the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
 echo
-yes_no "Setup PublicData Share? " $DEFAULT_INSTALL_PUBLICDATA
+yes_no "Setup ParticipantData Share? " $DEFAULT_INSTALL_PUBLICDATA
 INSTALL_PUBLICDATA=$YES_NO_RESULT
 echo
 

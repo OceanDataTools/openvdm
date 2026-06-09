@@ -81,9 +81,9 @@ Access URL: 'http://127.0.0.1'
  
 ```
 #####################################################################
-OpenVDM user to create? (survey) 
-Checking if user survey exists yet
-id: ‘survey’: no such user
+OpenVDM user to create? (mt) 
+Checking if user mt exists yet
+id: ‘mt’: no such user
 ...
 New password: 
 Retype new password: 
@@ -102,7 +102,7 @@ Current root database password (hit return if this is the initial
 installation)? 
 New database password for root? () weak_password
 
-New database password for user survey? (survey) weak_password
+New database password for user mt? (mt) weak_password
 ```
 
 ```
@@ -117,10 +117,10 @@ The supervisord service provides an optional web-interface that enables
 operators to start/stop/restart the OpenVDM main processes from a web-
 browser.
 
-Enable Supervisor Web-interface?  (no) yes
-Enable user/pass on Supervisor Web-interface?  (no) yes
-Username? (survey) 
-Password? (survey) weak_password
+Enable Supervisor Web-interface?  (yes) 
+Enable user/pass on Supervisor Web-interface?  (yes) 
+Username? (mt) 
+Password? (mt) weak_password
 ```
 
 ```
@@ -145,18 +145,18 @@ Optionally install TiTiler, a dynamic tile server for Cloud Optimized
 GeoTIFFs (COGs). TiTiler is required for the geotiff_titiler_parser
 plugin used by the sample data configuration.
 
-Install TiTiler?  (no) yes
+Install TiTiler?  (yes) 
 Port for TiTiler service? (8000)
 ```
 
 ```
 #####################################################################
-Setup a PublicData SMB Share for scientists and crew to share files,
+Setup a ParticipantData SMB Share for scientists and crew to share files,
 pictures, etc. These files will be copied to the cruise data
 directory at the end of the cruise. This behavior can be disabled in
 the /opt/openvdm/server/etc/openvdm.yaml file.
 
-Setup PublicData Share?  (yes)
+Setup ParticipantData Share?  (yes)
 ```
 
 ```
@@ -187,7 +187,7 @@ When the script completes successfully there will a message containing how to ac
 #####################################################################
 OpenVDM Installation: Complete
 OpenVDM WebUI available at: http://127.0.0.1
-Login with user: survey, pass: weak_password
+Login with user: mt, pass: weak_password
 Cruise Data will be stored at: /data/CruiseData
 ```
  
