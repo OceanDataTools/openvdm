@@ -4,6 +4,17 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.1] – 2026-06-09
+
+### Fixed
+- CDT SSH `destDir` normalizer no longer strips the required leading slash from absolute remote paths
+- CDT add form now preserves the selected transfer type after an inline connection test
+- Fixed undefined array key errors on CST and CDT add form initial load
+- Fixed copy-paste error in CDT form page guide text
+- 'Destination Directory is mountpoint?' check is no longer shown for non-local CDT transfer types
+
+---
+
 ## [2.15.0] – 2026-06-07
 
 ### Added
