@@ -96,8 +96,6 @@ $(function () {
                     $('#' + mapObject['placeholderID']).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
                     //Get the last coordinate from the latest trackline
-                    // console.log(getVisualizerDataURL);
-                    // console.log(data);
                     var lastCoordinate = data[0].features[0].geometry.coordinates[data[0].features[0].geometry.coordinates.length - 1];
 
                     L.Control.LastPosition = L.Control.extend({

@@ -98,55 +98,6 @@
 #      visType: tms
 #
 
-- title: Lowerings
-  page: vehicle
-  view: lowering
-  cssArray:
-  - leaflet
-  jsArray:
-  - dataDashboardDefault
-  - charts
-  - charts-zoom
-  - leaflet
-  - lowering
-  placeholderArray:
-  - plotType: map
-    id: map
-    heading: Position
-    dataArray:
-    - dataType: rov-usbl-pri
-      visType: geoJSON
-    - dataType: rov-usbl-sec
-      visType: geoJSON
-    - dataType: rov-sprint
-      visType: geoJSON
-    - dataType: geotiff
-      visType: tms
-  - plotType: chart
-    id: rov-comp-pres
-    heading: Comp Pressures
-    dataArray:
-    - dataType: rov-comp-pres
-      visType: json
-  - plotType: chart
-    id: rov-paro
-    heading: Depth
-    dataArray:
-    - dataType: rov-paro
-      visType: json
-  - plotType: chart
-    id: rov-ctd
-    heading: ROV CTD
-    dataArray:
-    - dataType: rov-ctd
-      visType: json
-  - plotType: chart
-    id: rov-o2
-    heading: ROV O2
-    dataArray:
-    - dataType: rov-o2
-      visType: json
-
 - title: Position
   page: position
   view: default

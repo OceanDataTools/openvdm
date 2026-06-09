@@ -1,25 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  size_cacher.py
+"""Continuously cache the on-disk sizes of the cruise and lowering directories.
 
-DESCRIPTION:  This program handles calculating the cruise and lowering
-                directory sizes.
+Runs as a long-lived daemon process (managed by Supervisor in production).
+At each interval it calls ``du -sb`` on the current cruise and, if active, the
+current lowering directory, then pushes the byte totals to the OpenVDM API so
+the web UI can display them without a blocking ``du`` call on every page load.
 
-USAGE: size_cacher.py [--interval <interval>]
+Usage::
 
-ARGUMENTS: --interval <interval> The minimum interval in second between directory
-    size calculations.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2017-09-30
- REVISION:  2025-08-04
+    size_cacher.py [--interval SECONDS] [-v ...]
 """
 
 import argparse
-import datetime
+from datetime import datetime, timezone
 import logging
 import subprocess
 import sys
@@ -30,16 +23,26 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
-def size_cacher(interval):
-    """
-    Calculate the sizes of the cruise and lowering directories at the defined
-    interval
+def size_cacher(interval: int) -> None:
+    """Poll cruise and lowering directory sizes and push them to the OpenVDM API.
+
+    Runs an infinite loop.  On each iteration the current cruise and (when
+    lowering components are enabled) lowering directory sizes are measured with
+    ``du -sb``, then written back to OpenVDM via
+    :py:meth:`~server.lib.openvdm.OpenVDM.set_cruise_size` and
+    :py:meth:`~server.lib.openvdm.OpenVDM.set_lowering_size`.  The loop then
+    sleeps until ``interval`` seconds have elapsed since the start of the
+    previous iteration.
+
+    Args:
+        interval: Minimum number of seconds between consecutive size
+            calculations.
     """
 
     ovdm = OpenVDM()
 
     def loop_delay(start_dt, interval_s):
-        elapsed = (datetime.datetime.utcnow() - start_dt).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
         delay = interval_s - elapsed
         logging.debug("Elapsed Time: %.2f seconds", elapsed)
 
@@ -80,7 +83,7 @@ def size_cacher(interval):
 
 
     while True:
-        start = datetime.datetime.utcnow()
+        start = datetime.now(timezone.utc)
 
         try:
             warehouse_config = ovdm.get_shipboard_data_warehouse_config()

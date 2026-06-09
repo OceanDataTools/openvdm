@@ -32,8 +32,8 @@ use Helpers\Form;
                     <?php echo Form::open( array('role'=>'form', 'method'=>'post')); ?>
                         <div class="row">
                             <div class="col-lg-12">
-                                <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=>$_POST['name'])); ?></div>
-                                <div class="form-group"><label>URL</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'url', 'value'=>$d_POST['url'])); ?></div>
+                                <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=>$_POST['name'] ?? '')); ?></div>
+                                <div class="form-group"><label>URL</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'url', 'value'=>$_POST['url'] ?? '')); ?></div>
                             </div>
                         </div>
                         <div class="row">

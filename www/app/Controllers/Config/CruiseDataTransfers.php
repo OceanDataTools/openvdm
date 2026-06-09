@@ -89,7 +89,7 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
-        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType']);
+        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType'] ?? '');
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
         $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
@@ -98,33 +98,34 @@ class CruiseDataTransfers extends Controller {
         $data['includeOVDMFilesOptions'] = $this->_buildIncludeOVDMFilesOptions();
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $transferType = $_POST['transferType'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncToDest = $_POST['syncToDest'];
-            $destDir = $_POST['destDir'];
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $includeOVDMFiles = $_POST['includeOVDMFiles'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncToDest = $_POST['syncToDest'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
-            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+            $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -132,7 +133,7 @@ class CruiseDataTransfers extends Controller {
             elseif( preg_match('/\s/',$name) ){
                 $error[] = 'Name cannot contain whitespace, underscores are acceptable';
 	    }
-	
+
             if($longName == ''){
                 $error[] = 'Long name is required';
             }
@@ -290,31 +291,31 @@ class CruiseDataTransfers extends Controller {
                 Url::redirect('config/cruiseDataTransfers');
             }
         } elseif(isset($_POST['inlineTest'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $transferType = $_POST['transferType'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncToDest = $_POST['syncToDest'];
-            $destDir = $_POST['destDir'];
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $includeOVDMFiles = $_POST['includeOVDMFiles'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncToDest = $_POST['syncToDest'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
             $status = 3;
             $enable = 0;
-            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
-            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+            $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -450,14 +451,14 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer'] = (object)array(
                     'name' => $name,
                     'longName' => $longName,
-                    'includeOVDMFiles' => $includeOVDMFiles,
-                    'bandwidthLimit' => $bandwidthLimit,
-                    'transferType' => $transferType,
-                    'skipEmptyDirs' => $skipEmptyDirs,
-                    'skipEmptyFiles' => $skipEmptyFiles,
-                    'syncToDest' => $syncToDest,
+                    'includeOVDMFiles' => (int)$includeOVDMFiles,
+                    'bandwidthLimit' => (int)$bandwidthLimit,
+                    'transferType' => (int)$transferType,
+                    'skipEmptyDirs' => (int)$skipEmptyDirs,
+                    'skipEmptyFiles' => (int)$skipEmptyFiles,
+                    'syncToDest' => (int)$syncToDest,
                     'destDir' => $destDir,
-                    'localDirIsMountPoint' => $localDirIsMountPoint,
+                    'localDirIsMountPoint' => (int)$localDirIsMountPoint,
                     'rsyncServer' => $rsyncServer,
                     'rsyncUser' => $rsyncUser,
                     'rsyncPass' => $rsyncPass,
@@ -467,10 +468,10 @@ class CruiseDataTransfers extends Controller {
                     'smbDomain' => $smbDomain,
                     'sshServer' => $sshServer,
                     'sshUser' => $sshUser,
-                    'sshUseKey' => $sshUseKey,
+                    'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
-                    'status' => '4',
-                    'enable' => '0',
+                    'status' => 4,
+                    'enable' => 0,
                     'excludedCollectionSystems' => $excludedCollectionSystems,
                     'excludedExtraDirectories' => $excludedExtraDirectories,
                 );
@@ -507,31 +508,42 @@ class CruiseDataTransfers extends Controller {
         $data['extraDirectories'] = $this->_extraDirectoriesModel->getExtraDirectories(true);
 
         $data['row'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id);
+        $error = [];
 
         if(isset($_POST['submit'])){
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $transferType = $_POST['transferType'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncToDest = $_POST['syncToDest'];
-            $destDir = $_POST['destDir'];
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
-            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $includeOVDMFiles = $_POST['includeOVDMFiles'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncToDest = $_POST['syncToDest'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+
+            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
+                $rsyncPass = $data['row'][0]->rsyncPass;
+            }
+            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
+                $smbPass = $data['row'][0]->smbPass;
+            }
+            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
+                $sshPass = $data['row'][0]->sshPass;
+            }
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -690,7 +702,7 @@ class CruiseDataTransfers extends Controller {
                 $where = array('cruiseDataTransferID' => $id);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
 
-                $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+                $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
                 Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
                 Url::redirect('config/cruiseDataTransfers'.$filter);
             } else {
@@ -707,43 +719,50 @@ class CruiseDataTransfers extends Controller {
                 $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
                 $data['row'][0]->rsyncServer = $rsyncServer;
                 $data['row'][0]->rsyncUser = $rsyncUser;
-                $data['row'][0]->rsyncPass = $rsyncPass;
                 $data['row'][0]->smbServer = $smbServer;
                 $data['row'][0]->smbUser = $smbUser;
-                $data['row'][0]->smbPass = $smbPass;
                 $data['row'][0]->smbDomain = $smbDomain;
                 $data['row'][0]->sshServer = $sshServer;
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
-                $data['row'][0]->sshPass = $sshPass;
                 $data['row'][0]->excludedCollectionSystems = $excludedCollectionSystems;
                 $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
             }
         } else if(isset($_POST['inlineTest'])){
 
-            $name = $_POST['name'];
-            $longName = $_POST['longName'];
-            $includeOVDMFiles = $_POST['includeOVDMFiles'];
-            $bandwidthLimit = $_POST['bandwidthLimit'];
-            $transferType = $_POST['transferType'];
-            $skipEmptyDirs = $_POST['skipEmptyDirs'];
-            $skipEmptyFiles = $_POST['skipEmptyFiles'];
-            $syncToDest = $_POST['syncToDest'];
-            $destDir = $_POST['destDir'];
-            $localDirIsMountPoint = $_POST['localDirIsMountPoint'];
-            $rsyncServer = $_POST['rsyncServer'];
-            $rsyncUser = $_POST['rsyncUser'];
-            $rsyncPass = $_POST['rsyncPass'];
-            $smbServer = $_POST['smbServer'];
-            $smbUser = $_POST['smbUser'];
-            $smbPass = $_POST['smbPass'];
-            $smbDomain = $_POST['smbDomain'];
-            $sshServer = $_POST['sshServer'];
-            $sshUser = $_POST['sshUser'];
-            $sshUseKey = $_POST['sshUseKey'];
-            $sshPass = $_POST['sshPass'];
-            $excludedCollectionSystems = ($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
-            $excludedExtraDirectories = ($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+            $name = $_POST['name'] ?? '';
+            $longName = $_POST['longName'] ?? '';
+            $includeOVDMFiles = $_POST['includeOVDMFiles'] ?? '';
+            $bandwidthLimit = $_POST['bandwidthLimit'] ?? '';
+            $transferType = $_POST['transferType'] ?? '';
+            $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
+            $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
+            $syncToDest = $_POST['syncToDest'] ?? '';
+            $destDir = $_POST['destDir'] ?? '';
+            $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
+            $rsyncServer = $_POST['rsyncServer'] ?? '';
+            $rsyncUser = $_POST['rsyncUser'] ?? '';
+            $rsyncPass = $_POST['rsyncPass'] ?? '';
+            $smbServer = $_POST['smbServer'] ?? '';
+            $smbUser = $_POST['smbUser'] ?? '';
+            $smbPass = $_POST['smbPass'] ?? '';
+            $smbDomain = $_POST['smbDomain'] ?? '';
+            $sshServer = $_POST['sshServer'] ?? '';
+            $sshUser = $_POST['sshUser'] ?? '';
+            $sshUseKey = $_POST['sshUseKey'] ?? '';
+            $sshPass = $_POST['sshPass'] ?? '';
+            $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
+            $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
+
+            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
+                $rsyncPass = $data['row'][0]->rsyncPass;
+            }
+            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
+                $smbPass = $data['row'][0]->smbPass;
+            }
+            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
+                $sshPass = $data['row'][0]->sshPass;
+            }
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -878,14 +897,14 @@ class CruiseDataTransfers extends Controller {
 
                 $gmData['cruiseDataTransfer']->name = $name;
                 $gmData['cruiseDataTransfer']->longName = $longName;
-                $gmData['cruiseDataTransfer']->includeOVDMFiles = $includeOVDMFiles;
-                $gmData['cruiseDataTransfer']->bandwidthLimit = $bandwidthLimit;
-                $gmData['cruiseDataTransfer']->transferType = $transferType;
-                $gmData['cruiseDataTransfer']->skipEmptyDirs = $skipEmptyDirs;
-                $gmData['cruiseDataTransfer']->skipEmptyFiles = $skipEmptyFiles;
-                $gmData['cruiseDataTransfer']->syncToDest = $syncToDest;
+                $gmData['cruiseDataTransfer']->includeOVDMFiles = (int)$includeOVDMFiles;
+                $gmData['cruiseDataTransfer']->bandwidthLimit = (int)$bandwidthLimit;
+                $gmData['cruiseDataTransfer']->transferType = (int)$transferType;
+                $gmData['cruiseDataTransfer']->skipEmptyDirs = (int)$skipEmptyDirs;
+                $gmData['cruiseDataTransfer']->skipEmptyFiles = (int)$skipEmptyFiles;
+                $gmData['cruiseDataTransfer']->syncToDest = (int)$syncToDest;
                 $gmData['cruiseDataTransfer']->destDir = $destDir;
-                $gmData['cruiseDataTransfer']->localDirIsMountPoint = $localDirIsMountPoint;
+                $gmData['cruiseDataTransfer']->localDirIsMountPoint = (int)$localDirIsMountPoint;
                 $gmData['cruiseDataTransfer']->rsyncServer = $rsyncServer;
                 $gmData['cruiseDataTransfer']->rsyncUser = $rsyncUser;
                 $gmData['cruiseDataTransfer']->rsyncPass = $rsyncPass;
@@ -895,7 +914,7 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->smbDomain = $smbDomain;
                 $gmData['cruiseDataTransfer']->sshServer = $sshServer;
                 $gmData['cruiseDataTransfer']->sshUser = $sshUser;
-                $gmData['cruiseDataTransfer']->sshUseKey = $sshUseKey;
+                $gmData['cruiseDataTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['cruiseDataTransfer']->sshPass = $sshPass;
                 $gmData['cruiseDataTransfer']->excludedCollectionSystems = $excludedCollectionSystems;
                 $gmData['cruiseDataTransfer']->excludedExtraDirectories = $excludedExtraDirectories;
@@ -924,15 +943,12 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->localDirIsMountPoint = $localDirIsMountPoint;
             $data['row'][0]->rsyncServer = $rsyncServer;
             $data['row'][0]->rsyncUser = $rsyncUser;
-            $data['row'][0]->rsyncPass = $rsyncPass;
             $data['row'][0]->smbServer = $smbServer;
             $data['row'][0]->smbUser = $smbUser;
-            $data['row'][0]->smbPass = $smbPass;
             $data['row'][0]->smbDomain = $smbDomain;
             $data['row'][0]->sshServer = $sshServer;
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
-            $data['row'][0]->sshPass = $sshPass;
             $data['row'][0]->excludedCollectionSystems = $excludedCollectionSystems;
             $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
 
@@ -947,7 +963,7 @@ class CruiseDataTransfers extends Controller {
 
         $where = array('cruiseDataTransferID' => $id);
         $this->_cruiseDataTransfersModel->deleteCruiseDataTransfer($where);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Session::set('message','Collection System Transfer Deleted');
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
@@ -955,14 +971,14 @@ class CruiseDataTransfers extends Controller {
     public function enable($id) {
 
         $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
     public function disable($id) {
 
         $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($id);
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
@@ -1021,7 +1037,7 @@ class CruiseDataTransfers extends Controller {
 
         sleep(1);
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 
@@ -1046,7 +1062,7 @@ class CruiseDataTransfers extends Controller {
 
         sleep(1);
 
-        $filter = $_GET['filter'] ? '?filter='.$_GET['filter'] : "";
+        $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
         Url::redirect('config/cruiseDataTransfers'.$filter);
     }
 }

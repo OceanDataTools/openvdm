@@ -2,7 +2,7 @@ $(function () {
     'use strict';
 
     var MAPPROXY_DIR = '/mapproxy';
-    var TITILER_URL = window.location.protocol + '//' + window.location.host + ':8000'
+    var TITILER_URL = '/titiler'
 
     var greenIcon = null;
     var redIcon = null;
@@ -188,7 +188,7 @@ $(function () {
                    return object['raw_data'].includes(loweringID)
                })
 
-               var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + files[0]['dd_json'];
+               var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataType + '/' + files[0]['dd_json'];
                $.getJSON(getVisualizerDataURL, function (data, status) {
                     if (status === 'success' && data !== null) {
 
@@ -373,7 +373,7 @@ $(function () {
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
         var reversedY = reversedY || false;
         var inverted = inverted || false;
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject.dataType + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
 

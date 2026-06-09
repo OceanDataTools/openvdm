@@ -2,10 +2,10 @@
 """
 FILE:  mwd_parser.py
 
-USAGE:  mwd_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] <dataFile>
+USAGE:  mwd_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
 
-DESCRIPTION:  Parse the supplied NMEA MWD data and return the json-formatted
-    string used by OpenVDM as part of it's Data dashboard.
+DESCRIPTION:  Parse the supplied NMEA-formtted MWD file and return the json-
+              formatted string used by OpenVDM as part of it's Data dashboard.
 
   OPTIONS:  [-h] Return the help message.
             [-v+] Increase verbosity (default: warning)
@@ -13,227 +13,236 @@ DESCRIPTION:  Parse the supplied NMEA MWD data and return the json-formatted
                            yyyy-mm-ddTHH:MM:SS.sssZ
             [--startTS] optional start crop time (strptime format)
             [--stopTS] optional stop crop time (strptime format)
+            [--noMag] skip the Direction magnetic processing
             <dataFile> Full or relative path of the data file to process.
 
-REQUIREMENTS:  Python3.8
-            Python Modules:
-                numpy==1.19.5
-                pandas==1.2.0
-                PyYAML==5.3.1
-                requests==2.25.1
+REQUIREMENTS:  Python3.11
+               Python Modules:
+                   numpy==2.4.0
+                   pandas==2.3.0
 
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.6
+  VERSION:  2.15
   CREATED:  2016-08-29
- REVISION:  2021-02-13
+ REVISION:  2025-12-30
 """
 
 import sys
-import csv
-import json
 import logging
-from copy import deepcopy
 from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
+import numpy as np
+import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','hdr','wind_dir_t','T','wind_dir_m','M','wind_spd_n','N','wind_spd_m','M_checksum'] # OpenRVDAS style
-# RAW_COLS = ['date','time','hdr','wind_dir_t','T','wind_dir_m','M','wind_spd_n','N','wind_spd_m','M_checksum'] # SCS style
-PROC_COLS = ['date_time','wind_spd_m','wind_dir_t']
+PROC_COLS = ['date_time','dir_t','dir_m','spd_kts','spd_mph']
+
+FIELDS = [
+    "header",
+    "dir_t",
+    "T",
+    "dir_m",
+    "M",
+    "spd_kts",
+    "N",
+    "spd_mph",
+    "M_checksum"
+]
 
 ROUNDING = {
-    'wind_spd_m': 2,
-    'wind_dir_t':1
+    'dir_t': 2,
+    'dir_m': 2,
+    'spd_kts': 2,
+    'spd_mph': 2
 }
-
-MAX_DELTA_T = pd.Timedelta('10 seconds')
 
 
 class MWDParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
-    """
+    """Parser for NMEA MWD files, fully refactored like GGAParser."""
 
-    def __init__(self, start_dt=None, stop_dt=None, time_format=None, skip_header=False, use_openvdm_api=False):
-        super().__init__(RAW_COLS, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt, time_format=time_format, skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
 
+    MIN_DIR = 0.0
+    MAX_DIR = 360.0
 
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
+    MAX_SPD_KTS = 80
+    MAX_SPD_MPH = MAX_SPD_KTS * 1.15078
 
-        raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False, no_mag=False):
+        self.no_mag = no_mag
+        proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'dir_m']
+        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
 
-        logging.debug("Parsing data file...")
+    def parse(self, filepath):
+        raw_data = {col: [] for col in self.proc_cols}
         errors = []
+
+        # -------------------------
+        # Read and parse MWD lines
+        # -------------------------
         try:
-            with open(filepath, mode='r', encoding="utf-8") as csvfile:
-                reader = csv.DictReader((l.replace('\0', '') for l in csvfile), self.raw_cols)
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWD'):
+                logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                if self.skip_header:
-                    next(reader)
+                # Map fields to FIELDS
+                mwd_data = dict(zip(FIELDS, fields))
 
-                for lineno, line in enumerate(reader):
+                try:
+                    dir_t = float(mwd_data['dir_t']) if mwd_data['dir_t'] else None
+                    dir_m = float(mwd_data['dir_m']) if (not self.no_mag and mwd_data['dir_m']) else None
+                    spd_kts = float(mwd_data['spd_kts']) if mwd_data['spd_kts'] else None
+                    spd_mph = float(mwd_data['spd_mph']) if mwd_data['spd_mph'] else None
 
-                    try:
-                        date_time = line['date_time'] # OpenRVDAS style
-                        # date_time = ' '.join([line['date'], line['time']]) # SCS style
+                    raw_data['date_time'].append(timestamp_str)
+                    raw_data['dir_t'].append(dir_t)
+                    if not self.no_mag:
+                        raw_data['dir_m'].append(dir_m)
+                    raw_data['spd_kts'].append(spd_kts)
+                    raw_data['spd_mph'].append(spd_mph)
 
-                        wind_spd_m = float(line['wind_spd_m'])
-                        wind_dir_t = float(line['wind_dir_t'])
-
-                    except Exception as err:
-                        errors.append(lineno)
-                        logging.warning("Parsing error encountered on line %s", lineno)
-                        logging.debug(line)
-                        logging.debug(str(err))
-
-                    else:
-                        raw_into_df['date_time'].append(date_time)
-                        raw_into_df['wind_spd_m'].append(wind_spd_m)
-                        raw_into_df['wind_dir_t'].append(wind_dir_t)
+                except Exception as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped due to parse error: %s", lineno, err)
 
         except Exception as err:
-            logging.error("Problem accessing input file: %s", filepath)
-            logging.error(str(err))
-            return
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
 
-        logging.debug("Finished parsing data file")
+        if not raw_data['date_time']:
+            logging.warning("No valid MWD data in file: %s", filepath)
+            return None
 
-        # If no data ingested from file, quit
-        if len(raw_into_df['date_time']) == 0:
-            logging.warning("Dataframe is empty... quitting")
-            return
-
+        # -------------------------
         # Build DataFrame
-        logging.debug("Building dataframe from parsed data...")
-        df_proc = pd.DataFrame(raw_into_df)
+        # -------------------------
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        if df['date_time'].isna().all():
+            logging.error("All timestamps could not be parsed; aborting.")
+            return None
+        df = df.dropna(subset=['date_time'])
+        df = df.set_index('date_time')
 
-        # Convert Date/time column to datetime objects
-        logging.debug("Converting data_time to datetime datatype...")
-
-        df_proc['date_time'] = pd.to_datetime(df_proc['date_time'], format=self.time_format)
-
-        # Optionally crop data by start/stop times
         if self.start_dt or self.stop_dt:
-            logging.debug("Cropping data...")
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
 
-            df_proc = self.crop_data(df_proc)
+        # -------------------------
+        # DeltaT
+        # -------------------------
+        df['deltaT'] = df.index.to_series().diff()
 
-        # If the crop operation emptied the dataframe, quit
-        if df_proc.shape[0] == 0:
-            logging.warning("Cropped dataframe is empty... quitting")
-            return
+        # -------------------------
+        # Statistics
+        # -------------------------
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(),df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(df['deltaT'].min().total_seconds(),3),
+                              round(df['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
+                                      len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
+        self.add_bounds_stat([round(df['dir_t'].min(), ROUNDING['dir_t']),
+                              round(df['dir_t'].max(), ROUNDING['dir_t'])], "Direction True Bounds", "deg")
+        self.add_value_validity_stat([len(df[(df['dir_t'] >= self.MIN_DIR) & (df['dir_t'] <= self.MAX_DIR)]),
+                                      len(df[(df['dir_t'] < self.MIN_DIR) | (df['dir_t'] > self.MAX_DIR)])], "Direction True Validity")
+        if not self.no_mag:
+            self.add_bounds_stat([round(df['dir_m'].min(), ROUNDING['dir_m']),
+                                  round(df['dir_m'].max(), ROUNDING['dir_m'])], "Direction Magnetic Bounds", "deg")
+            self.add_value_validity_stat([len(df[(df['dir_m'] >= self.MIN_DIR) & (df['dir_m'] <= self.MAX_DIR)]),
+                                          len(df[(df['dir_m'] < self.MIN_DIR) | (df['dir_m'] > self.MAX_DIR)])], "Direction Magnetic Validity")
+        self.add_bounds_stat([round(df['spd_kts'].min(), ROUNDING['spd_kts']),
+                              round(df['spd_kts'].max(), ROUNDING['spd_kts'])], 'Speed Knots Bounds', 'kts')
+        self.add_value_validity_stat([len(df[df['spd_kts'] <= self.MAX_SPD_KTS]),
+                                      len(df[df['spd_kts'] > self.MAX_SPD_KTS])], 'Speed Knots Validity')
+        self.add_bounds_stat([round(df['spd_mph'].min(), ROUNDING['spd_mph']),
+                              round(df['spd_mph'].max(), ROUNDING['spd_mph'])], 'Speed MPH Bounds', 'mph')
+        self.add_value_validity_stat([len(df[df['spd_mph'] <= self.MAX_SPD_MPH]),
+                                      len(df[df['spd_mph'] > self.MAX_SPD_MPH])], 'Speed MPH Validity')
 
-        # Calculate deltaT column
-        logging.debug('Building deltaT column...')
-        df_proc = df_proc.join(df_proc['date_time'].diff().to_frame(name='deltaT'))
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        logging.info("Running quality tests...")
+        quality_checks = [
+            ('Rows', len(df)+len(errors), len(errors)),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('Speed, kts', len(df), len(df[df['spd_kts'] > self.MAX_SPD_KTS])),
+            ('Speed, mph', len(df), len(df[df['spd_mph'] > self.MAX_SPD_MPH])),
+            ('Direction, True', len(df), len(df[(df['dir_t'] < self.MIN_DIR) | (df['dir_t'] > self.MAX_DIR)]))
+        ]
 
-        logging.debug("Tabulating statistics...")
-        self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_time_bounds_stat([df_proc['date_time'].min(), df_proc['date_time'].max()])
-        self.add_bounds_stat([round(df_proc['deltaT'].min().total_seconds(),3), round(df_proc['deltaT'].max().total_seconds(),3)], 'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([len(df_proc[(df_proc['deltaT'] <= MAX_DELTA_T)]),len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)])], 'DeltaT Validity')
-        self.add_bounds_stat([round(df_proc['wind_spd_m'].min(),2), round(df_proc['wind_spd_m'].max(),2)], 'Wind Speed Bounds', 'm/s')
+        if not self.no_mag:
+            quality_checks.append(("Direction, Magnetic", len(df), len(df[(df['dir_m'] < self.MIN_DIR) | (df['dir_m'] > self.MAX_DIR)])))
 
-        logging.debug("Running quality tests...")
-        # % of bad rows in datafile
-        error_rate = len(errors) / (len(df_proc) + len(errors))
-        if error_rate > .25:
-            self.add_quality_test_failed("Rows")
-        elif error_rate > .10:
-            self.add_quality_test_warning("Rows")
-        else:
-            self.add_quality_test_passed("Rows")
+        for col, total, bad in quality_checks:
+            error_rate = bad / total
+            if error_rate > 0.25:
+                self.add_quality_test_failed(col)
+            elif error_rate > 0.10:
+                self.add_quality_test_warning(col)
+            else:
+                self.add_quality_test_passed(col)
 
-        # % of time gaps in data
-        error_rate = len(df_proc[(df_proc['deltaT'] > MAX_DELTA_T)]) / len(df_proc)
-        if error_rate > .25:
-            self.add_quality_test_failed("DeltaT")
-        elif error_rate > .10:
-            self.add_quality_test_warning("DeltaT")
-        else:
-            self.add_quality_test_passed("DeltaT")
+        # -------------------------
+        # Resample and round
+        # -------------------------
+        df = self.resample_data(df)
+        df = self.round_data(df, ROUNDING)
+        df = df.set_index('date_time')
 
-        # set index
-        logging.debug('Setting index...')
-        df_proc = df_proc.set_index('date_time')
+        # -------------------------
+        # Visualization
+        # -------------------------
+        logging.info("Building visualization datasets...")
 
-        # resample data
-        logging.debug("Resampling data...")
-        df_proc = self.resample_data(df_proc)
+        for col, unit, label in [('dir_t', 'deg', 'Direction True'),
+                                 ('dir_m', 'deg', 'Direction Mag.'),
+                                 ('spd_kts', 'kts', 'Speed'),
+                                 ('spd_mph', 'mph', 'Speed')]:
+            if col == 'dir_m' and self.no_mag:
+                continue
 
-        # round data
-        logging.debug("Rounding data: %s", ROUNDING)
-        df_proc = self.round_data(df_proc, ROUNDING)
+            visualizer_data_obj = {'data': [], 'unit': unit, 'label': label}
+            for ts, row in df.iterrows():
+                if pd.notna(row[col]):
+                    ts = pd.Timestamp(ts)
+                    if ts.tzinfo is None:
+                        ts = ts.tz_localize('UTC')
+                    epoch_ms = int(ts.timestamp() * 1000)
+                    visualizer_data_obj['data'].append([epoch_ms, row[col]])
 
-        # split data where there are gaps
-        logging.debug("Building visualization data...")
+            self.add_visualization_data(visualizer_data_obj)
 
-        visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','wind_spd_m']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'm/s'
-        visualizer_data_obj['label'] = 'Wind Speed'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
+        # -------------------------
+        # Send errors to OpenVDM
+        # -------------------------
+        self.send_error_msg(errors, filepath)
 
-        visualizer_data_obj['data'] = json.loads(df_proc[['date_time','wind_dir_t']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'deg'
-        visualizer_data_obj['label'] = 'Wind Direction'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
+    # -----------------------------
+    # CLI hooks for custom arguments
+    # -----------------------------
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        parser.add_argument('--noMag', action='store_true', default=False, help='Skip Direction Magnetic')
 
-        # send message about errors encountered to OpenVDM
-        if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
-
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'no_mag': getattr(args, 'noMag', False)}
 
 # -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
+# Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Parse true wind sensor data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-    parser.add_argument('--timeFormat', help='timestamp format', default=None)
-    parser.add_argument('--startDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop start timestamp (iso8601)')
-    parser.add_argument('--stopDT', default=None,
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%dT%H:%M:%S.%fZ'),
-                        help=' crop stop timestamp (iso8601)')
-    parser.add_argument('dataFile', metavar='dataFile',
-                        help='the raw data file to process')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    ovdm_parser = MWDParser(start_dt=parsed_args.startDT, stop_dt=parsed_args.stopDT, time_format=parsed_args.timeFormat)
-
-    try:
-        logging.info("Processing file: %s", parsed_args.dataFile)
-        ovdm_parser.process_file(parsed_args.dataFile)
-        print(ovdm_parser.to_json())
-        logging.info("Done!")
-    except Exception as err:
-        logging.error(str(err))
-        raise err
+    MWDParser.run_cli()

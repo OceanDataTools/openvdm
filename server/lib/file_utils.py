@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  connection_utils.py
+"""Utilities for local filesystem operations used across OpenVDM workers.
 
-DESCRIPTION:  utilities for dealing with local files/directories
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2025-07-05
- REVISION:  2025-07-07
+Provides helpers for building file lists, writing rsync include files,
+managing directory ownership/permissions, purging old files, writing JSON
+data files, and managing temporary directories.
 """
 
 import os
@@ -21,9 +15,10 @@ import shutil
 import logging
 import errno
 import subprocess
+import numpy as np
 from contextlib import contextmanager
 from pwd import getpwnam
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 default_ignore_patterns = [
@@ -35,9 +30,14 @@ default_ignore_patterns = [
     "**/.*.??????"
 ]
 
-def is_ascii(s):
-    """
-    Check if the characters in string s are in ASCII, U+0-U+7F.
+def is_ascii(s: str) -> bool:
+    """Check whether all characters in *s* are within the ASCII range (U+0–U+7F).
+
+    Args:
+        s: The string to test.
+
+    Returns:
+        ``True`` if every character in *s* is ASCII, ``False`` otherwise.
     """
 
     try:
@@ -47,9 +47,16 @@ def is_ascii(s):
         return False
 
 def expand_patterns(patterns: List[str]) -> List[str]:
-    """
-    Expand recursive glob patterns (with **/) to also include
-    their top-level equivalents (without the **/ prefix).
+    """Expand recursive glob patterns to also include their top-level equivalents.
+
+    For each pattern beginning with ``**/``, adds a version without the prefix
+    so that files in the root of the search tree are also matched.
+
+    Args:
+        patterns: List of glob-style patterns, possibly containing ``**/``.
+
+    Returns:
+        Sorted list of unique patterns including both original and expanded forms.
     """
     expanded = set(patterns)
     for p in patterns:
@@ -58,8 +65,19 @@ def expand_patterns(patterns: List[str]) -> List[str]:
     return sorted(expanded)
 
 def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bool:
-    """
-    Returns True if the filepath matches any of the provided glob-style patterns.
+    """Return ``True`` if *filepath* matches any of the provided glob-style patterns.
+
+    Uses :func:`expand_patterns` to ensure both recursive (``**/``) and
+    top-level variants are checked.  Defaults to :data:`default_ignore_patterns`
+    when *patterns* is ``None``.
+
+    Args:
+        filepath: Absolute or relative path to test.
+        patterns: Optional list of glob patterns.  Defaults to
+            :data:`default_ignore_patterns`.
+
+    Returns:
+        ``True`` if *filepath* matches at least one pattern.
     """
 
     filepath = os.path.normpath(filepath)
@@ -68,9 +86,21 @@ def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bo
     return any(fnmatch.fnmatch(filepath, pattern) for pattern in patterns)
 
 
-def build_filelist(source_dir):
-    """
-    Builds the list of files in the source directory
+def build_filelist(source_dir: str) -> dict:
+    """Walk *source_dir* and categorise every file as included or excluded.
+
+    Files are excluded if they are symlinks, match
+    :func:`is_default_ignore`, or contain non-ASCII characters in their path.
+    All paths in the returned lists are relative to *source_dir*.
+
+    Args:
+        source_dir: Absolute path to the directory to scan.
+
+    Returns:
+        A dict with keys ``'include'``, ``'exclude'``, ``'new'``, and
+        ``'updated'``.  ``'include'`` contains ASCII-clean, non-ignored
+        relative paths; ``'exclude'`` contains non-ASCII paths.
+        ``'new'`` and ``'updated'`` are empty lists reserved for callers.
     """
 
     return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
@@ -96,9 +126,18 @@ def build_filelist(source_dir):
     return return_files
 
 
-def build_include_file(include_list, filepath):
-    """
-    Build the rsync files-from include file
+def build_include_file(include_list: List[str], filepath: str) -> bool:
+    """Write *include_list* to *filepath* for use as an rsync ``--files-from`` argument.
+
+    Each entry is written on its own line, followed by a NUL byte to satisfy
+    rsync's ``--from0`` option if used.
+
+    Args:
+        include_list: Relative file paths to include in the transfer.
+        filepath: Destination path for the generated include file.
+
+    Returns:
+        ``True`` on success, ``False`` if the file could not be written.
     """
 
     try:
@@ -112,9 +151,18 @@ def build_include_file(include_list, filepath):
     return True
 
 
-def clear_directory(target_dir, delete_self=False):
-    """
-    Deletes all empty sub-directorties within the specified target_dir
+def clear_directory(target_dir: str, delete_self: bool = False) -> dict:
+    """Recursively delete all files and subdirectories inside *target_dir*.
+
+    Args:
+        target_dir: Path to the directory to clear.
+        delete_self: If ``True``, also remove *target_dir* itself after
+            emptying it.
+
+    Returns:
+        A dict with keys ``'verdict'`` (``bool``) and ``'reason'``
+        (list of error strings).  ``'verdict'`` is ``True`` only when no
+        errors occurred.
     """
 
     reasons = []
@@ -161,9 +209,18 @@ def clear_directory(target_dir, delete_self=False):
     }
 
 
-def delete_from_dest(dest_dir, include_files):
-    """
-    Delete the files in the included_files list from the dest_dir
+def delete_from_dest(dest_dir: str, include_files: List[str]) -> List[str]:
+    """Delete any file in *dest_dir* that is not present in *include_files*.
+
+    Also removes empty subdirectories left behind after deletion.
+
+    Args:
+        dest_dir: Root directory to prune.
+        include_files: List of relative paths that should be *kept*.  Any file
+            in *dest_dir* whose relative path is not in this list is deleted.
+
+    Returns:
+        List of relative paths that were deleted.
     """
 
     deleted_files = []
@@ -198,9 +255,19 @@ def delete_from_dest(dest_dir, include_files):
     return deleted_files
 
 
-def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive=False):
-    """
-    purge files older than the given deltatime-formatted threshold
+def purge_old_files(directory_path: str, excludes: Optional[str] = None,
+                    timedelta_str: Optional[str] = None, recursive: bool = False) -> None:
+    """Delete files in *directory_path* that are older than *timedelta_str*.
+
+    Args:
+        directory_path: Directory to scan for old files.
+        excludes: Comma-separated list of glob patterns for files to skip.
+        timedelta_str: Human-readable age threshold such as ``"12 hours"`` or
+            ``"3 days"``.  Defaults to ``"12 hours"``.
+        recursive: If ``True``, also purge files in subdirectories.
+
+    Raises:
+        ValueError: If *timedelta_str* cannot be parsed.
     """
 
     timedelta_str = timedelta_str or "12 hours"
@@ -294,10 +361,20 @@ def purge_old_files(directory_path, excludes=None, timedelta_str=None, recursive
     _purge_files(directory_path, excludes, time_delta.total_seconds(), recursive)
 
 
-def output_json_data_to_file(file_path, contents):
-    """
-    Write contents to the specified file_path.  Assumes contents is a json
-    string-able object
+def output_json_data_to_file(file_path: str, contents) -> dict:
+    """Serialise *contents* as JSON and write it to *file_path*.
+
+    Parent directories are created automatically.  Uses :class:`NpEncoder` to
+    handle NumPy types and :class:`~datetime.datetime` objects.
+
+    Args:
+        file_path: Destination file path.
+        contents: Any JSON-serialisable object (including NumPy arrays and
+            ``datetime`` instances).
+
+    Returns:
+        A dict with key ``'verdict'`` (``bool``) and, on failure, a ``'reason'``
+        string.
     """
 
     try:
@@ -313,7 +390,7 @@ def output_json_data_to_file(file_path, contents):
     with open(file_path, mode='w', encoding="utf-8") as json_file:
         logging.debug("Saving JSON file: %s", file_path)
         try:
-            json.dump(contents, json_file, indent=4)
+            json.dump(contents, json_file, cls=NpEncoder)
 
         except IOError:
             reason = f'Unable to create data file: {file_path}'
@@ -323,10 +400,19 @@ def output_json_data_to_file(file_path, contents):
     return {'verdict': True}
 
 
-def set_owner_group_permissions(user, path):
-    """
-    Recursively set the ownership and permissions for the files and sub-
-    directories for the given path.
+def set_owner_group_permissions(user: str, path: str) -> dict:
+    """Recursively set ownership and permissions on *path* for *user*.
+
+    Files are set to ``0o644``; directories to ``0o755``.  Ownership (uid/gid)
+    is looked up from the system password database.
+
+    Args:
+        user: System username whose uid/gid will own the files.
+        path: File or directory path to update.
+
+    Returns:
+        A dict with key ``'verdict'`` (``bool``) and, on failure, a ``'reason'``
+        string describing the first set of errors encountered.
     """
 
     reasons = []
@@ -386,9 +472,21 @@ def set_owner_group_permissions(user, path):
 
 
 @contextmanager
-def temporary_directory(preserve_on_error=False):
-    """
-    Helper function to handle the creation/deletion of a tmp directory
+def temporary_directory(preserve_on_error: bool = False):
+    """Context manager that creates a temporary directory and cleans it up on exit.
+
+    If a ``mntpoint`` subdirectory exists and is mounted at cleanup time, it is
+    unmounted before the tree is removed.
+
+    Args:
+        preserve_on_error: If ``True``, skip cleanup when an exception is raised
+            (useful for post-mortem debugging).
+
+    Yields:
+        Path to the freshly created temporary directory.
+
+    Raises:
+        Exception: Re-raises any exception that occurs inside the ``with`` block.
     """
 
     tmpdir = tempfile.mkdtemp()
@@ -422,9 +520,18 @@ def temporary_directory(preserve_on_error=False):
         _cleanup_temp_dir(tmpdir, mntpoint_path)
 
 
-def create_directories(directorylist):
-    """
-    Create the directories in the provide directory list
+def create_directories(directorylist: List[str]) -> dict:
+    """Create all directories listed in *directorylist*.
+
+    Uses :func:`os.makedirs` so intermediate parents are created as needed.
+    Existing directories are silently skipped.
+
+    Args:
+        directorylist: Absolute paths of directories to create.
+
+    Returns:
+        A dict with key ``'verdict'`` (``bool``) and, on failure, a ``'reason'``
+        string containing newline-separated error messages.
     """
 
     reasons = []
@@ -443,13 +550,29 @@ def create_directories(directorylist):
     return {'verdict': True}
 
 
-def lockdown_directory(base_dir, exempt_dirs=[]):
-    """
-    Lockdown permissions on the base directory, skip the exempt directories if
-    present
+def lockdown_directory(base_dir: str, exempt_dirs: Optional[List[str]] = None) -> dict:
+    """Restrict permissions on the immediate contents of *base_dir*.
+
+    Files are set to ``0o600``; subdirectories to ``0o700``.  Directories
+    listed in *exempt_dirs* (relative to *base_dir*) are skipped.
+
+    Args:
+        base_dir: Directory whose contents will be locked down.
+        exempt_dirs: List of subdirectory names (relative to *base_dir*) to
+            leave untouched.  Defaults to an empty list.
+
+    Returns:
+        A dict with key ``'verdict'`` (``bool``) and, on failure, a ``'reason'``
+        string containing newline-separated error messages.
+
+    Raises:
+        ValueError: If *exempt_dirs* is not a list.
     """
 
     reasons = []
+
+    if exempt_dirs is None:
+        exempt_dirs = []
 
     if not isinstance(exempt_dirs, list):
         logging.error("Except directories not provided as a list")
@@ -489,9 +612,17 @@ def lockdown_directory(base_dir, exempt_dirs=[]):
     return {'verdict': True}
 
 
-def test_write_access(dest_dir):
-    """
-    Verify the current user has write permissions to the dest_dir
+def test_write_access(dest_dir: str) -> bool:
+    """Verify that the current process has write permission to *dest_dir*.
+
+    Creates and immediately deletes a temporary file inside the directory.
+
+    Args:
+        dest_dir: Directory path to test.
+
+    Returns:
+        ``True`` if a test file was successfully written and removed,
+        ``False`` otherwise.
     """
 
     try:
@@ -504,3 +635,34 @@ def test_write_access(dest_dir):
     except (OSError, PermissionError) as exc:
         logging.exception("Write test failed for %s: %s", dest_dir, str(exc))
         return False
+
+class NpEncoder(json.JSONEncoder):
+    """JSON encoder that handles NumPy scalars, arrays, and :class:`~datetime.datetime` objects.
+
+    Pass as the ``cls`` argument to :func:`json.dumps` or :func:`json.dump`
+    wherever OpenVDM data (which may contain NumPy values) is serialised.
+    """
+
+    def default(self, o): # pylint: disable=arguments-differ
+        """Serialise *o* to a JSON-compatible Python type.
+
+        Args:
+            o: Object to serialise.
+
+        Returns:
+            A JSON-native type (``int``, ``float``, ``list``, or ``str``).
+        """
+
+        if isinstance(o, np.integer):
+            return int(o)
+
+        if isinstance(o, np.floating):
+            return float(o)
+
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+
+        if isinstance(o, datetime):
+            return o.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        return super().default(o)

@@ -8,7 +8,7 @@ DESCRIPTION:  Gearman worker that handles testing cruise data transfer
      BUGS:
     NOTES:
    AUTHOR:  Webb Pinner
-  VERSION:  2.12
+  VERSION:  2.15
   CREATED:  2015-01-01
  REVISION:  2025-08-18
 """
@@ -25,7 +25,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
-from server.lib.connection_utils import get_transfer_type, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import get_transfer_type, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 
 TASK_NAMES = {
     'TEST_CRUISE_DATA_TRANSFER': 'testCruiseDataTransfer'
@@ -80,6 +80,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         else:
             self.cruise_data_transfer = cdt_cfg
 
+        self.cruise_data_transfer = normalize_transfer_config(self.cruise_data_transfer)
+
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
             f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
@@ -120,18 +122,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         cst_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         if cst_id:
-            self.ovdm.set_error_cruise_data_transfer_test(cst_id, f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_cruise_data_transfer_test(cst_id, f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -209,7 +217,7 @@ def task_test_cruise_data_transfer(worker, current_job):
     """
 
     cdt_cfg = worker.cruise_data_transfer
-    transfer_type = get_transfer_type(cdt_cfg)
+    transfer_type = get_transfer_type(cdt_cfg['transferType'])
 
     job_results = {'parts':[]}
 

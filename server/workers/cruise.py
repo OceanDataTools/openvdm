@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""
-FILE:  cruise.py
+"""Gearman worker that initializes and finalizes OpenVDM cruises.
 
-DESCRIPTION:  Gearman worker the handles the tasks of initializing a new cruise
-    and finalizing the current cruise.  This includes initializing/finalizing
-    the data dashboard, MD5summary and transfer log summary.
+Registers four Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``setupNewCruise`` — create the cruise directory tree, initialize the data
+  dashboard and MD5 summary, sync public data, and run post-setup hooks.
+- ``finalizeCurrentCruise`` — run pre-finalize hooks, update the data dashboard
+  and MD5 summary, apply directory permissions, export the OpenVDM config, and
+  run post-finalize hooks.
+- ``exportOVDMConfig`` — write the current OpenVDM configuration as JSON into
+  the cruise directory.
+- ``rsyncPublicDataToCruiseData`` — sync the ``/mnt/PublicData`` volume into
+  the ``From_PublicData`` collection system transfer directory.
 """
 
 import argparse
@@ -46,8 +46,16 @@ TASK_NAMES = {
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise setup and finalization.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        cruise_start_date: Start date of the current cruise.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):
@@ -66,7 +74,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the path to save transfer logfiles
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def update_md5_summary(self, files):
@@ -122,12 +132,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         scrub_transfers(cruise_config.get('collectionSystemTransfersConfig', []))
         scrub_transfers(cruise_config.get('extraDirectoriesConfig', []))
 
+        cruise_config['cruiseConfigFn'] = cruise_config['warehouseConfig']['cruiseConfigFn']
+        cruise_config['loweringConfigFn'] = cruise_config['warehouseConfig']['loweringConfigFn']
+        cruise_config['dataDashboardManifestFn'] = cruise_config['warehouseConfig']['dataDashboardManifestFn']
         cruise_config['md5SummaryFn'] = cruise_config['warehouseConfig']['md5SummaryFn']
         cruise_config['md5SummaryMd5Fn'] = cruise_config['warehouseConfig']['md5SummaryMd5Fn']
+
+        # Full path to data dashboard manifest, relative to cruise directory
+        dashboard_data_dir = next(
+            (entry['destDir'] for entry in cruise_config.get('extraDirectoriesConfig', [])
+             if entry.get('name') == 'Dashboard_Data'),
+            None
+        )
+        if dashboard_data_dir:
+            cruise_config['dataDashboardManifestPath'] = os.path.join(
+                dashboard_data_dir, cruise_config['dataDashboardManifestFn']
+            )
+
+        # Full path to lowering config, relative to cruise directory, with loweringID placeholder.
+        # Only included if the vehicle base directory exists within the cruise data directory.
+        lowering_data_base_dir = cruise_config['warehouseConfig'].get('loweringDataBaseDir', '')
+        if lowering_data_base_dir and os.path.isdir(os.path.join(self.cruise_dir, lowering_data_base_dir)):
+            cruise_config['loweringConfigPath'] = os.path.join(
+                lowering_data_base_dir, '<loweringID>', cruise_config['loweringConfigFn']
+            )
 
         del cruise_config['warehouseConfig']
         del cruise_config['cruiseDataTransfersConfig']
         del cruise_config['shipToShoreTransfersConfig']
+        del cruise_config['cruiseConfigFn']
+        del cruise_config['loweringConfigFn']
+        del cruise_config['dataDashboardManifestFn']
 
         # Remove empty keys
         cruise_config = {k: v for k, v in cruise_config.items() if v not in ("", None)}
@@ -219,15 +254,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             if not results['verdict']:
                 return {'verdict': False, 'reason': results['reason']}
 
-            logfile_filename = f"PublicData_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.log"
-            logfile_filepath = os.path.join(self.build_logfile_dirpath(), logfile_filename)
-            logfile_contents = {
-                'files': {
-                    'new': files['new'],
-                    'updated': files['updated']
+            if len(files['new']) or files['updated']:
+                logfile_filename = f"{self.cruise_id}_PublicData_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.log"
+                logfile_filepath = os.path.join(self.build_logfile_dirpath(), logfile_filename)
+                logfile_contents = {
+                    'files': {
+                        'new': files['new'],
+                        'updated': files['updated']
+                    }
                 }
-            }
-            results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
+                results = output_json_data_to_file(logfile_filepath, logfile_contents['files'])
 
             if not results['verdict']:
                 return {'verdict': False, "reason": f"Error writing transfer logfile {logfile_filename}"}
@@ -332,18 +368,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 

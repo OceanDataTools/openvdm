@@ -6,6 +6,17 @@ use Helpers\FormCustom;
 
 $_warehouseModel = new \Models\Warehouse();
 
+$_POST += [
+    'name' => '', 'longName' => '', 'destDir' => '', 'includeFilter' => '',
+    'excludeFilter' => '', 'ignoreFilter' => '', 'staleness' => '',
+    'removeSourceFiles' => '', 'useStartDate' => '', 'skipEmptyDirs' => '',
+    'skipEmptyFiles' => '', 'syncFromSource' => '', 'bandwidthLimit' => '',
+    'cruiseOrLowering' => '', 'transferType' => '', 'sourceDir' => '',
+    'localDirIsMountPoint' => '', 'rsyncServer' => '', 'rsyncUser' => '',
+    'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '', 'smbUser' => '',
+    'smbPass' => '', 'sshServer' => '', 'sshUser' => '', 'sshUseKey' => '', 'sshPass' => '',
+];
+
 ?>
 
     <div class="row">
@@ -58,7 +69,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
   }
 ?>
-                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType']); ?></div>
+                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType'] ?? ''); ?></div>
                                 <div class="form-group"><label>Source Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sourceDir', 'value'=> $_POST['sourceDir'])); ?></div>
                                 <div class="form-group localDir"><label>Source Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $_POST['localDirIsMountPoint']); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'value'=> $_POST['rsyncServer'])); ?></div>
@@ -144,7 +155,7 @@ $_warehouseModel = new \Models\Warehouse();
     </div>
 
 <?php
-    if($data['testResults']) {
+    if(!empty($data['testResults'])) {
 ?>
 <div class="modal fade" id="testResultsModal" tabindex="-1" role="dialog" aria-labelledby="Test Results" aria-hidden="true">
     <div class="modal-dialog">

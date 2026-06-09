@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""
-FILE:  stop_job.py
+"""Gearman worker that manually terminates running OpenVDM transfers and tasks.
 
-DESCRIPTION:  Gearman worker that handles the manual termination of other OVDM
-    data transfers and OVDM tasks.
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+Registers the ``stopJob`` Gearman task.  When invoked with a PID payload the
+worker sends ``SIGQUIT`` to that process, then marks the corresponding
+collection system transfer, cruise data transfer, or scheduled task as idle in
+the OpenVDM database.
 """
 
 import argparse
@@ -27,8 +21,16 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Class for the current Gearman worker
+    """Gearman worker that handles manual job termination.
+
+    Attributes:
+        stop: Flag set to ``True`` when the worker should cease after the
+            current job completes.
+        ovdm: OpenVDM API client used to query and update transfer/task state.
+        job_pid: PID string of the process targeted for termination, populated
+            from the incoming Gearman job payload.
+        job_info: Metadata dict returned by :py:meth:`_get_job_info` describing
+            the type, id, name, and pid of the job to be stopped.
     """
 
     def __init__(self):
@@ -39,9 +41,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
-    def _get_job_info(self):
-        """
-        Fetch job metadata
+    def _get_job_info(self) -> dict:
+        """Return metadata for the job whose PID matches :py:attr:`job_pid`.
+
+        Searches collection system transfers, cruise data transfers (including
+        required transfers), and scheduled tasks in that order.
+
+        Returns:
+            A dict with keys ``type``, ``id``, ``name``, and ``pid`` for the
+            matched job, or ``{'type': 'unknown'}`` when no match is found.
         """
 
         collection_system_transfers = self.ovdm.get_collection_system_transfers()
@@ -51,17 +59,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         cruise_data_transfers = self.ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != "0":
+            if cruise_data_transfer['pid'] != 0:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         cruise_data_transfers = self.ovdm.get_required_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != "0":
+            if cruise_data_transfer['pid'] != 0:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         tasks = self.ovdm.get_tasks()
         for task in tasks:
-            if task['pid'] != "0":
+            if task['pid'] != 0:
                 return {'type': 'task', 'id': task['taskID'], 'name': task['name'], 'pid': task['pid']}
 
         return {'type':'unknown'}
@@ -96,12 +104,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         return super().on_job_exception(current_job, exc_info)
@@ -150,9 +164,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         }))
 
 
-def task_stop_job(worker, current_job):
-    """
-    Stop the specified OpenVDM task/transfer/process
+def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
+    """Gearman task handler: send SIGQUIT to a running job and mark it idle.
+
+    Reads ``worker.job_info`` (populated by :py:meth:`OVDMGearmanWorker.on_job_execute`)
+    to determine the target PID and job type, signals the process, then resets
+    the corresponding OpenVDM record to idle via the API.
+
+    Args:
+        worker: The active :py:class:`OVDMGearmanWorker` instance.
+        current_job: The Gearman job object provided by the framework.
+
+    Returns:
+        JSON-encoded results dict with a ``parts`` list indicating Pass/Fail
+        for each step.
     """
     job_info = worker.job_info
     job_type = job_info.get('type')

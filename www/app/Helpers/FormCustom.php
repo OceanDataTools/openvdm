@@ -19,7 +19,7 @@ class FormCustom
      * @param   array(array(id, name, value, class, checked, disabled, label))
      * @return  string
      */
-    public function radioInline($params = array(), $value = '')
+    public static function radioInline($params = array(), $value = '')
     {
         $o = '<br />';
         if (!empty($params)) {

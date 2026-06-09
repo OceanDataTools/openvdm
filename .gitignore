@@ -9,6 +9,7 @@ venv/
 # OpenVDM specific
 **/.DS_Store
 database/openvdm_db_custom.sql
+database/backups/
 bin/*.py
 server/plugins/*.py
 server/plugins/parsers/*.py

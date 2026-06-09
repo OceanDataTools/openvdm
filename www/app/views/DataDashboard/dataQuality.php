@@ -55,11 +55,11 @@
 <?php
                 if($data['dataObjectsStats'][$i][$j]){
 ?>
-                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default'>Show</a>
+                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataTypes'][$i]; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default'>Show</a>
 <?php
             } else {
 ?>
-                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default disabled'>Show</a>
+                                                <a href='<?php echo DIR; ?>dataDashboard/dataQualityShowFileStats/<?php echo $data['dataTypes'][$i]; ?>/<?php echo $data['dataObjects'][$i][$j]['raw_data']; ?>' class='btn btn-xs btn-default disabled'>Show</a>
 <?php
             }
 ?>
@@ -104,7 +104,7 @@
         </div>
     </div>
 <?php
-    if($data['stats']) {
+    if(!empty($data['stats'])) {
 ?>
 <div class="modal fade" id="statsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">
@@ -120,7 +120,7 @@
     for($i=0; $i<(sizeof($data['stats'])); $i++){
 ?>
                         <tr>
-                            <td><?php echo $data['stats'][$i]->statName; ?>:</td>
+                            <td><?php echo $data['stats'][$i]->statName ?? ''; ?>:</td>
                             <td>
 <?php
         if(strcmp($data['stats'][$i]->statType, 'bounds') === 0){

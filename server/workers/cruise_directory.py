@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""
-FILE:  cruise_directory.py
+"""Gearman worker that creates and rebuilds the cruise data directory structure.
 
-DESCRIPTION:  Gearman worker the handles the tasks of creating a new cruise
-    data directory and updating the cruise directory structure when additional
-    subdirectories must be added.
+Registers three Gearman tasks:
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+- ``createCruiseDirectory`` — build the cruise directory tree from scratch,
+  including required extra directories, collection system transfer destination
+  directories, and (when enabled) the lowering base directory.
+- ``rebuildCruiseDirectory`` — re-create any missing directories in an existing
+  cruise directory, applying the same logic as ``createCruiseDirectory``.
+- ``setCruiseDataDirectoryPermissions`` — apply lockdown ownership and
+  permissions to the cruise data directory.
 """
 
 import argparse
@@ -36,20 +34,29 @@ TASK_NAMES = {
 
 CUSTOM_TASKS = [
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
         "longName": "Creating cruise directory",
     },
     {
-        "taskID": "0",
+        "taskID": 0,
         "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
         "longName": "Setting CruiseData directory permissions",
     }
 ]
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
-    """
-    Class for the current Gearman worker
+    """Gearman worker for cruise directory creation and permission management.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        task: Metadata dict for the task being processed.
+        cruise_id: Current cruise identifier.
+        cruise_dir: Absolute path to the cruise data directory.
+        lowering_id: Current lowering identifier, or ``None`` when no lowering
+            is active.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
     """
 
     def __init__(self):
@@ -73,9 +80,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
 
 
-    def keyword_replace(self, s):
-        """
-        Find/replace function used to build directory names containing wildcards
+    def keyword_replace(self, s: str) -> str:
+        """Substitute OpenVDM template tokens in a directory path string.
+
+        Replaces ``{cruiseID}``, ``{loweringDataBaseDir}``, and ``{loweringID}``
+        with their runtime values.  When no lowering is active the
+        ``{loweringID}`` token is left as-is.
+
+        Args:
+            s: Directory path string, possibly containing template tokens.
+
+        Returns:
+            The substituted string with trailing slashes stripped, or ``None``
+            if *s* is not a string.
         """
 
         if not isinstance(s, str):
@@ -133,7 +150,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # Retrieve active extra directories
         extra_directories = self.ovdm.get_active_extra_directories(lowering=False)
-        extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == '0']
+        extra_directories = [extra_directory for extra_directory in extra_directories if extra_directory['required'] == 0]
 
         # Filter out extra directories that contain {loweringID} in the dest_dir if there is no lowering ID
         if not self.lowering_id:
@@ -188,18 +205,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         if int(self.task['taskID']) > 0:
-            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_task(self.task['taskID'], f'Worker crashed: {reason}')
         else:
-            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {str(exc_type)}')
+            self.ovdm.send_msg(f"{self.task['longName']} failed", f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 

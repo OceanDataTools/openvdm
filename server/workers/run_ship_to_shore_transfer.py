@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-FILE:  run_ship_to_shore_transfer.py
+"""Gearman worker that transfers cruise data from the Shipboard Data Warehouse to a Shoreside Data Warehouse.
 
-DESCRIPTION:  Gearman worker that handles the transfer of data from the
-    Shipboard Data Warehouse to a Shoreside Data Warehouse.
+Registers the ``runShipToShoreTransfer`` Gearman task.  The shoreside
+destination (SSDW) is the special required cruise data transfer named
+``"SSDW"`` in the OpenVDM database.  Supported destination types are rsync
+server, SSH (via rclone), and generic rclone remote.
 
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.12
-  CREATED:  2017-09-30
- REVISION:  2025-08-08
+Key responsibilities:
+
+- Test the shoreside destination before transferring.
+- Apply per-file include/exclude filters in parallel batches.
+- Report real-time transfer progress to the Gearman job.
+- Restart automatically every hour (via ``stopJob`` submitted by the
+  :py:mod:`scheduler` worker).
 """
 
 import argparse
@@ -30,7 +32,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -40,9 +42,22 @@ TASK_NAMES = {
     'RUN_SHIP_TO_SHORE_TRANSFER': 'runShipToShoreTransfer'
 }
 
-def process_batch(batch, filters):
-    """
-    Process a batch of file paths
+def process_batch(batch: list, filters: dict) -> list:
+    """Filter a batch of file paths against ship-to-shore transfer criteria.
+
+    Each file is evaluated for default-ignore status, ASCII filename
+    requirement, and priority-ordered include/exclude filter patterns.
+
+    Args:
+        batch: List of absolute file paths to evaluate.
+        filters: Ordered dict mapping priority keys to lists of glob patterns.
+            Files are matched against patterns in priority order; the first
+            match determines the action.
+
+    Returns:
+        List of ``(action, filepath, priority)`` tuples where *action* is
+        ``"include"`` or ``"exclude"``.  Symlinks, default-ignored files, and
+        unmatched files are omitted.
     """
 
     def _process_filepath(filepath, filters):
@@ -80,8 +95,16 @@ def process_batch(batch, filters):
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
-    """
-    Class for the current Gearman worker
+    """Gearman worker for ship-to-shore data transfers.
+
+    Attributes:
+        stop: Flag set to ``True`` to halt after the current job.
+        ovdm: OpenVDM API client.
+        cruise_id: Current cruise identifier.
+        system_status: Cached system status string.
+        cruise_data_transfer: Configuration dict for the SSDW transfer.
+        shipboard_data_warehouse_config: Warehouse configuration snapshot.
+        cruise_dir: Absolute path to the cruise data directory.
     """
 
     def __init__(self):
@@ -132,9 +155,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         proc_filters = {'1':[],'2':[],'3':[],'4':[],'5':[]}
         for priority in map(str, range(1, 6)):
             for t in transfers:
+                t = normalize_transfer_config(t)
 
                 #filters transfers
-                if t['priority'] != priority or t['enable'] != '1':
+                if str(t['priority']) != priority or t['enable'] != 1:
                     continue
 
                 # replace {cruiseID}
@@ -144,23 +168,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 rare_filters = []
 
                 #if transfer is from a cst
-                if t['collectionSystem'] != "0":
+                if t['collectionSystem'] != 0:
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
-                    if cs['cruiseOrLowering'] == '1':
+                    if int(cs.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{cs['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if transfer is from an ed
-                if t['extraDirectory'] != "0":
+                if t['extraDirectory'] != 0:
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
-                    if ed['cruiseOrLowering'] == '1':
+                    if int(ed.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
                     path_prefix = f"{base_path}/{ed['destDir']}"
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if neither
-                if t['collectionSystem'] == "0" and t['extraDirectory'] == "0":
+                if t['collectionSystem'] == 0 and t['extraDirectory'] == 0:
                     path_prefix = base_path
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
@@ -213,7 +237,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         Build the path for saving the transfer logfile
         """
 
-        return os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Transfer_Logs')['destDir'])
+        log_dir = self.ovdm.get_transfer_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
 
     def test_destination(self):
@@ -379,8 +405,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 extra_args = ['-e', 'ssh']
                 cmd = _build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
 
-                if cdt_cfg.get('sshUseKey') == '0':
-                    cmd = ['sshpass', '-p', cdt_cfg['sshPass']] + cmd
+                if cdt_cfg.get('sshUseKey') == 0:
+                    cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + cmd
 
             files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             return {'verdict': True, 'files': files}
@@ -411,7 +437,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             logging.debug('bandwidthLimitStatus: %s', payload_obj.get('bandwidthLimitStatus', self.ovdm.get_ship_to_shore_bw_limit_status()))
             if not payload_obj.get('bandwidthLimitStatus', self.ovdm.get_ship_to_shore_bw_limit_status()):
-                self.cruise_data_transfer['bandwidthLimit'] = '0'
+                self.cruise_data_transfer['bandwidthLimit'] = 0
 
         except Exception:
             logging.exception("Failed to retrieve cruise data transfer config")
@@ -424,7 +450,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.cruise_data_transfer['status'] == "1":
+        if self.cruise_data_transfer['status'] == 1:
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
@@ -435,7 +461,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         self.system_status = payload_obj.get('systemStatus', self.ovdm.get_system_status())
 
-        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == '0':
+        if self.system_status == "Off" or self.cruise_data_transfer['enable'] == 0:
             logging.info("Transfer disabled for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer Enabled", "Transfer is disabled")
 
@@ -455,18 +481,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         logging.error("Job Failed: %s", current_job.handle)
 
-        exc_type, _, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        logging.error(exc_type, fname, exc_tb.tb_lineno)
+        exc_type, exc_value, exc_tb = exc_info
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
+        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        logging.error("%s in %s line %s", exc_type, fname, lineno)
+
+        exc_name = exc_type.__name__ if exc_type else "UnknownError"
+        exc_msg = str(exc_value) if exc_value else ""
+        location = f"{fname}, line {lineno}"
+        reason = f"{exc_name}: {exc_msg} ({location})" if exc_msg else f"{exc_name} ({location})"
 
         self.send_job_data(current_job, json.dumps(
-            [{"partName": "Worker crashed", "result": "Fail", "reason": str(exc_type)}]
+            [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         if cdt_id:
-            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {str(exc_type)}')
+            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -607,11 +639,12 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
         logging.info("Writing transfer logfile")
         worker.send_job_status(current_job, 96, 100)
 
-        logfile_filename = f"{cdt_cfg['name']}_{worker.transfer_start_date}.log"
+        logfile_filename = f"{worker.cruise_id}_{cdt_cfg['name']}_{worker.transfer_start_date}.log"
+        _cruise_prefix = f'{worker.cruise_id}/'
         logfile_contents = {
             'files': {
-                'new': [file.lstrip(f'{worker.cruise_id}/') for file in job_results['files']['new']],
-                'updated': [file.lstrip(f'{worker.cruise_id}/') for file in job_results['files']['updated']]
+                'new': [file.removeprefix(_cruise_prefix) for file in job_results['files']['new']],
+                'updated': [file.removeprefix(_cruise_prefix) for file in job_results['files']['updated']]
             }
         }
 
@@ -633,7 +666,7 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
     logging.info("Writing exclude logfile")
     worker.send_job_status(current_job, 98, 100)
 
-    logfile_filename = f"{cdt_cfg['name']}_Exclude.log"
+    logfile_filename = f"{worker.cruise_id}_{cdt_cfg['name']}_Exclude.log"
     logfile_contents = {
         'files': {
             'exclude': job_results['files']['exclude']

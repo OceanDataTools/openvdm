@@ -34,7 +34,7 @@ $_warehouseModel = new \Models\Warehouse();
                 <div class="panel-heading"><?php echo CRUISE_NAME; ?> Control</div>
                 <div class="panel-body">
                     <a href="<?php echo DIR ?>config/setupNewCruise" class="btn-lg btn btn-primary btn-block">Setup New <?php echo CRUISE_NAME; ?></a>
-                    <a id="finalizeCurrentCruise" href="<?php echo DIR ?>config/finalizeCurrentCruise" class="btn-lg btn btn-primary btn-block"><?php echo ($data['cruiseFinalizedOn'] === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-<?php echo CRUISE_NAME; ?> Tasks</a>
+                    <a id="finalizeCurrentCruise" href="<?php echo DIR ?>config/finalizeCurrentCruise" class="btn-lg btn btn-primary btn-block"><?php echo (($data['cruiseFinalizedOn'] ?? null) === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-<?php echo CRUISE_NAME; ?> Tasks</a>
                     <a href="<?php echo DIR ?>config/editCruise" class="btn-lg btn btn-primary btn-block">Edit Current <?php echo CRUISE_NAME; ?></a>
                 </div>
             </div>
@@ -47,9 +47,9 @@ $_warehouseModel = new \Models\Warehouse();
                     <a href="<?php echo DIR ?>config/setupNewLowering" class="btn-lg btn btn-primary btn-block">Setup New <?php echo LOWERING_NAME; ?></a>
 
 <?php
-        if($data['loweringID']) {
+        if(!empty($data['loweringID'])) {
 ?>
-                    <a id="finalizeCurrentLowering" href="<?php echo DIR ?>config/finalizeCurrentLowering" class="btn-lg btn btn-primary btn-block"><?php echo ($data['loweringFinalizedOn'] === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-<?php echo LOWERING_NAME; ?> Tasks</a>
+                    <a id="finalizeCurrentLowering" href="<?php echo DIR ?>config/finalizeCurrentLowering" class="btn-lg btn btn-primary btn-block"><?php echo (($data['loweringFinalizedOn'] ?? null) === null) ? '' : '<i class="fa fa-check"></i>';?> Run End-of-<?php echo LOWERING_NAME; ?> Tasks</a>
                     <a href="<?php echo DIR ?>config/editLowering" class="btn-lg btn btn-primary btn-block">Edit Current <?php echo LOWERING_NAME; ?></a>
 <?php
         }
@@ -100,7 +100,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
     if($data['collectionSystemTransfers']){
         foreach($data['collectionSystemTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>
@@ -167,7 +167,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
     if($data['cruiseDataTransfers']){
         foreach($data['cruiseDataTransfers'] as $row){
-            if($row->enable === "1"){
+            if($row->enable === 1){
                 switch($row->status) {
                     case 1:
 ?>
@@ -201,7 +201,7 @@ $_warehouseModel = new \Models\Warehouse();
         </div>
     </div>
 <?php
-    if($data['jobResults']) {
+    if(!empty($data['jobResults'])) {
 ?>
 <div class="modal fade" id="jobResultsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog">

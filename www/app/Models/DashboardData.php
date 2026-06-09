@@ -34,39 +34,21 @@ class DashboardData extends Model {
 
     private function buildManifestObj(){
 
-        $results = array();
-
         if($this->_manifestObj === null && $this->_cruiseID != null) {
 
-            //Get the list of directories
-            if (is_dir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID))
-            {
-                //Check each Directory for the OpenVDM config file
-                $cruiseList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID);
-                foreach ($cruiseList as $cruiseKey => $cruiseValue){
-                    if (in_array($cruiseValue,array($this->_cruiseConfigFn))){
-                        $ovdmConfigContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $this->_cruiseConfigFn);
-                        $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
-                        //Get the the directory that holds the DashboardData
-                        if (array_key_exists('extraDirectoriesConfig', $ovdmConfigJSON)){	
-                           for($i = 0; $i < sizeof($ovdmConfigJSON['extraDirectoriesConfig']); $i++){
-                                if(strcmp($ovdmConfigJSON['extraDirectoriesConfig'][$i]['name'], 'Dashboard_Data') === 0){
-                                    $dataDashboardList = scandir($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir']);
-                                    foreach ($dataDashboardList as $dataDashboardKey => $dataDashboardValue){
-                                        //If a manifest file is found, add CruiseID to output
-                                        if (in_array($dataDashboardValue,array($this->_dataDashboardManifestFn))){
-                                            $manifestContents = file_get_contents($this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $ovdmConfigJSON['extraDirectoriesConfig'][$i]['destDir'] . DIRECTORY_SEPARATOR . $this->_dataDashboardManifestFn);
-					    $this->_manifestObj = json_decode($manifestContents,true);
-                                            break;
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-		    }
-                }
+            $extraDirectoriesModel = new \Models\Config\ExtraDirectories();
+            $dashboardDataDir = $extraDirectoriesModel->getExtraDirectoryByName('Dashboard_Data');
+
+            if (!isset($dashboardDataDir[0])) {
+                return;
+            }
+
+            $destDir = $dashboardDataDir[0]->destDir;
+            $manifestPath = $this->_cruiseDataDir . DIRECTORY_SEPARATOR . $this->_cruiseID . DIRECTORY_SEPARATOR . $destDir . DIRECTORY_SEPARATOR . $this->_dataDashboardManifestFn;
+
+            if (is_readable($manifestPath)) {
+                $manifestContents = file_get_contents($manifestPath);
+                $this->_manifestObj = json_decode($manifestContents, true);
             }
         }
     }
@@ -125,11 +107,38 @@ class DashboardData extends Model {
         return $dataObjects;
     }
 
+    private function extractSection($obj, $section, $dataType = null) {
+        if (!$obj) {
+            return null;
+        }
+
+        // OLD FORMAT
+        if (isset($obj->$section)) {
+            return $obj->$section;
+        }
+
+        // NEW FORMAT with known dataType
+        if ($dataType !== null && isset($obj->$dataType->$section)) {
+            return $obj->$dataType->$section;
+        }
+
+        // NEW FORMAT fallback: first available dataType
+        // foreach ($obj as $dataset) {
+        //     if (isset($dataset->$section)) {
+        //         return $dataset->$section;
+        //     }
+        // }
+        print($dataType);
+
+        return null;
+    }
+
+
     public function getDashboardObjectContentsByJsonName($dd_json){
         $dataObjectContents = '';
 
         $foundIt = false;
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
                 if (strcmp($manifestItemKey, 'dd_json') === 0){
                     if(strcmp($manifestItemValue, $dd_json) === 0) {
@@ -150,7 +159,7 @@ class DashboardData extends Model {
         $dataObjectContents = '';
 
         $foundIt = false;
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             foreach ($manifestItem as $manifestItemKey => $manifestItemValue){
                 if (strcmp($manifestItemKey, 'raw_data') === 0){
                     if(strcmp($manifestItemValue, $raw_data) === 0) {
@@ -170,7 +179,7 @@ class DashboardData extends Model {
     public function getDashboardObjectDataTypeByJsonName($dd_json){
         $dataType = '';
 
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             if (strcmp($manifestItem['dd_json'], $dd_json) === 0) {
                 $dataType = $manifestItem['type'];
                 break;
@@ -182,7 +191,7 @@ class DashboardData extends Model {
     public function getDashboardObjectDataTypeByRawName($raw_data){
         $dataType = '';
 
-        foreach ($this->_manifestObj as $manifestItem) {
+        foreach (($this->_manifestObj ?? []) as $manifestItem) {
             if (strcmp($manifestItem['raw_data'], $raw_data) === 0) {
                 $dataType = $manifestItem['type'];
                 break;
@@ -191,34 +200,70 @@ class DashboardData extends Model {
         return $dataType;
     }
 
-    public function getDashboardObjectVisualizerDataByJsonName($dd_json){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
-        return $dataObjectContentsOBJ->visualizerData;
+    public function getDashboardObjectVisualizerDataByJsonName($dd_json, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
+        // return $dataObjectContentsOBJ->visualizerData;
+        $json = $this->getDashboardObjectContentsByJsonName($dd_json);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByJsonName($dd_json);
+
+        return $this->extractSection($obj, 'visualizerData', $dataType);
     }
 
-    public function getDashboardObjectVisualizerDataByRawName($raw_data){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
-        return $dataObjectContentsOBJ->visualizerData;
+    public function getDashboardObjectVisualizerDataByRawName($raw_data, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
+        // return $dataObjectContentsOBJ->visualizerData;
+        $json = $this->getDashboardObjectContentsByRawName($raw_data);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+
+        return $this->extractSection($obj, 'visualizerData', $dataType);
     }
 
-    public function getDashboardObjectStatsByJsonName($dd_json){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
-        return $dataObjectContentsOBJ->stats;
+    public function getDashboardObjectStatsByJsonName($dd_json, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
+        // return $dataObjectContentsOBJ->stats;
+        $json = $this->getDashboardObjectContentsByJsonName($dd_json);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByJsonName($dd_json);
+
+        return $this->extractSection($obj, 'stats', $dataType);
     }
 
-    public function getDashboardObjectStatsByRawName($raw_data){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
-        return $dataObjectContentsOBJ->stats;
+    public function getDashboardObjectStatsByRawName($raw_data, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
+        // return $dataObjectContentsOBJ->stats;
+        $json = $this->getDashboardObjectContentsByRawName($raw_data);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+
+        return $this->extractSection($obj, 'stats', $dataType);
     }
 
-    public function getDashboardObjectQualityTestsByJsonName($dd_json){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
-        return $dataObjectContentsOBJ->qualityTests;
+    public function getDashboardObjectQualityTestsByJsonName($dd_json, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByJsonName($dd_json));
+        // return $dataObjectContentsOBJ->qualityTests;
+        $json = $this->getDashboardObjectContentsByJsonName($dd_json);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByJsonName($dd_json);
+
+        return $this->extractSection($obj, 'qualityTests', $dataType);
     }
 
-    public function getDashboardObjectQualityTestsByRawName($raw_data){
-        $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
-        return $dataObjectContentsOBJ->qualityTests;
+    public function getDashboardObjectQualityTestsByRawName($raw_data, $dataType){
+        // $dataObjectContentsOBJ = json_decode($this->getDashboardObjectContentsByRawName($raw_data));
+        // return $dataObjectContentsOBJ->qualityTests;
+        $json = $this->getDashboardObjectContentsByRawName($raw_data);
+        $obj  = json_decode($json);
+
+        // $dataType = $this->getDashboardObjectDataTypeByRawName($raw_data);
+
+        return $this->extractSection($obj, 'qualityTests', $dataType);
     }
 
     public function getCruiseID(){
@@ -245,9 +290,9 @@ class DashboardData extends Model {
 
         $init = false;
         for ($i=0; $i < sizeof($dataObjects); $i++) {
-            $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json']);
+            $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json'], $dataType);
 
-            if($dataFileStatsObj[0]->error) {
+            if(isset($dataFileStatsObj[0]->error)) {
                 $return[0]->error = $dataFileStatsObj[0]->error;
                 return $return;
             } else {
