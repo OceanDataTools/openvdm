@@ -1,26 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  svp_profile_parser.py
+"""Parser for Valeport sound velocity profile (SVP) data.
 
-USAGE:  svp_profile_parser.py [-h] [-v+] <dataFile>
-
-DESCRIPTION:  Parse the supplied svp profile data and return the json-formatted
-              string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.10
-               Python Modules:
-                   pandas==2.0.3
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-04-12
+Reads latin-1 encoded, tab-delimited SVP files, locating the data section via a
+'[Data]' sentinel line, and returns the JSON-formatted plugin data used by
+OpenVDM's Data Dashboard.
 """
 
 import csv
@@ -45,17 +28,23 @@ ROUNDING = {
 }
 
 class SVProfileParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
+    """Parser for Valeport sound velocity profile files.
+
+    This parser intentionally uses process_file() rather than parse() +
+    read_lines_with_timestamps() because the SVP file format is incompatible
+    with the standard log-line architecture:
+      - latin-1 encoding (not UTF-8)
+      - tab-delimited data (not comma-separated)
+      - data begins after a '[Data]' section header that must be located first
+      - data rows contain no timestamps (profile is a depth vs. SV snapshot)
+      - PROC_COLS does not include 'date_time'
     """
 
     def __init__(self, use_openvdm_api=False):
         super().__init__(RAW_COLS, PROC_COLS, use_openvdm_api=use_openvdm_api)
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
+        """Process the SVP profile file."""
 
         raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
 
