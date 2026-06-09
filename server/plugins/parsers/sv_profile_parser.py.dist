@@ -1,177 +1,122 @@
 #!/usr/bin/env python3
-"""
-FILE:  svp_profile_parser.py
+"""Parse Valeport SVP profile data files for OpenVDM data dashboard.
 
-USAGE:  svp_profile_parser.py [-h] [-v+] <dataFile>
+Reads depth-indexed tab-delimited data from the [Data] section of Valeport export files
+and produces a depth-vs-sound-velocity visualization dataset and quality statistics.
 
-DESCRIPTION:  Parse the supplied svp profile data and return the json-formatted
-              string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.10
-               Python Modules:
-                   pandas==2.0.3
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-04-12
+Note: This parser does not use read_lines_with_timestamps because Valeport files contain
+no ISO8601 timestamp prefix; data is depth-indexed, not time-indexed.
 """
 
 import csv
 import json
 import logging
 import sys
-from copy import deepcopy
 from os.path import dirname, realpath
 import pandas as pd
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
-from server.lib.condense_to_ranges import condense_to_ranges
 
-RAW_COLS = ['date_time','depth','sound_velocity','Pressure','Temperature','Salinity','Density'] # Valeport
-PROC_COLS = ['depth','sound_velocity']
+RAW_COLS = ['date_time', 'depth', 'sound_velocity', 'Pressure', 'Temperature', 'Salinity', 'Density']
+PROC_COLS = ['depth', 'sound_velocity']
 
 ROUNDING = {
     'depth': 3,
     'sound_velocity': 3
 }
 
+
 class SVProfileParser(OpenVDMCSVParser):
-    """
-    Custom OpenVDM CSV file parser
-    """
+    """Parser for Valeport SVP profile data files."""
 
     def __init__(self, use_openvdm_api=False):
         super().__init__(RAW_COLS, PROC_COLS, use_openvdm_api=use_openvdm_api)
 
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
-
-        raw_into_df = { value: [] for key, value in enumerate(self.proc_cols) }
-
-        logging.debug("Parsing data file...")
+    def process_file(self, filepath):  # pylint: disable=too-many-branches
+        """Parse a Valeport SVP profile data file."""
+        raw_into_df = {col: [] for col in self.proc_cols}
         errors = []
+
         try:
             with open(filepath, mode='r', encoding='latin-1') as csvfile:
-
                 for line in csvfile:
                     if line.startswith("[Data]"):
                         break
-
-                csvfile.readline() # skip lable header: "date_time    depth   sound_velocity  Pressure    Temperature Salinity    Density"
-                csvfile.readline() # skip unit header:  "  m   m/s dBar    DegC    PSU kg/m³"
+                csvfile.readline()  # skip column label header
+                csvfile.readline()  # skip unit header
 
                 reader = csv.DictReader(csvfile, self.raw_cols, delimiter='\t')
-
                 for lineno, line in enumerate(reader):
-
                     logging.debug(line)
                     try:
                         depth = float(line['depth'])
                         sound_spd = float(line['sound_velocity'])
-
                     except Exception as err:
                         errors.append(lineno)
-                        logging.warning("Parsing error encountered on line %s", lineno)
-                        logging.debug(line)
-                        logging.debug(str(err))
-
+                        logging.warning("Parsing error on line %s: %s", lineno, err)
                     else:
                         raw_into_df['depth'].append(depth)
                         raw_into_df['sound_velocity'].append(sound_spd)
 
         except Exception as err:
-            logging.error("Problem accessing input file: %s", filepath)
-            logging.error(str(err))
+            logging.error("Problem accessing input file %s: %s", filepath, err)
             return
 
-        logging.debug("Finished parsing data file")
-
-        # If no data ingested from file, quit
-        if len(raw_into_df['depth']) == 0:
-            logging.warning("Dataframe is empty... quitting")
+        if not raw_into_df['depth']:
+            logging.warning("Dataframe is empty; quitting.")
             return
 
-        # Build DataFrame
-        logging.debug("Building dataframe from parsed data...")
-        df_proc = pd.DataFrame(raw_into_df)
+        df = pd.DataFrame(raw_into_df)
 
-        # Optionally crop data by start/stop times
-        if self.start_dt or self.stop_dt:
-            logging.debug("Cropping data...")
-
-            df_proc = self.crop_data(df_proc)
-
-        # If the crop operation emptied the dataframe, quit
-        if df_proc.shape[0] == 0:
-            logging.warning("Cropped dataframe is empty... quitting")
+        if df.empty:
+            logging.warning("Dataframe is empty after build; quitting.")
             return
 
-        logging.debug("Tabulating statistics...")
-        self.add_row_validity_stat([len(df_proc), len(errors)])
-        self.add_bounds_stat([round(df_proc['depth'].min(),ROUNDING['depth']), round(df_proc['depth'].max(),ROUNDING['depth'])], 'Depth Bounds', 'm')
-        self.add_bounds_stat([round(df_proc['sound_velocity'].min(),ROUNDING['sound_velocity']), round(df_proc['sound_velocity'].max(),ROUNDING['sound_velocity'])], 'Sound Velocity Bounds', 'm/s')
+        logging.info("Tabulating statistics...")
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_bounds_stat([round(df['depth'].min(), ROUNDING['depth']),
+                              round(df['depth'].max(), ROUNDING['depth'])], 'Depth Bounds', 'm')
+        self.add_bounds_stat([round(df['sound_velocity'].min(), ROUNDING['sound_velocity']),
+                              round(df['sound_velocity'].max(), ROUNDING['sound_velocity'])],
+                             'Sound Velocity Bounds', 'm/s')
 
-        logging.debug("Running quality tests...")
-        # % of bad rows in datafile
-        error_rate = len(errors) / (len(df_proc) + len(errors))
-        if error_rate > .25:
+        logging.info("Running quality tests...")
+        error_rate = len(errors) / (len(df) + len(errors))
+        if error_rate > 0.25:
             self.add_quality_test_failed("Rows")
-        elif error_rate > .10:
+        elif error_rate > 0.10:
             self.add_quality_test_warning("Rows")
         else:
             self.add_quality_test_passed("Rows")
 
-        # round data
-        logging.debug("Rounding data: %s", ROUNDING)
-        df_proc = self.round_data(df_proc, ROUNDING)
+        df = self.round_data(df, ROUNDING)
 
-        # split data where there are gaps
-        logging.debug("Building visualization data...")
-
-        visualizer_data_obj = {'data':[], 'unit':'', 'label':''}
-        visualizer_data_obj['data'] = json.loads(df_proc[['depth','sound_velocity']].to_json(orient='values'))
-        visualizer_data_obj['unit'] = 'm/s'
-        visualizer_data_obj['label'] = 'Sound Velocity'
-        self.add_visualization_data(deepcopy(visualizer_data_obj))
-
-        # send message about errors encountered to OpenVDM
-        if self.openvdm is not None and len(errors) > 0:
-            self.openvdm.send_msg('Parsing Error', f'Error(s) parsing datafile {filepath} on row(s): {", ".join(condense_to_ranges(errors))}')
+        logging.info("Building visualization datasets...")
+        visualizer_data_obj = {
+            'data': json.loads(df[['depth', 'sound_velocity']].to_json(orient='values')),
+            'unit': 'm/s',
+            'label': 'Sound Velocity'
+        }
+        self.add_visualization_data(visualizer_data_obj)
+        self.send_error_msg(errors, filepath)
 
 
-# -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
-# -------------------------------------------------------------------------------------
 if __name__ == "__main__":
     import argparse
+    from datetime import datetime  # noqa: F401 — kept for potential future use
 
-    parser = argparse.ArgumentParser(description='Parse SV Profile data')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
+    parser = argparse.ArgumentParser(description='Parse Valeport SVP profile data')
+    parser.add_argument('-v', '--verbosity', dest='verbosity', default=0, action='count',
                         help='Increase output verbosity')
     parser.add_argument('dataFile', metavar='dataFile',
                         help='the raw data file to process')
 
     parsed_args = parser.parse_args()
 
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
     LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
     logging.basicConfig(format=LOGGING_FORMAT)
-
     LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
