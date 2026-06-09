@@ -36,8 +36,8 @@ Log into the Server as root
 
 Download the install script
 ```
-export OPENVDM_REPO=raw.githubusercontent.com/oceandatatools/openvdm
-export BRANCH=master
+export OPENVDM_REPO=raw.githubusercontent.com/schmidtocean/openvdm
+export BRANCH=openvdm-soi
 wget -O install-openvdm.sh https://$OPENVDM_REPO/$BRANCH/utils/install-openvdm.sh
 ```
 
@@ -64,12 +64,12 @@ Hostname already in /etc/hosts
 OpenVDM install root? (/opt) 
 Install root will be '/opt'
 
-Repository to install from? (https://github.com/oceandatatools/openvdm) 
-Repository branch to install? (master) 
+Repository to install from? (https://github.com/schmidtocean/openvdm) 
+Repository branch to install? (openvdm-soi) 
 
 Will install from github.com
-Repository: 'https://github.com/oceandatatools/openvdm'
-Branch: 'master'
+Repository: 'https://github.com/schmidtocean/openvdm'
+Branch: 'openvdm-soi'
 Installation Directory: /opt
 ```
 ```
