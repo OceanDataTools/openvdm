@@ -109,6 +109,7 @@ New database password for user mt? (mt) weak_password
 #####################################################################
 Root data directory for OpenVDM? (/data) 
 Root data directory /data does not exists... create it?  (yes) 
+Path for CruiseData? (/mnt/CruiseData) 
 ```
 
 ```
@@ -157,6 +158,7 @@ directory at the end of the cruise. This behavior can be disabled in
 the /opt/openvdm/server/etc/openvdm.yaml file.
 
 Setup ParticipantData Share?  (yes)
+Path for ParticipantData Share? (/mnt/CruiseSandbox/ParticipantData) 
 ```
 
 ```
@@ -164,7 +166,18 @@ Setup ParticipantData Share?  (yes)
 Setup a VisitorInformation SMB Share for sharing documentation, print
 drivers, etc with crew and scientists.
 
-Setup VisitorInformation Share?  (no)
+Setup VisitorInformation Share?  (yes)
+Path for VisitorInformation Share? (/mnt/soi_data1/VisitorInformation) 
+```
+
+```
+#####################################################################
+Setup a ScienceData SMB Share for sharing science data with read/
+write access to all. This share is configured in a separate Samba
+conf file (/etc/samba/sciencedata.conf) independent of openvdm.conf.
+
+Setup ScienceData Share?  (yes)
+Path for ScienceData Share? (/mnt/soi_data1/ScienceData) 
 ```
 
 ```
@@ -188,7 +201,7 @@ When the script completes successfully there will a message containing how to ac
 OpenVDM Installation: Complete
 OpenVDM WebUI available at: http://127.0.0.1
 Login with user: mt, pass: weak_password
-Cruise Data will be stored at: /data/CruiseData
+Cruise Data will be stored at: /mnt/CruiseData
 ```
  
 At this point there should be a working installation of OpenVDM however the vessel operator will still need to configure data dashboard collection system transfers, cruise data transfers and the shoreside data warehouse.
