@@ -167,6 +167,7 @@ function set_default_variables {
     DEFAULT_INSTALL_ROOT=/opt
 
     DEFAULT_DATA_ROOT=/data
+    DEFAULT_CRUISEDATA_DIR=/mnt/CruiseData
 
     DEFAULT_OPENVDM_REPO=https://github.com/schmidtocean/openvdm
     DEFAULT_OPENVDM_BRANCH=openvdm-soi
@@ -178,7 +179,11 @@ function set_default_variables {
     DEFAULT_MAPPROXY_CACHE=
 
     DEFAULT_INSTALL_PUBLICDATA=yes
-    DEFAULT_INSTALL_VISITORINFORMATION=no
+    DEFAULT_PARTICIPANTDATA_DIR=/mnt/CruiseSandbox/ParticipantData
+    DEFAULT_INSTALL_VISITORINFORMATION=yes
+    DEFAULT_VISITORINFORMATION_DIR=/mnt/soi_data1/VisitorInformation
+    DEFAULT_INSTALL_SCIENCEDATA=yes
+    DEFAULT_SCIENCEDATA_DIR=/mnt/soi_data1/ScienceData
 
     DEFAULT_INSTALL_TITILER=yes
     DEFAULT_TITILER_PORT=8000
@@ -214,6 +219,7 @@ DEFAULT_OPENVDM_REPO=$OPENVDM_REPO
 DEFAULT_OPENVDM_BRANCH=$OPENVDM_BRANCH
 
 DEFAULT_DATA_ROOT=$DATA_ROOT
+DEFAULT_CRUISEDATA_DIR=$CRUISEDATA_DIR
 DEFAULT_OPENVDM_SITEROOT=$OPENVDM_SITEROOT
 
 DEFAULT_OPENVDM_USER=$OPENVDM_USER
@@ -222,7 +228,11 @@ DEFAULT_INSTALL_MAPPROXY=$INSTALL_MAPPROXY
 DEFAULT_MAPPROXY_CACHE=$MAPPROXY_CACHE
 
 DEFAULT_INSTALL_PUBLICDATA=$INSTALL_PUBLICDATA
+DEFAULT_PARTICIPANTDATA_DIR=$PARTICIPANTDATA_DIR
 DEFAULT_INSTALL_VISITORINFORMATION=$INSTALL_VISITORINFORMATION
+DEFAULT_VISITORINFORMATION_DIR=$VISITORINFORMATION_DIR
+DEFAULT_INSTALL_SCIENCEDATA=$INSTALL_SCIENCEDATA
+DEFAULT_SCIENCEDATA_DIR=$SCIENCEDATA_DIR
 
 DEFAULT_INSTALL_TITILER=$INSTALL_TITILER
 DEFAULT_TITILER_PORT=$TITILER_PORT
@@ -966,10 +976,16 @@ function configure_samba {
 SMBDEFAULT
     fi
 
+    _SMBD_INCLUDES="include = /etc/samba/openvdm.conf"
+    if [ "$INSTALL_SCIENCEDATA" = "yes" ]; then
+        _SMBD_INCLUDES="$_SMBD_INCLUDES
+include = /etc/samba/sciencedata.conf"
+    fi
+
     cat >> /etc/samba/smb.conf <<EOF
 
 ### Added by OpenVDM install script ###
-include = /etc/samba/openvdm.conf
+$_SMBD_INCLUDES
 ### Added by OpenVDM install script ###
 EOF
 
@@ -978,7 +994,7 @@ EOF
 
 [CruiseData]
   comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/CruiseData
+  path=${CRUISEDATA_DIR}
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -996,7 +1012,7 @@ EOF
 
 [VisitorInformation]
   comment=Visitor Information, read-only access to guest
-  path=${DATA_ROOT}/VisitorInformation
+  path=${VISITORINFORMATION_DIR}
   browsable = yes
   public = yes
   guest ok = yes
@@ -1014,7 +1030,25 @@ EOF
 
 [ParticipantData]
   comment=Participant Data, read/write access to all
-  path=${DATA_ROOT}/ParticipantData
+  path=${PARTICIPANTDATA_DIR}
+  browseable = yes
+  public = yes
+  guest ok = yes
+  writable = yes
+  create mask = 0000
+  directory mask = 0000
+  veto files = /._*/.DS_Store/.Trashes*/
+  delete veto files = yes
+  force create mode = 666
+  force directory mode = 777
+EOF
+    fi
+
+    if [ "$INSTALL_SCIENCEDATA" = "yes" ]; then
+        cat > /etc/samba/sciencedata.conf <<EOF
+[ScienceData]
+  comment=Science Data, read/write access to all
+  path=${SCIENCEDATA_DIR}
   browseable = yes
   public = yes
   guest ok = yes
@@ -1101,8 +1135,8 @@ EOF
 
     cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /CruiseData/ $DATA_ROOT/CruiseData/
-    <Directory "$DATA_ROOT/CruiseData">
+    Alias /CruiseData/ ${CRUISEDATA_DIR}/
+    <Directory "${CRUISEDATA_DIR}">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1114,8 +1148,8 @@ EOF
     if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
         cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /ParticipantData/ $DATA_ROOT/ParticipantData/
-    <Directory "$DATA_ROOT/ParticipantData">
+    Alias /ParticipantData/ ${PARTICIPANTDATA_DIR}/
+    <Directory "${PARTICIPANTDATA_DIR}">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1128,8 +1162,8 @@ EOF
     if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
         cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /VisitorInformation/ $DATA_ROOT/VisitorInformation/
-    <Directory "$DATA_ROOT/VisitorInformation">
+    Alias /VisitorInformation/ ${VISITORINFORMATION_DIR}/
+    <Directory "${VISITORINFORMATION_DIR}">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1503,15 +1537,15 @@ function configure_directories {
     if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData
+        mkdir -p ${CRUISEDATA_DIR}
 
         if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
-            mkdir -p ${DATA_ROOT}/ParticipantData
-            chmod -R 777 ${DATA_ROOT}/ParticipantData
+            mkdir -p ${PARTICIPANTDATA_DIR}
+            chmod -R 777 ${PARTICIPANTDATA_DIR}
         fi
 
         if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
-            mkdir -p ${DATA_ROOT}/VisitorInformation
+            mkdir -p ${VISITORINFORMATION_DIR}
         fi
 
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
@@ -1692,9 +1726,11 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
-    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/ParticipantData');|" | \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${CRUISEDATA_DIR}');|" | \
+    sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${PARTICIPANTDATA_DIR}');|" | \
     sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
+    sed -e "s/define('LOWERING_NAME', 'Lowering');/define('LOWERING_NAME', 'Dive');/" | \
+    sed -e "s/define('LOWERINGDATA_BASEDIR', 'Vehicle');/define('LOWERINGDATA_BASEDIR', 'Vehicles');/" | \
     sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
@@ -2084,6 +2120,9 @@ if [ ! -d "$DATA_ROOT" ]; then
         exit_gracefully
     fi
 fi
+
+read -p "Path for CruiseData? ($DEFAULT_CRUISEDATA_DIR) " CRUISEDATA_DIR
+CRUISEDATA_DIR=${CRUISEDATA_DIR:-$DEFAULT_CRUISEDATA_DIR}
 echo
 
 #########################################################################
@@ -2173,6 +2212,13 @@ echo "the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
 echo
 yes_no "Setup ParticipantData Share? " $DEFAULT_INSTALL_PUBLICDATA
 INSTALL_PUBLICDATA=$YES_NO_RESULT
+if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
+    _default=${DEFAULT_PARTICIPANTDATA_DIR:-/mnt/CruiseSandbox/ParticipantData}
+    read -p "Path for ParticipantData Share? ($_default) " PARTICIPANTDATA_DIR
+    PARTICIPANTDATA_DIR=${PARTICIPANTDATA_DIR:-$_default}
+else
+    PARTICIPANTDATA_DIR=${DEFAULT_PARTICIPANTDATA_DIR:-/mnt/CruiseSandbox/ParticipantData}
+fi
 echo
 
 #########################################################################
@@ -2183,6 +2229,31 @@ echo "drivers, etc with crew and scientists."
 echo
 yes_no "Setup VisitorInformation Share? " $DEFAULT_INSTALL_VISITORINFORMATION
 INSTALL_VISITORINFORMATION=$YES_NO_RESULT
+if [ "$INSTALL_VISITORINFORMATION" = "yes" ]; then
+    _default=${DEFAULT_VISITORINFORMATION_DIR:-/mnt/soi_data1/VisitorInformation}
+    read -p "Path for VisitorInformation Share? ($_default) " VISITORINFORMATION_DIR
+    VISITORINFORMATION_DIR=${VISITORINFORMATION_DIR:-$_default}
+else
+    VISITORINFORMATION_DIR=${DEFAULT_VISITORINFORMATION_DIR:-/mnt/soi_data1/VisitorInformation}
+fi
+echo
+
+#########################################################################
+# Install ScienceData?
+echo "#####################################################################"
+echo "Setup a ScienceData SMB Share for sharing science data with read/"
+echo "write access to all. This share is configured in a separate Samba"
+echo "conf file (/etc/samba/sciencedata.conf) independent of openvdm.conf."
+echo
+yes_no "Setup ScienceData Share? " $DEFAULT_INSTALL_SCIENCEDATA
+INSTALL_SCIENCEDATA=$YES_NO_RESULT
+if [ "$INSTALL_SCIENCEDATA" = "yes" ]; then
+    _default=${DEFAULT_SCIENCEDATA_DIR:-/mnt/soi_data1/ScienceData}
+    read -p "Path for ScienceData Share? ($_default) " SCIENCEDATA_DIR
+    SCIENCEDATA_DIR=${SCIENCEDATA_DIR:-$_default}
+else
+    SCIENCEDATA_DIR=${DEFAULT_SCIENCEDATA_DIR:-/mnt/soi_data1/ScienceData}
+fi
 echo
 
 #########################################################################
@@ -2310,7 +2381,7 @@ OVDM_CRUISE_START_DATE=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm
 OVDM_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
     "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=0;" \
     2>/dev/null | tr '\n' ',')
-OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+OVDM_CRUISE_DIR="${CRUISEDATA_DIR}/${OVDM_CRUISE_ID}"
 
 export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
 "${INSTALL_ROOT}/openvdm/venv/bin/python3" - <<'PYEOF'
@@ -2376,7 +2447,7 @@ echo "#####################################################################"
 echo "OpenVDM Installation: Complete"
 echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
 echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
-echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+echo "Cruise Data will be stored at: ${CRUISEDATA_DIR}"
 echo
 
 #########################################################################
