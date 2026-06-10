@@ -1715,7 +1715,7 @@ EOF
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml ] ; then
         echo "Building server configuration file"
-        sed -e "s/127.0.0.1/${HOSTNAME}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | \
+        sed -e "s/127.0.0.1/${OPENVDM_SITEROOT}/" ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml.dist | \
         sed -e "s/workerApiKey: \"${_PLACEHOLDER}\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
         > ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 
