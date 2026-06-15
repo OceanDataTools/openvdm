@@ -1768,10 +1768,15 @@ EOF
 
     echo "Installing bin scripts from .dist templates"
     BIN_DIR="${INSTALL_ROOT}/openvdm/bin"
-    for dist_file in "${BIN_DIR}"/*.py.dist; do
-        [ -e "${dist_file}" ] || continue
-        target="${dist_file%.dist}"
-        if [ ! -e "${target}" ]; then
+    for script in \
+        build_cruise_tracks.py \
+        build_lowering_tracks.py \
+        build_overlay_layers.py \
+        build_file_list.py \
+        db_backup_restore.py; do
+        dist_file="${BIN_DIR}/${script}.dist"
+        target="${BIN_DIR}/${script}"
+        if [ -e "${dist_file}" ] && [ ! -e "${target}" ]; then
             cp "${dist_file}" "${target}"
             chmod +x "${target}"
             chown "${OPENVDM_USER}:${OPENVDM_USER}" "${target}"

@@ -397,7 +397,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         results = json.loads(job_result)
 
-        if current_job.task in (TASK_NAMES['CREATE_CRUISE'], TASK_NAMES['FINALIZE_CRUISE']):
+        if current_job.task == TASK_NAMES['CREATE_CRUISE']:
 
             gm_data = {
                 'cruiseID': self.cruise_id,
@@ -666,6 +666,23 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
+    gm_data_post = {
+        'cruiseID': worker.cruise_id,
+        'cruiseStartDate': worker.cruise_start_date,
+        'cruiseEndDate': worker.cruise_end_date
+    }
+
+    post_finalize_jobs = [
+        {"task": task, "data": json.dumps(gm_data_post)}
+        for task in worker.ovdm.get_tasks_for_hook(TASK_NAMES['FINALIZE_CRUISE'])
+    ]
+
+    if post_finalize_jobs:
+        logging.info("Running post-finalize tasks before CDTs")
+        submitted_job_request = gm_client.submit_multiple_jobs(post_finalize_jobs, background=False, wait_until_complete=False)
+        gm_client.wait_until_jobs_completed(submitted_job_request)
+
+    job_results['parts'].append({"partName": "Run post-finalize tasks", "result": "Pass"})
 
     gm_data = {
         'cruiseID': worker.cruise_id,
