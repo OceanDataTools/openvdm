@@ -251,11 +251,15 @@ After the installer completes, verify or complete the following SOI-specific ste
    grep WORKER_API_KEY /opt/openvdm/www/app/Core/Config.php
    ```
 
-3. **OpenRVDAS integration scripts** — Ensure the following scripts exist at the paths referenced
-   in `openvdm.yaml` before starting a cruise:
+3. **Bin scripts** — The installer automatically copies every `bin/*.py.dist` template to
+   `bin/*.py` (without the `.dist` suffix) on first install.  On re-runs it skips any file that
+   already exists, preserving local edits.  Verify the following are present before starting a
+   cruise:
    - `/opt/openvdm/bin/build_cruise_tracks.py`
    - `/opt/openvdm/bin/build_lowering_tracks.py`
    - `/opt/openvdm/bin/build_overlay_layers.py`
+   - `/opt/openvdm/bin/build_file_list.py`
+   - `/opt/openvdm/bin/db_backup_restore.py`
 
 4. **Copy config templates** — If the config files were not created by the installer:
    ```bash
@@ -284,13 +288,8 @@ MySQL database. It reads credentials directly from `www/app/Core/Config.php`, so
 credentials file is needed. `OVDM_Messages` rows are excluded from backups (the table structure is
 preserved, but the transient message history is not).
 
-The script is distributed as `bin/db_backup_restore.py.dist`. Copy it once after installation:
-
-```bash
-cp /opt/openvdm/bin/db_backup_restore.py.dist /opt/openvdm/bin/db_backup_restore.py
-```
-
-All commands below assume they are run from `/opt/openvdm` as root (or as the `mt` user with
+The script is distributed as `bin/db_backup_restore.py.dist` and is copied automatically by the
+installer.  All commands below assume they are run from `/opt/openvdm` as root (or as the `mt` user with
 `sudo` access).
 
 ### Create a backup
@@ -363,6 +362,59 @@ python bin/db_backup_restore.py restore <file>`.
 ```
 
 If you do not supply a file name the script will present you with a list of available backup files from the `database/backups` directory
+
+---
+
+## Cruise file list
+
+The `bin/build_file_list.py` script walks the cruise data directory and writes a CSV report
+listing every file's path (relative to the cruise root), creation time, and last modification
+time.  The report is written to `<cruiseID>_FileList.csv` in the root of the cruise directory.
+
+The script is distributed as `bin/build_file_list.py.dist` and is copied automatically by the
+installer.  All commands below assume they are run from `/opt/openvdm` with the virtual
+environment active.
+
+### Generate the file list for the active cruise
+
+```bash
+source venv/bin/activate
+python bin/build_file_list.py
+```
+
+The output file will be at `<CruiseData_path>/<cruiseID>/<cruiseID>_FileList.csv`.
+
+### Rebuild the file list for a previous cruise
+
+```bash
+python bin/build_file_list.py -c SK2024001
+```
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `-c CRUISEID` | Process a specific cruise instead of the active one |
+| `-u USERNAME` | Set filesystem ownership of the output file (defaults to the warehouse user) |
+| `-o FILE` | Write output to a custom path instead of the cruise root |
+| `-v` / `-vv` | Increase verbosity (info / debug) |
+
+Files matching OpenVDM's default ignore patterns (`.DS_Store`, `._*`, `@eaDir`, symlinks, etc.)
+are automatically excluded.  Timestamps are in local time as `YYYY-MM-DD HH:MM:SS`.
+
+### Hook integration
+
+To regenerate the file list automatically after every finalization, add an entry to
+`preFinalizeCurrentCruise` in `server/etc/openvdm.yaml`:
+
+```yaml
+postHookCommands:
+  preFinalizeCurrentCruise:
+    commandList:
+      - command: /opt/openvdm/venv/bin/python
+        args:
+          - /opt/openvdm/bin/build_file_list.py
+```
 
 ---
 

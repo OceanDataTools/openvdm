@@ -1766,6 +1766,18 @@ EOF
             ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
     fi
 
+    echo "Installing bin scripts from .dist templates"
+    BIN_DIR="${INSTALL_ROOT}/openvdm/bin"
+    for dist_file in "${BIN_DIR}"/*.py.dist; do
+        [ -e "${dist_file}" ] || continue
+        target="${dist_file%.dist}"
+        if [ ! -e "${target}" ]; then
+            cp "${dist_file}" "${target}"
+            chmod +x "${target}"
+            chown "${OPENVDM_USER}:${OPENVDM_USER}" "${target}"
+        fi
+    done
+
     cd ${startingDir}
 }
 
