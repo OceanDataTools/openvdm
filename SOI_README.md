@@ -78,7 +78,7 @@ configuration wires them as follows:
 | `setupNewCruise` | `postSetupNewCruise` |
 | `setupNewLowering` | `postSetupNewLowering` |
 | `preFinalizeCurrentCruise` | `preFinalizeCurrentCruise` |
-| `finalizeCurrentCruise` | `postFinalizeCurrentCruise` |
+| `finalizeCurrentCruise` | `postFinalizeCurrentCruise` *(fires after cruise config export, before CDTs)* |
 | `preFinalizeCurrentLowering` | `preFinalizeCurrentLowering` |
 | `finalizeCurrentLowering` | `postFinalizeCurrentLowering` |
 
