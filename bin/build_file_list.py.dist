@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Build a CSV file listing all files in a cruise directory with timestamps.
+
+Walks the cruise data directory, collects every file's path relative to the
+cruise root, its creation time (or best available equivalent), and its last
+modification time, then writes a CSV report to ``<cruiseID>_FileList.csv``
+in the cruise root directory.
+
+The report has a header line followed by one line per file, sorted
+alphabetically by path::
+
+    filepath,creation_time,modification_time
+    raw/gps.log,2025-01-15 08:00:00,2025-01-15 08:30:00
+    ...
+
+Timestamps are formatted as ``YYYY-MM-DD HH:MM:SS`` in local time.
+
+Files matching OpenVDM's default ignore patterns (symlinks, macOS metadata
+files, Synology thumbnails, hidden temp files) are excluded.
+
+Usage::
+
+    build_file_list.py [-h] [-v ...] [-c CRUISEID] [-u USERNAME]
+                       [-o OUTPUT_FILE]
+"""
+
+import argparse
+import csv
+import logging
+import os
+import sys
+from datetime import datetime
+from os.path import dirname, realpath
+
+sys.path.append(dirname(dirname(realpath(__file__))))
+
+from server.lib.file_utils import build_filelist, set_owner_group_permissions
+from server.lib.openvdm import OpenVDM
+
+OUTPUT_FILENAME = "{cruiseID}_FileList.csv"
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# ----------------------------------------------------------------------
+# Timestamp helpers
+# ----------------------------------------------------------------------
+
+def get_file_timestamps(filepath: str) -> tuple[str, str]:
+    """Return ``(creation_time, modification_time)`` strings for *filepath*.
+
+    Tries ``st_birthtime`` first (macOS / Linux kernels >= 4.11 with statx
+    support) and falls back to ``st_ctime`` (inode-change time, the closest
+    analog on older Linux) when birth time is unavailable.
+
+    Args:
+        filepath: Absolute path to the file.
+
+    Returns:
+        A 2-tuple of ``(creation_time, modification_time)`` formatted as
+        ``YYYY-MM-DD HH:MM:SS`` in local time.
+    """
+    stat = os.stat(filepath)
+
+    try:
+        birth = stat.st_birthtime
+    except AttributeError:
+        birth = stat.st_ctime
+
+    creation = datetime.fromtimestamp(birth).strftime(TIMESTAMP_FORMAT)
+    modified = datetime.fromtimestamp(stat.st_mtime).strftime(TIMESTAMP_FORMAT)
+    return creation, modified
+
+# ----------------------------------------------------------------------
+# Core processing
+# ----------------------------------------------------------------------
+
+def collect_file_metadata(cruise_dir: str) -> list[dict]:
+    """Walk *cruise_dir* and collect timestamp metadata for every file.
+
+    Files matching the default ignore patterns (symlinks, macOS metadata,
+    Synology thumbnails, etc.) are excluded via :func:`build_filelist`.
+
+    Args:
+        cruise_dir: Absolute path to the cruise root directory.
+
+    Returns:
+        List of dicts with keys ``filepath``, ``creation_time``, and
+        ``modification_time``, sorted alphabetically by ``filepath``.
+    """
+    filelist = build_filelist(cruise_dir)
+    rows = []
+
+    for rel_path in sorted(filelist["include"]):
+        abs_path = os.path.join(cruise_dir, rel_path)
+        creation, modified = get_file_timestamps(abs_path)
+        rows.append({
+            "filepath": rel_path,
+            "creation_time": creation,
+            "modification_time": modified,
+        })
+
+    if filelist["exclude"]:
+        logging.warning(
+            "Skipped %d file(s) with non-ASCII paths", len(filelist["exclude"])
+        )
+
+    return rows
+
+
+def write_file_list(rows: list[dict], output_path: str) -> None:
+    """Write the file-list report as CSV to *output_path*.
+
+    Args:
+        rows: List of dicts from :func:`collect_file_metadata`.
+        output_path: Destination file path.
+
+    Raises:
+        OSError: If the file cannot be opened or written.
+    """
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["filepath", "creation_time", "modification_time"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    logging.info("Wrote %d entries to %s", len(rows), output_path)
+
+# ----------------------------------------------------------------------
+# Setup & entry point
+# ----------------------------------------------------------------------
+
+def resolve_cruise_and_dirs(openVDM, args) -> tuple[str, str, str]:
+    """Resolve cruise directory and warehouse metadata from OpenVDM.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        args: Parsed ``argparse.Namespace`` with optional ``cruiseID`` and
+            ``username`` attributes.
+
+    Returns:
+        A 3-tuple of ``(cruiseID, cruise_dir, output_user)``.
+
+    Raises:
+        RuntimeError: If the cruise ID cannot be determined or the resolved
+            cruise directory does not exist on disk.
+    """
+    cruiseID = args.cruiseID or openVDM.get_cruise_id()
+    if not cruiseID:
+        raise RuntimeError("Unable to determine CruiseID")
+
+    warehouse_cfg = openVDM.get_shipboard_data_warehouse_config()
+    base_dir = warehouse_cfg["shipboardDataWarehouseBaseDir"]
+    cruise_dir = os.path.join(base_dir, cruiseID)
+
+    if not os.path.isdir(cruise_dir):
+        raise RuntimeError(f"Cruise directory not found: {cruise_dir}")
+
+    output_user = args.username or warehouse_cfg["shipboardDataWarehouseUsername"]
+    return cruiseID, cruise_dir, output_user
+
+
+def main() -> None:
+    """Parse arguments and build the cruise file-list report."""
+    parser = argparse.ArgumentParser(
+        description="build a timestamped file list for a cruise directory"
+    )
+    parser.add_argument("-v", "--verbosity", default=0, action="count")
+    parser.add_argument(
+        "-c", dest="cruiseID",
+        help="cruise ID to process (defaults to the currently active cruise)"
+    )
+    parser.add_argument(
+        "-u", "--username",
+        help="filesystem owner applied to the output file (defaults to warehouse user)"
+    )
+    parser.add_argument(
+        "-o", "--output-file", dest="outputFile",
+        help="override the output file path (default: <cruise_dir>/<cruiseID>_FileList.csv)"
+    )
+
+    args = parser.parse_args()
+
+    LOGGING_FORMAT = "%(asctime)-15s %(levelname)s - %(message)s"
+    logging.basicConfig(format=LOGGING_FORMAT)
+    logging.getLogger().setLevel(
+        [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbosity, 2)]
+    )
+
+    openVDM = OpenVDM()
+
+    try:
+        cruiseID, cruise_dir, output_user = resolve_cruise_and_dirs(openVDM, args)
+    except RuntimeError as err:
+        logging.error(str(err))
+        sys.exit(1)
+
+    logging.info("Cruise: %s  directory: %s", cruiseID, cruise_dir)
+
+    output_path = args.outputFile or os.path.join(
+        cruise_dir, OUTPUT_FILENAME.format(cruiseID=cruiseID)
+    )
+
+    rows = collect_file_metadata(cruise_dir)
+    logging.info("Found %d files", len(rows))
+
+    try:
+        write_file_list(rows, output_path)
+    except OSError as err:
+        logging.error("Failed to write output file: %s", err)
+        sys.exit(1)
+
+    result = set_owner_group_permissions(output_user, output_path)
+    if not result["verdict"]:
+        logging.warning("Could not set permissions on output file: %s", result.get("reason"))
+
+
+if __name__ == "__main__":
+    main()
