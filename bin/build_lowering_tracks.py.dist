@@ -4,9 +4,9 @@
 Analogous to ``build_cruise_tracks.py`` but scoped to a single lowering.
 Reads dashboard data files for one or more navigation/positioning sources
 (e.g. USBL-PRI, USBL-SEC, SPRINT) that were processed by the OpenVDM plugin
-for the specified collection system, concatenates their ``LineString``
-coordinates, and writes per-device trackline outputs into the ``Tracklines``
-extra directory.
+for the specified collection system or extra directory, concatenates their
+``LineString`` coordinates, and writes per-device trackline outputs into the
+``Tracklines`` extra directory.
 
 Supported dashboard file formats:
 
@@ -86,7 +86,9 @@ def load_gps_sources_from_yaml(
         yaml_path: Path to a YAML file to load (mutually exclusive with
             *yaml_str*).
         collection_system: Expected value of the ``CollectionSystem`` key;
-            used to guard against loading a config for the wrong system.
+            may be the name of a collection system transfer or an extra
+            directory.  Used to guard against loading a config for the wrong
+            system.
 
     Returns:
         List of GPS source dicts, each containing ``device`` and ``type``
@@ -175,18 +177,14 @@ def get_gps_sources(args) -> list:
 # ----------------------------------------------------------------------
 
 def resolve_manifest_path(
-    openVDM, cruise_base_dir: str, cruiseID: str,
-    loweringID: str, lowering_base_dir: str
+    openVDM, cruise_base_dir: str, cruiseID: str
 ) -> str:
-    """Locate the dashboard data manifest file for a lowering.
+    """Locate the cruise-level dashboard data manifest file.
 
     Args:
         openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
         cruise_base_dir: Warehouse base directory (e.g. ``/data``).
         cruiseID: Current cruise identifier.
-        loweringID: Current lowering identifier.
-        lowering_base_dir: Relative path prefix for lowering data within the
-            cruise directory (from the warehouse config).
 
     Returns:
         Absolute path to the manifest file.
@@ -208,8 +206,6 @@ def resolve_manifest_path(
         cruise_base_dir,
         cruiseID,
         extra_dir["destDir"],
-        lowering_base_dir,
-        loweringID,
         manifest_fn,
     )
     if not os.path.isfile(manifest_path):
@@ -249,24 +245,33 @@ def load_manifest(manifest_path: str) -> list:
 
 
 def get_dd_json_files_for_gps_source(
-    manifest: list, gps_source: dict, cruise_base_dir: str
+    manifest: list, gps_source: dict, cruise_base_dir: str,
+    lowering_base_dir: str, loweringID: str
 ) -> list:
-    """Return dashboard JSON file paths matching a GPS source type.
+    """Return dashboard JSON file paths matching a GPS source type and lowering.
+
+    The cruise-level manifest contains entries for all lowerings.  Only entries
+    whose ``dd_json`` path falls under ``<lowering_base_dir>/<loweringID>``
+    are included.
 
     Args:
         manifest: Loaded manifest list (from :func:`load_manifest`).
         gps_source: GPS source dict with at least a ``type`` key.
         cruise_base_dir: Warehouse base directory prepended to each
             ``dd_json`` entry path.
+        lowering_base_dir: Relative path prefix for lowering data within the
+            cruise directory (from the warehouse config, e.g. ``Vehicles``).
+        loweringID: Current lowering identifier used to scope manifest entries.
 
     Returns:
         Sorted list of absolute file paths for the matching entries.
     """
     wanted_type = gps_source["type"]
+    lowering_path = os.path.join(lowering_base_dir, loweringID)
     files = []
 
     for entry in manifest:
-        if entry["type"] == wanted_type:
+        if entry["type"] == wanted_type and lowering_path in entry["dd_json"]:
             files.append(os.path.join(cruise_base_dir, entry["dd_json"]))
 
     return sorted(files)
@@ -324,7 +329,7 @@ def write_outputs(
 
 def process_gps_source(
     gps_source: dict, manifest: list, cruise_base_dir: str, loweringID: str,
-    tracklineDir: str, args, outputUser: str
+    lowering_base_dir: str, tracklineDir: str, args, outputUser: str
 ) -> None:
     """Process one GPS source: find its dashboard files and write tracklines.
 
@@ -333,6 +338,8 @@ def process_gps_source(
         manifest: Loaded manifest list.
         cruise_base_dir: Warehouse base directory.
         loweringID: Current lowering identifier.
+        lowering_base_dir: Relative path prefix for lowering data within the
+            cruise directory (from the warehouse config).
         tracklineDir: Directory where output files are written.
         args: Parsed ``argparse.Namespace``.
         outputUser: Username for ``chown`` after writing each file.
@@ -343,7 +350,9 @@ def process_gps_source(
         gps_source["type"],
     )
 
-    files = get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir)
+    files = get_dd_json_files_for_gps_source(
+        manifest, gps_source, cruise_base_dir, lowering_base_dir, loweringID
+    )
 
     if not files:
         logging.warning("No manifest entries found for %s", gps_source["device"])
@@ -404,8 +413,10 @@ def resolve_lowering_and_dirs(openVDM, args) -> tuple:
 
     Raises:
         RuntimeError: If the cruise or lowering ID cannot be determined, the
-            collection system is not found or is not lowering-scoped, or the
-            trackline directory does not exist.
+            name does not match any collection system transfer or extra
+            directory, the matched object is not lowering-scoped, the
+            ``Tracklines`` extra directory is not found, or the resolved
+            trackline directory does not exist on disk.
     """
     cruiseID = openVDM.get_cruise_id()
     if not cruiseID:
@@ -418,26 +429,42 @@ def resolve_lowering_and_dirs(openVDM, args) -> tuple:
     collectionSystem = openVDM.get_collection_system_transfer_by_name(
         args.collectionSystem
     )
-    if not collectionSystem:
-        raise RuntimeError(f"Collection System not found: {args.collectionSystem}")
-
-    if collectionSystem["cruiseOrLowering"] != "1":
-        raise RuntimeError(
-            f"Collection System: {args.collectionSystem} is not related to a lowering"
-        )
+    if collectionSystem:
+        if str(collectionSystem.get("cruiseOrLowering", "")) != "1":
+            raise RuntimeError(
+                f"Collection system '{args.collectionSystem}' is not lowering-scoped"
+            )
+    else:
+        extraDir = openVDM.get_extra_directory_by_name(args.collectionSystem)
+        if not extraDir:
+            raise RuntimeError(
+                f"'{args.collectionSystem}' is not a known collection system transfer "
+                f"or extra directory"
+            )
+        if str(extraDir.get("cruiseOrLowering", "")) != "1":
+            raise RuntimeError(
+                f"Extra directory '{args.collectionSystem}' is not lowering-scoped"
+            )
 
     warehouse_cfg = openVDM.get_shipboard_data_warehouse_config()
     cruise_base_dir = warehouse_cfg["shipboardDataWarehouseBaseDir"]
     lowering_base_dir = warehouse_cfg["loweringDataBaseDir"]
 
-    tracklineDir = (
-        args.outputDir
-        or os.path.join(
-            cruise_base_dir,
-            cruiseID,
-            openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)["destDir"],
+    trackline_extra_dir = openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)
+    if not trackline_extra_dir:
+        raise RuntimeError(f"Extra directory not found: {TRACKLINE_EXTRA_DIR_NAME}")
+
+    if args.outputDir:
+        tracklineDir = args.outputDir
+    elif str(trackline_extra_dir.get("cruiseOrLowering", "0")) == "1":
+        tracklineDir = os.path.join(
+            cruise_base_dir, cruiseID, lowering_base_dir, loweringID,
+            trackline_extra_dir["destDir"],
         )
-    )
+    else:
+        tracklineDir = os.path.join(
+            cruise_base_dir, cruiseID, trackline_extra_dir["destDir"],
+        )
 
     if not os.path.isdir(tracklineDir):
         raise RuntimeError(f"Trackline directory not found: {tracklineDir}")
@@ -481,9 +508,7 @@ def main() -> None:
         )
         gps_sources = get_gps_sources(args)
 
-        manifest_path = resolve_manifest_path(
-            openVDM, cruise_base_dir, cruiseID, loweringID, lowering_base_dir
-        )
+        manifest_path = resolve_manifest_path(openVDM, cruise_base_dir, cruiseID)
         manifest = load_manifest(manifest_path)
     except RuntimeError as err:
         logging.error(str(err))
@@ -494,7 +519,7 @@ def main() -> None:
     for gps_source in gps_sources:
         process_gps_source(
             gps_source, manifest, cruise_base_dir, loweringID,
-            tracklineDir, args, outputUser,
+            lowering_base_dir, tracklineDir, args, outputUser,
         )
 
 

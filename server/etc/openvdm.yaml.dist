@@ -100,6 +100,13 @@ postHookCommands:
             - /opt/openvdm/venv/bin/python
             - /opt/openvdm/bin/build_cruise_tracks.py
             - OpenRVDAS
+        - collectionSystemTransferName: Processed_MB
+          commandList:
+          - name: "Build overlay layers file"
+            command:
+            - /opt/openvdm/venv/bin/python
+            - /opt/openvdm/bin/build_overlay_layers.py
+            - Processed_MB
     postSetupNewCruise:
         commandList:
         #- name: "Setup Remote Cruise Directories"
@@ -109,12 +116,14 @@ postHookCommands:
         #  - "-s"
         - name: "Build new OpenRVDAS config file"
           command:
-          - bash 
-          - /opt/openvdm/bin/build_openrvdas_logger_config.sh
-        # - name: "Add Cruise record to Sealog"
-        #   command:
-        #   - bash 
-        #   - /home/mt/shipboard-configurations/Systems/OpenVDM/bin/build_openrvdas_logger_config.sh
+          - ssh
+          - mt@10.23.9.21
+          - "/home/mt/shipboard-configurations/Systems/OpenRVDAS/bin/build_openrvdas_logger_config.sh"
+        - name: "Add Cruise record to Sealog"
+          command:
+          - ssh
+          - mt@10.23.9.24 
+          - "/opt/sealog-server-FKt/venv/bin/python /opt/sealog-server-FKt/misc/sealog_create_cruise_from_openvdm.py"
     postSetupNewLowering:
         #commandList:
         #- name: "Setup Remote Lowering Directories"
@@ -124,28 +133,33 @@ postHookCommands:
         #  - "-s"
         #  - "-l"
     preFinalizeCurrentCruise:
-        #commandList:
-        #- name: "Export Sealog data for current cruise"
-        #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
+        commandList:
+        - name: "Export Sealog data for current cruise"
+          command:
+          - ssh
+          - mt@10.23.9.24
+          - "/opt/sealog-server-FKt/venv/bin/python /opt/sealog-server-FKt/misc/sealog_data_export.py"
     postFinalizeCurrentCruise:
-        commandList:
-        - name: "Export Sealog Data"
-          command:
-          - /opt/openvdm/venv/bin/python
-          - /opt/openvdm/bin/sealog_post_cruise_export.py
-    preFinalizeCurrentLowering:
         #commandList:
-        #- name: "Export Sealog data for current lowering"
+        #- name: "Export Sealog Data"
         #  command:
-        #  - ssh
-        #  - survey@192.168.0.22
-        #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
-    postFinalizeCurrentLowering:
+        #  - /opt/openvdm/venv/bin/python
+        #  - /opt/openvdm/bin/sealog_post_cruise_export.py
+    preFinalizeCurrentLowering:
         commandList:
-        - name: "Export Sealog Sub Data"
+        - name: "Export Sealog data for current lowering"
+          command:
+          - ssh
+          - mt@10.23.9.24
+          - "/opt/sealog-server-Sub/venv/bin/python /opt/sealog-server-Sub/misc/sealog_data_export.py"
+        - name: "Build cruise tracks"
           command:
           - /opt/openvdm/venv/bin/python
-          - /opt/openvdm/bin/sealog_post_dive_export.py
+          - /opt/openvdm/bin/build_lowering_tracks.py
+          - ROV_Tracklines
+    postFinalizeCurrentLowering:
+        #commandList:
+        #- name: "Export Sealog Sub Data"
+        #  command:
+        #  - /opt/openvdm/venv/bin/python
+        #  - /opt/openvdm/bin/sealog_post_dive_export.py

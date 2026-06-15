@@ -41,11 +41,8 @@ TITILER_URL = 'http://localhost/titiler'
 
 DEFAULT_GEOTIFF_SOURCES_YAML = """
 GeoTiffSources:
-  - CollectionSystem: EM302
-    device: EM302
-    regex: "**/*.json"
-  - CollectionSystem: EM712
-    device: EM712
+  - CollectionSystem: Processed_MB
+    device: MBES
     regex: "**/*.json"
 """
 
