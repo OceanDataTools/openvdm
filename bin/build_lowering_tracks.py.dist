@@ -8,23 +8,35 @@ for the specified collection system, concatenates their ``LineString``
 coordinates, and writes per-device trackline outputs into the ``Tracklines``
 extra directory.
 
-Navigation sources are defined in the ``AllGPSSources`` list at the top of the
-script — each entry maps a collection system name to a list of GPS source
-dicts with ``device`` and ``regex`` keys.
+Supported dashboard file formats:
+
+- **Legacy**: ``{ "visualizerData": [...] }``
+- **Datatype-keyed**: ``{ "<datatype>": { "visualizerData": [...] } }``
+
+Only ``FeatureCollection`` / ``LineString`` entries are used; non-spatial
+visualizer data (e.g. time-series charts) is silently skipped.  When
+``coordTimes`` arrays are present they are preserved in GeoJSON output and
+converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
+
+Navigation sources are configured via an embedded YAML block
+(``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
+with ``--gps-sources``.
 
 Usage::
 
     build_lowering_tracks.py [-h] [-v ...] [-l LOWERINGID]
+                             [--gps-sources FILE] [--no-combine]
+                             [--geojson-only | --kml-only]
                              [--output-dir DIR] [--username USER]
                              collectionSystem
 """
 
 import argparse
-import glob
 import json
 import logging
 import os
 import sys
+import yaml
 
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
@@ -36,172 +48,455 @@ from server.lib.openvdm import OpenVDM
 TRACKLINE_EXTRA_DIR_NAME = 'Tracklines'
 DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
 
-AllGPSSources = [
-    {
-        "CollectionSystem":"ROV_OpenRVDAS",
-        "GPSSources": [
-            {
-                "device":"USBL-PRI",
-                "regex":"*SBNAV/UDP-SB-USBL-PRI-GGA-RAW_*.json"
-            },
-            {
-                "device":"USBL-SEC",
-                "regex":"*SBNAV/UDP-SB-USBL-SEC-GGA-RAW_*.json"
-            },
-            {
-                "device":"SPRINT",
-                "regex":"*SUBASTIAN/UDP-SB-SPRINT-RAW_*.json"
-            }
-        ]
-    }
-]
+# ----------------------------------------------------------------------
+# Default GPS source configuration (embedded YAML)
+# ----------------------------------------------------------------------
+
+DEFAULT_GPS_SOURCES_YAML = """
+CollectionSystem: ROV_OpenRVDAS
+GPSSources:
+  - device: USBL-PRI
+    type: usbl_pri_gga
+  - device: USBL-SEC
+    type: usbl_sec_gga
+  - device: SPRINT
+    type: sprint
+"""
+
+# ----------------------------------------------------------------------
+# Configuration & validation
+# ----------------------------------------------------------------------
+
+def load_gps_sources_from_yaml(
+    *,
+    yaml_str: str | None = None,
+    yaml_path: str | None = None,
+    collection_system: str
+) -> list:
+    """Parse and validate a GPS sources YAML definition.
+
+    Exactly one of *yaml_str* or *yaml_path* must be provided.  The YAML must
+    describe a mapping with ``CollectionSystem`` and ``GPSSources`` keys; the
+    ``CollectionSystem`` value must match *collection_system*.  Duplicate device
+    names or reused data types raise ``RuntimeError``.
+
+    Args:
+        yaml_str: Raw YAML string to parse (mutually exclusive with
+            *yaml_path*).
+        yaml_path: Path to a YAML file to load (mutually exclusive with
+            *yaml_str*).
+        collection_system: Expected value of the ``CollectionSystem`` key;
+            used to guard against loading a config for the wrong system.
+
+    Returns:
+        List of GPS source dicts, each containing ``device`` and ``type``
+        string keys.
+
+    Raises:
+        RuntimeError: On missing arguments, file-not-found, YAML parse
+            errors, schema violations, or ``CollectionSystem`` mismatch.
+    """
+    if not yaml_str and not yaml_path:
+        raise RuntimeError("Either yaml_str or yaml_path must be provided")
+
+    try:
+        if yaml_path:
+            if not os.path.isfile(yaml_path):
+                raise RuntimeError(f"GPS sources YAML not found: {yaml_path}")
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        else:
+            data = yaml.safe_load(yaml_str)
+    except yaml.YAMLError as err:
+        raise RuntimeError(f"Invalid GPS sources YAML: {err}")
+
+    if not isinstance(data, dict):
+        raise RuntimeError("GPS sources YAML must be a mapping")
+
+    if data.get("CollectionSystem") != collection_system:
+        raise RuntimeError(
+            f"GPS sources CollectionSystem mismatch: "
+            f"{data.get('CollectionSystem')} != {collection_system}"
+        )
+
+    gps_sources = data.get("GPSSources")
+    if not isinstance(gps_sources, list):
+        raise RuntimeError("GPSSources must be a list")
+
+    seen_devices: set = set()
+    seen_types: set = set()
+
+    for src in gps_sources:
+        device = src.get("device")
+        dtype = src.get("type")
+
+        if not device or not dtype:
+            raise RuntimeError(
+                "Each GPSSource must define exactly one 'device' and one 'type'"
+            )
+
+        if device in seen_devices:
+            raise RuntimeError(f"Duplicate GPS device: {device}")
+
+        if dtype in seen_types:
+            raise RuntimeError(f"Manifest type reused across devices: {dtype}")
+
+        seen_devices.add(device)
+        seen_types.add(dtype)
+
+    return gps_sources
+
+
+def get_gps_sources(args) -> list:
+    """Return the GPS source list from a file or the embedded YAML default.
+
+    Args:
+        args: Parsed ``argparse.Namespace`` containing ``gps_sources_file``
+            and ``collectionSystem`` attributes.
+
+    Returns:
+        List of GPS source dicts validated by :func:`load_gps_sources_from_yaml`.
+    """
+    if args.gps_sources_file:
+        logging.info("Loading GPS sources from %s", args.gps_sources_file)
+        return load_gps_sources_from_yaml(
+            yaml_path=args.gps_sources_file,
+            collection_system=args.collectionSystem,
+        )
+
+    logging.debug("Using embedded GPS sources")
+    return load_gps_sources_from_yaml(
+        yaml_str=DEFAULT_GPS_SOURCES_YAML,
+        collection_system=args.collectionSystem,
+    )
+
+# ----------------------------------------------------------------------
+# Manifest handling (authoritative source)
+# ----------------------------------------------------------------------
+
+def resolve_manifest_path(
+    openVDM, cruise_base_dir: str, cruiseID: str,
+    loweringID: str, lowering_base_dir: str
+) -> str:
+    """Locate the dashboard data manifest file for a lowering.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        cruise_base_dir: Warehouse base directory (e.g. ``/data``).
+        cruiseID: Current cruise identifier.
+        loweringID: Current lowering identifier.
+        lowering_base_dir: Relative path prefix for lowering data within the
+            cruise directory (from the warehouse config).
+
+    Returns:
+        Absolute path to the manifest file.
+
+    Raises:
+        RuntimeError: If the manifest filename cannot be retrieved, the
+            ``Dashboard_Data`` extra directory is absent, or the manifest
+            file does not exist on disk.
+    """
+    manifest_fn = openVDM.get_data_dashboard_manifest_fn()
+    if not manifest_fn:
+        raise RuntimeError("OpenVDM returned no manifest filename")
+
+    extra_dir = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)
+    if not extra_dir:
+        raise RuntimeError(f"Unable to find extra directory: {DASHBOARD_EXTRA_DIR_NAME}")
+
+    manifest_path = os.path.join(
+        cruise_base_dir,
+        cruiseID,
+        extra_dir["destDir"],
+        lowering_base_dir,
+        loweringID,
+        manifest_fn,
+    )
+    if not os.path.isfile(manifest_path):
+        raise RuntimeError(f"Manifest not found: {manifest_path}")
+
+    return manifest_path
+
+
+def load_manifest(manifest_path: str) -> list:
+    """Load and validate a dashboard data manifest JSON file.
+
+    Args:
+        manifest_path: Absolute path to the manifest file.
+
+    Returns:
+        List of manifest entry dicts, each containing at least ``type``
+        and ``dd_json`` keys.
+
+    Raises:
+        RuntimeError: On JSON parse errors, non-list manifests, or entries
+            missing required keys.
+    """
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    except json.JSONDecodeError as err:
+        raise RuntimeError(f"Invalid manifest JSON: {err}")
+
+    if not isinstance(manifest, list):
+        raise RuntimeError("Manifest must be a list")
+
+    for entry in manifest:
+        if "type" not in entry or "dd_json" not in entry:
+            raise RuntimeError("Manifest entry missing 'type' or 'dd_json'")
+
+    return manifest
+
+
+def get_dd_json_files_for_gps_source(
+    manifest: list, gps_source: dict, cruise_base_dir: str
+) -> list:
+    """Return dashboard JSON file paths matching a GPS source type.
+
+    Args:
+        manifest: Loaded manifest list (from :func:`load_manifest`).
+        gps_source: GPS source dict with at least a ``type`` key.
+        cruise_base_dir: Warehouse base directory prepended to each
+            ``dd_json`` entry path.
+
+    Returns:
+        Sorted list of absolute file paths for the matching entries.
+    """
+    wanted_type = gps_source["type"]
+    files = []
+
+    for entry in manifest:
+        if entry["type"] == wanted_type:
+            files.append(os.path.join(cruise_base_dir, entry["dd_json"]))
+
+    return sorted(files)
+
+# ----------------------------------------------------------------------
+# Output helpers
+# ----------------------------------------------------------------------
+
+def write_outputs(
+    geojson_obj: dict, base_name: str, loweringID: str,
+    tracklineDir: str, args, outputUser: str
+) -> None:
+    """Write GeoJSON and/or KML trackline files for one GPS source.
+
+    Args:
+        geojson_obj: GeoJSON ``FeatureCollection`` dict to serialise.
+        base_name: Device name or file stem used to build the output filename.
+        loweringID: Current lowering identifier, used as filename prefix.
+        tracklineDir: Directory where output files are written.
+        args: Parsed ``argparse.Namespace`` containing ``kml_only``,
+            ``geojson_only``, ``outputDir``, and ``username`` attributes.
+        outputUser: Username for ``chown`` after writing each file.
+    """
+    if not args.kml_only:
+        json_path = os.path.join(
+            tracklineDir, f"{loweringID}_{base_name}_Trackline.json"
+        )
+        logging.info("Saving %s", json_path)
+
+        result = output_json_data_to_file(json_path, geojson_obj)
+        if not result["verdict"]:
+            logging.error("Write failed: %s", result["reason"])
+        elif not args.outputDir or args.username:
+            set_owner_group_permissions(outputUser, json_path)
+
+    if not args.geojson_only:
+        kml_path = os.path.join(
+            tracklineDir, f"{loweringID}_{base_name}_Trackline.kml"
+        )
+        logging.info("Saving %s", kml_path)
+
+        try:
+            with open(kml_path, "w", encoding="utf-8") as f:
+                f.write(convert_to_kml(geojson_obj))
+        except OSError as err:
+            logging.error("KML write failed: %s", err)
+            return
+
+        if not args.outputDir or args.username:
+            set_owner_group_permissions(outputUser, kml_path)
+
+# ----------------------------------------------------------------------
+# Core processing
+# ----------------------------------------------------------------------
+
+def process_gps_source(
+    gps_source: dict, manifest: list, cruise_base_dir: str, loweringID: str,
+    tracklineDir: str, args, outputUser: str
+) -> None:
+    """Process one GPS source: find its dashboard files and write tracklines.
+
+    Args:
+        gps_source: GPS source dict with ``device`` and ``type`` keys.
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        loweringID: Current lowering identifier.
+        tracklineDir: Directory where output files are written.
+        args: Parsed ``argparse.Namespace``.
+        outputUser: Username for ``chown`` after writing each file.
+    """
+    logging.info(
+        "Processing %s (type=%s)",
+        gps_source["device"],
+        gps_source["type"],
+    )
+
+    files = get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir)
+
+    if not files:
+        logging.warning("No manifest entries found for %s", gps_source["device"])
+        return
+
+    if not args.no_combine:
+        combined = combine_geojson_files(files, loweringID, gps_source["device"])
+        if not combined:
+            logging.error("Failed to combine files for %s", gps_source["device"])
+            return
+
+        write_outputs(
+            combined,
+            gps_source["device"],
+            loweringID,
+            tracklineDir,
+            args,
+            outputUser,
+        )
+        return
+
+    # no-combine mode
+    for file in files:
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            geojson_obj = data["visualizerData"][0]
+        except (OSError, KeyError, IndexError, json.JSONDecodeError) as err:
+            logging.error("Invalid dashboard file %s: %s", file, err)
+            continue
+
+        base_name = os.path.basename(file).split(".")[0]
+        write_outputs(
+            geojson_obj,
+            base_name,
+            loweringID,
+            tracklineDir,
+            args,
+            outputUser,
+        )
+
+# ----------------------------------------------------------------------
+# Setup & entry point
+# ----------------------------------------------------------------------
+
+def resolve_lowering_and_dirs(openVDM, args) -> tuple:
+    """Resolve lowering identifiers and output directories from OpenVDM.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        args: Parsed ``argparse.Namespace`` containing ``loweringID``,
+            ``collectionSystem``, ``outputDir``, and ``username``
+            attributes.
+
+    Returns:
+        A 6-tuple of ``(cruiseID, loweringID, cruise_base_dir,
+        lowering_base_dir, tracklineDir, outputUser)``.
+
+    Raises:
+        RuntimeError: If the cruise or lowering ID cannot be determined, the
+            collection system is not found or is not lowering-scoped, or the
+            trackline directory does not exist.
+    """
+    cruiseID = openVDM.get_cruise_id()
+    if not cruiseID:
+        raise RuntimeError("Unable to determine CruiseID")
+
+    loweringID = args.loweringID or openVDM.get_lowering_id()
+    if not loweringID:
+        raise RuntimeError(f"Unable to find LoweringID within Cruise: {cruiseID}")
+
+    collectionSystem = openVDM.get_collection_system_transfer_by_name(
+        args.collectionSystem
+    )
+    if not collectionSystem:
+        raise RuntimeError(f"Collection System not found: {args.collectionSystem}")
+
+    if collectionSystem["cruiseOrLowering"] != "1":
+        raise RuntimeError(
+            f"Collection System: {args.collectionSystem} is not related to a lowering"
+        )
+
+    warehouse_cfg = openVDM.get_shipboard_data_warehouse_config()
+    cruise_base_dir = warehouse_cfg["shipboardDataWarehouseBaseDir"]
+    lowering_base_dir = warehouse_cfg["loweringDataBaseDir"]
+
+    tracklineDir = (
+        args.outputDir
+        or os.path.join(
+            cruise_base_dir,
+            cruiseID,
+            openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)["destDir"],
+        )
+    )
+
+    if not os.path.isdir(tracklineDir):
+        raise RuntimeError(f"Trackline directory not found: {tracklineDir}")
+
+    outputUser = args.username or warehouse_cfg["shipboardDataWarehouseUsername"]
+
+    return cruiseID, loweringID, cruise_base_dir, lowering_base_dir, tracklineDir, outputUser
+
+
+def main() -> None:
+    """Parse arguments and build lowering trackline files."""
+    parser = argparse.ArgumentParser(
+        description="build lowering tracklines post-dashboard processing"
+    )
+    parser.add_argument("-v", "--verbosity", default=0, action="count")
+    parser.add_argument("-n", "--no-combine", dest="no_combine", action="store_true")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-k", "--kml-only", dest="kml_only", action="store_true")
+    group.add_argument("-g", "--geojson-only", dest="geojson_only", action="store_true")
+
+    parser.add_argument("-l", dest="loweringID")
+    parser.add_argument("-o", dest="outputDir")
+    parser.add_argument("-u", "--username")
+    parser.add_argument("--gps-sources", dest="gps_sources_file")
+    parser.add_argument("collectionSystem")
+
+    args = parser.parse_args()
+
+    LOGGING_FORMAT = "%(asctime)-15s %(levelname)s - %(message)s"
+    logging.basicConfig(format=LOGGING_FORMAT)
+    logging.getLogger().setLevel(
+        [logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbosity, 2)]
+    )
+
+    openVDM = OpenVDM()
+
+    try:
+        cruiseID, loweringID, cruise_base_dir, lowering_base_dir, tracklineDir, outputUser = (
+            resolve_lowering_and_dirs(openVDM, args)
+        )
+        gps_sources = get_gps_sources(args)
+
+        manifest_path = resolve_manifest_path(
+            openVDM, cruise_base_dir, cruiseID, loweringID, lowering_base_dir
+        )
+        manifest = load_manifest(manifest_path)
+    except RuntimeError as err:
+        logging.error(str(err))
+        sys.exit(1)
+
+    logging.info("Using manifest: %s", manifest_path)
+
+    for gps_source in gps_sources:
+        process_gps_source(
+            gps_source, manifest, cruise_base_dir, loweringID,
+            tracklineDir, args, outputUser,
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='build lowering tracklines from OpenVDM dashboardData files')
-    parser.add_argument('-v', '--verbosity', dest='verbosity',
-                        default=0, action='count',
-                        help='Increase output verbosity')
-
-    group1 = parser.add_mutually_exclusive_group()
-    group1.add_argument('-k','--kml_only', action='store_true', help='only create the KML files')
-    group1.add_argument('-g','--geojson_only', action='store_true', help='only create the GeoJSON files')
-
-    parser.add_argument('-l', dest='loweringID', metavar='loweringID', help='the loweringID to process')
-    parser.add_argument('-o', dest='outputDir', metavar='outputDir', help='the desired output directory')
-    parser.add_argument('-u', '--username', metavar='username', help='set the output file(s) ownership to username')
-    parser.add_argument('collectionSystem', help='the collection system to search for geoJSON files')
-
-    parsed_args = parser.parse_args()
-
-    ############################
-    # Set up logging before we do any other argument parsing (so that we
-    # can log problems with argument parsing).
-
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
-
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
-
-    # build an OpenVDM object
-    openVDM = OpenVDM()
-
-    # Define the cruiseID to use for identifying the position data
-    cruiseID = openVDM.get_cruise_id()
-
-    # Define the loweringID to use for identifying the position data
-    loweringID = parsed_args.loweringID or openVDM.get_lowering_id()
-
-    if loweringID is None:
-        logging.error("Unable to find LoweringID within Cruise: %s", cruiseID)
-        sys.exit(1)
-
-    # Retrieve the information for the collection system defined in the command-line argument
-    collectionSystem = openVDM.get_collection_system_transfer_by_name(parsed_args.collectionSystem)
-    if not collectionSystem:
-        logging.error("Collection System: %s not found in OpenVDM configuration.", parsed_args.collectionSystem)
-        sys.exit(1)
-    elif collectionSystem['cruiseOrLowering'] != '1':
-        logging.error("Collection System: %s is not related to a lowering.", parsed_args.collectionSystem)
-
-    # Retrieve the shipboard data warehouse configuration
-    shipboardDataWarehouseConfig = openVDM.get_shipboard_data_warehouse_config()
-
-    # Construct the full path to the cruise data directory
-    baseDir = shipboardDataWarehouseConfig['shipboardDataWarehouseBaseDir']
-    cruiseDir = os.path.join(baseDir, cruiseID)
-    loweringDir = os.path.join(cruiseDir, shipboardDataWarehouseConfig['loweringDataBaseDir'], loweringID)
-
-    # Get the user to save the output file(s) as
-    outputUser = parsed_args.username or shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
-
-    # Verify the cruise data directory exists
-    if not os.path.isdir(loweringDir):
-        logging.error("Lowering data directory: %s not found!", cruiseDir)
-        sys.exit(1)
-
-    tracklineDir = parsed_args.outputDir or os.path.join(cruiseDir, openVDM.get_extra_directory_by_name(TRACKLINE_EXTRA_DIR_NAME)['destDir'])
-
-    # Verify the trackline directory exists
-    if not os.path.isdir(tracklineDir):
-        logging.error("Trackline Directory: %s not found", tracklineDir)
-        sys.exit(1)
-
-    dashboardDataDirectory = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)['destDir']
-    dashboardDataDir = os.path.join(cruiseDir, dashboardDataDirectory)
-
-    # Verify the trackline directory exists
-    if not os.path.isdir(dashboardDataDir):
-        logging.error("Dashboard Data Directory: %s not found", dashboardDataDir)
-        sys.exit(1)
-
-    collectionSystemDashboardDataDir = os.path.join(dashboardDataDir, shipboardDataWarehouseConfig['loweringDataBaseDir'], loweringID, collectionSystem['destDir'])
-
-    # Verify the dashboard data directory for the specified collecion system exists
-    if not os.path.isdir(collectionSystemDashboardDataDir):
-        logging.error('Dashboard Data Directory for %s: %s not found', collectionSystem['name'], collectionSystemDashboardDataDir)
-        sys.exit(1)
-
-    # Loop through the AllGPSSources object
-    for GPSSources in AllGPSSources:
-
-        # If the collection system name matches the one in the command-line argrument
-        if GPSSources['CollectionSystem'] == parsed_args.collectionSystem:
-
-            #Build a geoJSON and kml cruisetrack for each GGA Device
-            for GPSSource in GPSSources['GPSSources']:
-                logging.info("Processing %s", GPSSource['device'])
-
-                # Build the list of files coorsponding to the current device based on the regex provided
-                files = glob.glob(collectionSystemDashboardDataDir.rstrip('/') + '/' + GPSSource['regex'])
-
-                if len(files) == 0:
-                    logging.warning('No files found for GPS Source: %s', GPSSource['device'])
-                    continue
-
-                files.sort()
-
-                logging.debug("Files: %s", json.dumps(files, indent=2))
-
-                # Combind the geoJSON objects
-                combineGeoJsonObj = combine_geojson_files(files, loweringID, GPSSource['device'])
-
-                # If there was a problem, exit
-                if not combineGeoJsonObj:
-                    logging.error("Problem combining data files from GPS Source: %s", GPSSource['device'])
-                    continue
-
-                warehouseUser = shipboardDataWarehouseConfig['shipboardDataWarehouseUsername']
-
-                # Save the combined geoJSON object to file
-                if not parsed_args.kml_only:
-                    output_filepath = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.json")
-                    logging.info("Saving file: %s", output_filepath)
-                    output_results = output_json_data_to_file(output_filepath, combineGeoJsonObj)
-
-                    if not output_results['verdict']:
-                        logging.error("Problem writing output file: %s, reason: %s", output_filepath, output_results['reason'])
-                    else:
-                        output_results = set_owner_group_permissions(warehouseUser, output_filepath)
-                        if not output_results['verdict']:
-                            logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath, output_results['reason'])
-
-                # Convert the combined geoJSON object to kml and save to file
-                if not parsed_args.geojson_only:
-                    output_filepath_kml = os.path.join(tracklineDir, loweringID + '_' + GPSSource['device'] + "_Trackline.kml")
-                    logging.info("Saving file: %s", output_filepath_kml)
-                    try:
-                        with open(output_filepath_kml, mode='w', encoding="utf-8") as kml_file:
-                            kml_file.write(convert_to_kml(combineGeoJsonObj))
-                    except Exception as err:
-                        logging.error("Problem writing output file: %s", output_filepath_kml)
-                        logging.debug(str(err))
-
-                    output_results = set_owner_group_permissions(warehouseUser, output_filepath_kml)
-                    if not output_results['verdict']:
-                        logging.error("Problem setting permissions for output file: %s, reason: %s", output_filepath_kml, output_results['reason'])
-
-            # No need to proceed to another collectionSystem
-            break
+    main()
