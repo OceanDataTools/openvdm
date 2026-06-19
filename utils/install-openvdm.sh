@@ -1224,6 +1224,7 @@ EOF
 
         setsebool httpd_tmp_exec on
         setsebool -P httpd_can_network_connect=1
+        setsebool -P httpd_use_cifs=1
     fi
 
     # Enable Apache so it starts on boot. Only start/restart it now if MapProxy
