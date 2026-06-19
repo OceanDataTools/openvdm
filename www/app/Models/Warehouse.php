@@ -388,7 +388,7 @@ class Warehouse extends Model {
         $cruises = array();
         $baseDir = $this->getShipboardDataWarehouseBaseDir();
 
-        if (is_dir($baseDir)) {
+        if (is_dir($baseDir) && is_readable($baseDir)) {
             $rootList = scandir($baseDir);
             foreach ($rootList as $rootValue) {
                 if (!in_array($rootValue, array(".", ".."))) {
@@ -432,7 +432,7 @@ class Warehouse extends Model {
             }
 
             //Get the list of directories
-            if (is_dir($loweringDataBaseDir)) {
+            if (is_dir($loweringDataBaseDir) && is_readable($loweringDataBaseDir)) {
                 $rootList = scandir($loweringDataBaseDir);
                 foreach ($rootList as $rootKey => $rootValue)
                 {
