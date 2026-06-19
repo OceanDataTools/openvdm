@@ -339,10 +339,18 @@ function _install_packages_debian {
         curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x71DAEAAB4AD4CAB6" \
             | gpg --dearmor | tee -a "$KEYRING_FILE" > /dev/null
 
-        echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
-            tee "$PHP_PPA_LIST"
-        echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
-            tee "$APACHE_PPA_LIST"
+        # Only add the PPA if it actually has a suite for this Ubuntu release.
+        # Newly-released codenames (e.g. resolute) may not yet be published.
+        if curl -fsSL --output /dev/null --silent --head "${PHP_PPA_URL}/dists/${CODENAME}/"; then
+            echo "Ondrej PHP/Apache2 PPA found for '${CODENAME}'; adding..."
+            echo "deb [signed-by=$KEYRING_FILE] $PHP_PPA_URL $CODENAME main" | \
+                tee "$PHP_PPA_LIST"
+            echo "deb [signed-by=$KEYRING_FILE] $APACHE_PPA_URL $CODENAME main" | \
+                tee "$APACHE_PPA_LIST"
+        else
+            echo "Ondrej PHP PPA does not yet support '${CODENAME}'; native PHP packages will be used"
+            rm -f "$PHP_PPA_LIST" "$APACHE_PPA_LIST"
+        fi
 
         # On Ubuntu 22.04 (jammy) the system Python is 3.10 — too old for
         # some required packages. Install Python 3.12 from the deadsnakes PPA.
@@ -393,9 +401,31 @@ function _install_packages_debian {
     # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
     apt-get update
 
-    # Ubuntu ships mysql-server/mysql-client; Debian ships mariadb-server/mariadb-client
+    # Determine the best available PHP version (8.2 or newer).
+    # Must run after apt-get update so the package cache reflects any PPAs added above.
+    PHP_VER=""
+    for _phpver in 8.5 8.4 8.3 8.2; do
+        if apt-cache show "php${_phpver}" > /dev/null 2>&1; then
+            PHP_VER="${_phpver}"
+            break
+        fi
+    done
+    if [ -z "$PHP_VER" ]; then
+        echo "ERROR: No supported PHP version (8.2+) is available in the configured repositories."
+        exit_gracefully
+    fi
+    echo "Using PHP ${PHP_VER}"
+
+    # Ubuntu ships mysql-server/mysql-client; Debian ships mariadb-server/mariadb-client.
+    # On newer Ubuntu releases mysql-server may not be available — fall back to MariaDB.
     if [ "$OS_ID" = "ubuntu" ]; then
-        MYSQL_PKGS="mysql-client mysql-server"
+        if apt-cache show mysql-server > /dev/null 2>&1; then
+            MYSQL_PKGS="mysql-client mysql-server"
+        else
+            echo "mysql-server not available for '${CODENAME}'; using MariaDB instead"
+            MYSQL_PKGS="mariadb-client mariadb-server"
+            MYSQL_SERVICE="mariadb"
+        fi
     else
         MYSQL_PKGS="mariadb-client mariadb-server"
     fi
@@ -403,11 +433,27 @@ function _install_packages_debian {
     NEEDRESTART_MODE=a apt-get install -q -y \
         openssh-server apache2 \
         cifs-utils gdal-bin gearman-job-server git \
-        libapache2-mod-php8.2 libapache2-mod-wsgi-py3 libgearman-dev \
+        libapache2-mod-php${PHP_VER} libapache2-mod-wsgi-py3 libgearman-dev \
         $MYSQL_PKGS \
-        php8.2 php8.2-cli php8.2-curl php8.2-gearman php8.2-mysql php8.2-yaml php8.2-zip \
+        php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl \
+        php${PHP_VER}-mysql php${PHP_VER}-yaml php${PHP_VER}-zip \
         python3 python3-dev python3-pip python3-venv \
         rclone rsync samba smbclient sshpass supervisor
+
+    # Install php-gearman: use the native versioned package when available
+    # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
+    if apt-cache show "php${PHP_VER}-gearman" > /dev/null 2>&1; then
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman"
+    else
+        echo "php${PHP_VER}-gearman not packaged; building via PECL (requires libgearman-dev)..."
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-dev" php-pear
+        if printf "\n" | pecl install gearman; then
+            echo "extension=gearman.so" > "/etc/php/${PHP_VER}/mods-available/gearman.ini"
+            phpenmod -v "${PHP_VER}" gearman 2>/dev/null || true
+        else
+            echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
+        fi
+    fi
 
     # Install newest available Python >= 3.12.
     # Try versioned packages from newest to oldest; fall back to system python3
