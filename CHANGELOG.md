@@ -4,6 +4,17 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.2] – 2026-06-19
+
+### Changed
+- Migrate `build_lowering_tracks` and `build_overlay_layers` workers to `build_cruise_tracks` architecture
+- Migrate legacy parsers to `read_lines_with_timestamps` architecture (closes #100)
+
+### Fixed
+- Fix install script for Ubuntu 26.04: dynamic PHP version detection and MySQL fallback
+
+---
+
 ## [2.15.1] – 2026-06-09
 
 ### Fixed
