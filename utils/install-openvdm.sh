@@ -1731,7 +1731,8 @@ EOF
     sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
     sed -e "s/define('LOWERING_NAME', 'Lowering');/define('LOWERING_NAME', 'Dive');/" | \
     sed -e "s/define('LOWERINGDATA_BASEDIR', 'Vehicle');/define('LOWERINGDATA_BASEDIR', 'Vehicles');/" | \
-    sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
+    sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" | \
+    sed -e "s/define('SHOW_CRUISE_META_IN_UI', false);/define('SHOW_CRUISE_META_IN_UI', true);/" \
     > ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
 
     if [ -e ${INSTALL_ROOT}/openvdm/www/errorlog.html ] ; then
