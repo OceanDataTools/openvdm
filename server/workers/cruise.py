@@ -397,7 +397,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         results = json.loads(job_result)
 
-        if current_job.task == TASK_NAMES['CREATE_CRUISE']:
+        if current_job.task in (TASK_NAMES['CREATE_CRUISE'], TASK_NAMES['FINALIZE_CRUISE']):
 
             gm_data = {
                 'cruiseID': self.cruise_id,
