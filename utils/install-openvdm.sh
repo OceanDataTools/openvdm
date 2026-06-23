@@ -1219,11 +1219,13 @@ EOF
         firewall_cmd_if_available --permanent --add-service={http,https}
 
         echo "Setting SELinux exception rules"
-        chcon -R -t httpd_sys_content_t ${DATA_ROOT}
-        chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html
+        chcon -R -t httpd_sys_content_t ${DATA_ROOT} 2>/dev/null || true
+        chcon -R -t httpd_sys_content_t /var/log/openvdm 2>/dev/null || true
+        chcon -R -t httpd_sys_rw_content_t /var/www/openvdm/errorlog.html 2>/dev/null || true
 
         setsebool httpd_tmp_exec on
         setsebool -P httpd_can_network_connect=1
+        setsebool -P httpd_use_cifs=1
     fi
 
     # Enable Apache so it starts on boot. Only start/restart it now if MapProxy
