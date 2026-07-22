@@ -371,6 +371,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 rsync_flags.append(f'--password-file={password_file}')
             cmd = ['rsync'] + rsync_flags + [f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode != 0:
+                logging.warning("Unable to list %s to expand wildcard: %s", parent, proc.stderr.strip())
+                return []
             matches = []
             for line in proc.stdout.splitlines():
                 parts = line.strip().split(None, 4)
@@ -390,10 +393,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             host = cst_cfg['sshServer']
             cmd = ['rsync', '-e', 'ssh', f"{user}@{host}:{parent}/"]
             if not is_darwin:
-                cmd.insert(2, '--protect-args')
+                cmd.insert(1, '--protect-args')
             if cst_cfg.get('sshUseKey') == 0:
                 cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode != 0:
+                logging.warning("Unable to list %s to expand wildcard: %s", parent, proc.stderr.strip())
+                return []
             matches = []
             for line in proc.stdout.splitlines():
                 parts = line.strip().split(None, 4)
