@@ -589,8 +589,12 @@ function _install_packages_rhel {
         # both the daemon and the headers needed for the PECL extension are available.
         if command -v gearmand &>/dev/null; then
             echo "gearmand already installed, skipping source build"
-        else
-            _build_gearmand_from_source
+        elif ! _build_gearmand_from_source; then
+            echo "ERROR: gearmand/libgearman build from source failed;" >&2
+            echo "       php-gearman cannot be built without it. Common cause:" >&2
+            echo "       a network proxy/firewall intercepting TLS to github.com" >&2
+            echo "       or its release-assets CDN host with an untrusted cert." >&2
+            exit_gracefully
         fi
         # On RHEL 10+, PHP runs via PHP-FPM (not mod_php). Start it now so the
         # PECL build environment matches the runtime environment, and so that
