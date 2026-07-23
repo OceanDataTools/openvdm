@@ -4,6 +4,18 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.4] – 2026-07-23
+
+### Changed
+- Dependency versions updated to latest safe patch/minor releases
+- Install script now aborts with a clear error if building gearmand/libgearman from source fails on RHEL-based installs, instead of continuing with a broken PHP-gearman build
+
+### Fixed
+- Fix wildcard source directory expansion for SSH Server collection system transfers: a misplaced `--protect-args` flag broke the remote directory listing
+- Failed remote directory listings during wildcard expansion (rsync/SSH) are no longer silently reported as "no directories matched"; the underlying connection/command error is now logged
+
+---
+
 ## [2.15.3] – 2026-06-23
 
 ### Fixed

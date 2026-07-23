@@ -1,13 +1,13 @@
-certifi==2026.6.17
+certifi==2026.7.22
 chardet==5.2.0
-charset-normalizer==3.4.7
+charset-normalizer==3.4.9
 flake8==7.3.0
 geographiclib==2.1
-geopy==2.4.1
+geopy==2.5.0
 idna==3.18
 numpy==2.4.6
 pandas==2.3.1
-pre_commit==4.6.0
+pre_commit==4.6.1
 python-dateutil==2.9.0.post0
 python3-gearman==0.1.0
 pyflakes==3.4.0
@@ -17,6 +17,6 @@ PyYAML==6.0.3
 requests==2.34.2
 ruff==0.12.9
 six==1.17.0
-tomlkit==0.15.0
-tzdata==2026.2
+tomlkit==0.15.1
+tzdata==2026.3
 urllib3==2.7.0
