@@ -344,19 +344,22 @@ def task_update_data_dashboard(worker, current_job):
     except Exception:
         existing_entries = []
 
-    # Remove obsolete entries
+    # Remove obsolete entries (a raw file may have multiple manifest entries,
+    # one per data type; remove all of them together)
     base_dir = worker.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
-    existing_entries_map = {e['raw_data']: e for e in existing_entries}
     for rm in remove_entries:
-        if rm['raw_data'] in existing_entries_map:
-            existing_entries.remove(existing_entries_map[rm['raw_data']])
+        matching_entries = [e for e in existing_entries if e['raw_data'] == rm['raw_data']]
+        if matching_entries:
+            for e in matching_entries:
+                existing_entries.remove(e)
             dd_json_path = os.path.join(base_dir, rm['dd_json'])
             if os.path.isfile(dd_json_path):
                 os.remove(dd_json_path)
 
-    # Update/add new entries
+    # Update/add new entries (dedupe on raw_data + type so a file with
+    # multiple data types keeps a manifest entry for each type)
     for entry in new_entries:
-        if not any(e['raw_data'] == entry['raw_data'] for e in existing_entries):
+        if not any(e['raw_data'] == entry['raw_data'] and e['type'] == entry['type'] for e in existing_entries):
             existing_entries.append(entry)
             job_results['files']['new'].append(entry['dd_json'])
         else:

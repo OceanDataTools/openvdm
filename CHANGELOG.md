@@ -4,6 +4,17 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.5] – 2026-08-19
+
+### Fixed
+- Fix data dashboard manifest incorrectly dropping entries when a single raw data file is processed into multiple dashboard data types (e.g. a plugin running more than one parser against the same file); the incremental update and removal logic now keys on raw file + data type instead of raw file alone
+- Fix `FutureWarning` from deprecated `DataFrame.swapaxes` in the GGA parser's gap-splitting logic
+
+### Changed
+- Dependency versions updated to latest safe patch/minor releases
+
+---
+
 ## [2.15.4] – 2026-07-23
 
 ### Changed
