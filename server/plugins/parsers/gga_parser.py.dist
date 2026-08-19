@@ -218,8 +218,9 @@ class GGAParser(OpenVDMCSVParser):
         # df = df.dropna(subset=['latitude', 'longitude'])
 
         # Split by gaps
-        segments = np.split(df, np.where(df['latitude'].isna() | df['longitude'].isna())[0])
-        segments = [seg.dropna(subset=['latitude', 'longitude']) for seg in segments if not seg.empty]
+        gap_id = (df['latitude'].isna() | df['longitude'].isna()).cumsum()
+        segments = [seg.dropna(subset=['latitude', 'longitude']) for _, seg in df.groupby(gap_id)]
+        segments = [seg for seg in segments if not seg.empty]
 
         features = []
         for seg in segments:
