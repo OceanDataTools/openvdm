@@ -59,12 +59,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         cruise_data_transfers = self.ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != 0:
+            if cruise_data_transfer['pid'] == self.job_pid:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         cruise_data_transfers = self.ovdm.get_required_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
-            if cruise_data_transfer['pid'] != 0:
+            if cruise_data_transfer['pid'] == self.job_pid:
                 return {'type': 'cruiseDataTransfer', 'id': cruise_data_transfer['cruiseDataTransferID'], 'name': cruise_data_transfer['name'], 'pid': cruise_data_transfer['pid']}
 
         tasks = self.ovdm.get_tasks()
