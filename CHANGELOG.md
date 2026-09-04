@@ -4,6 +4,14 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.6] – 2026-09-04
+
+### Fixed
+- Fix `stop_job` selecting the first running cruise data transfer or scheduled task with a nonzero PID instead of the one matching the requested PID, which could stop the wrong job (#104)
+- Fix cruise data transfer exclusion lists going stale during long-running rclone transfers: lowering-level excluded collection systems, extra directories, and lowering config files are now matched with a wildcard on the lowering ID instead of an explicit list of lowerings known at transfer start, so lowerings created mid-transfer are still excluded (#103)
+
+---
+
 ## [2.15.5] – 2026-08-19
 
 ### Fixed
