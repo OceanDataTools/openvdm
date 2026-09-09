@@ -45,8 +45,19 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
 <?php
     }
 ?>
-        <div class="panel panel-default">
-                <div class="panel-heading">Incorrect Filenames Detected</div>
+        <div class="panel <?php
+    $filenameErrorsPresent = false;
+    if( is_array($data['filenameErrors']) && sizeof($data['filenameErrors']) > 0) {
+        foreach($data['filenameErrors'] as $row) {
+            if(is_array($row->errorFiles) && sizeof($row->errorFiles) > 0) {
+                $filenameErrorsPresent = true;
+                break;
+            }
+        }
+    }
+    echo $filenameErrorsPresent ? 'panel-warning' : 'panel-default';
+?>" id="filenameErrorsPanel">
+                <div class="panel-heading">Incorrect Filenames Detected <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="These files do not match the naming pattern configured for their collection system and were NOT transferred into the cruise data directory."></i></div>
                 <div class="panel-body" id="filenameErrors">
 <?php
     $noErrors = True;

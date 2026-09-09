@@ -134,11 +134,13 @@ $(function () {
             if (status === 'success' && data !== null) {
 
                 var errorFilesOutput = '';
+                var errorFilesPresent = false;
                 if (data.length > 0) {
 
                     var i = 0;
                     for (i = 0; i < data.length; i++) {
                         if(data[i].errorFiles.length > 0) {
+                            errorFilesPresent = true;
                             errorFilesOutput += '                   <h5>' + data[i].collectionSystemName + '</h5>';
                             errorFilesOutput += '                   <ul>';
                             var j = 0;
@@ -161,6 +163,7 @@ $(function () {
                     errorFilesOutput = '                   <h5>No Filename Errors Detected</h5>';
                 }
 
+                $('#filenameErrorsPanel').removeClass('panel-default panel-warning').addClass(errorFilesPresent ? 'panel-warning' : 'panel-default');
                 $(errorFilesPanel).html(errorFilesOutput);
             } setTimeout(function () {
                 updateErrorLogSummary(errorFilesPanel);
@@ -273,6 +276,8 @@ $(function () {
             }, 5000);
         });
     }
+
+    $('[data-toggle="tooltip"]').tooltip();
 
     updateErrorLogSummary('#filenameErrors');
     updateShipboardLogSummary('#shipboardTransfers');
