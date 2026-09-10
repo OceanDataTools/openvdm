@@ -163,7 +163,7 @@ $(function () {
                     errorFilesOutput = '                   <h5>No Filename Errors Detected</h5>';
                 }
 
-                $('#filenameErrorsPanel').removeClass('panel-default panel-warning').addClass(errorFilesPresent ? 'panel-warning' : 'panel-default');
+                $('#filenameErrorsPanel').removeClass('panel-default panel-danger').addClass(errorFilesPresent ? 'panel-danger' : 'panel-default');
                 $(errorFilesPanel).html(errorFilesOutput);
             } setTimeout(function () {
                 updateErrorLogSummary(errorFilesPanel);
