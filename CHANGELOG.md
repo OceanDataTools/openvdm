@@ -4,6 +4,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.7] – 2026-09-12
+
+### Fixed
+- Clarify the "Incorrect Filenames Detected" panel: it now switches to a danger-styled panel with a tooltip only when incorrectly named files are actually present, making clear those files were not transferred into the cruise data directory (#109)
+
+---
+
 ## [2.15.6] – 2026-09-04
 
 ### Fixed
