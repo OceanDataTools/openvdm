@@ -528,10 +528,11 @@ def test_local_destination(dest_dir, is_mountpoint=0):
     if is_mountpoint == 1:
         mnt_dir = os.sep + os.path.join(*dest_dir.strip(os.sep).split(os.sep)[:2])
         if not os.path.ismount(mnt_dir):
+            reason = f"{mnt_dir} is not a mount point on the data warehouse"
             results.extend([{
                 "partName": "Destination directory is a mount point",
                 "result": "Fail",
-                "reason": f"{mnt_dir} is not a mount point on the data warehouse"
+                "reason": reason
             }])
             results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
@@ -1159,7 +1160,7 @@ def test_cdt_rclone_destination(cfg):
         results.append({"partName": "Rclone remote config", "result": "Pass"})
 
     if remote_type == 'local':
-        results.extend(test_local_destination(remote_path))
+        results.extend(test_local_destination(remote_path, cfg.get('localDirIsMountPoint', 0)))
 
     if remote_type == 'smb':
         with temporary_directory() as tmpdir:
