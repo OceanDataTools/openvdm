@@ -436,7 +436,7 @@ def set_owner_group_permissions(user: str, path: str) -> dict:
             os.chown(path, uid, gid)
             os.chmod(path, 0o755)
         except OSError:
-            reason = "Unable to set ownership/permissions for /%s", path
+            reason = f"Unable to set ownership/permissions for /{path}"
             logging.debug(reason)
             reasons.append(reason)
 
