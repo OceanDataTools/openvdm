@@ -1047,6 +1047,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
             if not results['verdict']:
                 logging.error("Error setting destination directory file/directory ownership/permissions: %s", worker.dest_dir)
                 job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": results['reason']})
+                return json.dumps(job_results)
 
             job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
