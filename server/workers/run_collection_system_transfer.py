@@ -1038,17 +1038,17 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
     if job_results['files']['new'] or job_results['files']['updated']:
-        if cst_cfg['localDirIsMountPoint'] == 0:
-            logging.info("Setting file permissions")
-            worker.send_job_status(current_job, 96, 100)
+        logging.info("Setting file permissions")
+        worker.send_job_status(current_job, 96, 100)
 
-            results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
+        results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
 
-            if not results['verdict']:
-                logging.error("Error setting destination directory file/directory ownership/permissions: %s", worker.dest_dir)
-                job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": results['reason']})
+        if not results['verdict']:
+            logging.error("Error setting destination directory file/directory ownership/permissions: %s", worker.dest_dir)
+            job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Fail", "reason": results['reason']})
+            return json.dumps(job_results)
 
-            job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
+        job_results['parts'].append({"partName": "Setting file/directory ownership/permissions", "result": "Pass"})
 
         logging.info("Writing transfer logfile")
         worker.send_job_status(current_job, 97, 100)

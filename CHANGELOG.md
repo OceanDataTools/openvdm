@@ -4,6 +4,15 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.8] – 2026-09-19
+
+### Fixed
+- Fix cruise data transfer connection test passing when a required local destination mountpoint is unmounted, and fix an `UnboundLocalError` on the equivalent active-transfer validation path (#112)
+- Fix collection system transfer ownership/permissions failure being reported as both Fail and Pass and the job continuing anyway; fix a malformed (non-f-string) reason string in `set_owner_group_permissions` (#114)
+- Fix collection system transfer destination ownership/permissions being skipped based on the source directory's mountpoint flag instead of always being applied, since the destination is never itself a mountpoint for CST (#116)
+
+---
+
 ## [2.15.7] – 2026-09-12
 
 ### Fixed
