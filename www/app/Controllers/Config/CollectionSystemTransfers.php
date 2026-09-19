@@ -5,6 +5,7 @@ use Core\Controller;
 use Core\View;
 use Helpers\Url;
 use Helpers\Session;
+use Helpers\PendingPasswords;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -614,6 +615,11 @@ class CollectionSystemTransfers extends Controller {
         $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
         $error = [];
 
+        # a fresh page load discards any password remembered from an earlier "Test Setup"
+        if(!isset($_POST['submit']) && !isset($_POST['inlineTest'])){
+            PendingPasswords::clear('cst', $id);
+        }
+
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
@@ -644,15 +650,10 @@ class CollectionSystemTransfers extends Controller {
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], false);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -848,6 +849,7 @@ class CollectionSystemTransfers extends Controller {
 		}
 
                 $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
+                PendingPasswords::clear('cst', $id);
                 Session::set('message','Collection System Transfers Updated');
                 Url::redirect('config/collectionSystemTransfers'.$filter);
             } else {
@@ -909,15 +911,10 @@ class CollectionSystemTransfers extends Controller {
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], true);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -1127,6 +1124,8 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->excludeFilter = $excludeFilter;
             $data['row'][0]->ignoreFilter = $ignoreFilter;
         }
+
+        $data['pendingPasswords'] = PendingPasswords::flags('cst', $id);
 
         View::rendertemplate('header',$data);
         View::render('Config/editCollectionSystemTransfers',$data,$error);

@@ -5,6 +5,7 @@ use Core\Controller;
 use Core\View;
 use Helpers\Url;
 use Helpers\Session;
+use Helpers\PendingPasswords;
 
 class CruiseDataTransfers extends Controller {
 
@@ -510,6 +511,11 @@ class CruiseDataTransfers extends Controller {
         $data['row'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($id);
         $error = [];
 
+        # a fresh page load discards any password remembered from an earlier "Test Setup"
+        if(!isset($_POST['submit']) && !isset($_POST['inlineTest'])){
+            PendingPasswords::clear('cdt', $id);
+        }
+
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
@@ -535,15 +541,10 @@ class CruiseDataTransfers extends Controller {
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
             $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], false);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -703,6 +704,7 @@ class CruiseDataTransfers extends Controller {
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
 
                 $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
+                PendingPasswords::clear('cdt', $id);
                 Session::set('message',CRUISE_NAME . ' Data Transfers Updated');
                 Url::redirect('config/cruiseDataTransfers'.$filter);
             } else {
@@ -754,15 +756,10 @@ class CruiseDataTransfers extends Controller {
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
             $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], true);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -953,6 +950,8 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
 
         }
+
+        $data['pendingPasswords'] = PendingPasswords::flags('cdt', $id);
 
         View::rendertemplate('header',$data);
         View::render('Config/editCruiseDataTransfers',$data,$error);
