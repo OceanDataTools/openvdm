@@ -155,6 +155,7 @@ Convention (established in issue #99):
 - Render password inputs without a `value=` attribute; use `placeholder="(leave blank to keep existing)"`.
 - In the Config controller's `edit()` handler, after reading password fields from `$_POST`, apply a fallback before validation: if the submitted value is empty and `$data['row'][0]->{field}` is non-empty, preserve the stored value. Apply this in both the `submit` and `inlineTest` branches.
 - In error re-render blocks, do not assign password fields back to `$data['row'][0]`.
+- A password typed before **Test Setup** is kept server-side (session) by `Helpers\PendingPasswords` (issue #119) so a later **Update** still applies it. In the CST/CDT `edit()` handlers, resolve passwords with `PendingPasswords::resolve()` (posted > remembered > stored; pass `$remember = true` only in the `inlineTest` branch), clear on successful update and on any non-POST page load, and expose only booleans (`PendingPasswords::flags()`) to the view for the placeholder text.
 
 ### REST API credential gating (shared-secret header)
 
