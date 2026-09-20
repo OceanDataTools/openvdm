@@ -27,6 +27,12 @@ function openvdmBaseLayers () {
             maxNativeZoom: 12,
             maxZoom: 20
         }),
+        'Esri Ocean Basemap': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, Garmin, GEBCO, NOAA NGDC, and other contributors',
+            // Open-ocean data ends at zoom 10; beyond that Esri serves a "map data not yet available" tile
+            maxNativeZoom: 10,
+            maxZoom: 20
+        }),
         'GMRT Base': L.tileLayer.wms('https://www.gmrt.org/services/mapserver/wms_merc?', {
             layers: 'topo',
             format: 'image/png',
@@ -49,4 +55,29 @@ function openvdmDefaultBaseLayer () {
         maxNativeZoom: 19,
         maxZoom: 20
     });
+}
+
+/**
+ * Build a fresh set of transparent label overlays for the layer switcher.
+ *
+ * These sit on top of the basemap and are off by default. They are mainly
+ * useful over the EMODnet, Esri Ocean and GMRT basemaps, which carry no labels
+ * of their own (OpenStreetMap and OpenTopoMap already do). Pass the result as
+ * the second argument to L.control.layers().
+ *
+ * @returns {Object} Map of overlay name to Leaflet layer, in display order.
+ */
+function openvdmOverlayLayers () {
+    return {
+        'Ocean Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Labels &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, GEBCO, NOAA, National Geographic, Garmin, HERE, Geonames.org, and other contributors',
+            maxNativeZoom: 12,
+            maxZoom: 20
+        }),
+        'Place Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Labels &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
+            maxNativeZoom: 19,
+            maxZoom: 20
+        })
+    };
 }

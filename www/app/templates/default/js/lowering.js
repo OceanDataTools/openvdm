@@ -67,7 +67,7 @@ $(function () {
         baseLayers["OpenStreetMap"].addTo(mapObject['map']);
         baseLayers["OpenStreetMap"].bringToBack();
 
-        L.control.layers(baseLayers).addTo(mapObject['map']);
+        L.control.layers(baseLayers, openvdmOverlayLayers()).addTo(mapObject['map']);
 
         L.easyPrint({
             title: 'Export current map view',
