@@ -61,10 +61,14 @@ function openvdmDefaultBaseLayer () {
 /**
  * Build a fresh set of transparent label overlays for the layer switcher.
  *
- * These sit on top of the basemap and are off by default. Only the Esri Ocean
- * Labels overlay is offered: undersea feature and ocean names for the Esri
- * basemaps and GMRT, which carry no labels of their own (OpenStreetMap already
- * does). Pass the result as the second argument to L.control.layers().
+ * These sit on top of the basemap and are off by default. Pass the result as the
+ * second argument to L.control.layers().
+ *
+ * - Ocean Labels (Esri): undersea feature and ocean names for the Esri
+ *   basemaps and GMRT, which carry no labels of their own (OpenStreetMap
+ *   already does).
+ * - OpenSeaMap Seamarks: buoys, lights and other nautical marks. Only drawn
+ *   when zoomed in to zoom 12 or closer, so it is a harbor and coastal aid.
  *
  * @returns {Object} Map of overlay name to Leaflet layer, in display order.
  */
@@ -73,6 +77,13 @@ function openvdmOverlayLayers () {
         'Ocean Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Labels &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, GEBCO, NOAA, National Geographic, Garmin, HERE, Geonames.org, and other contributors',
             maxNativeZoom: 12,
+            maxZoom: 20
+        }),
+        'OpenSeaMap Seamarks': L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+            attribution: 'Map data: &copy; <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a> contributors',
+            // Buoys, lights and other nautical marks: tiles are blank below zoom 12 and above zoom 18
+            minZoom: 12,
+            maxNativeZoom: 18,
             maxZoom: 20
         })
     };
