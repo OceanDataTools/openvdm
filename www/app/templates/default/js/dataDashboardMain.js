@@ -151,10 +151,7 @@ $(function () {
                     });
 
                     //Add basemap layer
-                    L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-                        // attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
-                        maxZoom: 20
-                    }).addTo(mapdb);
+                    openvdmDefaultBaseLayer().addTo(mapdb);
 
                     // Add latest trackline (GeoJSON)
                     ggaData.addTo(mapdb);
@@ -200,9 +197,7 @@ $(function () {
                     });
 
                     //Add basemap layer
-                    L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-                        maxZoom: 20
-                    }).addTo(mapdb);
+                    openvdmDefaultBaseLayer().addTo(mapdb);
 
                     // Add latest geotiff
                     if ('tileDirectory' in data[0]) {

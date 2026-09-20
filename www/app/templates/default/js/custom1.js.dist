@@ -37,24 +37,11 @@ $(function () {
             fullscreenControl: true,
         }).setView(L.latLng(0, 0), 2);
 
-        //Add basemap layer, use OpenStreetMap
-        var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
-            maxZoom: 20
-        }),
-        gmrtBase = L.tileLayer.wms('http://www.gmrt.org/services/mapserver/wms_merc?', {
-            layers: 'topo',
-            format: 'image/png',
-            attribution: '<a href="https://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
-        });
+        //Add basemap layers, default to OpenStreetMap (see mapBaseLayers.js)
+        var baseLayers = openvdmBaseLayers();
 
-        openStreetMap.addTo(mapObject['map']);
-        openStreetMap.bringToBack();
-
-        var baseLayers = {
-            "OpenStreetMap" : openStreetMap,
-            "GMRT Base" : gmrtBase
-        };
+        baseLayers["OpenStreetMap"].addTo(mapObject['map']);
+        baseLayers["OpenStreetMap"].bringToBack();
 
         L.control.layers(baseLayers).addTo(mapObject['map']);
 

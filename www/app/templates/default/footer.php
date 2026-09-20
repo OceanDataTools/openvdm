@@ -68,6 +68,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'node_modules/leaflet/dist/leaflet.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-fullscreen/dist/Leaflet.fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
+            array_push($jsFileArray, Url::templatePath() . 'js/mapBaseLayers.js');
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.min.js');
         } else if ($jsFile === 'charts') {
