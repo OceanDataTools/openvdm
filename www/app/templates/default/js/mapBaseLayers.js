@@ -33,6 +33,17 @@ function openvdmBaseLayers () {
             maxNativeZoom: 10,
             maxZoom: 20
         }),
+        'Esri Dark Gray Canvas': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
+            // Data ends at zoom 16; beyond that Esri serves a "map data not yet available" tile
+            maxNativeZoom: 16,
+            maxZoom: 20
+        }),
+        'Esri Light Gray Canvas': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
+            maxNativeZoom: 16,
+            maxZoom: 20
+        }),
         'GMRT Base': L.tileLayer.wms('https://www.gmrt.org/services/mapserver/wms_merc?', {
             layers: 'topo',
             format: 'image/png',
@@ -61,8 +72,9 @@ function openvdmDefaultBaseLayer () {
  * Build a fresh set of transparent label overlays for the layer switcher.
  *
  * These sit on top of the basemap and are off by default. They are mainly
- * useful over the EMODnet, Esri Ocean and GMRT basemaps, which carry no labels
- * of their own (OpenStreetMap and OpenTopoMap already do). Pass the result as
+ * useful over the EMODnet, Esri Ocean, Esri gray canvas and GMRT basemaps, which
+ * carry no labels of their own (OpenStreetMap and OpenTopoMap already do). The
+ * Dark Gray Labels overlay is styled for the Dark Gray Canvas basemap. Pass the result as
  * the second argument to L.control.layers().
  *
  * @returns {Object} Map of overlay name to Leaflet layer, in display order.
@@ -72,6 +84,11 @@ function openvdmOverlayLayers () {
         'Ocean Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Labels &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, GEBCO, NOAA, National Geographic, Garmin, HERE, Geonames.org, and other contributors',
             maxNativeZoom: 12,
+            maxZoom: 20
+        }),
+        'Dark Gray Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Labels &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
+            maxNativeZoom: 13,
             maxZoom: 20
         }),
         'Place Labels (Esri)': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
