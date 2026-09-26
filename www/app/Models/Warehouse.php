@@ -498,7 +498,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruiseName'];
+                        return $ovdmConfigJSON['cruiseName'] ?? '';
                     }
                 }
             }
@@ -525,7 +525,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruisePI'];
+                        return $ovdmConfigJSON['cruisePI'] ?? '';
                     }
                 }
             }
@@ -552,7 +552,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruiseLocation'];
+                        return $ovdmConfigJSON['cruiseLocation'] ?? '';
                     }
                 }
             }
@@ -578,7 +578,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']);
+                        return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'] ?? '','cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate'] ?? '');
                     }
                 }
             }
@@ -604,7 +604,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']);
+                        return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'] ?? '','cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort'] ?? '');
                     }
                 }
             }
