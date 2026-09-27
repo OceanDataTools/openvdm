@@ -36,6 +36,7 @@ rsort($data['loweringIDs']);
 ?>
                                 <div class="panel panel-default">
 <?php
+        $filecount = 0;
         //$dataFiles = array_filter($data['placeholders'][$i]['dataFiles'], "loweringFiles");
         //var_dump($dataFiles);
         for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){

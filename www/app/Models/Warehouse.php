@@ -1,6 +1,6 @@
 <?php
 
-namespace models;
+namespace Models;
 use Core\Model;
 
 class Warehouse extends Model {

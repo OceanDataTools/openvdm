@@ -11,6 +11,7 @@
 namespace Helpers;
 
 use PDO;
+use PDOException;
 
 /**
  * Extending PDO to use custom methods.

@@ -113,7 +113,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -262,7 +262,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -485,7 +485,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -640,7 +640,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }

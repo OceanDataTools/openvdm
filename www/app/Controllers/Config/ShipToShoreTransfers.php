@@ -6,7 +6,7 @@ use Core\View;
 use Helpers\Url;
 use Helpers\Session;
 
-class shipToShoreTransfers extends Controller {
+class ShipToShoreTransfers extends Controller {
 
     private $_shipToShoreTransfersModel;
     private $_cruiseDataTransfersModel;

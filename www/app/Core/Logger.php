@@ -47,6 +47,8 @@ class Logger
 
     /**
      * In the event of an error show this message.
+     *
+     * @return never
      */
     public static function customErrorMsg()
     {
@@ -178,7 +180,7 @@ class Logger
      */
     public static function sendEmail($message)
     {
-        if (self::$emailError == true) {
+        if (self::$emailError == true && defined('SITEEMAIL')) {
             $mail = new Mail();
             $mail->setFrom(SITEEMAIL);
             $mail->addAddress(SITEEMAIL);
