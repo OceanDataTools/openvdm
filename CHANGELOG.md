@@ -25,6 +25,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - Fix PHP 8.2+ `Creation of dynamic property` deprecation notices from the Ship-to-Shore config page (a misspelled property name), the data dashboard and the lowerings list (undeclared properties) (#132)
 - Fix data dashboard tabs configured with `view: lowering` or `view: dataDashboard` in `datadashboard.yaml` showing "An error occured" instead of the tab, caused by undefined variables in those views. The shipped config uses `view: default` for every tab, so default installs weren't affected (#135)
 - Fix the TiTiler GeoTIFF parser placing the data dashboard map overlay in the wrong place for GeoTIFFs not in lat/lon (e.g. UTM, Web Mercator): it used TiTiler's `/cog/info` bounds, which are in the file's own coordinate system. It now uses WGS84 bounds from `/cog/info.geojson`, and also adds a Geographic Bounds stat and, for data rasters such as bathymetry, per-band value range and valid-pixel stats. Sites must copy `server/plugins/parsers/geotiff_titiler_parser.py.dist` over their `geotiff_titiler_parser.py` to get this (#138)
+- Fix the SBE 45 TSG parser failing with `ValueError: All arrays must be of the same length` for files without SBE 38 data when a parser with the SBE 38 option had already run in the same process: the option modified a list shared by all instances. Sites that parse TSG files both with and without an SBE 38 must copy `server/plugins/parsers/tsg45_parser.py.dist` over their `tsg45_parser.py` (#146)
 
 ---
 
