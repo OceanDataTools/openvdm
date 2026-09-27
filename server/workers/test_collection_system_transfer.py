@@ -48,8 +48,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def keyword_replace(self, s):
-        """
-        Simple keyword replace function
+        """Replace the ``{cruiseID}``-style placeholders in a path.
+
+        The placeholders are ``{cruiseID}``, ``{loweringID}`` and
+        ``{loweringDataBaseDir}``.
+
+        Args:
+            s: Path or filter string that may contain placeholders.
+
+        Returns:
+            str | None: *s* with the placeholders replaced, or ``None`` if *s*
+            is ``None``.
         """
 
         if not isinstance(s, str):
@@ -63,8 +72,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def build_dest_dir(self):
-        """
-        Replace wildcard string in destDir
+        """Return the transfer's absolute destination directory.
+
+        Lowering-level transfers are placed under
+        ``<loweringDataBaseDir>/<loweringID>/`` in the cruise directory.
+
+        Returns:
+            str | None: The destination directory with placeholders replaced,
+            or ``None`` if the transfer has no ``destDir``.
         """
 
         if not self.collection_system_transfer:
@@ -82,16 +97,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def build_source_dir(self):
-        """
-        Replace wildcard string in sourceDir
+        """Return the transfer's source directory with its placeholders replaced.
+
+        Returns:
+            str | None: The ``sourceDir`` with ``{cruiseID}``-style
+            placeholders replaced, or ``None`` if it isn't set.
         """
 
         return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
     def test_destination_dir(self):
-        """
-        Verify the destination directory exists
+        """Check that the transfer's destination directory exists.
+
+        The directory is in the cruise directory (or the lowering's, for
+        lowering-level transfers).
+
+        Returns:
+            list[dict]: Test parts with ``partName``/``result``/``reason``
+            keys.
         """
 
         results = []
@@ -109,8 +133,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``collectionSystemTransfer``,
+        ``cruiseID``, ``loweringID``; any it omits default to the current
+        cruise/lowering settings), loads what the task needs from the OpenVDM
+        API, then runs the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
 
         self.stop = False
@@ -172,8 +207,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the collection system transfer's test status to error and sends it
+        back to Gearman as a failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -201,8 +245,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the collection system transfer's test status to error, with that part's
+        reason; anything else sets it to idle.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -268,8 +322,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
 def task_test_collection_system_transfer(worker, current_job):
-    """
-    Run connection tests for a collection system transfer
+    """Gearman task: test a collection system transfer.
+
+    Runs the connection tests for the transfer's source (``test_cst_source()``)
+    and destination directory, and adds a ``Final Verdict`` part.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -327,8 +391,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -337,8 +404,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

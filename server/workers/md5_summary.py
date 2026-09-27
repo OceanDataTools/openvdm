@@ -84,8 +84,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def hash_file(filepath):
-        """
-        Build the md5 hash for the given file
+        """Return the MD5 checksum of a file.
+
+        Args:
+            filepath: Path to the file.
+
+        Returns:
+            str: The hex digest.
+
+        Raises:
+            Exception: If the file can't be read.
         """
 
         def _hashlib_md5():
@@ -111,8 +119,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_md5_hashes(self, current_job, filelist):
-        """
-        Build the md5 hashes for the files in the filelist
+        """Hash the given files, honoring the MD5 file size limit.
+
+        Files over the limit (when enabled) get a placeholder hash of 32 ``*``
+        characters. Files that can't be hashed are logged and skipped. Reports
+        progress from 20 % to 80 %.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            filelist: Paths relative to the cruise directory.
+
+        Returns:
+            list[dict]: ``{'hash': ..., 'filename': ...}`` for each file
+            hashed.
         """
 
         filesize_limit = self.ovdm.get_md5_filesize_limit()
@@ -148,8 +167,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_md5_summary(self, hashes):
-        """
-        Builds a new/updated MD5 summary file
+        """Write the MD5 summary file from a list of hashes.
+
+        Args:
+            hashes: ``{'hash': ..., 'filename': ...}`` entries, as returned by
+                :meth:`build_md5_hashes`.
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         sorted_hashes = sorted(hashes, key=lambda entry: entry['filename'])
@@ -169,8 +195,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_md5_summary_md5(self):
-        """
-        Build the md5 hash file for the md5 summary file
+        """Write the checksum file for the MD5 summary file.
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         try:
@@ -186,8 +215,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseID``, ``cruiseStartDate``,
+        ``files``; any it omits default to the current cruise/lowering
+        settings), loads what the task needs from the OpenVDM API, then runs
+        the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
 
         self.stop = False
@@ -230,8 +270,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -259,8 +308,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -314,8 +374,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
 def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-    """
-    Update the existing MD5 summary files
+    """Gearman task: update the MD5 summary for new and updated files.
+
+    Hashes the files listed in the job payload's ``files``, merges them into
+    the existing summary, and rewrites the summary and its checksum file.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -442,8 +512,18 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
 
 
 def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-statements
-    """
-    Rebuild the existing MD5 summary files
+    """Gearman task: rebuild the MD5 summary from scratch.
+
+    Checks the cruise directory exists, hashes every file in it, and rewrites
+    the summary and its checksum file.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -565,8 +645,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -575,8 +658,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

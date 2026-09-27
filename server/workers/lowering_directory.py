@@ -86,8 +86,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def keyword_replace(self, s):
-        """
-        Simple keyword replace function
+        """Replace the ``{cruiseID}``-style placeholders in a path.
+
+        The placeholders are ``{cruiseID}``, ``{loweringID}`` and
+        ``{loweringDataBaseDir}``.
+
+        Args:
+            s: Path or filter string that may contain placeholders.
+
+        Returns:
+            str | None: *s* with the placeholders replaced, or ``None`` if *s*
+            is ``None``.
         """
 
         if not isinstance(s, str):
@@ -101,17 +110,28 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_dest_dir(self, dest_dir):
-        """
-        Replace any wildcards in the provided directory
+        """Return a destination directory with its placeholders replaced.
+
+        Args:
+            dest_dir: Destination directory from a transfer or extra directory
+                configuration.
+
+        Returns:
+            str | None: The directory with ``{cruiseID}``-style placeholders
+            replaced, or ``None`` if *dest_dir* is empty.
         """
 
         return self.keyword_replace(dest_dir) if dest_dir else None
 
 
     def build_directorylist(self):
-        """
-        Build the list of directories to be created as part of creating the new
-        cruise
+        """Return the directories to create in the lowering directory.
+
+        Includes the destination directories of the lowering-level collection
+        system transfers and extra directories.
+
+        Returns:
+            list[str]: Absolute directory paths, without duplicates.
         """
 
         lowering_full_dir = os.path.join(self.cruise_dir, self.lowering_dir)
@@ -138,8 +158,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseID``, ``loweringID``; any it
+        omits default to the current cruise/lowering settings), loads what the
+        task needs from the OpenVDM API, then runs the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
 
@@ -179,8 +209,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -208,8 +247,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -263,8 +313,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
 def task_create_lowering_directory(worker, current_job):
-    """
-    Setup the lowering directory for the specified lowering ID
+    """Gearman task: create the lowering directory.
+
+    Checks the cruise and lowering base directories exist and the lowering
+    directory doesn't, creates the lowering directory and the destination
+    directories of the lowering-level collection system transfers and extra
+    directories, and sets ownership and permissions.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -326,8 +388,18 @@ def task_create_lowering_directory(worker, current_job):
 
 
 def task_set_loweringdata_directory_permissions(worker, current_job):
-    """
-    Set the permissions for the specified lowering ID
+    """Gearman task: set ownership and permissions on the lowering base directory.
+
+    Checks the lowering base directory (``loweringDataBaseDir``) exists, then
+    sets its ownership and permissions.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -358,8 +430,18 @@ def task_set_loweringdata_directory_permissions(worker, current_job):
 
 
 def task_rebuild_lowering_directory(worker, current_job):
-    """
-    Verify and create if necessary all the lowering sub-directories
+    """Gearman task: repair the lowering directory.
+
+    Checks the lowering directory exists, creates any missing sub-directories,
+    and fixes ownership and permissions.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -439,16 +521,22 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.warning("INT Signal Received")

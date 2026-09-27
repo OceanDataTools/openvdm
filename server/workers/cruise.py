@@ -71,8 +71,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def build_logfile_dirpath(self):
-        """
-        Build the path to save transfer logfiles
+        """Return the transfer log directory, creating it if needed.
+
+        Returns:
+            str: The directory from ``OpenVDM.get_transfer_log_dir()``.
         """
 
         log_dir = self.ovdm.get_transfer_log_dir()
@@ -81,8 +83,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def update_md5_summary(self, files):
-        """
-        Submit list of files to be processed and added to the MD5 summary file
+        """Submit an ``updateMD5Summary`` Gearman job for the given files.
+
+        Args:
+            files: ``{'new': [...], 'updated': [...], 'deleted': [...]}`` with
+                paths relative to the cruise directory; missing keys are
+                treated as empty.
         """
 
         gm_data = {
@@ -101,9 +107,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def export_cruise_config(self, finalize=False):
-        """
-        Export the current cruise configuration to file.
-        if 'finalize' is true, mark the config as finalized.
+        """Write the current cruise configuration to the cruise config file.
+
+        Transfer entries are reduced to their name, long name and destination
+        directory (no credentials). When the file already exists, its
+        ``cruiseFinalizedOn`` value is kept. Queues an MD5 summary update for
+        the file.
+
+        Args:
+            finalize: Mark the configuration as finalized (sets
+                ``cruiseFinalizedOn``).
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         cruise_config_fn = self.shipboard_data_warehouse_config['cruiseConfigFn']
@@ -182,8 +199,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def transfer_publicdata_dir(self, current_job, start_status, end_status):
-        """
-        Transfer the contents of the PublicData share to the cruise data directory
+        """Copy the PublicData share into the cruise's ``From_PublicData`` directory.
+
+        Writes transfer and exclude logs, adds the copied files to the MD5
+        summary, and reports progress between *start_status* and *end_status*.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            start_status: Job progress (0-100) at the start of this step.
+            end_status: Job progress (0-100) at the end of this step.
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         source_dir = self.shipboard_data_warehouse_config['shipboardDataWarehousePublicDataDir']
@@ -283,8 +311,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseID``, ``cruiseStartDate``,
+        ``cruiseEndDate``; any it omits default to the current cruise/lowering
+        settings), loads what the task needs from the OpenVDM API, then runs
+        the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
 
         self.stop = False
@@ -363,8 +402,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -392,8 +440,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        After a new cruise is set up, submits the hook tasks configured for
+        ``setupNewCruise`` in ``openvdm.yaml``.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -490,8 +552,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
 def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-return-statements,too-many-statements
-    """
-    Setup a new cruise
+    """Gearman task: set up a new cruise.
+
+    Creates the cruise directory structure, creates the MD5 summary files,
+    exports the cruise config, sets up the data dashboard directory and
+    manifest, and clears out the PublicData directory.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -595,8 +668,20 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
 
 def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-many-return-statements,too-many-statements
-    """
-    Finalize the current cruise
+    """Gearman task: finalize the current cruise.
+
+    Runs the collection system transfers one last time, copies PublicData into
+    the cruise, exports the finalized cruise config, runs the post-finalize
+    hook tasks, then runs the cruise data transfers. (The pre-finalize hook
+    tasks run in ``on_job_execute()``.)
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -716,8 +801,17 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
 
 
 def task_rsync_publicdata_to_cruise_data(worker, current_job):
-    """
-    Sync the contents of the PublicData share to the from_PublicData extra directory
+    """Gearman task: copy the PublicData share into the cruise's ``From_PublicData`` directory.
+
+    The copied files are added to the MD5 summary.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -738,8 +832,18 @@ def task_rsync_publicdata_to_cruise_data(worker, current_job):
 
 
 def task_export_cruise_config(worker, current_job):
-    """
-    Export the OpenVDM configuration to file
+    """Gearman task: write the cruise config file.
+
+    Exports the current cruise configuration to the cruise's config file
+    (``cruiseConfigFn``) and queues an MD5 summary update for it.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -786,8 +890,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -796,8 +903,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
