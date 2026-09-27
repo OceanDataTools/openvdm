@@ -22,6 +22,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - Fix `api/dashboardData/getDashboardDataTypes/<cruiseID>` passing an undefined variable to the model, which logged an `Undefined variable` warning on every call (#132)
 - Fix PHP 8.2+ `Creation of dynamic property` deprecation notices from the Ship-to-Shore config page (a misspelled property name), the data dashboard and the lowerings list (undeclared properties) (#132)
 - Fix data dashboard tabs configured with `view: lowering` or `view: dataDashboard` in `datadashboard.yaml` showing "An error occured" instead of the tab, caused by undefined variables in those views. The shipped config uses `view: default` for every tab, so default installs weren't affected (#135)
+- Fix the TiTiler GeoTIFF parser placing the data dashboard map overlay in the wrong place for GeoTIFFs not in lat/lon (e.g. UTM, Web Mercator): it used TiTiler's `/cog/info` bounds, which are in the file's own coordinate system. It now uses WGS84 bounds from `/cog/info.geojson`, and also adds a Geographic Bounds stat and, for data rasters such as bathymetry, per-band value range and valid-pixel stats. Sites must copy `server/plugins/parsers/geotiff_titiler_parser.py.dist` over their `geotiff_titiler_parser.py` to get this (#138)
 
 ---
 
