@@ -54,7 +54,7 @@ pip install -r requirements.txt
 PHP dependencies:
 ```bash
 cd www/
-composer install
+composer install            # includes PHPStan; production installs use --no-dev
 bash ./post_composer.sh
 ```
 
@@ -71,7 +71,7 @@ npm install
 source ./venv/bin/activate
 python -m pytest server                  # only the known false-positive errors are expected (see Testing)
 ruff check server/
-pre-commit run --all-files               # ruff, ESLint and php -l
+pre-commit run --all-files               # ruff, ESLint, php -l and PHPStan
 ```
 
 There is no automated test suite for the PHP or JavaScript. Changes to the web UI need a manual check in a browser.
@@ -87,12 +87,20 @@ ruff check --fix server/
 pre-commit run eslint --all-files
 ```
 
+**Analyse PHP** (PHPStan, a Composer dev dependency; config in `www/phpstan.neon`):
+```bash
+cd www/
+vendor/bin/phpstan analyse
+# after fixing a finding listed in phpstan-baseline.neon:
+vendor/bin/phpstan analyse --generate-baseline phpstan-baseline.neon
+```
+
 ## Code Style
 
 - **Python**: PEP8, 100-character line limit, use `pylint` and `ruff` (configured in `.pylintrc` and `ruff.toml`)
 - **JavaScript**: match the existing code: 4-space indentation, semicolons, `var`, and page scripts wrapped in jQuery `$(function () { ... })`. ESLint (`eslint.config.mjs`) checks for bugs only (undefined names, unused and duplicate variables, unreachable code), not formatting. Variables defined outside the file being linted (libraries, the inline `<script>` in `templates/default/footer.php`, helpers such as `mapBaseLayers.js`) must be listed in the config's globals; a script that defines a helper for other files marks it with `/* exported name */`.
-- **PHP**: follows existing MVC conventions in `www/app/`
-- Ruff (auto-fix), ESLint and a `php -l` syntax check run on commit via `.pre-commit-config.yaml`. The PHP check uses the locally installed `php` (8.3 matches production) and is skipped with a message if PHP isn't installed.
+- **PHP**: follows existing MVC conventions in `www/app/`. PHPStan runs at level 1 with a baseline (`www/phpstan-baseline.neon`) of the findings that existed when it was added (#130); new code must not add to it. `www/phpstan-bootstrap.php` declares the `Config.php.dist` constants. Views get `$data`/`$error` from `Core\View::render()`, so those are ignored in `app/views` and `app/templates`. Type class properties (e.g. `private \Models\Warehouse $_warehouseModel;`) so PHPStan can check method calls on them, and declare every property (dynamic properties are deprecated in PHP 8.2+).
+- Ruff (auto-fix), ESLint, a `php -l` syntax check and PHPStan run on commit via `.pre-commit-config.yaml`. The PHP checks use the locally installed `php` (8.3 matches production) and are skipped with a message if PHP or PHPStan (`composer install` in `www/`) isn't installed.
 
 ### Python documentation standard
 

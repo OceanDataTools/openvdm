@@ -18,3 +18,9 @@ repos:
         language: system
         entry: bash -c 'command -v php >/dev/null || { echo "php not installed, skipping PHP syntax check"; exit 0; }; for f in "$@"; do php -l "$f" >/dev/null || exit 1; done' --
         files: ^www/.*\.php(\.dist)?$
+      - id: phpstan
+        name: phpstan
+        language: system
+        entry: bash -c 'cd www && if [ ! -x vendor/bin/phpstan ]; then echo "PHPStan not installed (run composer install in www/), skipping"; exit 0; fi; vendor/bin/phpstan analyse --no-progress --memory-limit=1G'
+        files: ^www/(app/.*\.php(\.dist)?|phpstan.*\.neon|phpstan-bootstrap\.php)$
+        pass_filenames: false
