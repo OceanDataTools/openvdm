@@ -113,6 +113,12 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 - The legacy `FILE: / DESCRIPTION: / AUTHOR: / REVISION:` header block must **not** be used — replace it with a proper module docstring.
 - Private helpers (names starting with `_`) should have docstrings when their purpose is non-obvious.
 
+**What's required now vs. what's a goal.** All of the above is required for new code and for functions you change. For existing code the state is:
+
+- Module docstrings (no legacy headers) and a docstring on every public class/function/method: done across `server/` (#141, #143). Keep it that way.
+- Google-style `Args:`/`Returns:`/`Raises:` sections: complete for `server/lib/` (#144), which is the API used by workers and site plugins. Workers and parsers still have many short docstrings without sections; add sections when you touch a function.
+- Type annotations: a goal only. Most existing functions have none, and nothing checks them. Add them in new code; don't mass-annotate existing code until a type checker (mypy/pyright) is run on it, since unchecked annotations can be wrong without anyone noticing.
+
 **Parsers and plugins** (`server/plugins/parsers/*_parser.py.dist`, `server/plugins/*_plugin.py.dist`) follow a lighter, uniform form (issue #141):
 
 - Module docstring: a summary line, then one paragraph. For parsers: `"""Parser for <instrument / data type>.` followed by `Parses <file format and contents> and returns the JSON-formatted plugin data used by OpenVDM's Data Dashboard.` Plugins use `Plugin for <system>.` and say what they dispatch to.
