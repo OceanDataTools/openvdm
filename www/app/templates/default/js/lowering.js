@@ -451,7 +451,6 @@ $(function () {
     //build the maps
     for(var i = 0; i < mapObjects.length; i++) {
         mapChecked(mapObjects[i]);
-        setTimeout(updateBounds(mapObjects[i]), 5000);
     }
 
     //build the charts
