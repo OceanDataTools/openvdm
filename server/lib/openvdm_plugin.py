@@ -79,16 +79,20 @@ class OpenVDMParserQualityTest():
 
 
     def get_test_data(self):
-        """
-        Return test data object
+        """Return the quality test's data.
+
+        Returns:
+            dict: ``testName`` and ``results``.
         """
 
         return self.test_data
 
 
     def to_json(self):
-        """
-        Return test data object as a json-formatted string
+        """Return the quality test's data as a JSON string.
+
+        Returns:
+            str: The JSON.
         """
 
         return json.dumps(self.get_test_data(), cls=NpEncoder)
@@ -214,16 +218,20 @@ class OpenVDMParserStat():
 
 
     def get_stat_data(self):
-        """
-        Return the statistic data
+        """Return the stat's data.
+
+        Returns:
+            dict: ``statName``, ``statType``, ``statUnit`` and ``statValue``.
         """
 
         return self.stat_data
 
 
     def to_json(self):
-        """
-        Return the statistic data as a json-formatted string
+        """Return the stat's data as a JSON string.
+
+        Returns:
+            str: The JSON.
         """
 
         return json.dumps(self.get_stat_data(), cls=NpEncoder)
@@ -314,8 +322,11 @@ class OpenVDMParser():
 
 
     def get_plugin_data(self):
-        """
-        Return the plugin data
+        """Return the parser's plugin data, if it produced any.
+
+        Returns:
+            dict | None: ``visualizerData``, ``qualityTests`` and ``stats``, or
+            ``None`` if all three are empty.
         """
 
         if len(self.plugin_data['visualizerData']) > 0 or len(self.plugin_data['qualityTests']) > 0 or len(self.plugin_data['stats']) > 0:
@@ -325,16 +336,35 @@ class OpenVDMParser():
 
 
     def process_file(self, filepath):
-        """
-        Legacy entry point. Calls parse() and stores results.
+        """Parse *filepath* through :meth:`parse` (legacy entry point).
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if nothing was parsed.
         """
         result = self.parse(filepath)
         return result
 
 
     def parse(self, filepath):
-        """
-        Unified entry point for all parsers (legacy + new)
+        """Parse *filepath* and return the plugin data.
+
+        Parsers override this. For older parsers that implement
+        ``process_file()`` instead, this calls it and returns
+        ``self.plugin_data``.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            dict | None: The plugin data (``visualizerData``, ``qualityTests``,
+            ``stats``), or ``None`` if nothing was parsed.
+
+        Raises:
+            NotImplementedError: If the parser implements neither ``parse()``
+                nor ``process_file()``.
         """
 
         # Preferred: new-style parsers override parse()
@@ -372,8 +402,12 @@ class OpenVDMParser():
 
 
     def add_quality_test_failed(self, name):
-        """
-        Add a failed QA test with the provided name
+        """Record a quality test that failed.
+
+        Shown on the Data Quality page as a failure.
+
+        Args:
+            name: Name of the test (e.g. ``'Rows'`` or ``'DeltaT'``).
         """
 
         test = OpenVDMParserQualityTestFailed(name)
@@ -381,8 +415,12 @@ class OpenVDMParser():
 
 
     def add_quality_test_warning(self, name):
-        """
-        Add a partially failed QA test with the provided name
+        """Record a quality test that partially failed.
+
+        Shown on the Data Quality page as a warning.
+
+        Args:
+            name: Name of the test (e.g. ``'Rows'`` or ``'DeltaT'``).
         """
 
         test = OpenVDMParserQualityTestWarning(name)
@@ -390,8 +428,12 @@ class OpenVDMParser():
 
 
     def add_quality_test_passed(self, name):
-        """
-        Add a passing QA test with the provided name
+        """Record a quality test that passed.
+
+        Shown on the Data Quality page as a pass.
+
+        Args:
+            name: Name of the test (e.g. ``'Rows'`` or ``'DeltaT'``).
         """
 
         test = OpenVDMParserQualityTestPassed(name)
@@ -399,8 +441,15 @@ class OpenVDMParser():
 
 
     def add_bounds_stat(self, value, name, uom=''):
-        """
-        Add a bounds statistic with the given name, value and unit of measure
+        """Record a value range (``bounds``) stat.
+
+        Args:
+            value: ``[min, max]``, as two numbers.
+            name: Stat name, e.g. ``'Depth Bounds'``.
+            uom: Unit of measure, e.g. ``'m'``.
+
+        Raises:
+            ValueError: If *value* isn't a list of two numbers.
         """
 
         stat = OpenVDMParserBoundsStat(value, name, uom)
@@ -408,8 +457,19 @@ class OpenVDMParser():
 
 
     def add_geobounds_stat(self, value, name='Geographic Bounds', uom='ddeg'):
-        """
-        Add a geoBounds statistic with the given name, value and unit of measure
+        """Record a geographic extent (``geoBounds``) stat.
+
+        The Data Quality page displays the four values as North, East, South,
+        West.
+
+        Args:
+            value: ``[north, east, south, west]`` in decimal degrees, i.e.
+                ``[max latitude, max longitude, min latitude, min longitude]``.
+            name: Stat name.
+            uom: Unit of measure.
+
+        Raises:
+            ValueError: If *value* isn't a list of four numbers.
         """
 
         stat = OpenVDMParserGeoBoundsStat(value, name, uom)
@@ -417,8 +477,13 @@ class OpenVDMParser():
 
 
     def add_row_validity_stat(self, value):
-        """
-        Add a rowValidity statistic with the given name, value and unit of measure
+        """Record how many rows parsed (``rowValidity``, named ``'Row Validity'``).
+
+        Args:
+            value: ``[valid_rows, invalid_rows]``, as two integers.
+
+        Raises:
+            ValueError: If *value* isn't a list of two integers.
         """
 
         stat = OpenVDMParserRowValidityStat(value)
@@ -426,8 +491,15 @@ class OpenVDMParser():
 
 
     def add_time_bounds_stat(self, value, name='Temporal Bounds', uom='seconds'):
-        """
-        Add a timeBounds statistic with the given name, value and unit of measure
+        """Record the time range of the data (``timeBounds``).
+
+        Args:
+            value: ``[start, end]``, as two ``datetime`` objects.
+            name: Stat name.
+            uom: Unit of measure.
+
+        Raises:
+            ValueError: If *value* isn't a list of two ``datetime`` objects.
         """
 
         stat = OpenVDMParserTimeBoundsStat(value, name, uom)
@@ -435,8 +507,15 @@ class OpenVDMParser():
 
 
     def add_total_value_stat(self, value, name, uom=''):
-        """
-        Add a totalValue statistic with the given name, value and unit of measure
+        """Record a single total (``totalValue``) stat.
+
+        Args:
+            value: ``[total]``, as a one-element list holding a number.
+            name: Stat name.
+            uom: Unit of measure.
+
+        Raises:
+            ValueError: If *value* isn't a list of one number.
         """
 
         stat = OpenVDMParserTotalValueStat(value, name, uom)
@@ -444,8 +523,14 @@ class OpenVDMParser():
 
 
     def add_value_validity_stat(self, value, name):
-        """
-        Add a valueValidity statistic with the given name, value and unit of measure
+        """Record how many values fell in the valid range (``valueValidity``).
+
+        Args:
+            value: ``[valid_count, invalid_count]``, as two numbers.
+            name: Stat name, e.g. ``'DeltaT Validity'``.
+
+        Raises:
+            ValueError: If *value* isn't a list of two numbers.
         """
 
         stat = OpenVDMParserValueValidityStat(value, name)
@@ -453,15 +538,19 @@ class OpenVDMParser():
 
 
     def get_results(self):
-        """
-        Return structured parser results or None
+        """Return the parser results (same as :meth:`get_plugin_data`).
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if empty.
         """
         return self.get_plugin_data()
 
 
     def to_json(self):
-        """
-        Return the plugin data and a json-formatted string
+        """Return the plugin data as a JSON string.
+
+        Returns:
+            str: The JSON; ``'null'`` if the parser produced no data.
         """
 
         return json.dumps(self.get_plugin_data())
@@ -544,20 +633,37 @@ class OpenVDMCSVParser(OpenVDMParser):
 
     @classmethod
     def add_cli_arguments(cls, parser: "argparse.ArgumentParser"):  # noqa
-        """
-        Subclasses can override this to add custom CLI arguments.
+        """Add parser-specific command-line options (hook for subclasses).
+
+        The base implementation adds nothing. Subclasses that add options
+        should also override ``_extract_custom_cli_kwargs()`` to pass them to
+        the constructor.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` used by :meth:`run_cli`.
         """
         pass
 
     def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
-        """
-        Generator that yields (lineno, timestamp, remainder, fields) for each valid line.
+        """Yield each timestamped data line of a file, split into fields.
 
-        nmea_filter:
-            - str:
-                * "GGA"        → fields[0].endswith("GGA")
-                * "PSXN,23"    → fields[0].endswith("PSXN") and fields[1] == "23"
-            - callable(fields) → bool
+        Blank lines, ``#`` comments and (with ``skip_header``) the first line
+        are skipped. Lines without a timestamp are counted as errors and
+        skipped.
+
+        Args:
+            filepath: Path to the raw data file.
+            fields_sep: Separator between the payload's fields.
+            nmea_filter: Only yield matching lines. A sentence name such as
+                ``'GGA'`` (first field ends with it), a name plus type such as
+                ``'PSXN,23'`` (first field ends with ``PSXN`` and second is
+                ``23``), or a callable taking the fields and returning
+                ``bool``.
+
+        Yields:
+            tuple: ``(lineno, timestamp_str, remainder, fields)``: the
+            zero-based line number, the timestamp string, the text after the
+            timestamp, and that text split on *fields_sep*.
         """
 
         def make_filter_predicate(nmea_filter):
@@ -675,8 +781,19 @@ class OpenVDMCSVParser(OpenVDMParser):
 
     @staticmethod
     def resample_data(data_frame, resample_interval='1min'):
-        """
-        Resample the data to the specified interval
+        """Average the data into fixed time intervals.
+
+        Args:
+            data_frame: DataFrame indexed by timestamp.
+            resample_interval: pandas offset alias for the interval (default
+                ``'1min'``). Each interval is labelled by its end time.
+
+        Returns:
+            pandas.DataFrame: The resampled data, with the timestamps moved
+            back into a column.
+
+        Raises:
+            Exception: If the data can't be resampled.
         """
 
         try:
@@ -692,8 +809,18 @@ class OpenVDMCSVParser(OpenVDMParser):
 
     @staticmethod
     def round_data(data_frame, precision=None):
-        """
-        Round the data to the specified precision
+        """Round the data's columns to per-column precisions.
+
+        Args:
+            data_frame: The data to round.
+            precision: Mapping of column name to number of decimal places. An
+                empty mapping returns the data unchanged.
+
+        Returns:
+            pandas.DataFrame: The rounded data.
+
+        Raises:
+            Exception: If the data can't be rounded.
         """
 
         if precision is None or bool(precision):
@@ -707,9 +834,15 @@ class OpenVDMCSVParser(OpenVDMParser):
         return data_frame
 
     def extract_timestamp_and_payload(self, line):
-        """
-        Extract ISO8601 timestamp and payload after it.
-        Returns (timestamp_str, payload) or (None, None)
+        """Split a line into its timestamp and the payload after it.
+
+        Args:
+            line: One line of the raw data file.
+
+        Returns:
+            tuple: ``(timestamp_str, payload)``, where the payload has the
+            leading timestamp separator removed; or ``(None, None)`` if the
+            line has no timestamp matching ``timestamp_re``.
         """
 
         match = self.timestamp_re.search(line)
@@ -754,8 +887,10 @@ class OpenVDMCSVParser(OpenVDMParser):
 
 
     def to_json(self):
-        """
-        Output the plugin data as a json-formatted string.
+        """Return the plugin data as a JSON string, converting numpy values.
+
+        Returns:
+            str: The JSON; ``'null'`` if the parser produced no data.
         """
 
         return json.dumps(self.get_plugin_data(), cls=NpEncoder)
@@ -850,8 +985,14 @@ class OpenVDMPlugin():
 
     ###################################
     def get_data_types(self, filepath):
-        """
-        Return a list of data types associated with the file.
+        """Return the data types of every file type filter that matches the file.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            list[str]: The matching filters' ``data_type`` values; empty if
+            none match.
         """
         return [
             f["data_type"]
@@ -861,17 +1002,30 @@ class OpenVDMPlugin():
 
 
     def parse_file(self, filepath):
-        """
-        Parse the given file
+        """Parse the file with the plugin's matching parsers (subclasses implement this).
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            dict: Each matching parser's plugin data, keyed by data type.
+
+        Raises:
+            NotImplementedError: Always, in the base class.
         """
 
         raise NotImplementedError('parse_file must be implemented by subclass')
 
 
     def get_json_str(self, filepath):
-        """
-        Return the plugin output corresponding to the given file.
-        Ensures output is JSON-serializable (legacy + new parsers).
+        """Parse the file and return the result as a JSON string.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            str | None: The JSON-encoded plugin data (numpy values converted),
+            or ``None`` if nothing was parsed.
         """
 
         data = self.parse_file(filepath)

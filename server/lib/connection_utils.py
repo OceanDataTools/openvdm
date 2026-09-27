@@ -33,15 +33,30 @@ _TRANSFER_INT_FIELDS = frozenset([
 
 
 def has_wildcard(s):
-    """Return True if string contains glob special characters (* ? [)."""
+    """Return whether a string contains glob wildcard characters (``*``, ``?``, ``[``).
+
+    Args:
+        s: The string to check, e.g. a source directory.
+
+    Returns:
+        bool: ``True`` if *s* contains a wildcard.
+    """
     return any(c in s for c in ('*', '?', '['))
 
 
 def normalize_transfer_config(cfg):
-    """
-    Return a copy of cfg with known integer fields cast from string to int.
-    PHP/PDO returns all DB column values as strings; callers that compare
-    with == 1 / == 0 need proper Python ints.
+    """Return a copy of a transfer configuration with its integer fields as ints.
+
+    PHP/PDO returns every database column as a string, so fields such as
+    ``transferType``, ``sshUseKey`` or ``removeSourceFiles`` arrive as ``'1'``;
+    callers that compare with ``== 1`` / ``== 0`` need real ints. Values that
+    can't be converted are left unchanged.
+
+    Args:
+        cfg: A collection system or cruise data transfer configuration.
+
+    Returns:
+        dict: A copy of *cfg* with the known integer fields converted.
     """
     result = dict(cfg)
     for field in _TRANSFER_INT_FIELDS:
@@ -54,8 +69,14 @@ def normalize_transfer_config(cfg):
 
 
 def get_transfer_type(transfer_type):
-    """
-    Return a human-readable transfer type
+    """Return the name of a transfer type code.
+
+    Args:
+        transfer_type: The ``transferType`` value (``1``-``4``, as int or str).
+
+    Returns:
+        str | None: ``'local'`` (1), ``'rsync'`` (2), ``'smb'`` (3) or
+        ``'ssh'`` (4), or ``None`` for any other value.
     """
 
     transfer_type = str(transfer_type)
@@ -104,8 +125,19 @@ def get_rclone_remote_type(remote_name, config_path=None):
 
 
 def check_darwin(cfg):
-    """
-    Return true if server is MacOS (Darwin)
+    """Return whether a transfer's SSH server runs macOS (Darwin).
+
+    Runs ``uname -s`` on the server over SSH, using ``sshpass`` when the
+    transfer doesn't use a key. rsync on macOS doesn't support
+    ``--protect-args``.
+
+    Args:
+        cfg: Transfer configuration with ``sshServer``, ``sshUser``,
+            ``sshUseKey`` and ``sshPass``.
+
+    Returns:
+        bool: ``True`` if the server reports ``Darwin``; ``False`` otherwise,
+        including when the SSH command fails.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -123,8 +155,20 @@ def check_darwin(cfg):
 
 
 def detect_smb_version(cfg):
-    """
-    Return the SMB version used on the remote server
+    """Detect which SMB protocol version to mount a transfer's server with.
+
+    Lists the server's shares with ``smbclient`` (as guest if ``smbUser`` is
+    ``'guest'``). Windows XP-era servers (``OS=[Windows 5.1]``) get ``'1.0'``;
+    all others get ``'2.1'``.
+
+    Args:
+        cfg: Transfer configuration with ``smbServer``, ``smbDomain``,
+            ``smbUser`` and ``smbPass``.
+
+    Returns:
+        tuple[str | None, str]: ``(version, "")`` on success, or ``(None,
+        detail)`` with the error output if the server can't be reached or
+        authentication fails.
     """
 
     if cfg.get('smbUser') == 'guest':
@@ -160,8 +204,21 @@ def detect_smb_version(cfg):
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
-    """
-    Mount the SMB Share to the mntpoint
+    """Mount a transfer's SMB share (CIFS) on a local directory.
+
+    The share is mounted read-write if the transfer removes source files
+    (``removeSourceFiles``), otherwise read-only. On failure the mount point is
+    unmounted again. Requires root.
+
+    Args:
+        cfg: Transfer configuration with ``smbServer`` (the share path),
+            ``smbDomain``, ``smbUser`` and ``smbPass``.
+        mntpoint: Existing local directory to mount the share on.
+        smb_version: SMB protocol version, from :func:`detect_smb_version`.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -192,9 +249,18 @@ def mount_smb_share(cfg, mntpoint, smb_version):
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
-    """
-    Build the cmd array for a rsync command.  The cmd array will be passed to
-    subprocess
+    """Build an rsync command line as an argument list for ``subprocess``.
+
+    Args:
+        flags: rsync options, e.g. from :func:`build_rsync_options`.
+        extra_args: Additional arguments added after *flags*, or ``None``.
+        source_dir: The source path.
+        dest_dir: The destination path, or ``None`` to list *source_dir* only.
+        include_filepath: File listing the files to transfer (passed as
+            ``--files-from``), or ``None``.
+
+    Returns:
+        list[str]: The command, starting with ``rsync``.
     """
 
     cmd = ['rsync'] + flags
@@ -209,9 +275,16 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
 
 
 def test_rsync_connection(server, user, password_file=None):
-    """
-    Test the connection to a rsync server.
-    Returns (success: bool, detail: str).
+    """Test that an rsync server accepts the transfer's credentials.
+
+    Args:
+        server: rsync server, as ``host`` or ``host/module``.
+        user: rsync username.
+        password_file: File holding the rsync password, or ``None``.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -237,11 +310,20 @@ def test_rsync_connection(server, user, password_file=None):
 
 
 def test_rsync_write_access(server, user, tmpdir, password_file=None):
-    """
-    Verify the transfer has write access to the rsync server.  This is done via
-    a write_test.txt file.  Currently there is no way to delete this file after
-    completing the test.
-    Returns (success: bool, detail: str).
+    """Test that the transfer can write to an rsync server.
+
+    Uploads a ``write_test.txt`` file. There's currently no way to delete it
+    afterwards, so the file stays on the server.
+
+    Args:
+        server: rsync server, as ``host`` or ``host/module``.
+        user: rsync username.
+        tmpdir: Local temporary directory to create the test file in.
+        password_file: File holding the rsync password, or ``None``.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -274,9 +356,26 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
 
 
 def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
-    """
-    Build the cmd array for a ssh command.  The cmd array will be passed to
-    subprocess
+    """Build an ssh command line as an argument list for ``subprocess``.
+
+    Both forms use a 5 s connection timeout and skip host key checking. With a
+    key the command runs in batch mode; with a password it's prefixed with
+    ``sshpass`` and public-key authentication is disabled.
+
+    Args:
+        flags: Extra ssh options, or ``None``.
+        user: SSH username.
+        server: SSH server hostname or address.
+        post_cmd: Command to run on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        list[str]: The command.
+
+    Raises:
+        ValueError: If there's no password and *use_pubkey* is false.
     """
 
     passwd = passwd or ''
@@ -290,9 +389,18 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
-    """
-    Test the connection to a ssh server.
-    Returns (success: bool, detail: str).
+    """Test that an SSH server accepts the transfer's credentials.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
@@ -316,9 +424,19 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
 
 
 def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
-    """
-    Verify the presence of a directory on the ssh server.
-    Returns (success: bool, detail: str).
+    """Test that a directory exists on an SSH server.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        remote_dir: Absolute path of the directory on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     passwd = passwd or ''
@@ -343,9 +461,19 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
-    """
-    Verify write access to the directory on the remote ssh server.
-    Returns (success: bool, detail: str).
+    """Test that the transfer can create and delete a file in a directory on an SSH server.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        dest_dir: Absolute path of the directory on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     passwd = passwd or ''
@@ -462,8 +590,20 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
 
 
 def build_rclone_options(cfg, mode='dry-run'):
-    """
-    Build the relevant rsync options for the given transfer
+    """Return the rclone subcommand and options for a cruise data transfer.
+
+    Uses ``sync`` if the transfer mirrors deletions (``syncToDest``), otherwise
+    ``copy``. Adds ``--create-empty-src-dirs`` unless ``skipEmptyDirs`` is set,
+    ``--dry-run`` in dry-run mode, ``--bwlimit`` for a bandwidth limit, and the
+    Google Cloud Storage options when the destination remote is a GCS bucket.
+
+    Args:
+        cfg: Cruise data transfer configuration.
+        mode: ``'dry-run'`` to only list what would be transferred; any other
+            value for a real transfer.
+
+    Returns:
+        tuple[str, list[str]]: ``('copy' | 'sync', flags)``.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -492,8 +632,23 @@ def build_rclone_options(cfg, mode='dry-run'):
 
 
 def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
-    """
-    Build the relevant rsync options for the given transfer
+    """Return the rsync options for a transfer.
+
+    Dry runs use ``-trinv --dry-run --stats``; real transfers use ``-triv
+    --progress`` plus ``--bwlimit``, ``--remove-source-files`` and ``--delete``
+    as configured (and ``--no-motd`` for rsync servers). Both add
+    ``--min-size=1`` (``skipEmptyFiles``), ``-m`` (``skipEmptyDirs``), and
+    ``--protect-args`` unless the other end is macOS.
+
+    Args:
+        cfg: Collection system or cruise data transfer configuration.
+        mode: ``'dry-run'`` to only list what would be transferred; any other
+            value for a real transfer.
+        is_darwin: The remote end runs macOS, whose rsync doesn't support
+            ``--protect-args`` (see :func:`check_darwin`).
+
+    Returns:
+        list[str]: The rsync options.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -648,8 +803,19 @@ def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
 
 
 def test_cst_source(cst_cfg, source_dir):
-    """
-    Test the connection to the collection system transfer
+    """Test a collection system transfer's source.
+
+    Checks the transfer type, then, depending on it, the SMB server and share,
+    rsync or SSH connection, the source directory (and, if required, that it's
+    a mount point), and write access when the transfer removes source files.
+
+    Args:
+        cst_cfg: Collection system transfer configuration.
+        source_dir: The source directory to test (with any cruise/lowering
+            substitutions already applied).
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
 
     cst_cfg = normalize_transfer_config(cst_cfg)
@@ -948,8 +1114,17 @@ def test_cst_source(cst_cfg, source_dir):
         return results
 
 def test_cdt_destination(cdt_cfg):
-    """
-    Test the connection to the cruise data transfer
+    """Test a cruise data transfer's destination.
+
+    Checks, depending on the transfer type, the local directory (or rclone
+    remote), rsync server, SMB share or SSH server, the destination directory,
+    and write access.
+
+    Args:
+        cdt_cfg: Cruise data transfer configuration.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
 
     cdt_cfg = normalize_transfer_config(cdt_cfg)
