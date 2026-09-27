@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""
-FILE:  test_collection_system_transfer.py
+"""Gearman worker that tests collection system transfer configurations.
 
-DESCRIPTION:  Gearman worker that handles testing collection system transfer
-    configurations
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2015-01-01
- REVISION:  2025-07-06
+Registers the ``testCollectionSystemTransfer`` Gearman task, which checks that
+a collection system transfer's source can be reached (and, when the transfer
+removes source files, written to), and reports the result of each check back
+to OpenVDM. This is an OpenVDM worker, not a pytest
+test module.
 """
 
 import argparse

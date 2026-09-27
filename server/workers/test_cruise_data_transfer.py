@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""
-FILE:  test_cruise_data_transfer.py
+"""Gearman worker that tests cruise data transfer configurations.
 
-DESCRIPTION:  Gearman worker that handles testing cruise data transfer
-                configurations
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2015-01-01
- REVISION:  2025-08-18
+Registers the ``testCruiseDataTransfer`` Gearman task, which checks that a
+cruise data transfer's destination (local directory, rclone remote, rsync
+server, SMB share or SSH server) can be reached and written to, and reports
+the result of each check back to OpenVDM. This is an OpenVDM worker, not a
+pytest test module.
 """
 
 import argparse

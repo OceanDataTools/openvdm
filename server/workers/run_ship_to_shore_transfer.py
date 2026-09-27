@@ -532,6 +532,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def shutdown(self, *args, **kwargs):
+        """Mark the ship-to-shore transfer idle, ask the running job to stop, and shut down.
+
+        Args:
+            *args: Passed to ``GearmanWorker.shutdown()``.
+            **kwargs: Passed to ``GearmanWorker.shutdown()``.
+        """
         logging.info("Shutdown requested: signaling current job to stop...")
         self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer.get('cruiseDataTransferID'))
         self._stop_requested = True
