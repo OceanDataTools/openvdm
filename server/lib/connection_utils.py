@@ -105,23 +105,26 @@ def get_rclone_remote_type(remote_name, config_path=None):
                 ``~/.config/rclone/rclone.conf``.
 
         Returns:
-            The remote's ``type`` (e.g. ``'smb'``, ``'sftp'``,
-            ``'google cloud storage'``), or ``'local'`` if the config file or the
-            remote isn't found.
+            The remote's ``type`` (e.g. ``'local'``, ``'smb'``, ``'sftp'``,
+            ``'google cloud storage'``), or ``None`` if the config file doesn't
+            exist or doesn't define the remote (or its type).
         """
         # Default rclone config path
         if config_path is None:
             config_path = os.path.expanduser("~/.config/rclone/rclone.conf")
 
         if not os.path.isfile(config_path):
-            logging.error("rclone config file %s not found.  assuming local", config_path)
-            return "local"
+            logging.error("rclone config file %s not found", config_path)
+            return None
 
         config = configparser.ConfigParser()
         config.read(config_path)
 
-        remote_section = config[remote_name] if remote_name in config else {}
-        return remote_section.get('type', 'local')
+        if remote_name not in config:
+            logging.error("rclone remote %s not found in %s", remote_name, config_path)
+            return None
+
+        return config[remote_name].get('type')
 
 
 def check_darwin(cfg):
@@ -1389,7 +1392,7 @@ def test_cdt_rclone_destination(cfg):
         remote_path = cfg['destDir']
         remote_type = get_transfer_type(cfg['transferType'])
     else:
-        remote_name, remote_path = cfg['destDir'].split(':')
+        remote_name, remote_path = cfg['destDir'].split(':', 1)
         remote_type = get_rclone_remote_type(remote_name)
 
         if remote_type is None:
