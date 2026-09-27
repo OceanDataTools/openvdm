@@ -66,16 +66,16 @@ npm install
 
 ## Common Commands
 
-**Run tests** (required before submitting PRs):
-```bash
-./manage.py test
-```
-
-**Run a specific worker test file:**
+**Checks to run before submitting a PR:**
 ```bash
 source ./venv/bin/activate
-python -m pytest server/workers/test_collection_system_transfer.py
+python -m pytest server                  # only the known false-positive errors are expected (see Testing)
+ruff check server/
+pre-commit run --all-files               # ruff + ESLint
+git diff --name-only dev -- '*.php' '*.php.dist' | xargs -r -n1 php -l   # PHP syntax check
 ```
+
+There is no automated test suite for the PHP or JavaScript. Changes to the web UI need a manual check in a browser.
 
 **Lint Python code:**
 ```bash
@@ -83,17 +83,17 @@ pylint server/
 ruff check --fix server/
 ```
 
-**Run pre-commit checks:**
+**Lint JavaScript** (ESLint via pre-commit; config in `eslint.config.mjs`):
 ```bash
-pre-commit run --all-files
+pre-commit run eslint --all-files
 ```
 
 ## Code Style
 
 - **Python**: PEP8, 100-character line limit, use `pylint` and `ruff` (configured in `.pylintrc` and `ruff.toml`)
-- **JavaScript**: JavaScript Standard Style
+- **JavaScript**: match the existing code: 4-space indentation, semicolons, `var`, and page scripts wrapped in jQuery `$(function () { ... })`. ESLint (`eslint.config.mjs`) checks for bugs only (undefined names, unused and duplicate variables, unreachable code), not formatting. Variables defined outside the file being linted (libraries, the inline `<script>` in `templates/default/footer.php`, helpers such as `mapBaseLayers.js`) must be listed in the config's globals; a script that defines a helper for other files marks it with `/* exported name */`.
 - **PHP**: follows existing MVC conventions in `www/app/`
-- Ruff is configured to auto-fix on commit via `.pre-commit-config.yaml`
+- Ruff (auto-fix) and ESLint run on commit via `.pre-commit-config.yaml`
 
 ### Python documentation standard
 
@@ -117,7 +117,7 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 - `master` — production releases
 - `dev` — integration branch (PRs target `dev`, not `master`)
 - Feature/fix branches use naming convention `issue_NNN`
-- Run `./manage.py test` before opening a PR
+- Run the checks under **Common Commands** before opening a PR
 
 ## Supported Transfer Methods
 
