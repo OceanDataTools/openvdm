@@ -1,18 +1,9 @@
 #!/usr/bin/env python3
 """Parser for GeoTIFF files served through TiTiler.
 
-Queries a TiTiler server about the supplied GeoTIFF and returns the
-JSON-formatted plugin data used by OpenVDM's Data Dashboard: a map tile
-visualization, a Geographic Bounds stat, and, for data rasters such as
-bathymetry, per-band value ranges and valid-pixel counts.
-
-The file is passed to TiTiler as a URL under the CruiseData web share, so
-TiTiler must be able to reach that URL.
-
-Usage::
-
-    geotiff_titiler_parser.py [-h] [-v+] [--cruisedataPath PATH]
-                              [--cruisedataURL URL] [--titilerURL URL] <dataFile>
+Queries a TiTiler server for the GeoTIFF's geographic bounds and band
+statistics and returns the JSON-formatted plugin data used by OpenVDM's Data
+Dashboard.
 """
 
 import logging
@@ -42,6 +33,9 @@ IMAGERY_COLORINTERP = {'red', 'green', 'blue', 'alpha', 'palette'}
 
 class GeoTIFFParser(OpenVDMParser):
     """OpenVDM parser for GeoTIFF files, using TiTiler for metadata and tiles.
+
+    The file is passed to TiTiler as a URL under the CruiseData web share, so
+    TiTiler must be able to reach that URL.
 
     Attributes:
         titiler_url: Base URL of the TiTiler server.
