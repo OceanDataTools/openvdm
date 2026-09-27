@@ -1,32 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  vtg_parser.py
+"""Parser for NMEA VTG (course and speed over ground) data.
 
-USAGE:  vtg_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
-
-DESCRIPTION:  Parse the supplied NMEA-formtted VTG file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            [--timeFormat] date/time format to use when parsing datafile, default
-                           yyyy-mm-ddTHH:MM:SS.sssZ
-            [--startTS] optional start crop time (strptime format)
-            [--stopTS] optional stop crop time (strptime format)
-            [--noMag] skip the COG magnetic processing
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   numpy==2.4.0
-                   pandas==2.3.0
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-12-30
+Parses timestamped log files containing NMEA VTG sentences (true and magnetic
+course over ground, and speed over ground) and returns the JSON-formatted
+plugin data used by OpenVDM's Data Dashboard.
 """
 
 import sys
@@ -65,7 +42,7 @@ ROUNDING = {
 
 
 class VTGParser(OpenVDMCSVParser):
-    """Parser for NMEA VTG files, fully refactored like GGAParser."""
+    """Parser for NMEA VTG course/speed log files."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
@@ -77,6 +54,16 @@ class VTGParser(OpenVDMCSVParser):
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False, no_mag=False):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            no_mag: Skip the magnetic course over ground field when ``True``.
+        """
         self.no_mag = no_mag
         proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'cog_m']
         super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
@@ -84,6 +71,7 @@ class VTGParser(OpenVDMCSVParser):
                          use_openvdm_api=use_openvdm_api)
 
     def parse(self, filepath):
+        """Parse the VTG file and populate the plugin data."""
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
 
@@ -236,6 +224,11 @@ class VTGParser(OpenVDMCSVParser):
     # -----------------------------
     @classmethod
     def add_cli_arguments(cls, parser):
+        """Add VTG-specific command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
         parser.add_argument('--noMag', action='store_true', default=False, help='Skip COG Magnetic')
 
     @classmethod

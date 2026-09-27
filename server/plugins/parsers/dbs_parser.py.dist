@@ -1,31 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  dbs_parser.py
+"""Parser for NMEA DBS (depth below surface) data.
 
-USAGE:  dbs_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--noMag] <dataFile>
-
-DESCRIPTION:  Parse the supplied NMEA-formtted DBS file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            [--timeFormat] date/time format to use when parsing datafile, default
-                           yyyy-mm-ddTHH:MM:SS.sssZ
-            [--startTS] optional start crop time (strptime format)
-            [--stopTS] optional stop crop time (strptime format)
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   numpy==2.4.0
-                   pandas==2.3.0
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-12-30
+Parses timestamped log files containing NMEA DBS sentences (water depth below
+the surface) and returns the JSON-formatted plugin data used by OpenVDM's Data
+Dashboard.
 """
 
 import sys
@@ -58,7 +36,7 @@ ROUNDING = {
 
 
 class DBSParser(OpenVDMCSVParser):
-    """Parser for NMEA DBS files, fully refactored like GGAParser."""
+    """Parser for NMEA DBS depth-below-surface log files."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
@@ -72,6 +50,7 @@ class DBSParser(OpenVDMCSVParser):
                          use_openvdm_api=use_openvdm_api)
 
     def parse(self, filepath):
+        """Parse the DBS file and populate the plugin data."""
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
 

@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  rov_openrvdas_plugin.py
+"""Plugin for ROV data logged by OpenRVDAS.
 
-USAGE:  rov_openrvdas_plugin.py [-h] [--dataType] <dataFile>
-
-DESCRIPTION:  This python script interprets raw files created by the OpenRVDAS
-    Data Acquision System.  Depending on the command-line arguments, the script
-    returns the data type of the file or a sub-sampled and json-formatted
-    version of the original file to stdout.  The json-formatted file is
-    used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [--dataType] Return the datatype of the file as defined in the
-                fileTypeFilter array.
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   requests==2.32.3
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-10-23
- REVISION:  2025-04-12
+Matches raw OpenRVDAS log files from an ROV to their parsers, crops the data to
+the current lowering (from Sealog or OpenVDM), and returns the JSON-formatted
+plugin data used by OpenVDM's Data Dashboard.
 """
 
 import sys
@@ -71,11 +51,17 @@ FILE_TYPE_FILTERS = [
 
 
 class ROVOpenRVDASPlugin(OpenVDMPlugin):
-    """
-    OpenVDM plugin for the SCS Underway data acquisition system
-    """
+    """OpenVDM plugin for ROV data logged by OpenRVDAS."""
 
     def __init__(self, lowering=None, use_sealog_api=True):
+        """Initialise the plugin and look up the lowering's start and stop times.
+
+        Args:
+            lowering: Lowering ID to crop data to. Defaults to the current
+                lowering in OpenVDM.
+            use_sealog_api: Take the start/stop times from the lowering's Sealog
+                milestones instead of OpenVDM.
+        """
 
         self.sealog_server_url = SEALOG_SERVER_URL
         self.sealog_jwt = SEALOG_JWT

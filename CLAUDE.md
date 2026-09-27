@@ -113,6 +113,13 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 - The legacy `FILE: / DESCRIPTION: / AUTHOR: / REVISION:` header block must **not** be used — replace it with a proper module docstring.
 - Private helpers (names starting with `_`) should have docstrings when their purpose is non-obvious.
 
+**Parsers and plugins** (`server/plugins/parsers/*_parser.py.dist`, `server/plugins/*_plugin.py.dist`) follow a lighter, uniform form (issue #141):
+
+- Module docstring: a summary line, then one paragraph. For parsers: `"""Parser for <instrument / data type>.` followed by `Parses <file format and contents> and returns the JSON-formatted plugin data used by OpenVDM's Data Dashboard.` Plugins use `Plugin for <system>.` and say what they dispatch to.
+- Don't repeat command-line usage/options (argparse `--help` is authoritative) or `requirements.txt` packages. Do mention dependencies that `requirements.txt` doesn't install (e.g. GDAL command-line tools).
+- A one-line docstring is enough for `parse()`/`process_file()`/`parse_file()` and other methods whose only argument is `filepath`, e.g. `"""Parse the DBS file and populate the plugin data."""`. Say "return plugin data dict" only if the method actually returns it.
+- Methods with other parameters, including constructors that add parser-specific options and `add_cli_arguments()`, get Google-style `Args:` (and `Returns:`/`Raises:` where applicable). Constructors that only take the standard `OpenVDMCSVParser` options don't need a docstring.
+
 ## Testing
 
 ### Known false-positive pytest errors
