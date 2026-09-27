@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-"""
-FILE:  connection_utils.py
+"""Utilities for testing and connecting to remote systems.
 
-DESCRIPTION:  utilities used to connect with remote systems
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2025-07-05
- REVISION:  2025-08-18
+Provides the connection checks and command builders used by the transfer
+workers for the five transfer types: local directory, rsync server, SMB share,
+SSH server and rclone remote. Low-level connection tests return ``(bool, str)``
+tuples (success flag plus detail); the higher-level source/destination tests
+return ``list[dict]`` with ``partName``/``result``/``reason`` keys.
 """
 
 import glob
@@ -80,6 +76,18 @@ def get_transfer_type(transfer_type):
 
 
 def get_rclone_remote_type(remote_name, config_path=None):
+        """Return the type of an rclone remote from the rclone config file.
+
+        Args:
+            remote_name: Name of the remote (the part of ``remote:path`` before ``:``).
+            config_path: rclone config file. Defaults to
+                ``~/.config/rclone/rclone.conf``.
+
+        Returns:
+            The remote's ``type`` (e.g. ``'smb'``, ``'sftp'``,
+            ``'google cloud storage'``), or ``'local'`` if the config file or the
+            remote isn't found.
+        """
         # Default rclone config path
         if config_path is None:
             config_path = os.path.expanduser("~/.config/rclone/rclone.conf")
@@ -381,6 +389,23 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
 
 
 def build_rclone_config_for_ssh(cfg, rclone_config):
+    """Write an rclone SFTP remote for a transfer's SSH server to a config file.
+
+    The remote authenticates with the transfer's password (obscured with
+    ``rclone obscure``) or, when ``sshUseKey`` is set, with the ``IdentityFile``
+    configured for the host in ``~/.ssh/config`` (default ``~/.ssh/id_rsa``).
+
+    Args:
+        cfg: Transfer configuration with ``sshServer``, ``sshUser``,
+            ``sshUseKey`` and ``sshPass``.
+        rclone_config: Path of the rclone config file to write.
+
+    Returns:
+        The remote's name: the SSH server with ``.`` replaced by ``_``.
+
+    Raises:
+        subprocess.CalledProcessError: If ``rclone obscure`` fails.
+    """
     cfg = normalize_transfer_config(cfg)
     ssh_config_path = os.path.expanduser("~/.ssh/config")
     identity_file = os.path.expanduser("~/.ssh/id_rsa")
@@ -508,6 +533,19 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
 
 
 def test_local_destination(dest_dir, is_mountpoint=0):
+    """Test a local destination directory for a cruise data transfer.
+
+    Checks that the directory exists, optionally that its top-level mount point
+    (the first two path components, e.g. ``/mnt/usb``) is mounted, and that it's
+    writable.
+
+    Args:
+        dest_dir: Absolute path of the destination directory.
+        is_mountpoint: ``1`` if the directory must be on a mounted filesystem.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
     results = []
 
     dest_dir_exists = os.path.isdir(dest_dir)
@@ -551,6 +589,24 @@ def test_local_destination(dest_dir, is_mountpoint=0):
 
 
 def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
+    """Test an SMB share destination for a cruise data transfer.
+
+    Reports the SMB server check, mounts the share at *mntpoint*, then runs
+    :func:`test_local_destination` on the destination directory within it. The
+    caller is responsible for unmounting the share.
+
+    Args:
+        cdt_cfg: Cruise data transfer configuration (SMB server, share,
+            credentials and ``destDir``).
+        mntpoint: Local directory to mount the share on.
+        smb_version: Detected SMB protocol version, or empty if detection
+            failed.
+        smb_detail: Error detail from SMB version detection, used as the
+            failure reason.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
     results = []
 
     if not smb_version:
@@ -1073,6 +1129,18 @@ def test_cdt_destination(cdt_cfg):
         return results
 
 def test_cdt_rclone_destination(cfg):
+    """Test an rclone destination for a cruise data transfer.
+
+    ``destDir`` is either a local path or an rclone ``remote:path``. The test
+    depends on the remote's type: local directory, SMB share (mounted in a
+    temporary directory), Google Cloud Storage bucket or SFTP server.
+
+    Args:
+        cfg: Cruise data transfer configuration.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
 
     def _gcs_bucket_exists(remote_path):
         try:

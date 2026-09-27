@@ -78,6 +78,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def get_custom_task(current_job):
+        """Return the ``CUSTOM_TASKS`` entry for the job's task, or ``None``.
+
+        Args:
+            current_job: The Gearman job.
+        """
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
 
@@ -176,6 +181,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return new_manifest_entries, remove_manifest_entries
 
     def on_job_execute(self, current_job):
+        """Load the job's task and cruise/lowering settings, then run the job.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            The job's result, or a failed-job result if its payload can't be read.
+        """
         self.stop = False
         try:
             payload_obj = json.loads(current_job.data)
@@ -301,10 +314,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }))
 
     def stop_task(self):
+        """Ask the current task to stop."""
         self.stop = True
         logging.warning("Stopping current task...")
 
     def quit_worker(self):
+        """Stop the current task and shut down the worker."""
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -314,6 +329,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 # Gearman task definitions
 # -------------------------
 def task_update_data_dashboard(worker, current_job):
+    """Update the data dashboard for a collection system transfer's new and updated files.
+
+    Runs the transfer's plugin on the files listed in the job payload, writes
+    their dashboard JSON files and updates the manifest.
+
+    Args:
+        worker: The data dashboard Gearman worker.
+        current_job: The Gearman job; its payload lists the new and updated files.
+
+    Returns:
+        str: JSON job results with ``parts`` and the new/updated/deleted files.
+    """
     job_results = {'parts':[], 'files':{'new':[], 'updated':[], 'deleted':[]}}
     logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
@@ -384,6 +411,19 @@ def task_update_data_dashboard(worker, current_job):
 
 
 def task_rebuild_data_dashboard(worker, current_job):
+    """Rebuild the whole data dashboard for the cruise.
+
+    Re-runs each collection system transfer's plugin on every file in its
+    destination directory (cruise-level, and for each lowering), then rewrites
+    the manifest.
+
+    Args:
+        worker: The data dashboard Gearman worker.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results with ``parts`` and the new/updated files.
+    """
     job_results = {'parts':[], 'files':{'new':[], 'updated':[]}}
     logging.info("Rebuilding data dashboard")
     worker.send_job_status(current_job, 1, 100)
