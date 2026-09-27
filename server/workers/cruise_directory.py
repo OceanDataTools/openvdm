@@ -26,12 +26,14 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import create_directories, lockdown_directory, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'CREATE_CRUISE_DIRECTORY': 'createCruiseDirectory',
     'REBUILD_CRUISE_DIRECTORY': 'rebuildCruiseDirectory',
     'SET_CRUISEDATA_PERMISSIONS': 'setCruiseDataDirectoryPermissions'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,

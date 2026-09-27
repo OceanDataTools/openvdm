@@ -38,6 +38,7 @@ from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'CREATE_CRUISE': 'setupNewCruise',
     'FINALIZE_CRUISE': 'finalizeCurrentCruise',

@@ -32,6 +32,7 @@ from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'CREATE_LOWERING': 'setupNewLowering',
     'FINALIZE_LOWERING': 'finalizeCurrentLowering',

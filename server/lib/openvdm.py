@@ -18,8 +18,10 @@ try:
 except ModuleNotFoundError:
     pass
 
+# OpenVDM server config file (server/etc/openvdm.yaml).
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
 
+# Timeout, in seconds, for requests to the OpenVDM web API.
 TIMEOUT = 5
 
 class OpenVDM():

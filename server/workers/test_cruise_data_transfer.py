@@ -22,6 +22,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 from server.lib.connection_utils import get_transfer_type, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'TEST_CRUISE_DATA_TRANSFER': 'testCruiseDataTransfer'
 }

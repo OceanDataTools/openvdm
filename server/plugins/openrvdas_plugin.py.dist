@@ -80,7 +80,15 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         return parsers
 
     def parse_file(self, filepath):
-        """Run every matching parser on the file and return their plugin data by data type."""
+        """Run every matching parser on the file and return their plugin data by data type.
+
+        Args:
+            filepath: Path to the raw OpenRVDAS log file.
+
+        Returns:
+            dict: Each matching parser's plugin data, keyed by data type; empty
+            if no filter matches or no parser produced data.
+        """
         parsers = self._get_parsers(filepath)
         if not parsers:
             logging.debug("No parsers matched file %s", filepath)
@@ -100,8 +108,14 @@ class OpenRVDASPlugin(OpenVDMPlugin):
 # Module-level function for worker
 # -------------------------------
 def process_file(filepath):
-    """
-    Module-level wrapper for Gearman worker compatibility.
+    """Parse a file with the OpenRVDAS plugin (entry point for the data dashboard worker).
+
+    Args:
+        filepath: Path to the raw OpenRVDAS log file.
+
+    Returns:
+        dict: The plugin data by data type, as returned by
+        :meth:`OpenRVDASPlugin.parse_file`.
     """
     plugin = OpenRVDASPlugin()
     return plugin.parse_file(filepath)

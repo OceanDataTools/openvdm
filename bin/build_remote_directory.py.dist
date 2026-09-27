@@ -46,11 +46,16 @@ sys.path.append(dirname(dirname(realpath(__file__))))
 from server.lib.file_utils import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
+# Default template directory to recreate on each collection system; override with -t.
 TEMPLATE_DIRECTORY = '/opt/openvdm/template_directory'
 
 def make_system_call(command):
-    """
-    function to make any system calls
+    """Run a command, logging its stdout (debug) and stderr (error).
+
+    Failures aren't raised or returned; check the log.
+
+    Args:
+        command: The command as an argument list, e.g. ``['smbclient', ...]``.
     """
 
     logging.debug("Command: %s", ' '.join(command))
@@ -64,8 +69,13 @@ def make_system_call(command):
         logging.error("stderr:\n%s",err)
 
 def make_local_directory(directory, create_source_dir=False):
-    """
-    Function to make a local directory
+    """Create a local directory (``mkdir -p`` style when *create_source_dir* is set).
+
+    Does nothing if the directory already exists.
+
+    Args:
+        directory: Path of the directory to create.
+        create_source_dir: Also create missing parent directories.
     """
     logging.debug("Create directory: %s, Create Source: %s", directory, "Yes" if create_source_dir else "No")
     pathlib.Path(directory).mkdir(mode=755, parents=create_source_dir, exist_ok=True)

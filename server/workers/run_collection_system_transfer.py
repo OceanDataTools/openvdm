@@ -38,8 +38,10 @@ from server.lib.file_utils import build_include_file, is_ascii, is_default_ignor
 from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
+# Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
