@@ -165,7 +165,7 @@ class Session
      *
      * @param string $sessionName default session name
      *
-     * @return string
+     * @return string|null the message, or null if there is none
      */
     public static function message($sessionName = 'success')
     {
@@ -176,5 +176,7 @@ class Session
                     <h4><i class='fa fa-check'></i> ".$msg.'</h4>
                   </div>';
         }
+
+        return null;
     }
 }

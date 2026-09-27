@@ -193,7 +193,7 @@ class Gump
      *
      * @param array $rules
      *
-     * @return array
+     * @return array|null the rules when called with none, otherwise null
      */
     public function validation_rules(array $rules = [])
     {
@@ -202,6 +202,8 @@ class Gump
         }
 
         $this->validation_rules = $rules;
+
+        return null;
     }
 
     /**
@@ -209,7 +211,7 @@ class Gump
      *
      * @param array $rules
      *
-     * @return array
+     * @return array|null the rules when called with none, otherwise null
      */
     public function filter_rules(array $rules = [])
     {
@@ -218,6 +220,8 @@ class Gump
         }
 
         $this->filter_rules = $rules;
+
+        return null;
     }
 
     /**
