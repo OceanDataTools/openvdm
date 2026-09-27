@@ -10,6 +10,8 @@ class DashboardData extends Model {
     // const MANIFEST_FN = 'manifest.json';
 
     private $_cruiseDataDir;
+    private $_cruiseConfigFn;
+    private $_dataDashboardManifestFn;
     private $_manifestObj;
     private $_cruiseID;
     private $_warehouseModel;
