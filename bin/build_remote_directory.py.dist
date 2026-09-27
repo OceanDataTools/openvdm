@@ -78,7 +78,7 @@ def make_local_directory(directory, create_source_dir=False):
         create_source_dir: Also create missing parent directories.
     """
     logging.debug("Create directory: %s, Create Source: %s", directory, "Yes" if create_source_dir else "No")
-    pathlib.Path(directory).mkdir(mode=755, parents=create_source_dir, exist_ok=True)
+    pathlib.Path(directory).mkdir(mode=0o755, parents=create_source_dir, exist_ok=True)
 
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
