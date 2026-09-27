@@ -82,11 +82,11 @@ class shipToShoreTransfers extends Controller {
         }
 
         $this->_shipToShoreTransfersModel = new \Models\Config\ShipToShoreTransfers();
-        $this->_cruiseDataTransferModel = new \Models\Config\CruiseDataTransfers();
+        $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
 
-        $requiredCruiseDataTransfers = $this->_cruiseDataTransferModel->getRequiredCruiseDataTransfers();
+        $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
 
         foreach($requiredCruiseDataTransfers as $requiredCruiseDataTransfer) {
             if(strcmp($requiredCruiseDataTransfer->name, 'SSDW') === 0) {
@@ -324,14 +324,14 @@ class shipToShoreTransfers extends Controller {
     public function enableShipToShoreTransfers() {
 
         //$this->_cruiseDataTransfersModel->enableCruiseDataTransfer($id);
-        $this->_cruiseDataTransferModel->enableCruiseDataTransfer($this->_ssdwConfig->cruiseDataTransferID);
+        $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($this->_ssdwConfig->cruiseDataTransferID);
         //Url::redirect('config/cruiseDataTransfers');
         Url::redirect('config/shipToShoreTransfers');
     }
 
     public function disableShipToShoreTransfers() {
 
-        $this->_cruiseDataTransferModel->disableCruiseDataTransfer($this->_ssdwConfig->cruiseDataTransferID);
+        $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($this->_ssdwConfig->cruiseDataTransferID);
         Url::redirect('config/shipToShoreTransfers');
     }
 

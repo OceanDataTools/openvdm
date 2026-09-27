@@ -9,6 +9,8 @@ class Warehouse extends Model {
     // const LOWERING_CONFIG_FN = 'loweringConfig.json';
     // const MANIFEST_FN = 'manifest.json';
 
+    private $_lowerings;
+
     public function getFreeSpace() {
         $baseDir = $this->getShipboardDataWarehouseBaseDir();
         if (is_dir($baseDir)) {

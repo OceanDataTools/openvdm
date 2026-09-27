@@ -1,18 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Instantiated class Models\\Cruises not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Controllers/Api/DashboardData.php
-
-		-
-			message: '#^Undefined variable\: \$dataType$#'
-			identifier: variable.undefined
-			count: 1
-			path: app/Controllers/Api/DashboardData.php
-
-		-
 			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
 			identifier: class.nameCase
 			count: 1
@@ -77,12 +65,6 @@ parameters:
 			identifier: class.nameCase
 			count: 1
 			path: app/Controllers/Config/Main.php
-
-		-
-			message: '#^Access to an undefined property Controllers\\Config\\shipToShoreTransfers\:\:\$_cruiseDataTransferModel\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Controllers/Config/ShipToShoreTransfers.php
 
 		-
 			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
@@ -331,18 +313,6 @@ parameters:
 			path: app/Models/Config/Tasks.php
 
 		-
-			message: '#^Access to an undefined property Models\\DashboardData\:\:\$_cruiseConfigFn\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/DashboardData.php
-
-		-
-			message: '#^Access to an undefined property Models\\DashboardData\:\:\$_dataDashboardManifestFn\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Models/DashboardData.php
-
-		-
 			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
 			identifier: class.nameCase
 			count: 1
@@ -359,12 +329,6 @@ parameters:
 			identifier: class.nameCase
 			count: 1
 			path: app/Models/TransferLogs.php
-
-		-
-			message: '#^Access to an undefined property models\\Warehouse\:\:\$_lowerings\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Models/Warehouse.php
 
 		-
 			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
