@@ -4,6 +4,18 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.15.9] – 2026-09-27
+
+### Changed
+- Replace the CARTO basemap, which now requires an API key, with keyless providers. The map layer switcher now offers OpenStreetMap, Esri Ocean, Esri Dark Gray and Light Gray canvas basemaps, and GMRT, plus Esri label and OpenSeaMap seamark overlays. The layers are defined once in the new `mapBaseLayers.js` and shared by the data dashboard, lowering and custom maps (#121). Installs with a customized `www/app/templates/default/js/custom1.js` still point at CARTO. Update that file from `custom1.js.dist`.
+
+### Fixed
+- Fix a new password typed into a collection system or cruise data transfer edit form being lost when **Test Setup** was clicked before **Update**. The password is now kept server-side for the following Update (#119)
+- Fix every page using the default header, and `/api/messages/getNewMessagesTotal`, returning an empty HTTP 500 once the Messages table grew large; message totals are now counted in MySQL instead of loading every row into PHP (#123)
+- Fix `Undefined array key` PHP warnings (e.g. `cruisePI`) when switching the current cruise to one whose `ovdmConfig.json` omits blank fields (#125)
+
+---
+
 ## [2.15.8] – 2026-09-19
 
 ### Fixed
