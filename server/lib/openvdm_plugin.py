@@ -149,6 +149,12 @@ class OpenVDMParserStat():
         if stat_type not in STAT_TYPES:
             raise ValueError(f"Invalid stat type, must be one of: {', '.join(STAT_TYPES)}")
 
+        # Values computed with pandas/numpy (e.g. round(df[col].min(), n) on an
+        # integer column) are numpy scalars; numpy.int64 isn't an int, so
+        # convert them to Python numbers before validating.
+        if isinstance(stat_value, list):
+            stat_value = [self._to_python_number(element) for element in stat_value]
+
         if stat_type == 'bounds':
             if not isinstance(stat_value, list) or len(stat_value) != 2:
                 raise ValueError("bounds stat requires list of length 2")
@@ -194,6 +200,17 @@ class OpenVDMParserStat():
             'statUnit': stat_uom,
             'statValue': stat_value
         }
+
+
+    @staticmethod
+    def _to_python_number(value):
+        """Return *value* as a Python ``int``/``float`` if it's a numpy number, else unchanged."""
+
+        if isinstance(value, np.integer):
+            return int(value)
+        if isinstance(value, np.floating):
+            return float(value)
+        return value
 
 
     def get_stat_data(self):
