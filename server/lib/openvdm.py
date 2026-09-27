@@ -1498,7 +1498,7 @@ class OpenVDM():
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
         if not collection_system_transfer:
-            raise ValueError("Invalid collection_system_transfer id: %s", collection_system_transfer_id)
+            raise ValueError(f"Invalid collection_system_transfer id: {collection_system_transfer_id}")
 
         title = f"{collection_system_transfer.get('name')} Data Transfer failed"
 
@@ -1528,7 +1528,7 @@ class OpenVDM():
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
         if not collection_system_transfer:
-            raise ValueError("Invalid collection_system_transfer id: %s", collection_system_transfer_id)
+            raise ValueError(f"Invalid collection_system_transfer id: {collection_system_transfer_id}")
 
         title = f"{collection_system_transfer.get('name')} Connection test failed"
 
@@ -1558,7 +1558,7 @@ class OpenVDM():
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
         if not cruise_data_transfer:
-            raise ValueError("Invalid cruise_data_transfer id: %s", cruise_data_transfer_id)
+            raise ValueError(f"Invalid cruise_data_transfer id: {cruise_data_transfer_id}")
 
         title = f"{cruise_data_transfer.get('name')} Data Transfer failed"
 
@@ -1588,7 +1588,7 @@ class OpenVDM():
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
         if not cruise_data_transfer:
-            raise ValueError("Invalid cruise_data_transfer id: %s", cruise_data_transfer_id)
+            raise ValueError(f"Invalid cruise_data_transfer id: {cruise_data_transfer_id}")
 
         title = f"{cruise_data_transfer.get('name')} Connection test failed"
 
@@ -1618,7 +1618,7 @@ class OpenVDM():
 
         task = self.get_task(task_id)
         if not task:
-            raise ValueError("Invalid task id: %s", task_id)
+            raise ValueError(f"Invalid task id: {task_id}")
 
         title = f"{task.get('longName')} failed"
 
@@ -1704,7 +1704,7 @@ class OpenVDM():
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
         if not collection_system_transfer:
-            raise ValueError("Invalid collection_system_transfer id: %s", collection_system_transfer_id)
+            raise ValueError(f"Invalid collection_system_transfer id: {collection_system_transfer_id}")
 
         msg = f"Transfer for {collection_system_transfer.get('name')}"
 
@@ -1740,7 +1740,7 @@ class OpenVDM():
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
         if not collection_system_transfer:
-            raise ValueError("Invalid collection system transfer id: %s", collection_system_transfer_id)
+            raise ValueError(f"Invalid collection system transfer id: {collection_system_transfer_id}")
 
         msg = f"Transfer test for {collection_system_transfer.get('name')}"
 
@@ -1763,7 +1763,7 @@ class OpenVDM():
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
         if not cruise_data_transfer:
-            raise ValueError("Invalid cruise_data_transfer id: %s", cruise_data_transfer_id)
+            raise ValueError(f"Invalid cruise_data_transfer id: {cruise_data_transfer_id}")
 
         msg = f"Transfer for {cruise_data_transfer.get('name')}"
 
@@ -1799,7 +1799,7 @@ class OpenVDM():
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
         if not cruise_data_transfer:
-            raise ValueError("Invalid cruise data transfer id: %s", cruise_data_transfer_id)
+            raise ValueError(f"Invalid cruise data transfer id: {cruise_data_transfer_id}")
 
         msg = f"Transfer test for {cruise_data_transfer.get('name')}"
 
@@ -1822,7 +1822,7 @@ class OpenVDM():
 
         task = self.get_task(task_id)
         if not task:
-            raise ValueError("Invalid task id: %s", task_id)
+            raise ValueError(f"Invalid task id: {task_id}")
 
         # Set Running for the tasks in DB via API
         url = f"{self.config['siteRoot']}api/tasks/setRunningTask/{task_id}"
