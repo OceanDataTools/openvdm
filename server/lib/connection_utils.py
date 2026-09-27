@@ -734,7 +734,7 @@ def test_local_destination(dest_dir, is_mountpoint=0):
         results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
 
     if not test_write_access(dest_dir):
-        reason = f"Unable to delete source files from: {dest_dir} on SMB share"
+        reason = f"Unable to write to destination directory: {dest_dir}"
         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
         return results
