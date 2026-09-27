@@ -103,7 +103,8 @@ class GeoTIFFParser(OpenVDMParser):
         logging.debug("Finished parsing data file")
 
         logging.debug("Tabulating statistics...")
-        self.add_geobounds_stat([minx,miny,maxx,maxy])
+        # geoBounds is [north, east, south, west]; mapBounds below stays west,south,east,north.
+        self.add_geobounds_stat([maxy, maxx, miny, minx])
 
         logging.debug("Building visualization data...")
 

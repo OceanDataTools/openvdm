@@ -155,7 +155,10 @@ class GeoTIFFParser(OpenVDMParser):
         logging.debug("Finished parsing data file")
 
         logging.debug("Tabulating statistics...")
-        self.add_geobounds_stat(bounds)
+        # TiTiler's bbox is [west, south, east, north]; geoBounds is
+        # [north, east, south, west]. mapBounds below keeps TiTiler's order.
+        west, south, east, north = bounds
+        self.add_geobounds_stat([north, east, south, west])
         self._add_band_stats(file_url, info)
 
         logging.debug("Building visualization data...")
