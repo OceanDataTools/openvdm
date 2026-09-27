@@ -26,5 +26,9 @@
             "bash ./post_composer.sh"
         ]
     },
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require-dev": {
+        "phpstan/phpstan": "^2.2"
+    }
 }

@@ -1,0 +1,421 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Instantiated class Models\\Cruises not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Controllers/Api/DashboardData.php
+
+		-
+			message: '#^Undefined variable\: \$dataType$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Controllers/Api/DashboardData.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Api/ExtraDirectories.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Api/Warehouse.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 2
+			path: app/Controllers/Api/Warehouse.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 6
+			path: app/Controllers/Config/CollectionSystemTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 2
+			path: app/Controllers/Config/CruiseDataTransfers.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/CruiseDataTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 4
+			path: app/Controllers/Config/ExtraDirectories.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/ExtraDirectories.php
+
+		-
+			message: '#^Caught class Controllers\\Config\\Exception not found\.$#'
+			identifier: class.notFound
+			count: 4
+			path: app/Controllers/Config/Main.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/Main.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/Main.php
+
+		-
+			message: '#^Access to an undefined property Controllers\\Config\\shipToShoreTransfers\:\:\$_cruiseDataTransferModel\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Controllers/Config/ShipToShoreTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 2
+			path: app/Controllers/Config/ShipToShoreTransfers.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/ShipToShoreTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 3
+			path: app/Controllers/Config/System.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/System.php
+
+		-
+			message: '#^Class models\\config\\Links referenced with incorrect case\: Models\\Config\\Links\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Config/System.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/DataDashboard/DataDashboard.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Welcome.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Controllers/Welcome.php
+
+		-
+			message: '#^Variable \$error in isset\(\) is never defined\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Core/Error.php
+
+		-
+			message: '#^Constant SITEEMAIL not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: app/Core/Logger.php
+
+		-
+			message: '#^Call to static method customErrorMsg\(\) on an unknown class Helpers\\Logger\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Call to static method newMessage\(\) on an unknown class Helpers\\Logger\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Caught class Helpers\\PDOException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Method Helpers\\Database\:\:get\(\) should return Helpers\\Database but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Variable \$dates might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Helpers/Date.php
+
+		-
+			message: '#^Method Helpers\\Ftp\:\:folderPermission\(\) should return string but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Ftp.php
+
+		-
+			message: '#^Method Helpers\\Gump\:\:filter_rules\(\) should return array but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Gump.php
+
+		-
+			message: '#^Method Helpers\\Gump\:\:validation_rules\(\) should return array but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Gump.php
+
+		-
+			message: '#^Variable \$counter might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Helpers/Paginator.php
+
+		-
+			message: '#^Method Helpers\\PhpMailer\\Exception\:\:errorMessage\(\) should return string but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/PhpMailer/Exception.php
+
+		-
+			message: '#^Caught class Helpers\\PhpMailer\\phpmailerException not found\.$#'
+			identifier: class.notFound
+			count: 6
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Class Helpers\\PhpMailer\\Smtp referenced with incorrect case\: Helpers\\PhpMailer\\SMTP\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\html2text not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\phpmailerException not found\.$#'
+			identifier: class.notFound
+			count: 22
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Path in require_once\(\) "extras/class\.html2text\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Variable \$_SERVER in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\ntlm_sasl_client_class not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\stdClass not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Path in require_once\(\) "extras/ntlm_sasl_client\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Variable \$_FILES in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_GET in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 2
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_POST in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_PUT in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Method Helpers\\Session\:\:message\(\) should return string but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Session.php
+
+		-
+			message: '#^Class Helpers\\Tags referenced with incorrect case\: Helpers\\tags\.$#'
+			identifier: class.nameCase
+			count: 7
+			path: app/Helpers/Tags.php
+
+		-
+			message: '#^Constant SITEEMAIL not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: app/Helpers/Tags.php
+
+		-
+			message: '#^Method Helpers\\Url\:\:getSegment\(\) should return string but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Url.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/Config/CollectionSystemTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/Config/ExtraDirectories.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/Config/Links.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/Config/Tasks.php
+
+		-
+			message: '#^Access to an undefined property Models\\DashboardData\:\:\$_cruiseConfigFn\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/DashboardData.php
+
+		-
+			message: '#^Access to an undefined property Models\\DashboardData\:\:\$_dataDashboardManifestFn\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/DashboardData.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/DashboardData.php
+
+		-
+			message: '#^Class models\\config\\ExtraDirectories referenced with incorrect case\: Models\\Config\\ExtraDirectories\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/DashboardData.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Models/TransferLogs.php
+
+		-
+			message: '#^Access to an undefined property models\\Warehouse\:\:\$_lowerings\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Warehouse.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/templates/default/header.php
+
+		-
+			message: '#^Class models\\config\\Links referenced with incorrect case\: Models\\Config\\Links\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/templates/default/header.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/views/Config/addCollectionSystemTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/views/Config/editCollectionSystemTransfers.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/views/Config/main.php
+
+		-
+			message: '#^Variable \$filecount might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: app/views/DataDashboard/dataDashboard.php
+
+		-
+			message: '#^Variable \$loadingImage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/views/DataDashboard/dataDashboard.php
+
+		-
+			message: '#^Variable \$filecount might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: app/views/DataDashboard/lowering.php
+
+		-
+			message: '#^Class models\\Warehouse referenced with incorrect case\: Models\\Warehouse\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/views/Welcome/index.php

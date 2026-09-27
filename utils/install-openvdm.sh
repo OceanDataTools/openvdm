@@ -1703,7 +1703,7 @@ EOF
 
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    /usr/local/bin/composer -q install
+    /usr/local/bin/composer -q install --no-dev
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
