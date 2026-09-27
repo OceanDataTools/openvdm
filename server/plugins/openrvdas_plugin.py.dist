@@ -1,31 +1,12 @@
 #!/usr/bin/env python3
-"""
-FILE:  openrvdas_plugin.py
+"""Plugin for underway data logged by OpenRVDAS.
 
-USAGE:  openrvdas_plugin.py [-h] [--dataType] <dataFile>
+Matches raw OpenRVDAS log files to the parsers configured in FILE_TYPE_FILTERS,
+runs them, and returns the JSON-formatted plugin data used by OpenVDM's Data
+Dashboard.
 
-DESCRIPTION:  This python script interprets raw files created by the OpenRVDAS
-    Data Acquision System.  Depending on the command-line arguments, the script
-    returns the data type(s) of the file or a sub-sampled and json-formatted
-    version of the original file to stdout.  The json-formatted file is used by
-    OpenVDM as part of it's Data dashboard.
-
-    NOTE: Multiple parsers may intentionally process the same file.
-    Each parser is responsible for filtering only the sentences it understands.
-
-  OPTIONS:  [-h] Return the help message.
-            [--dataType] Return the datatype of the file as defined in the
-                fileTypeFilter array.
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-10-23
- REVISION:  2025-12-30
+Multiple parsers may intentionally process the same file; each parser filters
+for only the sentences it understands.
 """
 
 import sys
@@ -63,6 +44,8 @@ fileTypeFilters = [
 # Plugin class
 # -------------------------------
 class OpenRVDASPlugin(OpenVDMPlugin):
+    """OpenVDM plugin for underway data logged by OpenRVDAS."""
+
     PARSER_MAP = {
         "GGA": GGAParser,
         # "HDT": HDTParser,
@@ -97,6 +80,7 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         return parsers
 
     def parse_file(self, filepath):
+        """Run every matching parser on the file and return their plugin data by data type."""
         parsers = self._get_parsers(filepath)
         if not parsers:
             logging.debug("No parsers matched file %s", filepath)
