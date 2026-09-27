@@ -71,8 +71,7 @@ npm install
 source ./venv/bin/activate
 python -m pytest server                  # only the known false-positive errors are expected (see Testing)
 ruff check server/
-pre-commit run --all-files               # ruff + ESLint
-git diff --name-only dev -- '*.php' '*.php.dist' | xargs -r -n1 php -l   # PHP syntax check
+pre-commit run --all-files               # ruff, ESLint and php -l
 ```
 
 There is no automated test suite for the PHP or JavaScript. Changes to the web UI need a manual check in a browser.
@@ -93,7 +92,7 @@ pre-commit run eslint --all-files
 - **Python**: PEP8, 100-character line limit, use `pylint` and `ruff` (configured in `.pylintrc` and `ruff.toml`)
 - **JavaScript**: match the existing code: 4-space indentation, semicolons, `var`, and page scripts wrapped in jQuery `$(function () { ... })`. ESLint (`eslint.config.mjs`) checks for bugs only (undefined names, unused and duplicate variables, unreachable code), not formatting. Variables defined outside the file being linted (libraries, the inline `<script>` in `templates/default/footer.php`, helpers such as `mapBaseLayers.js`) must be listed in the config's globals; a script that defines a helper for other files marks it with `/* exported name */`.
 - **PHP**: follows existing MVC conventions in `www/app/`
-- Ruff (auto-fix) and ESLint run on commit via `.pre-commit-config.yaml`
+- Ruff (auto-fix), ESLint and a `php -l` syntax check run on commit via `.pre-commit-config.yaml`. The PHP check uses the locally installed `php` (8.3 matches production) and is skipped with a message if PHP isn't installed.
 
 ### Python documentation standard
 

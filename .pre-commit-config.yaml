@@ -13,3 +13,8 @@ repos:
         files: ^www/app/templates/default/js/.*\.js(\.dist)?$
         exclude: ^www/app/templates/default/js/sb-admin-2\.js$
         additional_dependencies: ['eslint@10.11.0']
+      - id: php-lint
+        name: php -l
+        language: system
+        entry: bash -c 'command -v php >/dev/null || { echo "php not installed, skipping PHP syntax check"; exit 0; }; for f in "$@"; do php -l "$f" >/dev/null || exit 1; done' --
+        files: ^www/.*\.php(\.dist)?$
