@@ -1,12 +1,10 @@
 $(function () {
     'use strict';
 
-    var MAPPROXY_DIR = '/mapproxy';
 
     var greenIcon = null;
     var redIcon = null;
 
-    var chartHeight = 200;
 
     var mapObjects = [],
         chartObjects = [];
@@ -346,8 +344,8 @@ $(function () {
     }
 
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
-        var reversedY = reversedY || false;
-        var inverted = inverted || false;
+        reversedY = reversedY || false;
+        inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -457,7 +455,7 @@ $(function () {
     }
 
     //build the charts
-    for(var i = 0; i < chartObjects.length; i++) {
+    for(i = 0; i < chartObjects.length; i++) {
         chartChecked(chartObjects[i]);
     }
 

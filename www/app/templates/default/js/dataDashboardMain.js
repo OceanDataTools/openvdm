@@ -1,14 +1,11 @@
 $(function () {
     'use strict';
 
-    var MAPPROXY_DIR = '/mapproxy';
     var TITILER_URL = '/titiler'
 
-    var max_values = 5;
-
     function displayLatestJSON(dataType, reversedY, inverted) {
-        var reversedY = reversedY || false;
-        var inverted = inverted || false;
+        reversedY = reversedY || false;
+        inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -91,7 +88,7 @@ $(function () {
                     };
 
                     const ctx = document.getElementById(placeholderID).getContext('2d');
-                    var chart = new Chart(ctx, chartOptions);
+                    new Chart(ctx, chartOptions);
                 }
             }
         });
@@ -157,7 +154,7 @@ $(function () {
                     ggaData.addTo(mapdb);
 
                     // Add marker at the last coordinate
-                    var marker = L.marker(latLng).addTo(mapdb);
+                    L.marker(latLng).addTo(mapdb);
 
                 }
             }
@@ -180,7 +177,6 @@ $(function () {
 
                     //Build Leaflet latLng object
                     var mapBounds = L.latLngBounds(southwest, northeast);
-                    var latLng = mapBounds.getCenter();
 
                     //Build the map
                     var mapdb = L.map(placeholder.split('#')[1], {

@@ -6,6 +6,8 @@
  * dashboard, lowering and custom dashboard scripts can call openvdmBaseLayers().
  */
 
+/* exported openvdmBaseLayers, openvdmOverlayLayers */
+
 /**
  * Build a fresh set of basemap layers for the layer switcher.
  *
