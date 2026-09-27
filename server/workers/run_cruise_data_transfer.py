@@ -71,8 +71,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def build_exclude_filterlist(self):
-        """
-        Build exclude filter for the transfer
+        """Return the rsync/rclone exclude patterns for the cruise data transfer.
+
+        Excludes the collection systems and extra directories the transfer is
+        set to skip, and lowering config files where configured, plus files
+        with non-ASCII names.
+
+        Returns:
+            list[str]: Exclude patterns, relative to the cruise directory.
         """
 
         #exclude non-ascii filenames
@@ -159,8 +165,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def test_destination(self):
-        """
-        Test the transfer destination
+        """Run the connection tests for the transfer's destination.
+
+        Uses ``test_cdt_rclone_destination()`` for rclone destinations (a
+        ``remote:path`` ``destDir``) and ``test_cdt_destination()`` otherwise.
+
+        Returns:
+            list[dict]: Test parts with ``partName``/``result``/``reason``
+            keys.
         """
         if ':' in self.cruise_data_transfer['destDir']:
             return test_cdt_rclone_destination(self.cruise_data_transfer)
@@ -169,8 +181,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def make_cruise_dir(self, dest_dir, extra_args=None):
-        """
-        Run the rsync command and return the list of new/updated files
+        """Create the cruise directory on an rclone destination (``rclone mkdir``).
+
+        Failures are logged, not raised.
+
+        Args:
+            dest_dir: rclone destination (``remote:path``).
+            extra_args: Extra rclone arguments (e.g. ``['--config', path]``),
+                or ``None``.
         """
 
         # Build rclone command
@@ -191,8 +209,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def run_transfer_command(self, current_job, command, file_count):
-        """
-        Run the rsync command and return the list of new/updated files
+        """Run an rsync or rclone transfer command and collect the files it transferred.
+
+        Streams the command's output to report progress to the Gearman job.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            command: The rsync or rclone command as an argument list.
+            file_count: Number of files expected; with ``0`` the command isn't
+                run.
+
+        Returns:
+            tuple[list, list]: ``(new_files, updated_files)``.
+
+        Raises:
+            subprocess.CalledProcessError: If the command exits with an error.
         """
 
         def _process_rsync_line(line, last_percent):
@@ -276,8 +307,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def transfer_to_destination(self, current_job):
-        """
-        Unified transfer function to handle local, SMB, rsync, and SSH transfers
+        """Copy the cruise directory to the transfer's destination.
+
+        Handles local directories, SMB shares, rsync servers, SSH servers and
+        rclone remotes, applying the transfer's exclude filters.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+
+        Returns:
+            dict: ``{'verdict': True, 'files': ...}`` with the transferred
+            files, or ``{'verdict': False, 'reason': ...}``.
         """
 
         cdt_cfg = self.cruise_data_transfer
@@ -459,8 +499,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseDataTransfer``, ``cruiseID``,
+        ``systemStatus``; any it omits default to the current cruise/lowering
+        settings), loads what the task needs from the OpenVDM API, then runs
+        the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
 
@@ -512,8 +563,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the cruise data transfer's status to error and sends it back to
+        Gearman as a failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -541,8 +601,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the cruise data transfer's status to error, with that part's reason;
+        ``Ignore`` leaves the status unchanged; anything else sets it to idle.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -611,8 +681,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
 def task_run_cruise_data_transfer(worker, current_job):
-    """
-    Run the cruise data transfer
+    """Gearman task: run a cruise data transfer.
+
+    Checks the transfer isn't already running and is enabled, tests the
+    destination, then copies the cruise directory to it.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``) and ``files`` (the transferred files).
     """
 
     time.sleep(randint(0,2))
@@ -692,8 +772,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -702,8 +785,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

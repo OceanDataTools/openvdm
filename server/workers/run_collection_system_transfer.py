@@ -116,8 +116,21 @@ def process_batch(batch: list, filters: dict, data_start_time: float, data_end_t
 
 
 def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
-    """
-    Process a batch of rsync output lines.
+    """Classify a batch of files from an rsync listing against the transfer's filters.
+
+    Args:
+        batch: rsync output lines (one file each).
+        filters: Dict of ``include_filters``, ``exclude_filters`` and
+            ``ignore_filters`` glob patterns.
+        data_start_time: Start of the transfer's data window, in seconds since
+            *epoch*.
+        data_end_time: End of the data window, in seconds since *epoch*.
+        epoch: The ``datetime`` that file modification times are measured from.
+
+    Returns:
+        list[tuple]: ``('include', path, size)`` or ``('exclude', path, None)``
+        for each file; ignored files and files outside the data window are left
+        out.
     """
 
     def _process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
@@ -277,8 +290,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def keyword_replace(self, s):
-        """
-        Simple keyword replace function
+        """Replace the ``{cruiseID}``-style placeholders in a path.
+
+        The placeholders are ``{cruiseID}``, ``{loweringID}`` and
+        ``{loweringDataBaseDir}``.
+
+        Args:
+            s: Path or filter string that may contain placeholders.
+
+        Returns:
+            str | None: *s* with the placeholders replaced, or ``None`` if *s*
+            is ``None``.
         """
 
         if not isinstance(s, str):
@@ -292,8 +314,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def build_rel_dir(self):
-        """
-        Replace wildcard string in destDir
+        """Return the transfer's destination directory, relative to the cruise directory.
+
+        Lowering-level transfers are placed under
+        ``<loweringDataBaseDir>/<loweringID>/``.
+
+        Returns:
+            str | None: The relative destination directory with placeholders
+            replaced, or ``None`` if the transfer has no ``destDir``.
         """
 
         if not self.collection_system_transfer:
@@ -311,24 +339,31 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def build_source_dir(self):
-        """
-        Replace wildcard string in sourceDir
+        """Return the transfer's source directory with its placeholders replaced.
+
+        Returns:
+            str | None: The ``sourceDir`` with ``{cruiseID}``-style
+            placeholders replaced, or ``None`` if it isn't set.
         """
 
         return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
     def build_dest_dir(self):
-        """
-        Replace wildcard string in destDir AND add full cruise path
+        """Return the transfer's absolute destination directory.
+
+        Returns:
+            str: The cruise directory joined with :meth:`build_rel_dir`.
         """
 
         return os.path.join(self.cruise_dir, self.build_rel_dir())
 
 
     def build_logfile_dirpath(self):
-        """
-        Build the path to save transfer logfiles
+        """Return the transfer log directory, creating it if needed.
+
+        Returns:
+            str: The directory from ``OpenVDM.get_transfer_log_dir()``.
         """
 
         log_dir = self.ovdm.get_transfer_log_dir()
@@ -420,9 +455,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None):
-        """
-        Build the list of files to include, exclude, ignore for the given transfer.
-        override_source_dir, when provided, is used instead of self.source_dir.
+        """Build the lists of files to transfer and exclude for the collection system transfer.
+
+        Lists the source with rsync, then classifies the files in parallel
+        batches (see :func:`process_rsync_batch`).
+
+        Args:
+            prefix: Path prefix to strip from the listed files, or ``None``.
+            rsync_password_filepath: rsync password file, for rsync-server
+                sources.
+            is_darwin: The source is a macOS host (affects rsync options).
+            batch_size: Number of files per classification batch.
+            max_workers: Number of parallel classification workers.
+            override_source_dir: Source directory to use instead of
+                ``self.source_dir`` (e.g. for one match of a wildcard source).
+
+        Returns:
+            dict: ``{'verdict': True, 'files': {'include', 'exclude', 'new',
+            'updated', 'filesize'}}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         def _build_filters(cst_cfg, cruise_id, lowering_id):
@@ -585,8 +636,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def test_destination_dir(self):
-        """
-        Verify the destination directory exists
+        """Check that the transfer's destination directory exists.
+
+        The directory is in the cruise directory (or the lowering's, for
+        lowering-level transfers).
+
+        Returns:
+            list[dict]: Test parts with ``partName``/``result``/``reason``
+            keys.
         """
 
         results = []
@@ -604,8 +661,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def transfer_from_source(self, current_job):
-        """
-        Perform the collection system transfer.
+        """Copy new and updated files from the source into the cruise (or lowering) directory.
+
+        Expands wildcard source directories, builds the file list for each, and
+        runs rsync with the transfer's options.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+
+        Returns:
+            dict: ``{'verdict': True, 'files': ...}`` with the ``new``,
+            ``updated`` and ``exclude`` files (and ``deleted``, when the
+            transfer syncs deletions), or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         cst_cfg = self.collection_system_transfer
@@ -749,8 +817,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``collectionSystemTransfer``,
+        ``cruiseID``, ``loweringID``, ``systemStatus``; any it omits default to
+        the current cruise/lowering settings), loads what the task needs from
+        the OpenVDM API, then runs the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
 
@@ -847,8 +926,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the collection system transfer's status to error and sends it back
+        to Gearman as a failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
@@ -876,8 +964,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the collection system transfer's status to error, with that part's
+        reason; ``Ignore`` leaves the status unchanged; anything else sets it
+        to idle.
+
+        If the transfer produced new, updated or deleted files, submits the
+        hook tasks configured for ``runCollectionSystemTransfer`` in
+        ``openvdm.yaml`` with those file lists.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -970,8 +1073,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
 def task_run_collection_system_transfer(worker, current_job): # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
-    """
-    Run the collection system transfer
+    """Gearman task: run a collection system transfer.
+
+    Checks the transfer isn't already running and is enabled, tests the source
+    and destination, copies new and updated files into the cruise (or lowering)
+    directory, sets ownership and permissions, and writes the transfer and
+    exclude logs.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``) and ``files`` (new, updated and excluded
+        files).
     """
 
     time.sleep(randint(0,2))
@@ -1133,8 +1249,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -1143,8 +1262,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

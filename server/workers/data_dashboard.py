@@ -84,6 +84,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         Args:
             current_job: The Gearman job.
+
+        Returns:
+            dict | None: The matching task definition, or ``None`` if the job's
+            task isn't a custom task.
         """
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
@@ -230,8 +234,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return super().on_job_execute(current_job)
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
         logging.error("Job Failed: %s", current_job.handle)
 
@@ -257,9 +270,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return super().on_job_exception(current_job, exc_info)
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes.
-        Handles updating task status, triggering post-tasks, and logging results.
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        After an update, submits the hook tasks configured for
+        ``updateDataDashboard`` in ``openvdm.yaml``; after a rebuild, submits
+        them once per active collection system transfer.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
         try:
             payload_obj = json.loads(current_job.data)
