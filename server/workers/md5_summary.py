@@ -30,11 +30,13 @@ from server.lib.openvdm import OpenVDM
 
 BUF_SIZE = 65536  # read files in 64kb chunks
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'REBUILD_MD5_SUMMARY': 'rebuildMD5Summary',
     'UPDATE_MD5_SUMMARY': 'updateMD5Summary'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,

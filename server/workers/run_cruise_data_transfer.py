@@ -34,9 +34,12 @@ from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_g
 from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
+# Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
+# Parses rclone --progress output (Transferred: ..., NN%) for job progress.
 RCLONE_PROGRESS_RE = re.compile(r'Transferred:\s+[\d.]+\w+\s+\/\s+[\d.]+\w+,\s+(\d+)%')
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }

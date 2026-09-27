@@ -22,6 +22,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.openvdm import OpenVDM
 from server.lib.connection_utils import normalize_transfer_config, test_cst_source
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'TEST_COLLECTION_SYSTEM_TRANSFER': 'testCollectionSystemTransfer'
 }

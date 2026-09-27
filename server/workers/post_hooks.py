@@ -29,6 +29,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK': 'postCollectionSystemTransfer',
     'POST_UPDATE_DATA_DASHBOARD_HOOK': 'postDataDashboard',
@@ -40,6 +41,7 @@ TASK_NAMES = {
     'POST_FINALIZE_LOWERING_HOOK': 'postFinalizeCurrentLowering'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,

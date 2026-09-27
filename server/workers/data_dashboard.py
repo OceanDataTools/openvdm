@@ -33,11 +33,13 @@ from server.lib.openvdm import OpenVDM
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'UPDATE_DATA_DASHBOARD': 'updateDataDashboard',
     'REBUILD_DATA_DASHBOARD': 'rebuildDataDashboard'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,

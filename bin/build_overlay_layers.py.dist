@@ -30,15 +30,20 @@ sys.path.append(dirname(dirname(realpath(__file__))))
 
 from server.lib.openvdm import OpenVDM
 
+# Name of the extra directory holding the data dashboard files and manifest.
 DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
+# Default output directory (the OpenVDM web root); override with -o.
 OUTPUT_DIR = '/var/www/openvdm'
+# Name of the overlay layer list read by the web UI.
 OUTPUT_FN = 'overlay_layers.json'
+# TiTiler base URL used to build the overlay layers' tile URLs.
 TITILER_URL = 'http://localhost/titiler'
 
 # ----------------------------------------------------------------------
 # Default GeoTIFF source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
+# GeoTIFF sources used when no config file is given; edit to match this ship.
 DEFAULT_GEOTIFF_SOURCES_YAML = """
 GeoTiffSources:
   - CollectionSystem: EM302

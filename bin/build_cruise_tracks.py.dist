@@ -42,13 +42,16 @@ from server.lib.file_utils import set_owner_group_permissions, output_json_data_
 from server.lib.geojson_utils import convert_to_kml, combine_geojson_files
 from server.lib.openvdm import OpenVDM
 
+# Name of the extra directory the trackline files are written to.
 TRACKLINE_EXTRA_DIR_NAME = "Tracklines"
+# Name of the extra directory holding the data dashboard files and manifest.
 DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
 
 # ----------------------------------------------------------------------
 # Default GPS source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
+# GPS sources used when no --config_file is given; edit to match this ship.
 DEFAULT_GPS_SOURCES_YAML = """
 CollectionSystem: OpenRVDAS
 GPSSources:
@@ -141,6 +144,17 @@ def load_gps_sources_from_yaml(
 
 
 def get_gps_sources(args):
+    """Return the GPS source list from a file or the embedded YAML default.
+
+    Args:
+        args: Parsed ``argparse.Namespace`` containing ``gps_sources_file`` and
+            ``collectionSystem`` attributes.
+
+    Returns:
+        List of GPS source dicts validated by
+        :func:`load_gps_sources_from_yaml`.
+    """
+
     if args.gps_sources_file:
         logging.info("Loading GPS sources from %s", args.gps_sources_file)
         return load_gps_sources_from_yaml(
@@ -159,6 +173,22 @@ def get_gps_sources(args):
 # ----------------------------------------------------------------------
 
 def resolve_manifest_path(openVDM, cruise_base_dir, cruiseID):
+    """Locate the dashboard data manifest file for a cruise.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        cruise_base_dir: Warehouse base directory (e.g. ``/data``).
+        cruiseID: Current cruise identifier.
+
+    Returns:
+        Absolute path to the manifest file.
+
+    Raises:
+        RuntimeError: If the manifest filename cannot be retrieved, the
+            ``Dashboard_Data`` extra directory is absent, or the manifest file
+            does not exist on disk.
+    """
+
     manifest_fn = openVDM.get_data_dashboard_manifest_fn()
     if not manifest_fn:
         raise RuntimeError("OpenVDM returned no manifest filename")
@@ -181,6 +211,20 @@ def resolve_manifest_path(openVDM, cruise_base_dir, cruiseID):
 
 
 def load_manifest(manifest_path: str):
+    """Load and validate a dashboard data manifest JSON file.
+
+    Args:
+        manifest_path: Absolute path to the manifest file.
+
+    Returns:
+        List of manifest entry dicts, each containing at least ``type`` and
+        ``dd_json`` keys.
+
+    Raises:
+        RuntimeError: On JSON parse errors, non-list manifests, or entries
+            missing required keys.
+    """
+
     try:
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
@@ -198,6 +242,18 @@ def load_manifest(manifest_path: str):
 
 
 def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
+    """Return dashboard JSON file paths matching a GPS source type.
+
+    Args:
+        manifest: Loaded manifest list (from :func:`load_manifest`).
+        gps_source: GPS source dict with at least a ``type`` key.
+        cruise_base_dir: Warehouse base directory prepended to each ``dd_json``
+            entry path.
+
+    Returns:
+        Sorted list of absolute file paths for the matching entries.
+    """
+
     wanted_type = gps_source["type"]
     files = []
 
@@ -212,6 +268,20 @@ def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
 # ----------------------------------------------------------------------
 
 def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUser):
+    """Write GeoJSON and/or KML trackline files for one GPS source.
+
+    Files are named ``<cruiseID>_<base_name>_Trackline.json`` / ``.kml``.
+
+    Args:
+        geojson_obj: GeoJSON ``FeatureCollection`` dict to serialise.
+        base_name: Device name or file stem used to build the output filename.
+        cruiseID: Current cruise identifier, used as filename prefix.
+        tracklineDir: Directory where output files are written.
+        args: Parsed ``argparse.Namespace`` containing ``kml_only``,
+            ``geojson_only``, ``outputDir``, and ``username`` attributes.
+        outputUser: Username for ``chown`` after writing each file.
+    """
+
     if not args.kml_only:
         json_path = os.path.join(
             tracklineDir, f"{cruiseID}_{base_name}_Trackline.json"
@@ -246,6 +316,21 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
 
 def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
                        tracklineDir,args,outputUser):
+    """Process one GPS source: find its dashboard files and write tracklines.
+
+    Unless ``--no_combine`` is given, the source's dashboard files are combined
+    into a single trackline.
+
+    Args:
+        gps_source: GPS source dict with ``device`` and ``type`` keys.
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        cruiseID: Current cruise identifier.
+        tracklineDir: Directory where output files are written.
+        args: Parsed ``argparse.Namespace``.
+        outputUser: Username for ``chown`` after writing each file.
+    """
+
     logging.info(
         "Processing %s (type=%s)",
         gps_source["device"],
@@ -305,6 +390,21 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
 # ----------------------------------------------------------------------
 
 def resolve_cruise_and_dirs(openVDM, args):
+    """Resolve the cruise identifier and output directories from OpenVDM.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        args: Parsed ``argparse.Namespace`` containing ``cruiseID``,
+            ``collectionSystem``, ``outputDir``, and ``username`` attributes.
+
+    Returns:
+        A 4-tuple of ``(cruiseID, cruise_base_dir, tracklineDir, outputUser)``.
+
+    Raises:
+        RuntimeError: If the cruise ID cannot be determined, the collection
+            system is not found, or the trackline directory does not exist.
+    """
+
     cruiseID = args.cruiseID or openVDM.get_cruise_id()
     if not cruiseID:
         raise RuntimeError("Unable to determine CruiseID")
@@ -338,6 +438,8 @@ def resolve_cruise_and_dirs(openVDM, args):
 
 
 def main():
+    """Parse arguments and build cruise trackline files."""
+
     parser = argparse.ArgumentParser(
         description="build cruise tracklines post-dashboard processing"
     )

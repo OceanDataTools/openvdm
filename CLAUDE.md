@@ -87,6 +87,12 @@ ruff check --fix server/
 pre-commit run eslint --all-files
 ```
 
+**Generate Python API docs** (pdoc, not in `requirements.txt`; install it in a separate venv along with the requirements):
+```bash
+PYTHONPATH=. pdoc -d google -o <output_dir> server.lib server.workers
+```
+`-d google` renders the `Args:`/`Returns:` sections; `PYTHONPATH=.` lets pdoc import the `server` package. The `.py.dist` templates in `bin/` and `server/plugins/` aren't importable modules, so pdoc doesn't cover them.
+
 **Analyse PHP** (PHPStan, a Composer dev dependency; config in `www/phpstan.neon`):
 ```bash
 cd www/

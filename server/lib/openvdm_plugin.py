@@ -31,6 +31,7 @@ from server.lib.condense_to_ranges import condense_to_ranges
 from server.lib.file_utils import NpEncoder
 
 
+# Stat types a parser can report; see OpenVDMParserStat for each type's value format.
 STAT_TYPES = [
     'bounds',
     'geoBounds',
@@ -40,6 +41,7 @@ STAT_TYPES = [
     'valueValidity'
 ]
 
+# Results a parser quality test can have.
 QUALITY_TEST_RESULT_TYPES = [
     'Failed',
     'Warning',
