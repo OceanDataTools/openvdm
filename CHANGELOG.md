@@ -11,12 +11,17 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - Add an ESLint check for bugs only (undefined names, unused and duplicate variables), plus a `php -l` syntax check, to the pre-commit hooks, and clean up the unused variables and duplicate declarations it found in the dashboard, lowering, welcome-page and header scripts. No behavior changes. The `chartColors.js.dist`, `custom1.js.dist` and `dataDashboardMainCustom.js.dist` templates changed only by removing an unused variable or adding a lint comment, so sites don't need to update their copies (#128)
 - Add `moment`, used by the date pickers, to `www/package.json` as a direct dependency. It was already installed (2.30.1) as a dependency of the datetimepicker package, and the version is unchanged (#128)
 - The installer now runs `composer install --no-dev`, so Composer dev dependencies (currently only PHPStan) aren't installed on ship servers. Re-running the installer removes any already present (#130)
-- Add PHPStan static analysis (level 1, with a baseline of existing findings) for the web app's PHP, run from the pre-commit hooks. It's a development tool with no effect on running installs. The existing bugs it found are tracked in #132 (#130)
+- Add PHPStan static analysis (level 1, with a baseline of existing findings) for the web app's PHP, run from the pre-commit hooks. It's a development tool with no effect on running installs. The bugs it found are fixed below (#132, #135) (#130)
+- Remove a no-op `setTimeout(updateBounds(...), 5000)` from the data dashboard, lowering and custom-dashboard map setup. It called `updateBounds()` immediately, before any layer had loaded; each layer already refits the map when it loads, so map behavior is unchanged. Sites don't need to update their `custom1.js` (#131)
+- PHP cleanup with no behavior change: class namespace declarations now match their directories (`Models`, `Models\Config`, `Controllers\Config`, `ShipToShoreTransfers`); `catch` blocks in the cruise/lowering config forms and `Helpers\Database` now reference the right exception classes; framework helpers that fell off the end now return `null` explicitly; and the undefined `SITEEMAIL` constant is guarded (#135)
 
 ### Fixed
 - Fix a new password typed into a collection system or cruise data transfer edit form being lost when **Test Setup** was clicked before **Update**. The password is now kept server-side for the following Update (#119)
 - Fix every page using the default header, and `/api/messages/getNewMessagesTotal`, returning an empty HTTP 500 once the Messages table grew large; message totals are now counted in MySQL instead of loading every row into PHP (#123)
 - Fix `Undefined array key` PHP warnings (e.g. `cruisePI`) when switching the current cruise to one whose `ovdmConfig.json` omits blank fields (#125)
+- Fix `api/dashboardData/getDashboardDataTypes/<cruiseID>` passing an undefined variable to the model, which logged an `Undefined variable` warning on every call (#132)
+- Fix PHP 8.2+ `Creation of dynamic property` deprecation notices from the Ship-to-Shore config page (a misspelled property name), the data dashboard and the lowerings list (undeclared properties) (#132)
+- Fix data dashboard tabs configured with `view: lowering` or `view: dataDashboard` in `datadashboard.yaml` showing "An error occured" instead of the tab, caused by undefined variables in those views. The shipped config uses `view: default` for every tab, so default installs weren't affected (#135)
 
 ---
 
