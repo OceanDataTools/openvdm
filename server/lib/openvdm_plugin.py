@@ -614,24 +614,63 @@ class OpenVDMCSVParser(OpenVDMParser):
             return
 
     def crop_data(self, data_frame):
-        """
-        Crop the data to the start/stop time specified in the parser object
+        """Crop the data to the parser's ``start_dt``/``stop_dt`` window (inclusive).
+
+        The timestamps are taken from the ``date_time`` column, or from the
+        index when a parser has already moved ``date_time`` there. OpenVDM
+        timestamps are UTC: a naive ``start_dt``/``stop_dt`` is treated as UTC,
+        and an aware one is converted to UTC, so it can be compared with
+        timezone-aware timestamps (as parsed from ``...Z`` strings).
+
+        Args:
+            data_frame: DataFrame with a ``date_time`` column or a
+                ``DatetimeIndex``.
+
+        Returns:
+            The rows of *data_frame* within the window.
+
+        Raises:
+            ValueError: If *data_frame* has neither a ``date_time`` column nor
+                a ``DatetimeIndex``.
         """
 
         try:
+            if 'date_time' in data_frame.columns:
+                times = pd.DatetimeIndex(data_frame['date_time'])
+            elif isinstance(data_frame.index, pd.DatetimeIndex):
+                times = data_frame.index
+            else:
+                raise ValueError("data has no 'date_time' column or datetime index")
+
+            keep = np.ones(len(data_frame), dtype=bool)
+
             if self.start_dt is not None:
                 logging.debug("  start_dt: %s", self.start_dt)
-                data_frame = data_frame[(data_frame['date_time'] >= self.start_dt)]
+                keep &= np.asarray(times >= self._match_tz(self.start_dt, times.tz))
 
             if self.stop_dt is not None:
                 logging.debug("  stop_dt: %s", self.stop_dt)
-                data_frame = data_frame[(data_frame['date_time'] <= self.stop_dt)]
+                keep &= np.asarray(times <= self._match_tz(self.stop_dt, times.tz))
+
+            data_frame = data_frame[keep]
         except Exception as exc:
             logging.error("Could not crop data")
             logging.error(str(exc))
             raise exc
 
         return data_frame
+
+    @staticmethod
+    def _match_tz(bound, tz):
+        """Return *bound* as a Timestamp comparable with timestamps in timezone *tz*.
+
+        Naive bounds are taken to be UTC. If the timestamps are naive (*tz* is
+        ``None``), the bound is returned as naive UTC.
+        """
+
+        bound = pd.Timestamp(bound)
+        bound = bound.tz_localize('UTC') if bound.tzinfo is None else bound.tz_convert('UTC')
+        return bound.tz_localize(None) if tz is None else bound.tz_convert(tz)
 
 
     @staticmethod
