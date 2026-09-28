@@ -150,10 +150,10 @@ class OpenVDM():
         """Return whether only the current cruise directory is shown (from ``openvdm.yaml``).
 
         Returns:
-            bool: The ``showOnlyCurrentCruiseDir`` setting.
+            bool: The ``showOnlyCurrentCruiseDir`` setting; ``False`` if it isn't set.
         """
 
-        return self.config['showOnlyCurrentCruiseDir']
+        return self.config.get('showOnlyCurrentCruiseDir', False)
 
 
     def get_show_lowering_components(self):
@@ -249,10 +249,11 @@ class OpenVDM():
         """Return whether PublicData is copied into the cruise when it is finalized.
 
         Returns:
-            bool: The ``transferPublicData`` setting from ``openvdm.yaml``.
+            bool: The ``transferPublicData`` setting from ``openvdm.yaml``; ``True`` if it
+            isn't set (``openvdm.yaml`` files from before 2.15.5 don't have it).
         """
 
-        return self.config['transferPublicData']
+        return self.config.get('transferPublicData', True)
 
 
     def get_md5_filesize_limit(self):

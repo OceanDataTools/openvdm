@@ -25,6 +25,7 @@ import sys
 import signal
 import subprocess
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from os.path import dirname, realpath
 from random import randint
@@ -540,8 +541,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
