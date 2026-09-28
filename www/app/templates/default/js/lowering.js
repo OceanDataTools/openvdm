@@ -14,15 +14,21 @@ $(function () {
     // Leaflet's default style.
     var trackColors = (typeof colors !== 'undefined') ? colors : null;
 
-    // A track's color comes from its checkbox's position in the map's file
-    // list, so it doesn't change when other tracks are toggled.
+    // All tracks of a data type share a color, chosen by the data type's
+    // position in the map's file list, so colors don't change when tracks are
+    // toggled. Track checkbox values are "<dataType>/<dd_json>".
     function geoJSONColor(mapObject, dataObjectJsonName) {
         if (!trackColors) {
             return null;
         }
-        var index = $('#' + mapObject['objectListID']).find('.geoJSON-checkbox').map(function () {
-            return $(this).val();
-        }).get().indexOf(dataObjectJsonName);
+        var dataTypes = [];
+        $('#' + mapObject['objectListID']).find('.geoJSON-checkbox').each(function () {
+            var dataType = $(this).val().split('/')[0];
+            if (dataTypes.indexOf(dataType) === -1) {
+                dataTypes.push(dataType);
+            }
+        });
+        var index = dataTypes.indexOf(dataObjectJsonName.split('/')[0]);
         return trackColors[Math.max(index, 0) % trackColors.length];
     }
 
@@ -468,9 +474,9 @@ $(function () {
     //Show each track's color next to its checkbox
     if (trackColors) {
         $.each(mapObjects, function (i) {
-            $('#' + mapObjects[i]['objectListID']).find('.geoJSON-checkbox').each(function (index) {
+            $('#' + mapObjects[i]['objectListID']).find('.geoJSON-checkbox').each(function () {
                 $(this).after('<span class="track-swatch" style="display:inline-block; width:10px; height:10px; margin-left:4px; vertical-align:middle; background-color:' +
-                    trackColors[index % trackColors.length] + '"></span>');
+                    geoJSONColor(mapObjects[i], $(this).val()) + '"></span>');
             });
         });
     }
