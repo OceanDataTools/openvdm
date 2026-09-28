@@ -385,17 +385,22 @@ function _install_packages_debian {
         fi
     fi
 
-    # Install Node.js via nvm
-    if [ ! -e "/usr/local/bin/npm" ]; then
+    # Install Node.js via nvm into /usr/local/nvm, not root's home, so the
+    # OpenVDM user can run npm (install_openvdm builds the web app as that
+    # user). Older installs linked npm into /root/.nvm, which only root can
+    # read; relink those. The old /root/.nvm is left in place.
+    if [ ! -e "/usr/local/bin/npm" ] || [[ "$(readlink /usr/local/bin/npm)" == */.nvm/* ]]; then
         cd ~
+        export NVM_DIR="/usr/local/nvm"
+        mkdir -p "$NVM_DIR"
         curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-        export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
         nvm install --lts
         NODE_VERSION=$(node -v)
-        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/
-        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/
+        chmod -R a+rX "$NVM_DIR"
+        ln -sf "$NVM_DIR/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/
+        ln -sf "$NVM_DIR/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/
     fi
 
     # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
@@ -1701,9 +1706,14 @@ flush privileges;
 EOF
     fi
 
+    # Build as the OpenVDM user so Composer and npm (run by post_composer.sh)
+    # and any package install scripts don't run as root. Earlier installs
+    # built as root; the chown gives their vendor/ and node_modules/ to the
+    # OpenVDM user first.
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    /usr/local/bin/composer -q install --no-dev
+    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
+    sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer -q install --no-dev
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess

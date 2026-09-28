@@ -300,7 +300,7 @@ OpenVDM v2.15 moves away from PHP 7.3 to PHP 8.2.  This isn't a trivial change a
 OpenVDM v2.16 needs no database changes, but several plugins, parsers and `bin/` scripts were fixed, and the installer doesn't update your copies of those. See the 2.16.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details of each change.
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
-2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). It asks the same questions as the original install, with your previous answers as the defaults:
+2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). Both now run as the OpenVDM user instead of root. On Debian and Ubuntu the installer also moves Node.js from root's home directory to `/usr/local/nvm` so that user can run it; the old `/root/.nvm` can be deleted afterwards. It asks the same questions as the original install, with your previous answers as the defaults:
 ```
 cd <openvdm_root>
 git pull
@@ -336,5 +336,12 @@ sudo supervisorctl restart openvdm:*
 ```
 chmod 755 <directory>
 ```
+
+If you update the web app's PHP or JavaScript libraries by hand instead of re-running the installer, run the commands as the OpenVDM user so the files it owns stay owned by it:
+```
+cd <openvdm_root>/www
+sudo -H -u <openvdm_user> /usr/local/bin/composer install --no-dev
+```
+`composer install` also runs `npm install` (through `post_composer.sh`).
 
 If you contribute to OpenVDM: `pre-commit` now also runs ESLint, `php -l` and PHPStan. Run `composer install` (without `--no-dev`) in `www/` to install PHPStan, and see CONTRIBUTING.md.
