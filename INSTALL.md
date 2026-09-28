@@ -295,3 +295,46 @@ pip install -r requirements.txt
 
 OpenVDM v2.15 moves away from PHP 7.3 to PHP 8.2.  This isn't a trivial change and will require the installation of PHP 8.2 and reconfiguration of Apache to use the new version.  Recommend backing up the OpenVDM database and reinstalling OpenVDM onto a fresh OS install using the updated ./utils/install_openvdm.sh script. 
 
+## Upgrading from 2.15.
+
+OpenVDM v2.16 needs no database changes, but several plugins, parsers and `bin/` scripts were fixed, and the installer doesn't update your copies of those. See the 2.16.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details of each change.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). It asks the same questions as the original install, with your previous answers as the defaults:
+```
+cd <openvdm_root>
+git pull
+sudo ./utils/install-openvdm.sh
+```
+3. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so it won't update these for you. Only the files you actually use need copying. If you've customized a file (for example a plugin's `FILE_TYPE_FILTERS`), merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+| File (in `<openvdm_root>`) | Why |
+|---|---|
+| `server/plugins/parsers/geotiff_titiler_parser.py` | Map overlay placement for GeoTIFFs not in lat/lon; new Geographic Bounds and band stats; stats order (#138, #158) |
+| `server/plugins/parsers/geotiff_parser.py` | Geographic Bounds order (#158) |
+| `server/plugins/parsers/tsg45_parser.py` | Parsing failures when TSG files with and without an SBE 38 are handled by the same worker (#146) |
+| `server/plugins/parsers/hpr_parser.py`, `gnss_parser.py` | No output for any file with fractional roll values (#152) |
+| `server/plugins/rov_openrvdas_plugin.py` | The plugin couldn't run; now also crops data to each lowering (#150). **Keep your `SEALOG_SERVER_URL` and `SEALOG_JWT` values.** |
+| `bin/build_remote_directory.py` | Directories created with the wrong permissions (#164) |
+| `www/app/templates/default/js/custom1.js` | The CARTO basemap now requires an API key; replaced with keyless maps (#121) |
+
+For example:
+```
+cd <openvdm_root>/server/plugins/parsers
+cp geotiff_titiler_parser.py.dist geotiff_titiler_parser.py
+```
+The other `.dist` files changed in this release have documentation-only changes and don't need copying.
+
+4. Optional: to show the new version in the web interface's title, change `SITETITLE` in `www/app/Core/Config.php` to `'Open Vessel Data Management v2.16.0'`. No other settings in `Config.php`, `openvdm.yaml` or `datadashboard.yaml` changed.
+5. Restart the OpenVDM workers so they load the updated code and plugins:
+```
+sudo supervisorctl restart openvdm:*
+```
+6. Set OpenVDM back to On.
+7. If you use either GeoTIFF parser, rebuild the data dashboard so existing Geographic Bounds stats are regenerated in the right order. While logged in to the web interface, open `http://<openvdm_host>/config/rebuildDataDashboard`. There's no button for this. This rebuilds the current cruise only; dashboard stats for earlier cruises keep the old (mislabelled) order.
+8. If you've run `bin/build_remote_directory.py` to create template directories on a local-directory collection system, fix the permissions of the directories it created:
+```
+chmod 755 <directory>
+```
+
+If you contribute to OpenVDM: `pre-commit` now also runs ESLint, `php -l` and PHPStan. Run `composer install` (without `--no-dev`) in `www/` to install PHPStan, and see CONTRIBUTING.md.

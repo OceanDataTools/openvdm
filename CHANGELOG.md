@@ -6,6 +6,8 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.16.0] – 2026-09-28
 
+**Upgrading:** follow "Upgrading from 2.15" in [INSTALL.md](INSTALL.md). Several plugins, parsers and `bin/` scripts need their updated `.dist` files copied by hand, and GeoTIFF sites should rebuild the data dashboard.
+
 ### Changed
 - Replace the CARTO basemap, which now requires an API key, with keyless providers. The map layer switcher now offers OpenStreetMap, Esri Ocean, Esri Dark Gray and Light Gray canvas basemaps, and GMRT, plus Esri label and OpenSeaMap seamark overlays. The layers are defined once in the new `mapBaseLayers.js` and shared by the data dashboard, lowering and custom maps (#121). Installs with a customized `www/app/templates/default/js/custom1.js` still point at CARTO. Update that file from `custom1.js.dist`.
 - Add an ESLint check for bugs only (undefined names, unused and duplicate variables), plus a `php -l` syntax check, to the pre-commit hooks, and clean up the unused variables and duplicate declarations it found in the dashboard, lowering, welcome-page and header scripts. No behavior changes. The `chartColors.js.dist`, `custom1.js.dist` and `dataDashboardMainCustom.js.dist` templates changed only by removing an unused variable or adding a lint comment, so sites don't need to update their copies (#128)
