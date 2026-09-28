@@ -21,6 +21,10 @@ class CruiseDataTransfers extends Controller {
         $i=1;
 
         foreach($transferTypes as $row){
+            // FTP Server (5) is only a collection system transfer type until #199
+            if ((int)$row->transferTypeID === 5) {
+                continue;
+            }
             $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
             array_push($output, $option);
         }

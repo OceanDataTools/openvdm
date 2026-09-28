@@ -474,7 +474,7 @@ function _install_packages_debian {
 
     NEEDRESTART_MODE=a apt-get install -q -y \
         openssh-server apache2 \
-        cifs-utils gdal-bin gearman-job-server git \
+        cifs-utils fuse3 gdal-bin gearman-job-server git \
         libapache2-mod-php${PHP_VER} libapache2-mod-wsgi-py3 libgearman-dev \
         $MYSQL_PKGS \
         php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl \
@@ -698,7 +698,7 @@ function _install_packages_rhel {
         # v10+: mariadb-server replaces mysql-server; gearmand/libgearman-devel/
         # python3-pyproj not available in base/EPEL 10 repos — handled separately.
         dnf -y install \
-            cifs-utils curl gcc gcc-c++ gdal git httpd httpd-devel \
+            cifs-utils curl fuse3 gcc gcc-c++ gdal git httpd httpd-devel \
             gdal-devel geos-devel libjpeg-devel make redhat-rpm-config \
             mariadb-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \
@@ -707,7 +707,7 @@ function _install_packages_rhel {
         # gearmand was already built from source in the PHP section above
     else
         dnf -y install \
-            cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
+            cifs-utils curl fuse3 gcc gcc-c++ gdal gearmand git httpd httpd-devel \
             gdal-devel libgearman-devel geos-devel libjpeg-devel make redhat-rpm-config \
             mysql-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \

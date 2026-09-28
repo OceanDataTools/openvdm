@@ -65,6 +65,10 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `sshUser` tinytext,
   `sshUseKey` int(1) unsigned NOT NULL DEFAULT '0',
   `sshPass` tinytext,
+  `ftpServer` tinytext,
+  `ftpPort` int(5) unsigned NOT NULL DEFAULT '21',
+  `ftpUser` tinytext,
+  `ftpPass` tinytext,
   `includeFilter` text,
   `excludeFilter` text,
   `ignoreFilter` text,
@@ -357,7 +361,8 @@ VALUES
   (1,'Local Directory'),
   (2,'Rsync Server'),
   (3,'SMB Share'),
-  (4,'SSH Server');
+  (4,'SSH Server'),
+  (5,'FTP Server');
 
 /*!40000 ALTER TABLE `OVDM_TransferTypes` ENABLE KEYS */;
 UNLOCK TABLES;
