@@ -9,7 +9,9 @@ return ``list[dict]`` with ``partName``/``result``/``reason`` keys.
 """
 
 import glob
+import json
 import os
+import re
 import sys
 import uuid
 import logging
@@ -1309,9 +1311,13 @@ def test_cdt_destination(cdt_cfg):
 def test_cdt_rclone_destination(cfg):
     """Test an rclone destination for a cruise data transfer.
 
-    ``destDir`` is either a local path or an rclone ``remote:path``. The test
-    depends on the remote's type: local directory, SMB share (mounted in a
-    temporary directory), Google Cloud Storage bucket or SFTP server.
+    ``destDir`` is either a local path or an rclone ``remote:path``. Local
+    directories and SMB shares get their own tests. Any other rclone remote
+    (SFTP, FTP, S3, Google Cloud Storage, Google Drive, WebDAV, ...) is tested
+    with rclone itself: for bucket-based remotes (S3, GCS, B2, Azure Blob, ...)
+    that the bucket exists, otherwise that the destination directory exists,
+    then that a test file can be written and deleted. Failures include
+    rclone's error message.
 
     Args:
         cfg: Cruise data transfer configuration.
@@ -1320,71 +1326,60 @@ def test_cdt_rclone_destination(cfg):
         list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
 
-    def _gcs_bucket_exists(remote_path):
-        try:
-            subprocess.run(
-                ["rclone", "lsd", remote_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True
-            )
-            return True
-        except subprocess.CalledProcessError:
-            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
-            return False
+    # Keep Test Setup quick when a remote can't be reached; by default rclone
+    # retries for minutes.
+    rclone_test_flags = ['--contimeout', '15s', '--timeout', '30s',
+                         '--retries', '1', '--low-level-retries', '1']
 
-    def _verify_write_access(remote_path, bucket=False):
+    def _rclone_error(stderr):
+        """Return rclone's last error line, without its timestamp/level prefix."""
+        lines = [line.strip() for line in (stderr or '').splitlines() if line.strip()]
+        if not lines:
+            return 'rclone failed with no error message'
+        return re.sub(r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} [A-Z]+\s*:\s*', '', lines[-1])
+
+    def _run_rclone(args):
+        """Run ``rclone <args>``; return ``(True, stdout)`` or ``(False, error)``."""
+        try:
+            proc = subprocess.run(['rclone'] + args + rclone_test_flags,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  check=True, text=True)
+            return True, proc.stdout
+        except subprocess.CalledProcessError as exc:
+            return False, _rclone_error(exc.stderr)
+        except FileNotFoundError:
+            return False, 'rclone is not installed'
+
+    def _remote_features(remote_name):
+        """Return ``(True, features)`` for the remote, or ``(False, error)`` if rclone can't open it."""
+        success, output = _run_rclone(['backend', 'features', f'{remote_name}:'])
+        if not success:
+            return False, output
+        try:
+            return True, json.loads(output).get('Features', {})
+        except ValueError:
+            return True, {}
+
+    def _verify_write_access(remote_path, gcs=False):
+        """Copy a small file to ``remote_path`` and delete it; return ``(ok, error)``."""
         temp_file = tempfile.NamedTemporaryFile(delete=False)
         temp_file.write(b"rclone write test")
         temp_file.close()
 
         # Create a unique name to avoid conflicts
         remote_test_path = f"{remote_path.rstrip('/')}/.rclone-write-test-{uuid.uuid4().hex}.txt"
-        cmd = ["rclone", "copyto", temp_file.name, remote_test_path]
+        cmd = ["copyto", temp_file.name, remote_test_path]
 
-        if bucket:
+        if gcs:
             cmd += ["--gcs-bucket-policy-only", "--local-no-set-modtime"]
 
         try:
-            # Attempt to copy the file to the bucket
-            subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True,
-            )
-
-            # Attempt to delete the test file from the bucket
-            subprocess.run(
-                ["rclone", "deletefile", remote_test_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True,
-            )
-
-            return True
-        except subprocess.CalledProcessError:
-            #logging.exception(str(e))
-            return False
+            success, detail = _run_rclone(cmd)
+            if not success:
+                return False, detail
+            return _run_rclone(["deletefile", remote_test_path])
         finally:
             os.remove(temp_file.name)
-
-    def _verify_sftp_destination(remote_path):
-        try:
-            subprocess.run(
-                ["rclone", "lsf", remote_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True
-            )
-            return True
-        except subprocess.CalledProcessError:
-            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
-            return False
 
     results = []
     if ':' not in cfg['destDir']:
@@ -1407,6 +1402,7 @@ def test_cdt_rclone_destination(cfg):
 
     if remote_type == 'local':
         results.extend(test_local_destination(remote_path, cfg.get('localDirIsMountPoint', 0)))
+        return results
 
     if remote_type == 'smb':
         with temporary_directory() as tmpdir:
@@ -1415,50 +1411,61 @@ def test_cdt_rclone_destination(cfg):
             smb_version, smb_detail = detect_smb_version(cfg)
 
             results.extend(test_smb_destination(cfg, mntpoint, smb_version, smb_detail))
+        return results
 
-    if remote_type == 'google cloud storage':
-        if '/' not in remote_path:
-            remote_path += '/'
-        bucket_name, dest_dir = remote_path.split('/',1)
-        if not _gcs_bucket_exists(f"{remote_name}:{bucket_name}"):
-            reason = f"GCS bucket {bucket_name} does not exist"
-            results.extend([
-                {"partName": "Verify GCS bucket", "result": "Fail", "reason": reason},
-                {"partName": "Write test", "result": "Fail", "reason": reason}
-            ])
+    if remote_name is None:
+        return results
 
-            return results
+    # Any other rclone remote. Opening it also connects to it, so a remote
+    # that can't be reached fails here rather than timing out again below.
+    is_gcs = remote_type == 'google cloud storage'
+    success, features = _remote_features(remote_name)
+    if not success:
+        # Label it as the check that would have run: bucket or directory
+        if is_gcs:
+            part_name = "Verify GCS bucket"
+        elif remote_type in ('s3', 'b2', 'azureblob', 'swift', 'oracleobjectstorage', 'qingstor'):
+            part_name = "Verify bucket"
+        else:
+            part_name = "Destination directory"
+        reason = f"Unable to connect to rclone remote {remote_name}: {features}"
+        results.extend([
+            {"partName": part_name, "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+        return results
 
-        results.append({"partName": "Verify GCS bucket", "result": "Pass"})
+    if is_gcs or features.get('BucketBased', False):
+        # Buckets have no real directories, so check the bucket itself
+        part_name = "Verify GCS bucket" if is_gcs else "Verify bucket"
+        bucket_name = remote_path.lstrip('/').split('/', 1)[0]
+        if not bucket_name:
+            reason = f"No bucket in destination {cfg['destDir']}; use {remote_name}:<bucket>/<path>"
+            success = False
+        else:
+            success, detail = _run_rclone(['lsd', f"{remote_name}:{bucket_name}"])
+            reason = f"Bucket {bucket_name} not found or not accessible: {detail}"
+    else:
+        part_name = "Destination directory"
+        success, detail = _run_rclone(['lsf', cfg['destDir']])
+        reason = f"Destination directory {cfg['destDir']} not found or not accessible: {detail}"
 
-        if not _verify_write_access(f"{remote_name}:{remote_path}", True):
-            reason = f"No write access to {remote_name}:{remote_path}"
-            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+    if not success:
+        results.extend([
+            {"partName": part_name, "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+        return results
 
-            return results
+    results.append({"partName": part_name, "result": "Pass"})
 
-        results.append({"partName": "Write test", "result": "Pass"})
+    success, detail = _verify_write_access(cfg['destDir'], gcs=is_gcs)
+    if not success:
+        reason = f"No write access to {cfg['destDir']}: {detail}"
+        results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+        return results
 
-    if remote_type == 'sftp':
-        dest_dir = remote_path
-        if not _verify_sftp_destination(cfg['destDir']):
-            reason = f"Destination directory {dest_dir} does not exist"
-            results.extend([
-                {"partName": "Destination directory", "result": "Fail", "reason": reason},
-                {"partName": "Write test", "result": "Fail", "reason": reason}
-            ])
-
-            return results
-
-        results.append({"partName": "Destination directory", "result": "Pass"})
-
-        if not _verify_write_access(cfg['destDir']):
-            reason = f"No write access to {cfg['destDir']}"
-            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
-
-            return results
-
-        results.append({"partName": "Write test", "result": "Pass"})
+    results.append({"partName": "Write test", "result": "Pass"})
 
     return results
 
