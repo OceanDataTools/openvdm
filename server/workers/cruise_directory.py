@@ -530,6 +530,7 @@ def task_rebuild_cruise_directory(worker, current_job):
 
     if not output_results['verdict']:
         job_results['parts'].append({"partName": "Set directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Set directory ownership/permissions", "result": "Pass"})
 

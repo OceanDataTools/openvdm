@@ -369,6 +369,7 @@ def task_create_lowering_directory(worker, current_job):
     if not output_results['verdict']:
         logging.error("Failed to create any/all of the lowering data directory structure")
         job_results['parts'].append({"partName": "Create Directories", "result": "Fail", "reason": output_results['reason']})
+        return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Create Directories", "result": "Pass"})
 
@@ -378,10 +379,10 @@ def task_create_lowering_directory(worker, current_job):
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.lowering_full_dir)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": "Set lowering directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
+    job_results['parts'].append({"partName": "Set lowering directory ownership/permissions", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)

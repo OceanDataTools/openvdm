@@ -569,6 +569,15 @@ class Main extends Controller {
 
             if(isset($_POST['showLoweringComponents'])) {
                 $this->_warehouseModel->showLoweringComponents();
+
+                # Rebuild the current cruise's directory so it gets the lowering
+                # base directory, as Edit Cruise does
+                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
+                if (!empty($gmData['cruiseID'])) {
+                    $gmc= new \GearmanClient();
+                    $gmc->addServer();
+                    $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
+                }
             }
 
             if(isset($_POST['disableSSDW'])) {
