@@ -30,7 +30,7 @@ $(function () {
 
         greenIcon = new L.Icon({
             iconUrl: '/node_modules/@vectorial1024/leaflet-color-markers/img/marker-icon-green.png',
-            shadowUrl: '/node_modules/@vectorial1024/leaflet/dist/images/marker-shadow.png',
+            shadowUrl: '/node_modules/@vectorial1024/leaflet-color-markers/img/marker-shadow.png',
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
@@ -39,7 +39,7 @@ $(function () {
 
         redIcon = new L.Icon({
             iconUrl: '/node_modules/@vectorial1024/leaflet-color-markers/img/marker-icon-red.png',
-            shadowUrl: '/node_modules/@vectorial1024/leaflet/dist/images/marker-shadow.png',
+            shadowUrl: '/node_modules/@vectorial1024/leaflet-color-markers/img/marker-shadow.png',
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
