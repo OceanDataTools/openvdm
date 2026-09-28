@@ -9,6 +9,32 @@ $(function () {
     var mapObjects = [],
         chartObjects = [];
 
+    // Track colors: the chart palette from chartColors.js, which the page only
+    // loads when its jsArray includes "charts". Without it, tracks keep
+    // Leaflet's default style.
+    var trackColors = (typeof colors !== 'undefined') ? colors : null;
+
+    // A track's color comes from its checkbox's position in the map's file
+    // list, so it doesn't change when other tracks are toggled.
+    function geoJSONColor(mapObject, dataObjectJsonName) {
+        if (!trackColors) {
+            return null;
+        }
+        var index = $('#' + mapObject['objectListID']).find('.geoJSON-checkbox').map(function () {
+            return $(this).val();
+        }).get().indexOf(dataObjectJsonName);
+        return trackColors[Math.max(index, 0) % trackColors.length];
+    }
+
+    function geoJSONStyle(mapObject, dataObjectJsonName) {
+        var style = { weight: 3 };
+        var color = geoJSONColor(mapObject, dataObjectJsonName);
+        if (color) {
+            style.color = color;
+        }
+        return style;
+    }
+
     function updateBounds(mapObject) {
         if (mapObject['map']) {
             // Center the map based on the bounds
@@ -246,7 +272,7 @@ $(function () {
                     // Build the layer
                     //mapObject['geoJSONLayers'][dataObjectJsonName] = L.timeDimension.layer.geoJson(data[0], {
                     mapObject['geoJSONLayers'][dataObjectJsonName] = L.geoJson(data[0], {
-                        style: { weight: 3 },
+                        style: geoJSONStyle(mapObject, dataObjectJsonName),
                         //udpateTimeDimension: true,
                         addLastPoint: true,
                         waitForReady: true,
@@ -438,6 +464,16 @@ $(function () {
         var objectListPlaceholderID =  tempArray.join('_') + '_objectList-placeholder';
         mapObjects.push(initMapObject(mapPlaceholderID, objectListPlaceholderID));
     });
+
+    //Show each track's color next to its checkbox
+    if (trackColors) {
+        $.each(mapObjects, function (i) {
+            $('#' + mapObjects[i]['objectListID']).find('.geoJSON-checkbox').each(function (index) {
+                $(this).after('<span class="track-swatch" style="display:inline-block; width:10px; height:10px; margin-left:4px; vertical-align:middle; background-color:' +
+                    trackColors[index % trackColors.length] + '"></span>');
+            });
+        });
+    }
 
     //Initialize the chartObjects
     $( '.chart' ).each(function( index ) {
