@@ -308,6 +308,59 @@ function install_packages {
 
 ###########################################################################
 ###########################################################################
+# Debian/Ubuntu: install Node.js LTS with nvm in the OpenVDM user's home and
+# link npm/node into /usr/local/bin. install_openvdm builds the web app as
+# that user. Earlier installers put nvm in root's home, where the OpenVDM
+# user can't run it; that install is removed (unless root installed other
+# global npm packages in it) and its lines in root's shell startup files are
+# deleted. An npm in /usr/local/bin that isn't from nvm is left alone.
+function _install_node_nvm {
+
+    local user_home nvm_dir npm_target old_nvm_dir extra node_version rcfile
+    user_home=$(getent passwd "${OPENVDM_USER}" | cut -d: -f6)
+    nvm_dir="${user_home}/.nvm"
+    npm_target=$(readlink /usr/local/bin/npm || true)
+
+    if [ -e /usr/local/bin/npm ] && [[ "${npm_target}" != */.nvm/* ]]; then
+        echo "Using the existing /usr/local/bin/npm"
+        return
+    fi
+    if [ -e /usr/local/bin/npm ] && [[ "${npm_target}" == "${nvm_dir}/"* ]] && \
+            [ "$(stat -c %U "${nvm_dir}")" = "${OPENVDM_USER}" ]; then
+        echo "Node.js is already installed for ${OPENVDM_USER}"
+        return
+    fi
+
+    if [[ "${npm_target}" == */.nvm/* ]]; then
+        old_nvm_dir="${npm_target%%/.nvm/*}/.nvm"
+        if [ -d "${old_nvm_dir}" ] && [ "$(stat -c %U "${old_nvm_dir}")" = "root" ]; then
+            extra=$(find "${old_nvm_dir}"/versions/node/*/lib/node_modules -mindepth 1 -maxdepth 1 \
+                ! -name npm ! -name corepack -printf '%f ' 2>/dev/null || true)
+            if [ -n "${extra}" ]; then
+                echo "Keeping ${old_nvm_dir}: it has other global npm packages (${extra})"
+            else
+                echo "Removing the root-owned nvm install in ${old_nvm_dir}"
+                rm -rf "${old_nvm_dir}"
+                for rcfile in .bashrc .bash_profile .profile .zshrc; do
+                    rcfile="${old_nvm_dir%/.nvm}/${rcfile}"
+                    [ -f "${rcfile}" ] && sed -i -e '/^export NVM_DIR=/d' \
+                        -e '/\$NVM_DIR\/nvm\.sh/d' -e '/\$NVM_DIR\/bash_completion/d' "${rcfile}"
+                done
+            fi
+        fi
+    fi
+
+    echo "Installing Node.js (nvm) for ${OPENVDM_USER}"
+    sudo -H -u "${OPENVDM_USER}" bash -c '
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash &&
+        . "$HOME/.nvm/nvm.sh" && nvm install --lts'
+    node_version=$(sudo -H -u "${OPENVDM_USER}" bash -c '. "$HOME/.nvm/nvm.sh" && nvm version "lts/*"')
+    ln -sf "${nvm_dir}/versions/node/${node_version}/bin/npm" /usr/local/bin/npm
+    ln -sf "${nvm_dir}/versions/node/${node_version}/bin/node" /usr/local/bin/node
+}
+
+###########################################################################
+###########################################################################
 # Debian/Ubuntu package installation
 function _install_packages_debian {
 
@@ -385,23 +438,7 @@ function _install_packages_debian {
         fi
     fi
 
-    # Install Node.js via nvm into /usr/local/nvm, not root's home, so the
-    # OpenVDM user can run npm (install_openvdm builds the web app as that
-    # user). Older installs linked npm into /root/.nvm, which only root can
-    # read; relink those. The old /root/.nvm is left in place.
-    if [ ! -e "/usr/local/bin/npm" ] || [[ "$(readlink /usr/local/bin/npm)" == */.nvm/* ]]; then
-        cd ~
-        export NVM_DIR="/usr/local/nvm"
-        mkdir -p "$NVM_DIR"
-        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-        nvm install --lts
-        NODE_VERSION=$(node -v)
-        chmod -R a+rX "$NVM_DIR"
-        ln -sf "$NVM_DIR/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/
-        ln -sf "$NVM_DIR/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/
-    fi
+    _install_node_nvm
 
     # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
     apt-get update
