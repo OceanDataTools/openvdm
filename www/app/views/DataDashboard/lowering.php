@@ -55,7 +55,7 @@ rsort($data['loweringIDs']);
                                     <div class="panel-heading"><?php echo $data['placeholders'][$i]['heading'];?><?php echo ($data['placeholders'][$i]['plotType'] == 'chart'? '<i id="' . $data['placeholders'][$i]['id'] . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i>': ''); ?>
                                     </div>
                                     <div class="panel-body">
-                                        <div class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount == 0? 'No Data Found.': ''); ?></div>
+                                        <?php $tag = (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?><<?php echo $tag; ?> class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount == 0? 'No Data Found.': ''); ?></<?php echo $tag; ?>>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">
@@ -71,7 +71,7 @@ rsort($data['loweringIDs']);
             // echo '<pre>'; print_r($dataFiles); echo '</pre>';
 ?>
                                                 <div class="row">
-                                                    <div class="col-lg-12"><strong><?php echo $dataFiles[0]['type']; ?></strong><?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0 && sizeof($dataFiles) > 0? '<div class="pull-right"><div class="btn btn-xs btn-default selectAll" >Select All</div> <div class="btn btn-xs btn-default clearAll" >Clear All</div></div>': ''); ?></div>
+                                                    <div class="col-lg-12"><strong><?php echo (sizeof($dataFiles) > 0 ? $dataFiles[0]['type'] : ''); ?></strong><?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0 && sizeof($dataFiles) > 0? '<div class="pull-right"><div class="btn btn-xs btn-default selectAll" >Select All</div> <div class="btn btn-xs btn-default clearAll" >Clear All</div></div>': ''); ?></div>
 <?php
             if(sizeof($dataFiles) > 0){
                 if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'geoJSON')===0) {
@@ -83,7 +83,7 @@ rsort($data['loweringIDs']);
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
 ?>
                                                     <div class='col-lg-4 col-sm-6'>
-                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
+                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['type'] . '/' . $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
                                                     </div>
 <?php
@@ -92,7 +92,7 @@ rsort($data['loweringIDs']);
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
 ?>
                                                     <div class='col-lg-4 col-sm-6'>
-                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
+                                                        <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $dataFiles[$k]['type'] . '/' . $dataFiles[$k]['dd_json'];?>" checked> <?php echo end(explode('/',$dataFiles[$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $dataFiles[$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
                                                     </div>
 <?php
