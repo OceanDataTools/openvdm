@@ -4,7 +4,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [2.15.9] – 2026-09-27
+## [2.16.0] – 2026-09-28
 
 ### Changed
 - Replace the CARTO basemap, which now requires an API key, with keyless providers. The map layer switcher now offers OpenStreetMap, Esri Ocean, Esri Dark Gray and Light Gray canvas basemaps, and GMRT, plus Esri label and OpenSeaMap seamark overlays. The layers are defined once in the new `mapBaseLayers.js` and shared by the data dashboard, lowering and custom maps (#121). Installs with a customized `www/app/templates/default/js/custom1.js` still point at CARTO. Update that file from `custom1.js.dist`.
