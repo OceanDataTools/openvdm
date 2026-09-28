@@ -49,6 +49,11 @@ CUSTOM_TASKS = [
     }
 ]
 
+
+class PluginLoadError(Exception):
+    """A collection system transfer's plugin file exists but couldn't be imported."""
+
+
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """Gearman worker for data-dashboard generation and updates.
 
@@ -94,8 +99,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return task[0] if len(task) > 0 else None
 
     def _get_plugin_callable(self, cfg=None):
-        """
-        Retrieve the Python plugin callable for a collection system transfer.
+        """Return the ``process_file`` function of a collection system transfer's plugin.
+
+        Args:
+            cfg: The collection system transfer; defaults to the job's transfer.
+
+        Returns:
+            Callable | None: The plugin's ``process_file``, or ``None`` if the
+            transfer has no plugin file or the plugin has no ``process_file``.
+
+        Raises:
+            PluginLoadError: If the plugin file exists but importing it fails,
+                e.g. because a parser it imports is missing.
         """
         cst_cfg = cfg or self.collection_system_transfer
         plugin_name = cst_cfg['name'].lower()
@@ -106,9 +121,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if not os.path.isfile(plugin_path):
             return None
 
-        spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
-        plugin_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(plugin_module)
+        try:
+            spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
+            plugin_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(plugin_module)
+        except Exception as exc:
+            reason = f"Unable to load plugin {os.path.basename(plugin_path)}: {type(exc).__name__}: {exc}"
+            logging.exception(reason)
+            raise PluginLoadError(reason) from exc
 
         if not hasattr(plugin_module, 'process_file'):
             logging.warning("Plugin %s does not have a 'process_file(raw_path)' function", plugin_name)
@@ -377,7 +397,12 @@ def task_update_data_dashboard(worker, current_job):
     logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
-    plugin_callable = worker._get_plugin_callable()
+    try:
+        plugin_callable = worker._get_plugin_callable()
+    except PluginLoadError as exc:
+        job_results['parts'].append({"partName": "Load plugin", "result": "Fail", "reason": str(exc)})
+        return json.dumps(job_results)
+
     if plugin_callable is None:
         reason = f"Plugin not found for {worker.collection_system_transfer['name']}"
         logging.warning(reason)
@@ -467,9 +492,17 @@ def task_rebuild_data_dashboard(worker, current_job):
     job_results['parts'].append({"partName": "Verify Data dashboard directory exists", "result": "Pass"})
 
     manifest_entries = []
+    plugin_load_failures = []
     active_csts = worker.ovdm.get_active_collection_system_transfers()
     for idx, cst in enumerate(active_csts, 1):
-        plugin_callable = worker._get_plugin_callable(cfg=cst)
+        # A plugin that won't load fails its own transfer; the rest are still rebuilt
+        try:
+            plugin_callable = worker._get_plugin_callable(cfg=cst)
+        except PluginLoadError as exc:
+            job_results['parts'].append({"partName": f"Load plugin for {cst['name']}", "result": "Fail", "reason": str(exc)})
+            plugin_load_failures.append(str(exc))
+            continue
+
         if plugin_callable is None:
             logging.warning(f"No plugin for {cst['name']}, skipping")
             continue
@@ -504,6 +537,12 @@ def task_rebuild_data_dashboard(worker, current_job):
     if not output_results['verdict']:
         part_result['reason'] = output_results['reason']
     job_results['parts'].append(part_result)
+
+    # The last part sets the task's status (on_job_complete), so end with the
+    # plugin failures unless a later step already failed
+    if plugin_load_failures and output_results['verdict']:
+        job_results['parts'].append({"partName": "Load plugins", "result": "Fail",
+                                     "reason": "; ".join(plugin_load_failures)})
 
     worker.send_job_status(current_job, 100, 100)
     return json.dumps(job_results)
