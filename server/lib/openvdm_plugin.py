@@ -815,8 +815,9 @@ class OpenVDMCSVParser(OpenVDMParser):
 
         Args:
             data_frame: The data to round.
-            precision: Mapping of column name to number of decimal places. An
-                empty mapping returns the data unchanged.
+            precision: Mapping of column name to number of decimal places.
+                ``None`` (the default) or an empty mapping returns the data
+                unchanged.
 
         Returns:
             pandas.DataFrame: The rounded data.
@@ -825,7 +826,7 @@ class OpenVDMCSVParser(OpenVDMParser):
             Exception: If the data can't be rounded.
         """
 
-        if precision is None or bool(precision):
+        if precision:
             try:
                 decimals = pd.Series(precision.values(), index=precision.keys())
                 return data_frame.round(decimals)
