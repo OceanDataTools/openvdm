@@ -15,15 +15,21 @@ $(function () {
     // Leaflet's default style.
     var trackColors = (typeof colors !== 'undefined') ? colors : null;
 
-    // A track's color comes from its checkbox's position in the map's file
-    // list, so it doesn't change when other tracks are toggled.
+    // All tracks of a data type share a color, chosen by the data type's
+    // position in the map's file list, so colors don't change when tracks are
+    // toggled. Track checkbox values are "<dataType>/<dd_json>".
     function geoJSONColor(mapObject, dataObjectJsonName) {
         if (!trackColors) {
             return null;
         }
-        var index = $('#' + mapObject['objectListID']).find('.geoJSON-checkbox').map(function () {
-            return $(this).val();
-        }).get().indexOf(dataObjectJsonName);
+        var dataTypes = [];
+        $('#' + mapObject['objectListID']).find('.geoJSON-checkbox').each(function () {
+            var dataType = $(this).val().split('/')[0];
+            if (dataTypes.indexOf(dataType) === -1) {
+                dataTypes.push(dataType);
+            }
+        });
+        var index = dataTypes.indexOf(dataObjectJsonName.split('/')[0]);
         return trackColors[Math.max(index, 0) % trackColors.length];
     }
 
@@ -527,12 +533,16 @@ $(function () {
         mapObjects.push(initMapObject(mapPlaceholderID, objectListPlaceholderID));
     });
 
-    //Show each track's color next to its checkbox
+    //Show each data type's track color to the right of its title. Each data
+    //type is a row in the map's file list: a <strong> title, then its checkboxes.
     if (trackColors) {
         $.each(mapObjects, function (i) {
-            $('#' + mapObjects[i]['objectListID']).find('.geoJSON-checkbox').each(function (index) {
-                $(this).after('<span class="track-swatch" style="display:inline-block; width:10px; height:10px; margin-left:4px; vertical-align:middle; background-color:' +
-                    trackColors[index % trackColors.length] + '"></span>');
+            $('#' + mapObjects[i]['objectListID']).find('div.row').each(function () {
+                var checkbox = $(this).find('.geoJSON-checkbox').first();
+                if (checkbox.length > 0) {
+                    $(this).find('strong').first().after('<span class="track-swatch" style="display:inline-block; width:10px; height:10px; margin-left:6px; vertical-align:middle; background-color:' +
+                        geoJSONColor(mapObjects[i], checkbox.val()) + '"></span>');
+                }
             });
         });
     }
