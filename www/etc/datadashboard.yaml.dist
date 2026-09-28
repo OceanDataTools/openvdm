@@ -42,7 +42,10 @@
 #  page: position
 
 # The MVC view used to format the tab.  OpenVDM includes a "default" view that can be
-# used for displaying maps, and time-series data but additional custom view can be
+# used for displaying maps, and time-series data, and a "lowering" view that shows the
+# same for one lowering at a time, chosen from a drop-down (use it with the "lowering"
+# js file instead of "dataDashboardDefault"; see the example Lowering tab at the end
+# of this file).  Additional custom views can be
 # developed and used.  For custom views, specify the filename of the view (which must
 # be located in the ./app/views/DataDashboard directory of the OpenVDM web-application)
 # minus the php suffix (i.e use "customView" for "customView.php")
@@ -108,7 +111,6 @@
   - charts
   - charts-zoom
   - leaflet
-  - lowering
   placeholderArray:
   - plotType: map
     id: map
@@ -160,3 +162,30 @@
     dataArray:
     - dataType: ssv
       visType: json
+
+# Example tab for lowering data (e.g. from the ROV OpenRVDAS plugin). The "lowering"
+# view adds a drop-down to choose the lowering and shows only that lowering's files.
+# Load the "lowering" js file on this tab instead of "dataDashboardDefault", never both:
+# each builds every map and chart on the page.
+#- title: Lowering
+#  page: lowering
+#  view: lowering
+#  cssArray:
+#  - leaflet
+#  jsArray:
+#  - lowering
+#  - charts
+#  - leaflet
+#  placeholderArray:
+#  - plotType: map
+#    id: map
+#    heading: ROV Position
+#    dataArray:
+#    - dataType: rov-usbl-pri
+#      visType: geoJSON
+#  - plotType: chart
+#    id: rov-ctd
+#    heading: ROV CTD
+#    dataArray:
+#    - dataType: rov-ctd
+#      visType: json

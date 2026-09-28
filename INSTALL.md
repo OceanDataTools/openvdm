@@ -325,7 +325,11 @@ cp geotiff_titiler_parser.py.dist geotiff_titiler_parser.py
 ```
 The other `.dist` files changed in this release have documentation-only changes and don't need copying.
 
-4. Optional: to show the new version in the web interface's title, change `SITETITLE` in `www/app/Core/Config.php` to `'Open Vessel Data Management v2.16.0'`. No other settings in `Config.php`, `openvdm.yaml` or `datadashboard.yaml` changed.
+4. Update two settings files by hand (the installer doesn't change your copies):
+   - In `www/etc/datadashboard.yaml`, delete the `- lowering` line from the Position tab's `jsArray`. The shipped Position tab listed both `dataDashboardDefault` and `lowering`; each one builds every map on the page, so loading both logs `Map container is already initialized` (#185). The same applies to any other tab that lists both: keep `lowering` (without `dataDashboardDefault`) only on tabs that use the `lowering` view. `lowering.js` and the `lowering` view themselves are fixed by the code update: their maps, charts and start/end positions hadn't loaded since 2.14. To add a lowering tab, see the commented-out example Lowering tab at the end of `www/etc/datadashboard.yaml.dist`.
+   - Optional: to show the new version in the web interface's title, change `SITETITLE` in `www/app/Core/Config.php` to `'Open Vessel Data Management v2.16.0'`.
+
+   No other settings in `Config.php`, `openvdm.yaml` or `datadashboard.yaml` changed.
 5. Restart the OpenVDM workers so they load the updated code and plugins:
 ```
 sudo supervisorctl restart openvdm:*
