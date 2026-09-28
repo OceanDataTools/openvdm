@@ -55,7 +55,7 @@ $jsFileArray = array(
     DIR . 'node_modules/jquery/dist/jquery.min.js',
     DIR . 'node_modules/bootstrap/dist/js/bootstrap.min.js',
     DIR . 'node_modules/metismenu/dist/metisMenu.min.js',
-    DIR . 'node_modules/js-cookie/src/js.cookie.js',
+    DIR . 'node_modules/js-cookie/dist/js.cookie.min.js',
     DIR . 'node_modules/list.js/dist/list.min.js',
     Url::templatePath() . 'js/sb-admin-2.js',
     Url::templatePath() . 'js/header.js',

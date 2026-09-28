@@ -21,7 +21,7 @@
     "font-awesome": "^4.7.0",
     "ionicons": "^2.0.1",
     "jquery": "^3.7.1",
-    "js-cookie": "^2.2.1",
+    "js-cookie": "^3.0.8",
     "leaflet": "^1.9.4",
     "leaflet-easyprint": "^2.1.9",
     "leaflet-fullscreen": "^1.0.2",
@@ -30,5 +30,8 @@
     "luxon": "^3.7.2",
     "metismenu": "^1.1.3",
     "moment": "^2.30.1"
+  },
+  "overrides": {
+    "moment-timezone": "^0.5.35"
   }
 }
