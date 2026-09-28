@@ -1827,6 +1827,22 @@ EOF
         # On re-runs, update the key in-place if it is still the placeholder
         sed -i -e "s/workerApiKey: \"${_PLACEHOLDER}\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
             ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+
+        # openvdm.yaml files from before 2.15.5 lack these keys. Without
+        # workerApiKey the workers get no transfer passwords from the API.
+        if [ -n "$(tail -c1 "${_YAML}")" ]; then
+            echo >> "${_YAML}"
+        fi
+        if ! grep -q '^workerApiKey:' "${_YAML}"; then
+            echo "Adding workerApiKey to ${_YAML}"
+            echo "workerApiKey: \"${WORKER_API_KEY}\"" >> "${_YAML}"
+        fi
+        if ! grep -q '^transferPublicData:' "${_YAML}"; then
+            echo "Adding transferPublicData to ${_YAML}"
+            _TRANSFER_PUBLICDATA='True'
+            [ "$INSTALL_PUBLICDATA" = "no" ] && _TRANSFER_PUBLICDATA='False'
+            echo "transferPublicData: ${_TRANSFER_PUBLICDATA}" >> "${_YAML}"
+        fi
     fi
 
     cd ${startingDir}

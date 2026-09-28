@@ -306,6 +306,10 @@ cd <openvdm_root>
 git pull
 sudo ./utils/install-openvdm.sh
 ```
+If your `server/etc/openvdm.yaml` is older than 2.15.5, the installer also adds the two settings added in that release: `workerApiKey`, set to the same key as `WORKER_API_KEY` in `www/app/Core/Config.php`, and `transferPublicData`, set from your PublicData answer. Without `workerApiKey` the workers don't receive transfer passwords from the web app, so transfers that use a password fail. Without `transferPublicData`, older releases' Rebuild Cruise Directory and cruise setup/finalize crashed with `KeyError: 'transferPublicData'`; 2.16.0 defaults it to `True` (#187). To check:
+```
+grep -E 'workerApiKey|transferPublicData' <openvdm_root>/server/etc/openvdm.yaml
+```
 3. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so it won't update these for you. Only the files you actually use need copying. If you've customized a file (for example a plugin's `FILE_TYPE_FILTERS`), merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
 
 | File (in `<openvdm_root>`) | Why |
