@@ -1856,7 +1856,7 @@ function install_sample_data {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT          - root directory where openvdm is installed
     # OPENVDM_USER          - valid userid
-    # OPENVDM_DATABASE_PASSWORD - OpenVDM DB/SMB password (reused for sample SMB shares)
+    # OPENVDM_DATABASE_PASSWORD - OpenVDM DB/SMB password (reused for sample SMB shares and FTP)
     # NEW_ROOT_DATABASE_PASSWORD - MySQL root password
     # SAMPLEDATA_ROOT       - where sample data files will be extracted
     # SAMPLEDATA_REPO       - git repository URL for openvdm_sample_data
@@ -1905,6 +1905,10 @@ function install_sample_data {
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssdw"
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_destination"
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
+    # Older sample_data.tgz archives don't include the FTP directories
+    mkdir -p "${SAMPLEDATA_ROOT}/ftp_source" "${SAMPLEDATA_ROOT}/ftp_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_destination"
 
     if [ "$HAS_SELINUX" = true ]; then
         # Samba shares need samba_share_t; rsync daemon (rsync_t) needs
@@ -2104,6 +2108,32 @@ RSYNCUNIT
 
     systemctl enable "${RSYNC_SERVICE}"
     systemctl restart "${RSYNC_SERVICE}"
+
+    # Local FTP server for testing FTP transfers (pyftpdlib, run by Supervisor).
+    # Listens on localhost only: port 2121 supports MLSD, port 2122 doesn't.
+    echo "Configuring FTP server for sample data"
+    "${INSTALL_ROOT}/openvdm/venv/bin/pip" install pyftpdlib --quiet
+
+    printf '%s\n' "${OPENVDM_DATABASE_PASSWORD}" > /etc/openvdm_sample_ftp.passwd
+    chown "${OPENVDM_USER}:${OPENVDM_USER}" /etc/openvdm_sample_ftp.passwd
+    chmod 600 /etc/openvdm_sample_ftp.passwd
+
+    cat > "${SUPERVISOR_CONF_D}/openvdm_sample_ftp.${SUPERVISOR_PROG_EXT}" << EOF
+[program:openvdm_sample_ftp]
+command=${INSTALL_ROOT}/openvdm/venv/bin/python utils/sample_ftp_server.py --root ${SAMPLEDATA_ROOT} --user ${OPENVDM_USER} --password-file /etc/openvdm_sample_ftp.passwd --port 2121
+directory=${INSTALL_ROOT}/openvdm
+redirect_stderr=true
+stdout_logfile=/var/log/openvdm/sample_ftp.log
+user=${OPENVDM_USER}
+autostart=true
+autorestart=true
+stopsignal=INT
+EOF
+
+    supervisorctl reread
+    supervisorctl update
+    # Pick up a changed password or script on re-install
+    supervisorctl restart openvdm_sample_ftp
 
     echo "Sample data installation complete"
 
