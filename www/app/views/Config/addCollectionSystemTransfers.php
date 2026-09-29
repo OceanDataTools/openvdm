@@ -15,7 +15,7 @@ $_POST += [
     'localDirIsMountPoint' => '', 'rsyncServer' => '', 'rsyncUser' => '',
     'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '', 'smbUser' => '',
     'smbPass' => '', 'sshServer' => '', 'sshUser' => '', 'sshUseKey' => '', 'sshPass' => '',
-    'ftpServer' => '', 'ftpPort' => '21', 'ftpUser' => '', 'ftpPass' => '',
+    'ftpServer' => '', 'ftpUser' => '', 'ftpPass' => '',
 ];
 
 ?>
@@ -85,7 +85,6 @@ $_POST += [
                                 <div class="form-group sshServer"><label>Use SSH Public/Private key?</label><?php echo FormCustom::radioInline($data['useSSHKeyOptions'], $_POST['sshUseKey']); ?></div>
                                 <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'value'=> $_POST['sshPass'], 'type'=>'password')); ?></div>
                                 <div class="form-group ftpServer"><label>FTP Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpServer', 'value'=> $_POST['ftpServer'])); ?></div>
-                                <div class="form-group ftpServer"><label>FTP Port</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpPort', 'value'=> $_POST['ftpPort'])); ?></div>
                                 <div class="form-group ftpServer"><label>FTP Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpUser', 'value'=> $_POST['ftpUser'])); ?></div>
                                 <div class="form-group ftpServer"><label>FTP Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpPass', 'value'=> $_POST['ftpPass'], 'type'=>'password')); ?></div>
                             </div>
@@ -132,8 +131,7 @@ $_POST += [
             <p class="sshServer">The <strong>SSH Username</strong> is the SSH username with permission to access the data on the Collection System (i.e. "shipTech").</p>
             <p class="sshServer">The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p class="sshServer">The <strong>SSH Password</strong> is the SSH password for the Rsync Username.</p>
-            <p class="ftpServer">The <strong>FTP Server</strong> is the hostname or IP address of the Collection System (i.e. "192.168.4.151").  For an FTP Server, the <strong>Source Directory</strong> is the path on the FTP server (i.e. "/data").</p>
-            <p class="ftpServer">The <strong>FTP Port</strong> is the FTP server's port.  If no value is defined this field will default to 21.</p>
+            <p class="ftpServer">The <strong>FTP Server</strong> is the hostname or IP address of the Collection System (i.e. "192.168.4.151"), followed by <strong>:port</strong> if the FTP server doesn't use port 21 (i.e. "192.168.4.151:2121", or "[2001:db8::1]:2121" for an IPv6 address).  For an FTP Server, the <strong>Source Directory</strong> is the path on the FTP server (i.e. "/data").</p>
             <p class="ftpServer">The <strong>FTP Username</strong> is the FTP username with permission to access the data on the Collection System (i.e. "shipTech").  If the FTP server allows anonymous access set this field to "anonymous" and no password will be required.</p>
             <p class="ftpServer">The <strong>FTP Password</strong> is the FTP password for the FTP Username. Not required if FTP Username is set to "anonymous".</p>
             <p>Click the <strong>Add</strong> button to add the new collection system transfer to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>

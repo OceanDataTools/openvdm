@@ -57,16 +57,10 @@ $(function () {
         val = val.replace(/^ftp:\/\//i, '');
         // Replace backslashes with forward slashes, then strip leading slashes
         val = val.replace(/\\/g, '/').replace(/^\/+/, '');
-        // FTP server field should be hostname/IP only — strip any path component
+        // FTP server field is host[:port] only — strip any path component
         var slashIdx = val.indexOf('/');
         if (slashIdx !== -1) {
             val = val.substring(0, slashIdx);
-        }
-        // Move a "host:port" port into the FTP Port field
-        var portMatch = val.match(/^([^:]+):(\d+)$/);
-        if (portMatch) {
-            val = portMatch[1];
-            $('input[name=ftpPort]').val(portMatch[2]);
         }
         return val.trim();
     }
@@ -257,7 +251,7 @@ $(function () {
         $(this).val(normalizeFtpServer($(this).val()));
     });
 
-    $('input[name=ftpPort], input[name=ftpUser], input[name=ftpPass]').on('blur', function () {
+    $('input[name=ftpUser], input[name=ftpPass]').on('blur', function () {
         $(this).val($(this).val().trim());
     });
 

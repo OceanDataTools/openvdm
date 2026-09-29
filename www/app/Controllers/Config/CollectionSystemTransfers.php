@@ -83,25 +83,24 @@ class CollectionSystemTransfers extends Controller {
     /**
      * Validate the FTP Server fields of a submitted transfer, or clear them.
      *
-     * For an FTP Server transfer (type 5), checks the server, the port
-     * (default 21, must be 1-65535), the username and the password (not
-     * needed for anonymous). For other transfer types, clears the FTP
-     * fields, which only apply to FTP transfers. Shared by add, edit and
-     * their Test Setup (#213).
+     * For an FTP Server transfer (type 5), checks the server (host, with an
+     * optional :port from 1 to 65535; [brackets] around an IPv6 address
+     * with a port), the username and the password (not needed for
+     * anonymous). The port defaults to 21 (#224). For other transfer types,
+     * clears the FTP fields, which only apply to FTP transfers. Shared by
+     * add, edit and their Test Setup (#213).
      *
      * @param mixed  $transferType submitted transfer type
-     * @param string $ftpServer    FTP server (cleared for other types)
-     * @param mixed  $ftpPort      FTP port (defaulted or reset to 21)
+     * @param string $ftpServer    FTP server, host[:port] (cleared for other types)
      * @param string $ftpUser      FTP username (cleared for other types)
      * @param string $ftpPass      FTP password (cleared for other types)
      *
      * @return array validation errors; empty if valid or not an FTP transfer
      */
-    private function _checkFtpFields($transferType, &$ftpServer, &$ftpPort, &$ftpUser, &$ftpPass) {
+    private function _checkFtpFields($transferType, &$ftpServer, &$ftpUser, &$ftpPass) {
 
         if ($transferType != 5) {
             $ftpServer = '';
-            $ftpPort = '21';
             $ftpUser = '';
             $ftpPass = '';
             return array();
@@ -110,12 +109,22 @@ class CollectionSystemTransfers extends Controller {
         $errors = array();
         if($ftpServer == ''){
             $errors[] = 'FTP Server is required';
-        }
+        } else {
+            // Same rules as split_ftp_server() in server/lib/connection_utils.py
+            $port = null;
+            if($ftpServer[0] === '['){
+                if(preg_match('/^\[[^\]]+\](?::(\d*))?$/', $ftpServer, $matches)){
+                    $port = $matches[1] ?? '';
+                } else {
+                    $errors[] = 'FTP Server must be a hostname or IP address, optionally followed by :port (e.g. "[2001:db8::1]:2121" for IPv6)';
+                }
+            } elseif(substr_count($ftpServer, ':') == 1){
+                $port = explode(':', $ftpServer)[1];
+            }
 
-        if($ftpPort === ''){
-            $ftpPort = '21';
-        } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
-            $errors[] = 'FTP Port must be a number from 1 to 65535';
+            if($port !== null && $port !== '' && (!ctype_digit($port) || (int)$port < 1 || (int)$port > 65535)){
+                $errors[] = 'FTP Server port must be a number from 1 to 65535';
+            }
         }
 
         if($ftpUser == ''){
@@ -228,7 +237,6 @@ class CollectionSystemTransfers extends Controller {
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
             $ftpServer = $_POST['ftpServer'] ?? '';
-            $ftpPort = $_POST['ftpPort'] ?? '';
             $ftpUser = $_POST['ftpUser'] ?? '';
             $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
@@ -286,7 +294,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -435,7 +443,6 @@ class CollectionSystemTransfers extends Controller {
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
                     'ftpServer' => $ftpServer,
-                    'ftpPort' => (int)$ftpPort,
                     'ftpUser' => $ftpUser,
                     'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
@@ -476,7 +483,6 @@ class CollectionSystemTransfers extends Controller {
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
             $ftpServer = $_POST['ftpServer'] ?? '';
-            $ftpPort = $_POST['ftpPort'] ?? '';
             $ftpUser = $_POST['ftpUser'] ?? '';
             $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
@@ -514,7 +520,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -667,7 +673,6 @@ class CollectionSystemTransfers extends Controller {
                     'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
                     'ftpServer' => $ftpServer,
-                    'ftpPort' => (int)$ftpPort,
                     'ftpUser' => $ftpUser,
                     'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
@@ -748,7 +753,6 @@ class CollectionSystemTransfers extends Controller {
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
             $ftpServer = $_POST['ftpServer'] ?? '';
-            $ftpPort = $_POST['ftpPort'] ?? '';
             $ftpUser = $_POST['ftpUser'] ?? '';
             $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
@@ -821,7 +825,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -971,7 +975,6 @@ class CollectionSystemTransfers extends Controller {
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
                     'ftpServer' => $ftpServer,
-                    'ftpPort' => (int)$ftpPort,
                     'ftpUser' => $ftpUser,
                     'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
@@ -1016,7 +1019,6 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
                 $data['row'][0]->ftpServer = $ftpServer;
-                $data['row'][0]->ftpPort = $ftpPort;
                 $data['row'][0]->ftpUser = $ftpUser;
                 $data['row'][0]->includeFilter = $includeFilter;
                 $data['row'][0]->excludeFilter = $excludeFilter;
@@ -1050,7 +1052,6 @@ class CollectionSystemTransfers extends Controller {
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
             $ftpServer = $_POST['ftpServer'] ?? '';
-            $ftpPort = $_POST['ftpPort'] ?? '';
             $ftpUser = $_POST['ftpUser'] ?? '';
             $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
@@ -1107,7 +1108,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -1259,7 +1260,6 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['collectionSystemTransfer']->sshPass = $sshPass;
                 $gmData['collectionSystemTransfer']->ftpServer = $ftpServer;
-                $gmData['collectionSystemTransfer']->ftpPort = (int)$ftpPort;
                 $gmData['collectionSystemTransfer']->ftpUser = $ftpUser;
                 $gmData['collectionSystemTransfer']->ftpPass = $ftpPass;
                 $gmData['collectionSystemTransfer']->includeFilter = $includeFilter;
@@ -1301,7 +1301,6 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
             $data['row'][0]->ftpServer = $ftpServer;
-            $data['row'][0]->ftpPort = $ftpPort;
             $data['row'][0]->ftpUser = $ftpUser;
             $data['row'][0]->includeFilter = $includeFilter;
             $data['row'][0]->excludeFilter = $excludeFilter;
