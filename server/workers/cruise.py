@@ -31,6 +31,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
+from server.lib.transfer_utils import TransferCommandError
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
@@ -268,9 +269,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             cmd = build_rsync_command(rsync_flags, [], source_dir, dest_dir, include_file)
 
             # Transfer files
-            files['new'], files['updated'] = run_transfer_command(
-                self, current_job, cmd, len(files['include'])
-            )
+            try:
+                files['new'], files['updated'] = run_transfer_command(
+                    self, current_job, cmd, len(files['include'])
+                )
+            except TransferCommandError as exc:
+                return {'verdict': False, 'reason': f"PublicData transfer failed: {exc}"}
 
             files['new'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in files['new'] ]
             files['updated'] = [ os.path.join(from_publicdata_dir, filepath) for filepath in files['updated'] ]
