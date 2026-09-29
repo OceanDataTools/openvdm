@@ -181,6 +181,8 @@ Sample data repository? (https://github.com/oceandatatools/openvdm_sample_data)
 Sample data branch? (master)
 ```
 
+The sample data includes lowering-level transfers, so installing it also turns on lowering components. After setting up the cruise, the installer sets up the current lowering (`ROV0001` on a new install) and runs its transfers along with the cruise's.
+
 ### All done... almost ###
 When the script completes successfully there will a message containing how to access the OpenVDM web-interface:
 ```
