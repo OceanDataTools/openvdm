@@ -9,6 +9,15 @@ $(function () {
         {"value" : 5, "text" : "FTP Server"},
     ];
 
+    // Source Directory placeholder for each transfer type, keyed by type value (#227)
+    var sourceDirPlaceholders = {
+        1: 'e.g. /mnt/xbt',
+        2: 'e.g. /EM302',
+        3: 'e.g. /XBT',
+        4: 'e.g. /data/openrvdas',
+        5: 'e.g. /data'
+    };
+
     // ---------------------------------------------------------------------------
     // Field normalization helpers
     // ---------------------------------------------------------------------------
@@ -175,6 +184,8 @@ $(function () {
             break;
         default:
         }
+
+        $('input[name=sourceDir]').attr('placeholder', sourceDirPlaceholders[transferType] || '');
     }
 
     function setCustomStalenessField(staleness) {

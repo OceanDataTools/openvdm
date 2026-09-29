@@ -9,6 +9,15 @@ $(function () {
         {"value" : 5, "text" : "FTP Server"}
     ];
 
+    // Destination Directory placeholder for each transfer type, keyed by type value (#227)
+    var destDirPlaceholders = {
+        1: 'e.g. /mnt/backup, or remote:path for an rclone remote',
+        2: 'e.g. backups (blank for the top of the module)',
+        3: 'e.g. backups (blank for the top of the share)',
+        4: 'e.g. /data/cruises',
+        5: 'e.g. /data/cruises'
+    };
+
     // ---------------------------------------------------------------------------
     // Field normalization helpers
     // ---------------------------------------------------------------------------
@@ -103,7 +112,7 @@ $(function () {
             }
             return val;
         }
-        // Rsync and SMB: dest dir is relative within the cruise directory
+        // Rsync and SMB: dest dir is relative to the rsync module or SMB share
         val = val.replace(/^\/+/, '').replace(/\/+$/, '');
         return val;
     }
@@ -191,6 +200,8 @@ $(function () {
             break;
         default:
         }
+
+        $('input[name=destDir]').attr('placeholder', destDirPlaceholders[transferType] || '');
     }
 
     function setMountpointFieldForDestDir(destDirVal) {
