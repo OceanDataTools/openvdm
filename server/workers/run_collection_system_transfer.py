@@ -538,10 +538,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # Get file list based on transfer_type
         if transfer_type in ['local', 'smb', 'ftp']:
+            # A missing source or a listing error must not look like an empty
+            # source: with syncFromSource that would delete the destination (#206)
+            if not os.path.isdir(source_dir):
+                return {'verdict': False, 'reason': f"Source directory {raw_source_dir} not found"}
+
+            walk_errors = []
             filepaths = []
-            for root, _, filenames in os.walk(source_dir):
+            for root, _, filenames in os.walk(source_dir, onerror=walk_errors.append):
                 for filename in filenames:
                     filepaths.append(os.path.join(root, filename))
+
+            if walk_errors:
+                if transfer_type in ['smb', 'ftp']:
+                    # On a mounted share or FTP server this is usually a
+                    # network error, so the listing can't be trusted
+                    return {'verdict': False,
+                            'reason': f"Error listing source directory {raw_source_dir}: {walk_errors[0]}"}
+                for exc in walk_errors:
+                    logging.warning("Skipping unreadable source path: %s", exc)
         else:
             command = ['rsync', '-r']
             if cst_cfg.get('skipEmptyFiles') == 1:
@@ -768,12 +783,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
 
+            # List every source directory before copying anything. A listing
+            # that fails fails the transfer: skipping it would report success,
+            # and an empty list with syncFromSource deletes the destination (#206).
+            file_lists = []
             for src_dir, dest_name in source_pairs:
-                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
-                if dest_name:
-                    os.makedirs(effective_dest, exist_ok=True)
-
-                # Build filelist for this source directory
                 filelist_result = self.build_cst_filelist(
                     prefix=prefix,
                     rsync_password_filepath=password_file,
@@ -782,10 +796,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 )
 
                 if not filelist_result['verdict']:
-                    logging.warning("Filelist build failed for %s: %s", src_dir, filelist_result.get('reason', 'Unknown'))
-                    continue
+                    reason = filelist_result.get('reason', 'Unknown error')
+                    logging.error("Filelist build failed for %s: %s", src_dir, reason)
+                    return {'verdict': False, 'reason': f"Unable to list source files: {reason}", 'files': []}
 
-                files = filelist_result['files']
+                file_lists.append((src_dir, dest_name, filelist_result['files']))
+
+            for src_dir, dest_name, files in file_lists:
+                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
+                if dest_name:
+                    os.makedirs(effective_dest, exist_ok=True)
 
                 # Write file list
                 if not build_include_file(files['include'], include_file):

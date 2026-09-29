@@ -18,6 +18,7 @@ import uuid
 import logging
 import tempfile
 import subprocess
+import time
 import configparser
 from os.path import dirname, realpath
 
@@ -605,6 +606,9 @@ RCLONE_TEST_FLAGS = ['--contimeout', '15s', '--timeout', '30s',
 
 FTP_REMOTE = 'ftp_source'
 
+# How long mount_ftp_source() waits for the mount to appear
+FTP_MOUNT_TIMEOUT = 30
+
 
 def rclone_error(stderr: str) -> str:
     """Return rclone's last error line, without its timestamp/level prefix.
@@ -697,6 +701,11 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
     :func:`~server.lib.file_utils.temporary_directory` unmounts it. Requires
     FUSE (``fuse3``) and root.
 
+    Success means *mntpoint* is actually mounted: rclone versions without
+    ``--daemon-wait`` (e.g. 1.53 on Ubuntu 22.04) return before the mount is
+    ready, and walking an unmounted directory would look like an empty
+    source (#206).
+
     Args:
         cfg: Transfer configuration.
         mntpoint: Existing local directory to mount the server on.
@@ -730,6 +739,22 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
         subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, check=False)
         return False, detail
+
+    deadline = time.monotonic() + FTP_MOUNT_TIMEOUT
+    while not os.path.ismount(mntpoint):
+        if time.monotonic() > deadline:
+            with open(log_file, encoding='utf-8') as f:
+                log_text = f.read()
+            detail = (rclone_error(log_text) if log_text.strip()
+                      else f"not mounted after {FTP_MOUNT_TIMEOUT} s")
+            logging.error("FTP server mount not ready: %s", detail)
+            # rclone may still be trying: stop it so it can't mount later
+            subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, check=False)
+            subprocess.run(['pkill', '-f', f'rclone mount {FTP_REMOTE}:/ {mntpoint}'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            return False, detail
+        time.sleep(0.2)
 
     logging.info("Mounted FTP server %s on %s", cfg['ftpServer'], mntpoint)
     return True, ""
