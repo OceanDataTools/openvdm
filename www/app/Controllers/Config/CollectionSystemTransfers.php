@@ -6,6 +6,7 @@ use Core\View;
 use Helpers\Url;
 use Helpers\Session;
 use Helpers\PendingPasswords;
+use Helpers\FtpFields;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -80,63 +81,6 @@ class CollectionSystemTransfers extends Controller {
         return $output;
     }
 
-    /**
-     * Validate the FTP Server fields of a submitted transfer, or clear them.
-     *
-     * For an FTP Server transfer (type 5), checks the server (host, with an
-     * optional :port from 1 to 65535; [brackets] around an IPv6 address
-     * with a port), the username and the password (not needed for
-     * anonymous). The port defaults to 21 (#224). For other transfer types,
-     * clears the FTP fields, which only apply to FTP transfers. Shared by
-     * add, edit and their Test Setup (#213).
-     *
-     * @param mixed  $transferType submitted transfer type
-     * @param string $ftpServer    FTP server, host[:port] (cleared for other types)
-     * @param string $ftpUser      FTP username (cleared for other types)
-     * @param string $ftpPass      FTP password (cleared for other types)
-     *
-     * @return array validation errors; empty if valid or not an FTP transfer
-     */
-    private function _checkFtpFields($transferType, &$ftpServer, &$ftpUser, &$ftpPass) {
-
-        if ($transferType != 5) {
-            $ftpServer = '';
-            $ftpUser = '';
-            $ftpPass = '';
-            return array();
-        }
-
-        $errors = array();
-        if($ftpServer == ''){
-            $errors[] = 'FTP Server is required';
-        } else {
-            // Same rules as split_ftp_server() in server/lib/connection_utils.py
-            $port = null;
-            if($ftpServer[0] === '['){
-                if(preg_match('/^\[[^\]]+\](?::(\d*))?$/', $ftpServer, $matches)){
-                    $port = $matches[1] ?? '';
-                } else {
-                    $errors[] = 'FTP Server must be a hostname or IP address, optionally followed by :port (e.g. "[2001:db8::1]:2121" for IPv6)';
-                }
-            } elseif(substr_count($ftpServer, ':') == 1){
-                $port = explode(':', $ftpServer)[1];
-            }
-
-            if($port !== null && $port !== '' && (!ctype_digit($port) || (int)$port < 1 || (int)$port > 65535)){
-                $errors[] = 'FTP Server port must be a number from 1 to 65535';
-            }
-        }
-
-        if($ftpUser == ''){
-            $errors[] = 'FTP Username is required';
-        }
-
-        if($ftpUser != 'anonymous' && $ftpPass == ''){
-            $errors[] = 'FTP Password is required';
-        }
-
-        return $errors;
-    }
 
     private function updateDestinationDirectory() {
         $_warehouseModel = new \Models\Warehouse();
@@ -294,7 +238,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -520,7 +464,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -765,16 +709,8 @@ class CollectionSystemTransfers extends Controller {
             $sshPass = $passwords['sshPass'];
             $ftpPass = $passwords['ftpPass'];
 
-            // Don't send a password saved for another FTP login (#211): not for
-            // anonymous access unless one is typed, and not after the username
-            // changed (validation then asks for the new user's password)
-            if (($_POST['ftpPass'] ?? '') === '') {
-                if ($ftpUser == 'anonymous') {
-                    $ftpPass = '';
-                } elseif ($ftpUser != $data['row'][0]->ftpUser && $ftpPass === $data['row'][0]->ftpPass) {
-                    $ftpPass = '';
-                }
-            }
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -825,7 +761,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
@@ -1064,16 +1000,8 @@ class CollectionSystemTransfers extends Controller {
             $sshPass = $passwords['sshPass'];
             $ftpPass = $passwords['ftpPass'];
 
-            // Don't send a password saved for another FTP login (#211): not for
-            // anonymous access unless one is typed, and not after the username
-            // changed (validation then asks for the new user's password)
-            if (($_POST['ftpPass'] ?? '') === '') {
-                if ($ftpUser == 'anonymous') {
-                    $ftpPass = '';
-                } elseif ($ftpUser != $data['row'][0]->ftpUser && $ftpPass === $data['row'][0]->ftpPass) {
-                    $ftpPass = '';
-                }
-            }
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -1108,7 +1036,7 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
             $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
