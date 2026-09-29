@@ -36,7 +36,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_ftp_source, mount_smb_share, test_cst_source
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, list_ftp_source, mount_ftp_source, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
@@ -47,12 +47,54 @@ TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
+def classify_file(filepath: str, size: int, mod_time: float, filters: dict,
+                  data_start_time: float, data_end_time: float):
+    """Decide whether a listed file is transferred, reported as excluded or ignored.
+
+    Applies the default-ignore patterns, the date-range bounds (modification
+    time), the ASCII filename requirement and the transfer's ignore, include
+    and exclude filters.
+
+    Args:
+        filepath: Path of the file (matched against the filters).
+        size: File size in bytes.
+        mod_time: Modification time as a Unix epoch float.
+        filters: Dict with ``ignore_filters``, ``include_filters`` and
+            ``exclude_filters`` keys, each a list of glob patterns.
+        data_start_time: Earliest allowed modification time (inclusive).
+        data_end_time: Latest allowed modification time (inclusive).
+
+    Returns:
+        tuple | None: ``("include", filepath, size_str)``, ``("exclude",
+        filepath, None)``, or ``None`` for a file that is skipped entirely.
+    """
+
+    if is_default_ignore(filepath):
+        return None
+
+    if not data_start_time <= mod_time <= data_end_time:
+        return None
+
+    if not is_ascii(filepath):
+        return ("exclude", filepath, None)
+
+    if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
+        return None
+
+    if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
+        if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
+            return ("exclude", filepath, None)
+
+        return ("include", filepath, str(size))
+
+    return ("exclude", filepath, None)
+
+
 def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
     """Filter a batch of local file paths against transfer criteria.
 
-    Each file is evaluated against date-range bounds (modification time),
-    default-ignore patterns, ASCII filename requirement, and the configured
-    include/exclude filter lists.
+    Each file is ``stat``ed and evaluated with :func:`classify_file`.
+    Symlinks and files that disappear are skipped.
 
     Args:
         batch: List of absolute file paths to evaluate.
@@ -69,48 +111,42 @@ def process_batch(batch: list, filters: dict, data_start_time: float, data_end_t
         (symlinks, default-ignored, out-of-range) are omitted from the result.
     """
 
-    def _process_filepath(filepath, filters, data_start_time, data_end_time):
-        """
-        Process a file path to determine if it should be included or excluded from
-        the data transfer
-        """
-
-        try:
-            if os.path.islink(filepath):
-                return None
-
-            if is_default_ignore(filepath):
-                return None
-
-            stat = os.stat(filepath)
-            mod_time = stat.st_mtime
-            size = stat.st_size
-
-            if not (data_start_time <= mod_time <= data_end_time):
-                return None
-
-            if not is_ascii(filepath):
-                return ("exclude", filepath, None)
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
-                return None
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
-                if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
-                    return ("exclude", filepath, None)
-
-                return ("include", filepath, str(size))
-
-            return ("exclude", filepath, None)
-
-        except FileNotFoundError:
-            return None
-
-
     results = []
 
     for filepath in batch:
-        result = _process_filepath(filepath, filters, data_start_time, data_end_time)
+        try:
+            if os.path.islink(filepath):
+                continue
+            stat = os.stat(filepath)
+        except FileNotFoundError:
+            continue
+
+        result = classify_file(filepath, stat.st_size, stat.st_mtime, filters, data_start_time, data_end_time)
+        if result:
+            results.append(result)
+    return results
+
+
+def process_listed_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
+    """Filter a batch of already-listed files (e.g. from ``rclone lsjson``) against transfer criteria.
+
+    Like :func:`process_batch`, but the size and modification time come from
+    the listing, so nothing is ``stat``ed.
+
+    Args:
+        batch: ``(filepath, size, mod_time)`` tuples.
+        filters: Dict with ``ignore_filters``, ``include_filters``, and
+            ``exclude_filters`` keys, each containing a list of glob patterns.
+        data_start_time: Earliest allowed modification time (inclusive).
+        data_end_time: Latest allowed modification time (inclusive).
+
+    Returns:
+        List of ``(action, filepath, size_str)`` tuples, as for :func:`process_batch`.
+    """
+
+    results = []
+    for filepath, size, mod_time in batch:
+        result = classify_file(filepath, size, mod_time, filters, data_start_time, data_end_time)
         if result:
             results.append(result)
     return results
@@ -455,7 +491,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return [(source_dir, None)]
 
 
-    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None):
+    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None, rclone_config=None):
         """Build the lists of files to transfer and exclude for the collection system transfer.
 
         Lists the source with rsync, then classifies the files in parallel
@@ -470,6 +506,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             max_workers: Number of parallel classification workers.
             override_source_dir: Source directory to use instead of
                 ``self.source_dir`` (e.g. for one match of a wildcard source).
+            rclone_config: rclone config file with the FTP remote, for FTP
+                sources, which are listed with ``rclone lsjson`` rather than
+                through the mount (#208).
 
         Returns:
             dict: ``{'verdict': True, 'files': {'include', 'exclude', 'new',
@@ -537,7 +576,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
         # Get file list based on transfer_type
-        if transfer_type in ['local', 'smb', 'ftp']:
+        if transfer_type == 'ftp':
+            # One rclone listing, not a walk and a stat per file through the
+            # mount, which is slow over FTP and shows a directory the server
+            # refuses to list as empty (#208)
+            success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir)
+            if not success:
+                return {'verdict': False,
+                        'reason': f"Error listing source directory {raw_source_dir}: {listing}"}
+            filepaths = [(os.path.join(source_dir, path), size, mod_time)
+                         for path, size, mod_time in listing]
+        elif transfer_type in ['local', 'smb']:
             # A missing source or a listing error must not look like an empty
             # source: with syncFromSource that would delete the destination (#206)
             if not os.path.isdir(source_dir):
@@ -550,7 +599,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     filepaths.append(os.path.join(root, filename))
 
             if walk_errors:
-                if transfer_type in ['smb', 'ftp']:
+                if transfer_type == 'smb':
                     # On a mounted share or FTP server this is usually a
                     # network error, so the listing can't be trusted
                     return {'verdict': False,
@@ -591,7 +640,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            if transfer_type in ['local', 'smb', 'ftp']:
+            if transfer_type == 'ftp':
+                futures = [executor.submit(process_listed_batch, batch, filters, data_start_time, data_end_time)
+                           for batch in batches]
+            elif transfer_type in ['local', 'smb']:
                 futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
                            for batch in batches]
             else:
@@ -614,7 +666,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
-            if transfer_type in ['local', 'smb', 'ftp']:
+            if transfer_type == 'ftp':
+                success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir)
+                if not success:
+                    return {'verdict': False,
+                            'reason': f"Error re-listing source directory {raw_source_dir}: {listing}"}
+                current_sizes = {os.path.join(source_dir, path): str(size) for path, size, _ in listing}
+                kept = [(path, size) for path, size in zip(return_files['include'], return_files['filesize'])
+                        if current_sizes.get(path) == size]
+                return_files['include'] = [path for path, _ in kept]
+                return_files['filesize'] = [size for _, size in kept]
+            elif transfer_type in ['local', 'smb']:
                 paths_sizes = list(zip(return_files['include'], return_files['filesize']))
                 stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
                 verified_paths = []
@@ -706,6 +768,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         prefix = None
         mntpoint = None
+        rclone_config = None
         is_darwin = False
 
         with temporary_directory() as tmpdir:
@@ -792,7 +855,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     prefix=prefix,
                     rsync_password_filepath=password_file,
                     is_darwin=is_darwin,
-                    override_source_dir=src_dir
+                    override_source_dir=src_dir,
+                    rclone_config=rclone_config
                 )
 
                 if not filelist_result['verdict']:
