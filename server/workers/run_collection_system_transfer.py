@@ -36,7 +36,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_ftp_source, mount_path, mount_smb_share, test_cst_source
+from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
@@ -792,29 +792,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             # Adjustments for FTP
             if transfer_type == 'ftp':
-                if cst_cfg.get('ftpUser') != 'anonymous' and cst_cfg.get('ftpPass') is None:
-                    return {'verdict': False,
-                            'reason': 'ftpPass not available — worker API token may be '
-                                      'misconfigured or password not set for this transfer',
-                            'files': []}
-                # Mount the FTP server
-                mntpoint = os.path.join(tmpdir, 'mntpoint')
-                os.mkdir(mntpoint, 0o755)
-                rclone_config = os.path.join(tmpdir, 'rclone.conf')
-                try:
-                    build_rclone_config_for_ftp(cst_cfg, rclone_config)
-                except (subprocess.CalledProcessError, OSError) as exc:
-                    return {'verdict': False, 'reason': f'Error writing rclone config: {exc}', 'files': []}
+                success, rclone_config = prepare_ftp_config(cst_cfg, tmpdir)
+                if not success:
+                    return {'verdict': False, 'reason': rclone_config, 'files': []}
                 # Mount the source directory (or wildcard parent), not the
                 # server root, which the account may not be able to list (#209)
                 mount_base = ftp_mount_base(source_dir)
-                success, mount_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config, mount_base)
+                success, mount_result = prepare_ftp_mount(cst_cfg, tmpdir, rclone_config, mount_base)
                 if not success:
                     reason = 'Failed to mount FTP server'
-                    if mount_detail:
-                        reason += f' — {mount_detail}'
+                    if mount_result:
+                        reason += f' — {mount_result}'
                     return {'verdict': False, 'reason': reason}
-                prefix = mntpoint
+                mntpoint = prefix = mount_result
 
             # Adjustments for RSYNC
             if transfer_type == 'rsync':
