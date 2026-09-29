@@ -1,4 +1,4 @@
--- Migration: OpenVDM 2.16 -> 2.17
+-- Migration: OpenVDM 2.15 -> 2.16
 --
 -- Add FTP Server as a collection system transfer type (#17). The type is
 -- shared with cruise data transfers, whose form hides it until FTP
