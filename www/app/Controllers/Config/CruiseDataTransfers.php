@@ -9,6 +9,11 @@ use Helpers\PendingPasswords;
 
 class CruiseDataTransfers extends Controller {
 
+    // Transfer types that aren't available for cruise data transfers:
+    // FTP Server (5) is only a collection system transfer type until #199.
+    // Hidden in the form, and rejected when submitted anyway (#210).
+    const UNSUPPORTED_TRANSFER_TYPES = array(5);
+
     private $_cruiseDataTransfersModel,
             $_collectionSystemTransfersModel,
             $_extraDirectoriesModel,
@@ -21,8 +26,7 @@ class CruiseDataTransfers extends Controller {
         $i=1;
 
         foreach($transferTypes as $row){
-            // FTP Server (5) is only a collection system transfer type until #199
-            if ((int)$row->transferTypeID === 5) {
+            if (in_array((int)$row->transferTypeID, self::UNSUPPORTED_TRANSFER_TYPES, true)) {
                 continue;
             }
             $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
@@ -145,6 +149,8 @@ class CruiseDataTransfers extends Controller {
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
+            } elseif(in_array((int)$transferType, self::UNSUPPORTED_TRANSFER_TYPES, true)){
+                $error[] = 'This transfer type is not available for cruise data transfers';
             }
 
             if($destDir == ''){
@@ -335,6 +341,8 @@ class CruiseDataTransfers extends Controller {
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
+            } elseif(in_array((int)$transferType, self::UNSUPPORTED_TRANSFER_TYPES, true)){
+                $error[] = 'This transfer type is not available for cruise data transfers';
             }
 
             if($destDir == ''){
@@ -563,6 +571,8 @@ class CruiseDataTransfers extends Controller {
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
+            } elseif(in_array((int)$transferType, self::UNSUPPORTED_TRANSFER_TYPES, true)){
+                $error[] = 'This transfer type is not available for cruise data transfers';
             }
 
             if($destDir == ''){
@@ -778,6 +788,8 @@ class CruiseDataTransfers extends Controller {
 
             if($transferType == ''){
                 $error[] = 'Transfer type is required';
+            } elseif(in_array((int)$transferType, self::UNSUPPORTED_TRANSFER_TYPES, true)){
+                $error[] = 'This transfer type is not available for cruise data transfers';
             }
 
             if($destDir == ''){

@@ -328,6 +328,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             logging.error("Unknown Transfer Type")
             return {'verdict': False, 'reason': 'Unknown Transfer Type'}
 
+        # Only a collection system transfer type; the CDT form rejects it (#210)
+        if transfer_type == 'ftp':
+            logging.error("FTP Server isn't available for cruise data transfers")
+            return {'verdict': False, 'reason': "FTP Server isn't available for cruise data transfers"}
+
         files = { 'new':[], 'updated':[], 'exclude': [] }
         is_darwin = False
 
