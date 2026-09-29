@@ -181,6 +181,11 @@ Sample data repository? (https://github.com/oceandatatools/openvdm_sample_data)
 Sample data branch? (master)
 ```
 
+The sample data also sets up local test servers for each transfer type: Samba shares, rsync daemon modules and an FTP server. The FTP server (`utils/sample_ftp_server.py`, run by Supervisor as `openvdm_sample_ftp`) listens on localhost only:
+- port 2121 supports `MLSD`; port 2122 doesn't, like many older instrument FTP servers;
+- the OpenVDM user, with the OpenVDM password, can read the sample data root and write only to `ftp_destination`;
+- anonymous users can read `ftp_source`.
+
 ### All done... almost ###
 When the script completes successfully there will a message containing how to access the OpenVDM web-interface:
 ```
