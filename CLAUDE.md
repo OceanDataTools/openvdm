@@ -191,7 +191,7 @@ Convention (established in issue #99):
 
 ### REST API credential gating (shared-secret header)
 
-The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers strip `rsyncPass`, `smbPass`, and `sshPass` (and, for collection system transfers, `ftpPass`) from all responses unless the request includes a valid `X-Worker-Token` header.
+The `Api/CollectionSystemTransfers`, `Api/CruiseDataTransfers` and `Api/Warehouse` (`getCruiseConfig`, `getLoweringConfig`) controllers strip transfer passwords from all responses unless the request includes a valid `X-Worker-Token` header. They all use `Helpers\TransferCredentials` (`forResponse()`), whose `FIELDS` constant is the one list of password fields (`rsyncPass`, `smbPass`, `sshPass`, `ftpPass`); `PendingPasswords` uses the same list. A new transfer type's password field only needs adding there (#205).
 
 - The expected token is `WORKER_API_KEY` defined in `www/app/Core/Config.php`.
 - The same value must be set as `workerApiKey` in `server/etc/openvdm.yaml`.
