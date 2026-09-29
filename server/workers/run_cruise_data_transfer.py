@@ -33,7 +33,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError, error_detail
-from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -327,7 +327,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 with open(password_file, 'w', encoding='utf-8') as f:
                     f.write(cdt_cfg['rsyncPass'])
                 os.chmod(password_file, 0o600)
-                dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}/"
+                dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir'])}/"
 
             elif transfer_type == 'ssh':
 
