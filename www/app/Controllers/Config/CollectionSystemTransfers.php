@@ -13,15 +13,14 @@ class CollectionSystemTransfers extends Controller {
     private $_collectionSystemTransfersModel,
             $_transferTypesModel;
 
+    // Transfer type choices for the form's Form::select(), as ID => name (#226).
     private function _buildTransferTypesOptions() {
         $transferTypes = $this->_transferTypesModel->getTransferTypes();
 
         $output = array();
-        $i=1;
 
         foreach($transferTypes as $row){
-            $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
-            array_push($output, $option);
+            $output[$row->transferTypeID] = $row->transferType;
         }
 
         return $output;

@@ -70,7 +70,7 @@ $_POST += [
 <?php
   }
 ?>
-                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType'] ?? ''); ?></div>
+                                <div class="form-group"><label>Transfer Type</label><?php echo Form::select(array('class'=>'form-control', 'name'=>'transferType', 'placeholder'=>'Select a transfer type…', 'data'=>$data['transferTypeOptions'], 'value'=>$_POST['transferType'] ?? '')); ?></div>
                                 <div class="form-group"><label>Source Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sourceDir', 'value'=> $_POST['sourceDir'])); ?></div>
                                 <div class="form-group localDir"><label>Source Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $_POST['localDirIsMountPoint']); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'placeholder'=>'e.g. 192.168.4.151/data', 'value'=> $_POST['rsyncServer'])); ?></div>
