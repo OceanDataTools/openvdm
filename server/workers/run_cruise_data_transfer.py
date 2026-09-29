@@ -353,10 +353,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'rsync':
                 extra_args += [f"--password-file={password_file}"]
 
+            # The dry run only counts the files to send, and always writes
+            # locally: to the temporary directory for a remote destination
+            # (':' in dest_dir), so without the remote-only arguments above
+            # (rsync rejects --password-file without an rsync daemon, #249)
             dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
-            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
-            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                dry_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + dry_cmd
+            dry_cmd = _build_rsync_command(dry_flags, None, self.cruise_dir, dr_dest_dir, exclude_file)
 
             logging.debug("Dry run command: %s", transfer_utils.redact_command(dry_cmd))
             proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
