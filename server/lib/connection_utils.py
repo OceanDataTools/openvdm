@@ -669,18 +669,25 @@ def build_rclone_config_for_ftp(cfg: dict, rclone_config: str) -> str:
     return FTP_REMOTE
 
 
-def test_ftp_connection(rclone_config: str, remote: str) -> tuple:
-    """Test logging in to an FTP server by listing its root directory.
+def test_ftp_connection(rclone_config: str, remote: str, path: str = '/') -> tuple:
+    """Test logging in to an FTP server by listing a directory.
+
+    List the directory the transfer will use (see :func:`ftp_mount_base`)
+    rather than ``/``, which some accounts can't list (#209). A failure
+    whose detail says the directory wasn't found (rclone's ``directory not
+    found``, or the server's own wording such as ``No such directory``) means
+    the login worked but *path* can't be listed.
 
     Args:
         rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
         remote: Name of the FTP remote in *rclone_config*.
+        path: Directory on the server to list.
 
     Returns:
         tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
         with rclone's error.
     """
-    cmd = ['rclone', 'lsf', f'{remote}:/', '--config', rclone_config,
+    cmd = ['rclone', 'lsf', f'{remote}:{path}', '--config', rclone_config,
            '--max-depth', '1'] + RCLONE_TEST_FLAGS
     try:
         subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -689,6 +696,42 @@ def test_ftp_connection(rclone_config: str, remote: str) -> tuple:
         return False, _ftp_rclone_error(exc.stderr)
     except FileNotFoundError:
         return False, 'rclone is not installed'
+
+
+def ftp_mount_base(source_dir: str) -> str:
+    """Return the FTP directory to mount for a source directory.
+
+    The source directory itself, or for a wildcard source (wildcards only in
+    the last component) its parent. Mounting the server root instead would
+    need the account to be able to list ``/`` and every directory down to
+    the source, which some servers don't allow (#209).
+
+    Args:
+        source_dir: The transfer's source directory on the FTP server.
+
+    Returns:
+        The absolute directory to mount.
+    """
+    base = os.path.dirname(source_dir) if has_wildcard(os.path.basename(source_dir)) else source_dir
+    return '/' + base.strip('/') if base.strip('/') else '/'
+
+
+def mount_path(mntpoint: str, path: str, mount_base: str = None) -> str:
+    """Return where *path* on the remote is in a mount of *mount_base*.
+
+    Args:
+        mntpoint: Local mount point.
+        path: Path on the remote (FTP) or within the share (SMB).
+        mount_base: Remote directory mounted at *mntpoint*; ``None`` (or
+            ``/``) when the root of the server or share is mounted.
+
+    Returns:
+        The local path.
+    """
+    if not mount_base or mount_base == '/':
+        return os.path.join(mntpoint, path.lstrip('/'))
+    rel = os.path.relpath('/' + path.strip('/'), mount_base)
+    return mntpoint if rel == '.' else os.path.join(mntpoint, rel)
 
 
 def _ftp_rclone_error(stderr: str) -> str:
@@ -761,12 +804,13 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
         return False, f"Unreadable rclone lsjson output: {exc}"
 
 
-def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
-    """Mount a transfer's FTP server on a local directory with ``rclone mount``.
+def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str, mount_base: str = '/') -> tuple:
+    """Mount a directory of a transfer's FTP server on a local directory with ``rclone mount``.
 
-    The server's root is mounted read-write if the transfer removes source
-    files (``removeSourceFiles``), otherwise read-only, so ``sourceDir`` is a
-    path within the mount, as for SMB shares. The files to copy are listed
+    *mount_base* (from :func:`ftp_mount_base`: the source directory, or a
+    wildcard source's parent) is mounted read-write if the transfer removes
+    source files (``removeSourceFiles``), otherwise read-only. Use
+    :func:`mount_path` to find a server path in the mount. The files to copy are listed
     with :func:`list_ftp_source`, not through the mount, so rclone's default
     directory cache is fine. :func:`~server.lib.file_utils.temporary_directory`
     unmounts it. Requires
@@ -781,6 +825,7 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
         cfg: Transfer configuration.
         mntpoint: Existing local directory to mount the server on.
         rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        mount_base: Directory on the FTP server to mount.
 
     Returns:
         tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
@@ -789,7 +834,7 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
     cfg = normalize_transfer_config(cfg)
     log_file = os.path.join(os.path.dirname(rclone_config), 'rclone_mount.log')
 
-    cmd = ['rclone', 'mount', f'{FTP_REMOTE}:/', mntpoint, '--config', rclone_config,
+    cmd = ['rclone', 'mount', f'{FTP_REMOTE}:{mount_base}', mntpoint, '--config', rclone_config,
            '--daemon', '--contimeout', '15s', '--timeout', '30s',
            '--log-level', 'ERROR', '--log-file', log_file]
     if cfg.get('removeSourceFiles', 0) != 1:
@@ -822,7 +867,7 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
             # rclone may still be trying: stop it so it can't mount later
             subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, check=False)
-            subprocess.run(['pkill', '-f', f'rclone mount {FTP_REMOTE}:/ {mntpoint}'],
+            subprocess.run(['pkill', '-f', f'rclone mount {FTP_REMOTE}:{mount_base} {mntpoint}'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             return False, detail
         time.sleep(0.2)
@@ -1045,7 +1090,7 @@ def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
 
 
 def _test_mounted_source(mntpoint: str, source_dir: str, remove_source_files: bool,
-                         location: str) -> list:
+                         location: str, mount_base: str = None) -> list:
     """Check a source directory on a mounted SMB share or FTP server.
 
     Checks that the source directory exists (for a wildcard source, that its
@@ -1057,6 +1102,8 @@ def _test_mounted_source(mntpoint: str, source_dir: str, remove_source_files: bo
         source_dir: Source directory within the mount; may end in a wildcard.
         remove_source_files: Whether the transfer deletes source files.
         location: Where the source is, for failure reasons (e.g. ``'SMB share'``).
+        mount_base: Remote directory mounted at *mntpoint* (see
+            :func:`mount_path`); ``None`` for the root of a share.
 
     Returns:
         list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
@@ -1066,7 +1113,7 @@ def _test_mounted_source(mntpoint: str, source_dir: str, remove_source_files: bo
     if has_wildcard(source_dir):
         wildcard_parent = os.path.dirname(source_dir)
         wildcard_pattern = os.path.basename(source_dir)
-        mnt_parent = os.path.join(mntpoint, wildcard_parent.lstrip('/'))
+        mnt_parent = mount_path(mntpoint, wildcard_parent, mount_base)
         if not os.path.isdir(mnt_parent):
             reason = f"Unable to find parent directory: {wildcard_parent} on {location}"
             results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
@@ -1089,7 +1136,7 @@ def _test_mounted_source(mntpoint: str, source_dir: str, remove_source_files: bo
             results.extend([{"partName": "Write test", "result": "Pass"}])
         return results
 
-    mnt_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
+    mnt_source_dir = mount_path(mntpoint, source_dir, mount_base)
     if not os.path.isdir(mnt_source_dir):
         reason = f"Unable to find source directory: {source_dir} on {location}"
         results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
@@ -1286,12 +1333,26 @@ def test_cst_source(cst_cfg, source_dir):
                 return results
 
             server = f"{cst_cfg['ftpServer']}:{cst_cfg.get('ftpPort') or 21}"
+            mount_base = ftp_mount_base(source_dir)
             rclone_config = os.path.join(tmpdir, 'rclone.conf')
             try:
                 remote = build_rclone_config_for_ftp(cst_cfg, rclone_config)
-                contest_success, contest_detail = test_ftp_connection(rclone_config, remote)
+                contest_success, contest_detail = test_ftp_connection(rclone_config, remote, mount_base)
             except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
                 contest_success, contest_detail = False, f"Unable to write rclone config: {exc}"
+
+            # rclone says "directory not found"; servers vary, e.g. "501 No such directory."
+            if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
+                # Logged in, but the source (or wildcard parent) can't be listed
+                results.extend([{"partName": "FTP server", "result": "Pass"}])
+                if mount_base != source_dir:
+                    reason = f"Unable to find parent directory: {mount_base} on FTP server"
+                else:
+                    reason = f"Unable to find source directory: {source_dir} on FTP server"
+                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                if cst_cfg['removeSourceFiles'] == 1:
+                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                return results
 
             if not contest_success:
                 reason = f"Could not connect to FTP server: {server} as {cst_cfg['ftpUser']}"
@@ -1311,7 +1372,7 @@ def test_cst_source(cst_cfg, source_dir):
 
             mntpoint = os.path.join(tmpdir, 'mntpoint')
             os.mkdir(mntpoint, 0o755)
-            mnt_success, mnt_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config)
+            mnt_success, mnt_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config, mount_base)
             if not mnt_success:
                 reason = f"Could not mount FTP server: {server}"
                 if mnt_detail:
@@ -1329,7 +1390,8 @@ def test_cst_source(cst_cfg, source_dir):
             results.extend([{"partName": "Mount FTP server", "result": "Pass"}])
 
             results.extend(_test_mounted_source(mntpoint, source_dir,
-                                                cst_cfg['removeSourceFiles'] == 1, 'FTP server'))
+                                                cst_cfg['removeSourceFiles'] == 1, 'FTP server',
+                                                mount_base))
 
         # Tests for rsync
         if transfer_type == 'rsync':
