@@ -10,6 +10,5 @@ ON DUPLICATE KEY UPDATE `transferType` = VALUES(`transferType`);
 
 ALTER TABLE `OVDM_CollectionSystemTransfers`
   ADD COLUMN `ftpServer` tinytext AFTER `sshPass`,
-  ADD COLUMN `ftpPort` int(5) unsigned NOT NULL DEFAULT '21' AFTER `ftpServer`,
-  ADD COLUMN `ftpUser` tinytext AFTER `ftpPort`,
+  ADD COLUMN `ftpUser` tinytext AFTER `ftpServer`,
   ADD COLUMN `ftpPass` tinytext AFTER `ftpUser`;

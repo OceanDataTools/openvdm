@@ -32,7 +32,7 @@ _TRANSFER_INT_FIELDS = frozenset([
     'transferType', 'staleness', 'removeSourceFiles', 'useStartDate',
     'skipEmptyDirs', 'skipEmptyFiles', 'syncFromSource', 'syncToDest',
     'bandwidthLimit', 'cruiseOrLowering', 'localDirIsMountPoint',
-    'sshUseKey', 'ftpPort', 'includeOVDMFiles', 'status', 'enable',
+    'sshUseKey', 'includeOVDMFiles', 'status', 'enable',
     'collectionSystemTransferID', 'cruiseDataTransferID',
     'collectionSystem', 'extraDirectory',
 ])
@@ -628,6 +628,60 @@ def rclone_error(stderr: str) -> str:
     return re.sub(r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\s+(?:[A-Z]+\s*:\s*)?', '', lines[-1])
 
 
+FTP_DEFAULT_PORT = 21
+
+
+def split_ftp_server(value: str) -> tuple:
+    """Split an FTP Server field into host and port.
+
+    The field is ``host``, ``host:port``, ``[ipv6]:port`` or a bare IPv6
+    address; the port defaults to 21 (#224).
+
+    Args:
+        value: The transfer's ``ftpServer``.
+
+    Returns:
+        tuple[str, int]: The host (IPv6 without brackets) and the port.
+
+    Raises:
+        ValueError: If the port isn't a number from 1 to 65535, or the
+            brackets of an IPv6 address don't match.
+    """
+    value = (value or '').strip()
+    if value.startswith('['):
+        match = re.match(r'^\[([^\]]+)\](?::(\d*))?$', value)
+        if not match:
+            raise ValueError(f"Invalid FTP server: {value}")
+        host, port = match.group(1), match.group(2)
+    elif value.count(':') == 1:
+        host, port = value.split(':')
+    else:
+        host, port = value, None   # hostname, IPv4, or bare IPv6 (default port)
+
+    if port is None or port == '':
+        return host, FTP_DEFAULT_PORT
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ValueError(f"Invalid FTP port in {value}: must be a number from 1 to 65535")
+    return host, int(port)
+
+
+def ftp_server_label(value: str) -> str:
+    """Return an FTP Server field as ``host:port``, for messages.
+
+    Args:
+        value: The transfer's ``ftpServer``.
+
+    Returns:
+        ``host:port`` (``[ipv6]:port``), or *value* unchanged if it can't
+        be parsed.
+    """
+    try:
+        host, port = split_ftp_server(value)
+    except ValueError:
+        return value
+    return f"[{host}]:{port}" if ':' in host else f"{host}:{port}"
+
+
 def build_rclone_config_for_ftp(cfg: dict, rclone_config: str) -> str:
     """Write an rclone FTP remote for a transfer's FTP server to a config file.
 
@@ -636,8 +690,8 @@ def build_rclone_config_for_ftp(cfg: dict, rclone_config: str) -> str:
     password uses the conventional password ``anonymous``.
 
     Args:
-        cfg: Transfer configuration with ``ftpServer``, ``ftpPort``,
-            ``ftpUser`` and ``ftpPass``.
+        cfg: Transfer configuration with ``ftpServer`` (``host[:port]``, see
+            :func:`split_ftp_server`), ``ftpUser`` and ``ftpPass``.
         rclone_config: Path of the rclone config file to write.
 
     Returns:
@@ -645,14 +699,17 @@ def build_rclone_config_for_ftp(cfg: dict, rclone_config: str) -> str:
 
     Raises:
         subprocess.CalledProcessError: If ``rclone obscure`` fails.
+        ValueError: If ``ftpServer`` has an invalid port.
     """
     cfg = normalize_transfer_config(cfg)
+    host, port = split_ftp_server(cfg["ftpServer"])
 
     out = configparser.ConfigParser()
     out[FTP_REMOTE] = {
         "type": "ftp",
-        "host": cfg["ftpServer"],
-        "port": str(cfg.get("ftpPort") or 21),
+        # rclone joins host and port with ":", so an IPv6 host needs brackets
+        "host": f"[{host}]" if ':' in host else host,
+        "port": str(port),
         "user": cfg.get("ftpUser") or "anonymous",
     }
 
@@ -894,7 +951,8 @@ def prepare_ftp_config(cfg: dict, tmpdir: str) -> tuple:
     Returns:
         tuple[bool, str]: ``(True, rclone_config_path)``, or ``(False,
         reason)`` if the password wasn't sent by the web app (worker API
-        token), rclone isn't installed, or the config can't be written.
+        token), the FTP Server field has an invalid port, rclone isn't
+        installed, or the config can't be written.
     """
     cfg = normalize_transfer_config(cfg)
     if cfg.get('ftpUser') != 'anonymous' and cfg.get('ftpPass') is None:
@@ -905,6 +963,8 @@ def prepare_ftp_config(cfg: dict, tmpdir: str) -> tuple:
         build_rclone_config_for_ftp(cfg, rclone_config)
     except FileNotFoundError:
         return False, 'rclone is not installed'
+    except ValueError as exc:
+        return False, str(exc)
     except (subprocess.CalledProcessError, OSError) as exc:
         return False, f"Unable to write rclone config: {exc}"
     return True, rclone_config
@@ -1389,7 +1449,7 @@ def test_cst_source(cst_cfg, source_dir):
                 ])
                 return results
 
-            server = f"{cst_cfg['ftpServer']}:{cst_cfg.get('ftpPort') or 21}"
+            server = ftp_server_label(cst_cfg['ftpServer'])
             mount_base = ftp_mount_base(source_dir)
             contest_success, contest_detail = test_ftp_connection(rclone_config, FTP_REMOTE, mount_base)
 

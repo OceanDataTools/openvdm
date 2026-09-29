@@ -66,7 +66,6 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `sshUseKey` int(1) unsigned NOT NULL DEFAULT '0',
   `sshPass` tinytext,
   `ftpServer` tinytext,
-  `ftpPort` int(5) unsigned NOT NULL DEFAULT '21',
   `ftpUser` tinytext,
   `ftpPass` tinytext,
   `includeFilter` text,
