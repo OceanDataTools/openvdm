@@ -31,6 +31,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from random import randint
+from typing import Optional
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -221,6 +222,21 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
+def _add_files(all_files: dict, dest_name: Optional[str], files: dict) -> None:
+    """Add one source directory's new, updated and excluded files to the transfer's totals.
+
+    Args:
+        all_files: The transfer's file lists, updated in place.
+        dest_name: The directory the source is copied into for a wildcard
+            match (its paths are prefixed with it), or ``None``.
+        files: The source directory's ``new``, ``updated`` and ``exclude``
+            lists.
+    """
+    for key in ('new', 'updated', 'exclude'):
+        all_files[key].extend([os.path.join(dest_name, f) for f in files[key]] if dest_name
+                              else files[key])
+
+
 def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str:
     """Return the failure reason for an rsync source listing that failed.
 
@@ -255,7 +271,8 @@ def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, fi
         list of relative file paths.
 
     Raises:
-        TransferCommandError: If rsync exits with an error (#230).
+        TransferCommandError: If rsync exits with an error (#230). Its
+            ``files`` holds what rsync transferred before failing (#239).
     """
 
     def _progress(percent):
@@ -883,8 +900,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                         self, current_job, cmd, len(files['include'])
                     )
                 except TransferCommandError as exc:
-                    # Don't report a failed transfer as successful (#230)
-                    return {'verdict': False, 'reason': f"Transfer failed: {exc}", 'files': []}
+                    # Don't report a failed transfer as successful (#230), but
+                    # return what was copied (here and from any earlier
+                    # wildcard matches), so the hooks still process it (#239)
+                    _add_files(all_files, dest_name, {'new': exc.files['new'],
+                                                      'updated': exc.files['updated'],
+                                                      'exclude': files['exclude']})
+                    return {'verdict': False, 'reason': f"Transfer failed: {exc}", 'files': all_files}
                 files['new'] = new_files
                 files['updated'] = updated_files
 
@@ -896,15 +918,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     else:
                         all_files['deleted'].extend(deleted)
 
-                # Accumulate results, prefixing paths with dest_name for wildcard expansions
-                if dest_name:
-                    all_files['new'].extend([os.path.join(dest_name, f) for f in files['new']])
-                    all_files['updated'].extend([os.path.join(dest_name, f) for f in files['updated']])
-                    all_files['exclude'].extend([os.path.join(dest_name, f) for f in files['exclude']])
-                else:
-                    all_files['new'].extend(files['new'])
-                    all_files['updated'].extend(files['updated'])
-                    all_files['exclude'].extend(files['exclude'])
+                _add_files(all_files, dest_name, files)
 
         return {'verdict': True, 'files': all_files}
 
@@ -1068,7 +1082,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         If the transfer produced new, updated or deleted files, submits the
         hook tasks configured for ``runCollectionSystemTransfer`` in
-        ``openvdm.yaml`` with those file lists.
+        ``openvdm.yaml`` with those file lists. That includes a failed
+        transfer's files that were copied before it failed (#239).
 
         Args:
             current_job: The Gearman job.
@@ -1093,9 +1108,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if final_verdict == "Fail":
             reason = final_part.get('reason', "undefined")
             self.ovdm.set_error_collection_system_transfer(cst_id, reason)
-            return super().send_job_complete(current_job, job_result)
 
-        # If not a failure, prepare potential follow-up jobs
+        # Prepare follow-up jobs for the files transferred, also by a failed
+        # transfer before it failed (#239)
         new_files = results.get('files', {}).get('new', [])
         updated_files = results.get('files', {}).get('updated', [])
         deleted_files = results.get('files', {}).get('deleted', [])
@@ -1120,7 +1135,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         # Always set idle at the end if not failed
-        self.ovdm.set_idle_collection_system_transfer(cst_id)
+        if final_verdict != "Fail":
+            self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -1235,6 +1251,17 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     if not results['verdict']:
         logging.error("Transfer of remote files failed: %s", results['reason'])
+        # Files copied before the failure still get their ownership set and
+        # are passed to the hooks by on_job_complete() (#239)
+        copied = results.get('files') or {}
+        if copied.get('new') or copied.get('updated') or copied.get('deleted'):
+            job_results['files'] = copied
+            if copied.get('new') or copied.get('updated'):
+                perms = set_owner_group_permissions(
+                    worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
+                if not perms['verdict']:
+                    logging.error("Error setting destination directory file/directory ownership/permissions: %s",
+                                  worker.dest_dir)
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 

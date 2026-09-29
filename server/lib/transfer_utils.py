@@ -44,11 +44,15 @@ class TransferCommandError(Exception):
     Attributes:
         returncode: The command's exit code.
         detail: The command's most specific error line.
+        files: The files the command transferred before it failed: ``new``,
+            ``updated`` and ``deleted`` lists, as :func:`run_transfer_command`
+            returns them (#239).
     """
 
-    def __init__(self, command: str, returncode: int, detail: str):
+    def __init__(self, command: str, returncode: int, detail: str, files: Optional[dict] = None):
         self.returncode = returncode
         self.detail = detail
+        self.files = files if files is not None else {'new': [], 'updated': [], 'deleted': []}
         super().__init__(f"{command} exited with code {returncode}"
                          + (f": {detail}" if detail else ""))
 
@@ -218,7 +222,8 @@ def run_transfer_command(cmd: list, file_count: int,
     if returncode not in ok_codes:
         detail = (_rsync_failure_detail(errors, error_count, recent) if tool == 'rsync'
                   else error_detail(tool, recent))
-        error = TransferCommandError(tool, returncode, detail)
+        error = TransferCommandError(tool, returncode, detail,
+                                     {key: result[key] for key in ('new', 'updated', 'deleted')})
         logging.error("Transfer failed: %s", error)
         raise error
     if returncode == 23:
