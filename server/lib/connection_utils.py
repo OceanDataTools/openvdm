@@ -9,6 +9,7 @@ source/destination tests return ``list[dict]`` with
 ``partName``/``result``/``reason`` keys.
 """
 
+import calendar
 import glob
 import json
 import os
@@ -20,6 +21,7 @@ import tempfile
 import subprocess
 import time
 import configparser
+from datetime import datetime
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -684,11 +686,79 @@ def test_ftp_connection(rclone_config: str, remote: str) -> tuple:
         subprocess.run(cmd, capture_output=True, text=True, check=True)
         return True, ""
     except subprocess.CalledProcessError as exc:
-        # Drop the internal remote name: 'Failed to create file system for "ftp_source:/": '
-        return False, re.sub(r'^Failed to create file system for "[^"]*": (NewFs: )?', '',
-                             rclone_error(exc.stderr))
+        return False, _ftp_rclone_error(exc.stderr)
     except FileNotFoundError:
         return False, 'rclone is not installed'
+
+
+def _ftp_rclone_error(stderr: str) -> str:
+    """Return rclone's error for an FTP remote, without the internal remote name.
+
+    Drops the ``Failed to create file system for "ftp_source:/": `` prefix,
+    which only names :data:`FTP_REMOTE`.
+    """
+    return re.sub(r'^Failed to create file system for "[^"]*": (NewFs: )?', '',
+                  rclone_error(stderr))
+
+
+def _rfc3339_to_epoch(value: str) -> float:
+    """Convert an rclone ``ModTime`` (RFC 3339, up to nanoseconds) to seconds since the epoch.
+
+    Args:
+        value: e.g. ``2019-08-11T19:03:35Z`` or ``2019-08-11T19:03:35.123456789-04:00``.
+
+    Returns:
+        The time as a Unix timestamp.
+
+    Raises:
+        ValueError: If *value* isn't in that format.
+    """
+    match = re.match(r'^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$', value)
+    if not match:
+        raise ValueError(f"Unrecognized time: {value}")
+    base, fraction, zone = match.groups()
+    seconds = calendar.timegm(datetime.strptime(base, '%Y-%m-%dT%H:%M:%S').timetuple())
+    if fraction:
+        seconds += float(f"0.{fraction}")
+    if zone != 'Z':
+        sign = 1 if zone[0] == '+' else -1
+        seconds -= sign * (int(zone[1:3]) * 3600 + int(zone[4:6]) * 60)
+    return seconds
+
+
+def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
+    """List every file under an FTP source directory with one ``rclone lsjson -R``.
+
+    Listing through the rclone mount would ``stat`` each file over FTP, and
+    shows a subdirectory the server refuses to list as empty. ``lsjson``
+    lists each directory once and fails on such errors, so a listing that
+    can't be trusted fails the transfer instead of looking like missing files
+    (#206, #208).
+
+    Args:
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        remote: Name of the FTP remote in *rclone_config*.
+        source_dir: Directory on the FTP server to list, e.g. ``/data``.
+
+    Returns:
+        tuple[bool, list | str]: ``(True, files)`` with ``(path, size, mtime)``
+        tuples (*path* relative to *source_dir*, *mtime* in seconds since the
+        epoch), or ``(False, detail)`` with rclone's error.
+    """
+    cmd = ['rclone', 'lsjson', '-R', '--files-only', '--no-mimetype', '--config', rclone_config,
+           f"{remote}:{source_dir}", '--contimeout', '15s', '--timeout', '30s']
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    except subprocess.CalledProcessError as exc:
+        return False, _ftp_rclone_error(exc.stderr)
+
+    try:
+        return True, [(entry['Path'], int(entry['Size']), _rfc3339_to_epoch(entry['ModTime']))
+                      for entry in json.loads(proc.stdout)]
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, f"Unreadable rclone lsjson output: {exc}"
 
 
 def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
@@ -696,9 +766,10 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
 
     The server's root is mounted read-write if the transfer removes source
     files (``removeSourceFiles``), otherwise read-only, so ``sourceDir`` is a
-    path within the mount, as for SMB shares. The directory cache is kept
-    short so the staleness check sees current file sizes.
-    :func:`~server.lib.file_utils.temporary_directory` unmounts it. Requires
+    path within the mount, as for SMB shares. The files to copy are listed
+    with :func:`list_ftp_source`, not through the mount, so rclone's default
+    directory cache is fine. :func:`~server.lib.file_utils.temporary_directory`
+    unmounts it. Requires
     FUSE (``fuse3``) and root.
 
     Success means *mntpoint* is actually mounted: rclone versions without
@@ -719,7 +790,7 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str) -> tuple:
     log_file = os.path.join(os.path.dirname(rclone_config), 'rclone_mount.log')
 
     cmd = ['rclone', 'mount', f'{FTP_REMOTE}:/', mntpoint, '--config', rclone_config,
-           '--daemon', '--dir-cache-time', '1s', '--contimeout', '15s', '--timeout', '30s',
+           '--daemon', '--contimeout', '15s', '--timeout', '30s',
            '--log-level', 'ERROR', '--log-file', log_file]
     if cfg.get('removeSourceFiles', 0) != 1:
         cmd.append('--read-only')
