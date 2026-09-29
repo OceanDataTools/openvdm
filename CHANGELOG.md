@@ -6,7 +6,10 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.16.0] – 2026-09-28
 
-**Upgrading:** follow "Upgrading from 2.15" in [INSTALL.md](INSTALL.md). Several plugins, parsers and `bin/` scripts need their updated `.dist` files copied by hand, and GeoTIFF sites should rebuild the data dashboard.
+**Upgrading:** follow "Upgrading from 2.15" in [INSTALL.md](INSTALL.md). The database needs updating with `database/openvdm_215_to_216.sql`. Several plugins, parsers and `bin/` scripts need their updated `.dist` files copied by hand, and GeoTIFF sites should rebuild the data dashboard.
+
+### Added
+- Add FTP Server as a collection system transfer type. OpenVDM mounts the FTP server with `rclone mount` and copies from it with `rsync`, as for SMB shares, so file filters, staleness, wildcard source directories and removing source files work as for other types. The transfer form takes the server, port (default 21), username and password; `anonymous` needs no password. **Test Setup** checks the login, the mount, the source directory and, when source files are removed, write access. Only plain FTP is supported, not FTPS, and FTP isn't yet available for cruise data transfers (#199). Existing installs must run `database/openvdm_215_to_216.sql`; the installer now also installs `fuse3`, which `rclone mount` needs (#17)
 
 ### Changed
 - Replace the CARTO basemap, which now requires an API key, with keyless providers. The map layer switcher now offers OpenStreetMap, Esri Ocean, Esri Dark Gray and Light Gray canvas basemaps, and GMRT, plus Esri label and OpenSeaMap seamark overlays. The layers are defined once in the new `mapBaseLayers.js` and shared by the data dashboard, lowering and custom maps (#121). Installs with a customized `www/app/templates/default/js/custom1.js` still point at CARTO. Update that file from `custom1.js.dist`.
