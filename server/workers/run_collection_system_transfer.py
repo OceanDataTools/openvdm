@@ -221,6 +221,21 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
+def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str:
+    """Return the failure reason for an rsync source listing that failed.
+
+    Args:
+        message: What failed, e.g. ``"Error listing source directory /data"``.
+        proc: The finished rsync listing.
+
+    Returns:
+        *message* with rsync's exit code and its most specific error line.
+    """
+    reason = f"{message}: rsync exited with code {proc.returncode}"
+    detail = transfer_utils.error_detail('rsync', (proc.stdout + proc.stderr).splitlines())
+    return f"{reason}: {detail}" if detail else reason
+
+
 def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
     """Run an rsync transfer command and collect the new and updated files.
 
@@ -590,6 +605,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg.get("sshPass", "")}', '-p ****'))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
+                # A failed or partial listing looks like missing files, and
+                # with syncFromSource those are deleted from the destination (#238)
+                return {'verdict': False,
+                        'reason': _rsync_listing_error(f"Error listing source directory {raw_source_dir}", proc)}
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
 
@@ -651,6 +671,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return_files['filesize'] = verified_sizes
             else:
                 proc = subprocess.run(command, capture_output=True, text=True, check=False)
+                if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
+                    # Otherwise the staleness check is silently skipped (#238)
+                    return {'verdict': False,
+                            'reason': _rsync_listing_error(f"Error re-listing source directory {raw_source_dir}", proc)}
                 for line in proc.stdout.splitlines():
                     try:
                         file_or_dir, size, *_ , filepath = line.split(None, 4)
@@ -827,8 +851,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
                 # Write file list
                 if not build_include_file(files['include'], include_file):
-                    logging.warning("Error writing file list for %s, skipping", src_dir)
-                    continue
+                    # Skipping the source would report success (#238)
+                    logging.error("Error writing file list for %s", src_dir)
+                    return {'verdict': False, 'reason': f"Unable to write the file list for {src_dir}",
+                            'files': []}
 
                 # Build rsync source path
                 if transfer_type == 'local':
