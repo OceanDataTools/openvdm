@@ -36,7 +36,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_smb_share, test_cst_source
+from server.lib.connection_utils import build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_ftp_source, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
@@ -392,7 +392,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         cst_cfg = self.collection_system_transfer
 
-        if transfer_type in ['local', 'smb']:
+        if transfer_type in ['local', 'smb', 'ftp']:
             local_parent = os.path.join(prefix, parent.lstrip('/')) if prefix else parent
             matched = sorted([
                 d for d in glob_module.glob(os.path.join(local_parent, pattern))
@@ -537,7 +537,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
         # Get file list based on transfer_type
-        if transfer_type in ['local', 'smb']:
+        if transfer_type in ['local', 'smb', 'ftp']:
             filepaths = []
             for root, _, filenames in os.walk(source_dir):
                 for filename in filenames:
@@ -576,7 +576,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            if transfer_type in ['local', 'smb']:
+            if transfer_type in ['local', 'smb', 'ftp']:
                 futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
                            for batch in batches]
             else:
@@ -599,7 +599,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
-            if transfer_type in ['local', 'smb']:
+            if transfer_type in ['local', 'smb', 'ftp']:
                 paths_sizes = list(zip(return_files['include'], return_files['filesize']))
                 stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
                 verified_paths = []
@@ -628,7 +628,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # Format final output
         del return_files['filesize']
-        if transfer_type in ['local', 'smb']:
+        if transfer_type in ['local', 'smb', 'ftp']:
             base_len = len(source_dir.rstrip(os.sep)) + 1
             return_files['include'] = [f[base_len:] for f in return_files['include']]
             return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
@@ -664,8 +664,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
     def transfer_from_source(self, current_job):
         """Copy new and updated files from the source into the cruise (or lowering) directory.
 
-        Expands wildcard source directories, builds the file list for each, and
-        runs rsync with the transfer's options.
+        Mounts SMB shares and FTP servers first. Expands wildcard source
+        directories, builds the file list for each, and runs rsync with the
+        transfer's options.
 
         Args:
             current_job: The Gearman job, for progress updates.
@@ -705,6 +706,29 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 success, mount_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
                 if not success:
                     reason = 'Failed to mount SMB share'
+                    if mount_detail:
+                        reason += f' — {mount_detail}'
+                    return {'verdict': False, 'reason': reason}
+                prefix = mntpoint
+
+            # Adjustments for FTP
+            if transfer_type == 'ftp':
+                if cst_cfg.get('ftpUser') != 'anonymous' and cst_cfg.get('ftpPass') is None:
+                    return {'verdict': False,
+                            'reason': 'ftpPass not available — worker API token may be '
+                                      'misconfigured or password not set for this transfer',
+                            'files': []}
+                # Mount the FTP server
+                mntpoint = os.path.join(tmpdir, 'mntpoint')
+                os.mkdir(mntpoint, 0o755)
+                rclone_config = os.path.join(tmpdir, 'rclone.conf')
+                try:
+                    build_rclone_config_for_ftp(cst_cfg, rclone_config)
+                except (subprocess.CalledProcessError, OSError) as exc:
+                    return {'verdict': False, 'reason': f'Error writing rclone config: {exc}', 'files': []}
+                success, mount_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config)
+                if not success:
+                    reason = 'Failed to mount FTP server'
                     if mount_detail:
                         reason += f' — {mount_detail}'
                     return {'verdict': False, 'reason': reason}
@@ -775,7 +799,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     source_path = f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{src_dir}"
                 elif transfer_type == 'ssh':
                     source_path = f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}:{src_dir}"
-                elif transfer_type == 'smb':
+                elif transfer_type in ['smb', 'ftp']:
                     source_path = os.path.join(mntpoint, src_dir.lstrip('/').rstrip('/'))
 
                 source_path += '/'

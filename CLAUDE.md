@@ -22,7 +22,7 @@ OpenVDM is a 3-tier distributed system:
 **Tier 2 — Python Backend**
 - Location: `server/`
 - Core API wrapper: `server/lib/openvdm.py` — primary interface to the MySQL database via the web API
-- Connection utilities: `server/lib/connection_utils.py` — handles local, rsync, SMB, SSH, and rclone transfers
+- Connection utilities: `server/lib/connection_utils.py` — handles local, rsync, SMB, SSH, FTP, and rclone transfers
 - Plugin base classes: `server/lib/openvdm_plugin.py` — `OpenVDMPlugin` and `OpenVDMParserQualityTest`
 - File utilities: `server/lib/file_utils.py`, `server/lib/geojson_utils.py`
 
@@ -147,11 +147,17 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 
 ## Supported Transfer Methods
 
-The `connection_utils.py` module handles five transfer types: local directory, rsync server, SMB (Samba) share, SSH server, and rclone (cloud storage). Transfer type logic branches on these in workers.
+The `connection_utils.py` module handles six transfer types: local directory, rsync server, SMB (Samba) share, SSH server, FTP server, and rclone (cloud storage). Transfer type logic branches on these in workers.
+
+`OVDM_TransferTypes` is shared by collection system and cruise data transfers. FTP Server (5) is a collection system transfer type only: the cruise data transfer form hides it until #199.
+
+### FTP collection system transfers
+
+FTP sources (#17) are mounted with `rclone mount` (FUSE, `fuse3`) in the transfer's temporary directory and then handled like SMB shares: `sourceDir` is a path within the mount, and rsync copies from the mount point. `build_rclone_config_for_ftp()` writes the remote to a config file in the temporary directory (password obscured via stdin, never on the command line). `mount_ftp_source()` keeps rclone's directory cache short so the staleness check sees current sizes, and must not read the daemonized rclone's output through a pipe (the daemon holds it open while mounted).
 
 ### connection_utils.py return conventions
 
-Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `test_rsync_connection`, `test_rsync_write_access`, `test_ssh_connection`, `test_ssh_remote_directory`, `test_ssh_write_access`) return `(bool, str)` tuples — success flag plus stderr detail. The higher-level functions (`test_cst_source`, `test_cdt_destination`, `test_smb_destination`) return `list[dict]` with `partName`/`result`/`reason` keys. Maintain this distinction when adding new connection tests.
+Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `test_rsync_connection`, `test_rsync_write_access`, `test_ssh_connection`, `test_ssh_remote_directory`, `test_ssh_write_access`, `test_ftp_connection`, `mount_ftp_source`) return `(bool, str)` tuples — success flag plus stderr detail. The higher-level functions (`test_cst_source`, `test_cdt_destination`, `test_smb_destination`) return `list[dict]` with `partName`/`result`/`reason` keys. Maintain this distinction when adding new connection tests.
 
 ### rclone destination convention
 
@@ -185,7 +191,7 @@ Convention (established in issue #99):
 
 ### REST API credential gating (shared-secret header)
 
-The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers strip `rsyncPass`, `smbPass`, and `sshPass` from all responses unless the request includes a valid `X-Worker-Token` header.
+The `Api/CollectionSystemTransfers` and `Api/CruiseDataTransfers` controllers strip `rsyncPass`, `smbPass`, and `sshPass` (and, for collection system transfers, `ftpPass`) from all responses unless the request includes a valid `X-Worker-Token` header.
 
 - The expected token is `WORKER_API_KEY` defined in `www/app/Core/Config.php`.
 - The same value must be set as `workerApiKey` in `server/etc/openvdm.yaml`.

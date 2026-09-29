@@ -16,7 +16,7 @@ class PendingPasswords
      *
      * @var array
      */
-    private static $fields = array('rsyncPass', 'smbPass', 'sshPass');
+    private static $fields = array('rsyncPass', 'smbPass', 'sshPass', 'ftpPass');
 
     /**
      * Build the session key for one record.

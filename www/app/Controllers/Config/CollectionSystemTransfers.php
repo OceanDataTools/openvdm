@@ -178,6 +178,10 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpPort = $_POST['ftpPort'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
@@ -334,6 +338,51 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                $ftpDataCheck = true;
+                if($ftpServer == ''){
+                    $error[] = 'FTP Server is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpPort === ''){
+                    $ftpPort = '21';
+                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
+                    $error[] = 'FTP Port must be a number from 1 to 65535';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser == ''){
+                    $error[] = 'FTP Username is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser != 'anonymous' && $ftpPass == ''){
+                    $error[] = 'FTP Password is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpDataCheck) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
+            }
+
+            if ($transferType != 5) { // FTP settings only apply to FTP transfers
+                $ftpServer = '';
+                $ftpPort = '21';
+                $ftpUser = '';
+                $ftpPass = '';
             }
 
             if(!$error){
@@ -363,6 +412,10 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpPort' => (int)$ftpPort,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
@@ -400,6 +453,10 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpPort = $_POST['ftpPort'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
@@ -538,6 +595,51 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                $ftpDataCheck = true;
+                if($ftpServer == ''){
+                    $error[] = 'FTP Server is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpPort === ''){
+                    $ftpPort = '21';
+                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
+                    $error[] = 'FTP Port must be a number from 1 to 65535';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser == ''){
+                    $error[] = 'FTP Username is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser != 'anonymous' && $ftpPass == ''){
+                    $error[] = 'FTP Password is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpDataCheck) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
+            }
+
+            if ($transferType != 5) { // FTP settings only apply to FTP transfers
+                $ftpServer = '';
+                $ftpPort = '21';
+                $ftpUser = '';
+                $ftpPass = '';
             }
 
             if(!$error){
@@ -569,6 +671,10 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpPort' => (int)$ftpPort,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
@@ -646,14 +752,19 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpPort = $_POST['ftpPort'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], false);
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], false);
             $rsyncPass = $passwords['rsyncPass'];
             $smbPass = $passwords['smbPass'];
             $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -806,6 +917,51 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncPass = '';
                 }
 
+            } elseif ($transferType == 5) { // FTP Server
+                $ftpDataCheck = true;
+                if($ftpServer == ''){
+                    $error[] = 'FTP Server is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpPort === ''){
+                    $ftpPort = '21';
+                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
+                    $error[] = 'FTP Port must be a number from 1 to 65535';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser == ''){
+                    $error[] = 'FTP Username is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser != 'anonymous' && $ftpPass == ''){
+                    $error[] = 'FTP Password is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpDataCheck) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
+            }
+
+            if ($transferType != 5) { // FTP settings only apply to FTP transfers
+                $ftpServer = '';
+                $ftpPort = '21';
+                $ftpUser = '';
+                $ftpPass = '';
             }
 
             if(!$error){
@@ -835,6 +991,10 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpPort' => (int)$ftpPort,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
@@ -876,6 +1036,9 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->sshServer = $sshServer;
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
+                $data['row'][0]->ftpServer = $ftpServer;
+                $data['row'][0]->ftpPort = $ftpPort;
+                $data['row'][0]->ftpUser = $ftpUser;
                 $data['row'][0]->includeFilter = $includeFilter;
                 $data['row'][0]->excludeFilter = $excludeFilter;
                 $data['row'][0]->ignoreFilter = $ignoreFilter;
@@ -907,14 +1070,19 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpPort = $_POST['ftpPort'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], true);
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], true);
             $rsyncPass = $passwords['rsyncPass'];
             $smbPass = $passwords['smbPass'];
             $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -1051,6 +1219,51 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncPass = '';
                 }
 
+            } elseif ($transferType == 5) { // FTP Server
+                $ftpDataCheck = true;
+                if($ftpServer == ''){
+                    $error[] = 'FTP Server is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpPort === ''){
+                    $ftpPort = '21';
+                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
+                    $error[] = 'FTP Port must be a number from 1 to 65535';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser == ''){
+                    $error[] = 'FTP Username is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpUser != 'anonymous' && $ftpPass == ''){
+                    $error[] = 'FTP Password is required';
+                    $ftpDataCheck = false;
+                }
+
+                if($ftpDataCheck) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
+            }
+
+            if ($transferType != 5) { // FTP settings only apply to FTP transfers
+                $ftpServer = '';
+                $ftpPort = '21';
+                $ftpUser = '';
+                $ftpPass = '';
             }
 
             if(!$error) {
@@ -1082,6 +1295,10 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->sshUser = $sshUser;
                 $gmData['collectionSystemTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['collectionSystemTransfer']->sshPass = $sshPass;
+                $gmData['collectionSystemTransfer']->ftpServer = $ftpServer;
+                $gmData['collectionSystemTransfer']->ftpPort = (int)$ftpPort;
+                $gmData['collectionSystemTransfer']->ftpUser = $ftpUser;
+                $gmData['collectionSystemTransfer']->ftpPass = $ftpPass;
                 $gmData['collectionSystemTransfer']->includeFilter = $includeFilter;
                 $gmData['collectionSystemTransfer']->excludeFilter = $excludeFilter;
                 $gmData['collectionSystemTransfer']->ignoreFilter = $ignoreFilter;
@@ -1120,6 +1337,9 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->sshServer = $sshServer;
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
+            $data['row'][0]->ftpServer = $ftpServer;
+            $data['row'][0]->ftpPort = $ftpPort;
+            $data['row'][0]->ftpUser = $ftpUser;
             $data['row'][0]->includeFilter = $includeFilter;
             $data['row'][0]->excludeFilter = $excludeFilter;
             $data['row'][0]->ignoreFilter = $ignoreFilter;

@@ -302,7 +302,7 @@ OpenVDM v2.15 moves away from PHP 7.3 to PHP 8.2.  This isn't a trivial change a
 
 ## Upgrading from 2.15.
 
-OpenVDM v2.16 needs no database changes, but several plugins, parsers and `bin/` scripts were fixed, and the installer doesn't update your copies of those. See the 2.16.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details of each change.
+OpenVDM v2.16 adds FTP Server as a collection system transfer type (#17), which needs a database update (step 3). Several plugins, parsers and `bin/` scripts were also fixed, and the installer doesn't update your copies of those. See the 2.16.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details of each change.
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). Both now run as the OpenVDM user instead of root. On Debian and Ubuntu the installer also moves Node.js (nvm) from root's home directory to the OpenVDM user's, so that user can run npm, and removes the old `/root/.nvm` and its lines in root's `.bashrc`. If root installed other global npm packages in `/root/.nvm`, it's kept and the installer says so. It asks the same questions as the original install, with your previous answers as the defaults:
@@ -315,7 +315,14 @@ If your `server/etc/openvdm.yaml` is older than 2.15.5, the installer also adds 
 ```
 grep -E 'workerApiKey|transferPublicData' <openvdm_root>/server/etc/openvdm.yaml
 ```
-3. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so it won't update these for you. Only the files you actually use need copying. If you've customized a file (for example a plugin's `FILE_TYPE_FILTERS`), merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+3. Update the database. FTP Server needs a new transfer type and four new columns in the collection system transfers table; the installer doesn't change an existing database. Back up the database first, so it can be restored if the update fails. The backup script asks for the MySQL root password twice, and the update once:
+```
+cd <openvdm_root>
+sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_backup_before_2.16.sql
+mysql -u root -p openvdm < ./database/openvdm_215_to_216.sql
+```
+The update prints nothing when it succeeds. If you see errors, save them and contact OceanDataTools.
+4. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so it won't update these for you. Only the files you actually use need copying. If you've customized a file (for example a plugin's `FILE_TYPE_FILTERS`), merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
 
 | File (in `<openvdm_root>`) | Why |
 |---|---|
@@ -334,18 +341,18 @@ cp geotiff_titiler_parser.py.dist geotiff_titiler_parser.py
 ```
 The other `.dist` files changed in this release have documentation-only changes and don't need copying.
 
-4. Update two settings files by hand (the installer doesn't change your copies):
+5. Update two settings files by hand (the installer doesn't change your copies):
    - In `www/etc/datadashboard.yaml`, delete the `- lowering` line from the Position tab's `jsArray`. The shipped Position tab listed both `dataDashboardDefault` and `lowering`; each one builds every map on the page, so loading both logs `Map container is already initialized` (#185). The same applies to any other tab that lists both: keep `lowering` (without `dataDashboardDefault`) only on tabs that use the `lowering` view. `lowering.js` and the `lowering` view themselves are fixed by the code update: their maps, charts and start/end positions hadn't loaded since 2.14. To add a lowering tab, see the commented-out example Lowering tab at the end of `www/etc/datadashboard.yaml.dist`.
    - Optional: to show the new version in the web interface's title, change `SITETITLE` in `www/app/Core/Config.php` to `'Open Vessel Data Management v2.16.0'`.
 
    No other settings in `Config.php`, `openvdm.yaml` or `datadashboard.yaml` changed.
-5. Restart the OpenVDM workers so they load the updated code and plugins:
+6. Restart the OpenVDM workers so they load the updated code and plugins:
 ```
 sudo supervisorctl restart openvdm:*
 ```
-6. Set OpenVDM back to On.
-7. If you use either GeoTIFF parser, rebuild the data dashboard so existing Geographic Bounds stats are regenerated in the right order. While logged in to the web interface, open `http://<openvdm_host>/config/rebuildDataDashboard`. There's no button for this. This rebuilds the current cruise only; dashboard stats for earlier cruises keep the old (mislabelled) order.
-8. If you've run `bin/build_remote_directory.py` to create template directories on a local-directory collection system, fix the permissions of the directories it created:
+7. Set OpenVDM back to On.
+8. If you use either GeoTIFF parser, rebuild the data dashboard so existing Geographic Bounds stats are regenerated in the right order. While logged in to the web interface, open `http://<openvdm_host>/config/rebuildDataDashboard`. There's no button for this. This rebuilds the current cruise only; dashboard stats for earlier cruises keep the old (mislabelled) order.
+9. If you've run `bin/build_remote_directory.py` to create template directories on a local-directory collection system, fix the permissions of the directories it created:
 ```
 chmod 755 <directory>
 ```

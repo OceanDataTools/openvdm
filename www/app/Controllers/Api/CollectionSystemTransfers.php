@@ -53,7 +53,7 @@ class CollectionSystemTransfers extends Controller {
 
     private function _strip_credentials(array $rows): array {
         return array_map(function($row) {
-            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
+            unset($row->rsyncPass, $row->smbPass, $row->sshPass, $row->ftpPass);
             return $row;
         }, $rows);
     }

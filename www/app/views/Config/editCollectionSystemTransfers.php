@@ -72,6 +72,10 @@ $_warehouseModel = new \Models\Warehouse();
                                 <div class="form-group sshServer"><label>SSH Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshUser', 'value'=> $data['row'][0]->sshUser)); ?></div>
                                 <div class="form-group sshServer"><label>Use SSH Public/Private key?</label><?php echo FormCustom::radioInline($data['useSSHKeyOptions'], $data['row'][0]->sshUseKey); ?></div>
                                 <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'type'=>'password', 'placeholder'=>(!empty($data['pendingPasswords']['sshPass']) ? '(new password retained from test - leave blank to use it, click Update to save it)' : '(leave blank to keep existing)'))); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpServer', 'value'=> $data['row'][0]->ftpServer)); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Port</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpPort', 'value'=> $data['row'][0]->ftpPort)); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpUser', 'value'=> $data['row'][0]->ftpUser)); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpPass', 'type'=>'password', 'placeholder'=>(!empty($data['pendingPasswords']['ftpPass']) ? '(new password retained from test - leave blank to use it, click Update to save it)' : '(leave blank to keep existing)'))); ?></div>
                             </div>
                         </div>
                         <div class="row">
@@ -102,7 +106,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
   }
 ?>
-            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).</p>
+            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).  <strong>FTP Server</strong> is a transfer of data from a Collection System running an FTP server.</p>
             <p>The <strong>Source Directory</strong> is the location of the data files on the collection system.</p>
             <p class="localDir">The <strong>Source Directory is mountpoint</strong> specifies whether OpenVDM should confirm a device (external HDD) is connected at that location.</p>
             <p class="rsyncServer">The <strong>Rsync Server</strong> is the IP address and share name of the Collection System (i.e. "192.168.4.151/data").</p>
@@ -116,6 +120,10 @@ $_warehouseModel = new \Models\Warehouse();
             <p class="sshServer">The <strong>SSH Username</strong> is the SSH username with permission to access the data on the Collection System (i.e. "shipTech").</p>
             <p class="sshServer">The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p class="sshServer">The <strong>SSH Password</strong> is the SSH password for the Rsync Username.</p>
+            <p class="ftpServer">The <strong>FTP Server</strong> is the hostname or IP address of the Collection System (i.e. "192.168.4.151").  For an FTP Server, the <strong>Source Directory</strong> is the path on the FTP server (i.e. "/data").</p>
+            <p class="ftpServer">The <strong>FTP Port</strong> is the FTP server's port.  If no value is defined this field will default to 21.</p>
+            <p class="ftpServer">The <strong>FTP Username</strong> is the FTP username with permission to access the data on the Collection System (i.e. "shipTech").  If the FTP server allows anonymous access set this field to "anonymous" and no password will be required.</p>
+            <p class="ftpServer">The <strong>FTP Password</strong> is the FTP password for the FTP Username. Not required if FTP Username is set to "anonymous".</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.  Click the <strong>Test Setup</strong> button to test the configuration currently in the form.  This DOES NOT save the configuration.  You will need to click the <strong>Update</strong> button to commit the changes.</p>
             <p><strong>Shorthand notation</strong> for file filters, source and destination directories:<br/>
                 <ul>
