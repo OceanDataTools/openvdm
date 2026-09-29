@@ -876,6 +876,64 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str, mount_base: s
     return True, ""
 
 
+FTP_PASS_MISSING = ("ftpPass not available — worker API token may be misconfigured "
+                    "or the password is not set for this transfer")
+
+
+def prepare_ftp_config(cfg: dict, tmpdir: str) -> tuple:
+    """Check an FTP transfer's password is available and write its rclone config.
+
+    First step of setting up an FTP source, shared by Test Setup and the
+    transfer (#214). Test Setup then tests the connection; both then call
+    :func:`prepare_ftp_mount`.
+
+    Args:
+        cfg: Collection system transfer configuration.
+        tmpdir: The transfer's temporary directory; the config is written there.
+
+    Returns:
+        tuple[bool, str]: ``(True, rclone_config_path)``, or ``(False,
+        reason)`` if the password wasn't sent by the web app (worker API
+        token), rclone isn't installed, or the config can't be written.
+    """
+    cfg = normalize_transfer_config(cfg)
+    if cfg.get('ftpUser') != 'anonymous' and cfg.get('ftpPass') is None:
+        return False, FTP_PASS_MISSING
+
+    rclone_config = os.path.join(tmpdir, 'rclone.conf')
+    try:
+        build_rclone_config_for_ftp(cfg, rclone_config)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    except (subprocess.CalledProcessError, OSError) as exc:
+        return False, f"Unable to write rclone config: {exc}"
+    return True, rclone_config
+
+
+def prepare_ftp_mount(cfg: dict, tmpdir: str, rclone_config: str, mount_base: str) -> tuple:
+    """Mount an FTP transfer's source at ``<tmpdir>/mntpoint``.
+
+    Second step of setting up an FTP source, shared by Test Setup and the
+    transfer (#214). :func:`~server.lib.file_utils.temporary_directory`
+    unmounts it.
+
+    Args:
+        cfg: Collection system transfer configuration.
+        tmpdir: The transfer's temporary directory.
+        rclone_config: rclone config file, from :func:`prepare_ftp_config`.
+        mount_base: Directory on the FTP server to mount, from
+            :func:`ftp_mount_base`.
+
+    Returns:
+        tuple[bool, str]: ``(True, mntpoint)``, or ``(False, detail)`` with
+        rclone's error.
+    """
+    mntpoint = os.path.join(tmpdir, 'mntpoint')
+    os.makedirs(mntpoint, mode=0o755, exist_ok=True)
+    success, detail = mount_ftp_source(cfg, mntpoint, rclone_config, mount_base)
+    return (True, mntpoint) if success else (False, detail)
+
+
 def build_rclone_options(cfg, mode='dry-run'):
     """Return the rclone subcommand and options for a cruise data transfer.
 
@@ -1323,23 +1381,17 @@ def test_cst_source(cst_cfg, source_dir):
         # Tests for FTP
         if transfer_type == 'ftp':
 
-            if cst_cfg.get('ftpUser') != 'anonymous' and cst_cfg.get('ftpPass') is None:
-                reason = ("ftpPass not available — worker API token may be misconfigured "
-                          "or the password is not set for this transfer")
+            config_success, rclone_config = prepare_ftp_config(cst_cfg, tmpdir)
+            if not config_success:
                 results.extend([
-                    {"partName": "FTP server", "result": "Fail", "reason": reason},
-                    {"partName": "Source directory", "result": "Fail", "reason": reason}
+                    {"partName": "FTP server", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Source directory", "result": "Fail", "reason": rclone_config}
                 ])
                 return results
 
             server = f"{cst_cfg['ftpServer']}:{cst_cfg.get('ftpPort') or 21}"
             mount_base = ftp_mount_base(source_dir)
-            rclone_config = os.path.join(tmpdir, 'rclone.conf')
-            try:
-                remote = build_rclone_config_for_ftp(cst_cfg, rclone_config)
-                contest_success, contest_detail = test_ftp_connection(rclone_config, remote, mount_base)
-            except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
-                contest_success, contest_detail = False, f"Unable to write rclone config: {exc}"
+            contest_success, contest_detail = test_ftp_connection(rclone_config, FTP_REMOTE, mount_base)
 
             # rclone says "directory not found"; servers vary, e.g. "501 No such directory."
             if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
@@ -1370,13 +1422,11 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "FTP server", "result": "Pass"}])
 
-            mntpoint = os.path.join(tmpdir, 'mntpoint')
-            os.mkdir(mntpoint, 0o755)
-            mnt_success, mnt_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config, mount_base)
+            mnt_success, mount_result = prepare_ftp_mount(cst_cfg, tmpdir, rclone_config, mount_base)
             if not mnt_success:
                 reason = f"Could not mount FTP server: {server}"
-                if mnt_detail:
-                    reason += f" — {mnt_detail}"
+                if mount_result:
+                    reason += f" — {mount_result}"
                 results.extend([
                     {"partName": "Mount FTP server", "result": "Fail", "reason": reason},
                     {"partName": "Source directory", "result": "Fail", "reason": reason}
@@ -1388,6 +1438,7 @@ def test_cst_source(cst_cfg, source_dir):
                 return results
 
             results.extend([{"partName": "Mount FTP server", "result": "Pass"}])
+            mntpoint = mount_result
 
             results.extend(_test_mounted_source(mntpoint, source_dir,
                                                 cst_cfg['removeSourceFiles'] == 1, 'FTP server',
