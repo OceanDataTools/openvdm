@@ -14,8 +14,8 @@ $(function () {
     // Destination Directory placeholder for each transfer type, keyed by type value (#227)
     var destDirPlaceholders = {
         1: 'e.g. /mnt/backup, or remote:path for an rclone remote',
-        2: 'e.g. backups (blank for the top of the module)',
-        3: 'e.g. backups (blank for the top of the share)',
+        2: 'e.g. backups (/ for the top of the module)',
+        3: 'e.g. backups (/ for the top of the share)',
         4: 'e.g. /data/cruises',
         5: 'e.g. /data/cruises'
     };
@@ -104,7 +104,8 @@ $(function () {
                 val = '/' + val;
             }
             if (val.length > 1) {
-                val = val.replace(/\/+$/, '');
+                // "//" is still the root, not "" (#247)
+                val = val.replace(/\/+$/, '') || '/';
             }
             return val;
         }
@@ -114,13 +115,15 @@ $(function () {
                 val = '/' + val;
             }
             if (val.length > 1) {
-                val = val.replace(/\/+$/, '');
+                // "//" is still the root, not "" (#247)
+                val = val.replace(/\/+$/, '') || '/';
             }
             return val;
         }
-        // Rsync and SMB: dest dir is relative to the rsync module or SMB share
-        val = val.replace(/^\/+/, '').replace(/\/+$/, '');
-        return val;
+        // Rsync and SMB: dest dir is relative to the rsync module or SMB share;
+        // "/" is its top level, so it isn't stripped to "" (#247)
+        var relative = val.replace(/^\/+/, '').replace(/\/+$/, '');
+        return (relative === '' && val !== '') ? '/' : relative;
     }
 
     // ---------------------------------------------------------------------------
