@@ -766,6 +766,17 @@ class CollectionSystemTransfers extends Controller {
             $sshPass = $passwords['sshPass'];
             $ftpPass = $passwords['ftpPass'];
 
+            // Don't send a password saved for another FTP login (#211): not for
+            // anonymous access unless one is typed, and not after the username
+            // changed (validation then asks for the new user's password)
+            if (($_POST['ftpPass'] ?? '') === '') {
+                if ($ftpUser == 'anonymous') {
+                    $ftpPass = '';
+                } elseif ($ftpUser != $data['row'][0]->ftpUser && $ftpPass === $data['row'][0]->ftpPass) {
+                    $ftpPass = '';
+                }
+            }
+
             if($name == ''){
                 $error[] = 'Name is required';
             }
@@ -1083,6 +1094,17 @@ class CollectionSystemTransfers extends Controller {
             $smbPass = $passwords['smbPass'];
             $sshPass = $passwords['sshPass'];
             $ftpPass = $passwords['ftpPass'];
+
+            // Don't send a password saved for another FTP login (#211): not for
+            // anonymous access unless one is typed, and not after the username
+            // changed (validation then asks for the new user's password)
+            if (($_POST['ftpPass'] ?? '') === '') {
+                if ($ftpUser == 'anonymous') {
+                    $ftpPass = '';
+                } elseif ($ftpUser != $data['row'][0]->ftpUser && $ftpPass === $data['row'][0]->ftpPass) {
+                    $ftpPass = '';
+                }
+            }
 
             if($name == ''){
                 $error[] = 'Name is required';
