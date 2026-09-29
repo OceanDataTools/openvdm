@@ -6,7 +6,7 @@ $(function () {
         {"value" : 2, "text" : "Rsync Server"},
         {"value" : 3, "text" : "SMB Share"},
         {"value" : 4, "text" : "SSH Server"},
-        {"value" : 5, "text" : "NFS Share"}
+        {"value" : 5, "text" : "FTP Server"}
     ];
 
     // ---------------------------------------------------------------------------
@@ -51,6 +51,20 @@ $(function () {
         return val.trim();
     }
 
+    function normalizeFtpServer(val) {
+        val = val.trim();
+        // Strip protocol prefix
+        val = val.replace(/^ftp:\/\//i, '');
+        // Replace backslashes with forward slashes, then strip leading slashes
+        val = val.replace(/\\/g, '/').replace(/^\/+/, '');
+        // FTP server field is host[:port] only — strip any path component
+        var slashIdx = val.indexOf('/');
+        if (slashIdx !== -1) {
+            val = val.substring(0, slashIdx);
+        }
+        return val.trim();
+    }
+
     function isRcloneDest(val) {
         return val.indexOf(':') !== -1;
     }
@@ -79,8 +93,8 @@ $(function () {
             }
             return val;
         }
-        if (currentTransferTypeText() === 'SSH Server') {
-            // SSH dest is an absolute path on the remote server (user@host:/path)
+        if (currentTransferTypeText() === 'SSH Server' || currentTransferTypeText() === 'FTP Server') {
+            // SSH and FTP dests are absolute paths on the remote server
             if (val.length > 0 && !val.startsWith('/')) {
                 val = '/' + val;
             }
@@ -113,6 +127,9 @@ $(function () {
         case 'SSH Server':
             $('input[name=sshServer]').val(normalizeSshServer($('input[name=sshServer]').val()));
             break;
+        case 'FTP Server':
+            $('input[name=ftpServer]').val(normalizeFtpServer($('input[name=ftpServer]').val()));
+            break;
         }
 
         $('input[name=destDir]').val(normalizeDestDir($('input[name=destDir]').val()));
@@ -142,35 +159,35 @@ $(function () {
             $(".rsyncServer").hide();
             $(".smbShare").hide();
             $(".sshServer").hide();
-            $(".nfsShare").hide();
+            $(".ftpServer").hide();
             break;
         case "Rsync Server":
             $(".localDir").hide();
             $(".rsyncServer").show();
             $(".smbShare").hide();
             $(".sshServer").hide();
-            $(".nfsShare").hide();
+            $(".ftpServer").hide();
             break;
         case "SMB Share":
             $(".localDir").hide();
             $(".rsyncServer").hide();
             $(".smbShare").show();
             $(".sshServer").hide();
-            $(".nfsShare").hide();
+            $(".ftpServer").hide();
             break;
         case "SSH Server":
             $(".localDir").hide();
             $(".rsyncServer").hide();
             $(".smbShare").hide();
             $(".sshServer").show();
-            $(".nfsShare").hide();
+            $(".ftpServer").hide();
             break;
-        case "NFS Share":
+        case "FTP Server":
             $(".localDir").hide();
             $(".rsyncServer").hide();
             $(".smbShare").hide();
             $(".sshServer").hide();
-            $(".nfsShare").show();
+            $(".ftpServer").show();
             break;
         default:
         }
@@ -252,6 +269,14 @@ $(function () {
     });
 
     $('input[name=sshUser], input[name=sshPass]').on('blur', function () {
+        $(this).val($(this).val().trim());
+    });
+
+    $('input[name=ftpServer]').on('blur', function () {
+        $(this).val(normalizeFtpServer($(this).val()));
+    });
+
+    $('input[name=ftpUser], input[name=ftpPass]').on('blur', function () {
         $(this).val($(this).val().trim());
     });
 

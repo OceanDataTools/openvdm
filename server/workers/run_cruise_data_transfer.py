@@ -32,7 +32,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
@@ -310,8 +310,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def transfer_to_destination(self, current_job):
         """Copy the cruise directory to the transfer's destination.
 
-        Handles local directories, SMB shares, rsync servers, SSH servers and
-        rclone remotes, applying the transfer's exclude filters.
+        Handles local directories, SMB shares, rsync servers, SSH servers, FTP
+        servers and rclone remotes, applying the transfer's exclude filters.
 
         Args:
             current_job: The Gearman job, for progress updates.
@@ -327,11 +327,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if not transfer_type:
             logging.error("Unknown Transfer Type")
             return {'verdict': False, 'reason': 'Unknown Transfer Type'}
-
-        # Only a collection system transfer type; the CDT form rejects it (#210)
-        if transfer_type == 'ftp':
-            logging.error("FTP Server isn't available for cruise data transfers")
-            return {'verdict': False, 'reason': "FTP Server isn't available for cruise data transfers"}
 
         files = { 'new':[], 'updated':[], 'exclude': [] }
         is_darwin = False
@@ -414,6 +409,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 is_darwin = check_darwin(cdt_cfg)
                 dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir']}"
 
+            elif transfer_type == 'ftp':
+                # destDir is an absolute path on the FTP server (#199)
+                success, rclone_config = prepare_ftp_config(cdt_cfg, tmpdir)
+                if not success:
+                    return {'verdict': False, 'reason': rclone_config}
+                dest_dir = f"{FTP_REMOTE}:{cdt_cfg['destDir']}"
+
             else:  # local
                 dest_dir = cdt_cfg['destDir']
 
@@ -475,6 +477,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     extra_args,
                     self.cruise_dir,
                     f'{rclone_remote}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
+                )
+
+                logging.debug(' '.join(cmd))
+
+                files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
+
+            elif transfer_type == 'ftp':
+                extra_args = ['--config', rclone_config]
+
+                self.make_cruise_dir(dest_dir, extra_args)
+
+                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+
+                cmd = _build_rclone_command(copy_sync,
+                    flags,
+                    extra_args,
+                    self.cruise_dir,
+                    f'{dest_dir}/{self.cruise_id}', exclude_file
                 )
 
                 logging.debug(' '.join(cmd))

@@ -861,6 +861,38 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
         return False, f"Unreadable rclone lsjson output: {exc}"
 
 
+def test_ftp_write_access(rclone_config: str, remote: str, path: str) -> tuple:
+    """Test writing to a directory on an FTP server.
+
+    Uploads a small test file to *path* and deletes it again, with the same
+    timeouts as the other rclone tests.
+
+    Args:
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        remote: Name of the FTP remote in *rclone_config*.
+        path: Directory on the server.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with rclone's error.
+    """
+    remote_file = f"{remote}:{path.rstrip('/')}/.openvdm-write-test-{uuid.uuid4().hex}.txt"
+    with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as tmp:
+        tmp.write('OpenVDM write test')
+    try:
+        for cmd in (['rclone', 'copyto', tmp.name, remote_file],
+                    ['rclone', 'deletefile', remote_file]):
+            subprocess.run(cmd + ['--config', rclone_config] + RCLONE_TEST_FLAGS,
+                           capture_output=True, text=True, check=True)
+        return True, ""
+    except subprocess.CalledProcessError as exc:
+        return False, _ftp_rclone_error(exc.stderr)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    finally:
+        os.remove(tmp.name)
+
+
 def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str, mount_base: str = '/') -> tuple:
     """Mount a directory of a transfer's FTP server on a local directory with ``rclone mount``.
 
@@ -1617,8 +1649,8 @@ def test_cdt_destination(cdt_cfg):
     """Test a cruise data transfer's destination.
 
     Checks, depending on the transfer type, the local directory (or rclone
-    remote), rsync server, SMB share or SSH server, the destination directory,
-    and write access.
+    remote), rsync server, SMB share, SSH server or FTP server, the
+    destination directory, and write access.
 
     Args:
         cdt_cfg: Cruise data transfer configuration.
@@ -1638,12 +1670,6 @@ def test_cdt_destination(cdt_cfg):
     if not transfer_type:
         logging.error("Unknown transfer type")
         results.extend([{"partName": "Transfer type", "result": "Fail", "reason": "Unknown transfer type"}])
-        return results
-
-    # Only a collection system transfer type; the CDT form rejects it (#210)
-    if transfer_type == 'ftp':
-        results.extend([{"partName": "Transfer type", "result": "Fail",
-                         "reason": "FTP Server isn't available for cruise data transfers"}])
         return results
 
     with temporary_directory() as tmpdir:
@@ -1806,6 +1832,57 @@ def test_cdt_destination(cdt_cfg):
                 return results
 
             results.extend([{"partName": "Write test", "result": "Pass"}])
+
+        # Tests for FTP (#199): destDir is an absolute path on the server
+        if transfer_type == 'ftp':
+            dest_dir = cdt_cfg['destDir']
+            config_success, rclone_config = prepare_ftp_config(cdt_cfg, tmpdir)
+            if not config_success:
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Destination directory", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Write test", "result": "Fail", "reason": rclone_config}
+                ])
+                return results
+
+            server = ftp_server_label(cdt_cfg['ftpServer'])
+            contest_success, contest_detail = test_ftp_connection(rclone_config, FTP_REMOTE, dest_dir)
+
+            # rclone says "directory not found"; servers vary, e.g. "501 No such directory."
+            if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
+                reason = f"Unable to find destination directory: {dest_dir} on FTP server"
+                results.extend([
+                    {"partName": "FTP server", "result": "Pass"},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
+
+            if not contest_success:
+                reason = f"Could not connect to FTP server: {server} as {cdt_cfg['ftpUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
+
+            results.extend([
+                {"partName": "FTP server", "result": "Pass"},
+                {"partName": "Destination directory", "result": "Pass"}
+            ])
+
+            write_success, write_detail = test_ftp_write_access(rclone_config, FTP_REMOTE, dest_dir)
+            if not write_success:
+                reason = f"Unable to write to: {dest_dir} on FTP server"
+                if write_detail:
+                    reason += f" — {write_detail}"
+                results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+                return results
+
+            results.append({"partName": "Write test", "result": "Pass"})
 
         return results
 

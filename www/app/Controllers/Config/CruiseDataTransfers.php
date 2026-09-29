@@ -6,13 +6,14 @@ use Core\View;
 use Helpers\Url;
 use Helpers\Session;
 use Helpers\PendingPasswords;
+use Helpers\FtpFields;
 
 class CruiseDataTransfers extends Controller {
 
-    // Transfer types that aren't available for cruise data transfers:
-    // FTP Server (5) is only a collection system transfer type until #199.
-    // Hidden in the form, and rejected when submitted anyway (#210).
-    const UNSUPPORTED_TRANSFER_TYPES = array(5);
+    // Transfer types that aren't available for cruise data transfers: hidden
+    // in the form, and rejected when submitted anyway (#210). Empty since FTP
+    // Server destinations were added (#199).
+    const UNSUPPORTED_TRANSFER_TYPES = array();
 
     private $_cruiseDataTransfersModel,
             $_collectionSystemTransfersModel,
@@ -131,6 +132,9 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $status = 3;
             $enable = 0;
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
@@ -162,6 +166,9 @@ class CruiseDataTransfers extends Controller {
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)) {
                 $error[] = 'Transfer limit must be an integer';
             }
+
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
                 $smbServer = '';
@@ -265,6 +272,21 @@ class CruiseDataTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                if(!$ftpErrors) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
             }
 
             if(!$error){
@@ -290,6 +312,9 @@ class CruiseDataTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'status' => $status,
                     'enable' => $enable,
                     'excludedCollectionSystems' => $excludedCollectionSystems,
@@ -323,6 +348,9 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $status = 3;
             $enable = 0;
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
@@ -354,6 +382,9 @@ class CruiseDataTransfers extends Controller {
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
                 $error[] = 'Transfer limit must be an integer';
             }
+
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
                 $smbServer = '';
@@ -457,6 +488,21 @@ class CruiseDataTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                if(!$ftpErrors) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
             }
 
             if(!$error){
@@ -483,6 +529,9 @@ class CruiseDataTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'status' => 4,
                     'enable' => 0,
                     'excludedCollectionSystems' => $excludedCollectionSystems,
@@ -550,13 +599,20 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
             $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
-            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], false);
+            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], false);
             $rsyncPass = $passwords['rsyncPass'];
             $smbPass = $passwords['smbPass'];
             $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
+
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -584,6 +640,9 @@ class CruiseDataTransfers extends Controller {
             } else if(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
                 $error[] = 'Transfer limit must be an integer';
             }
+
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
                 $smbServer = '';
@@ -685,6 +744,21 @@ class CruiseDataTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                if(!$ftpErrors) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
             }
 
             if(!$error){
@@ -710,6 +784,9 @@ class CruiseDataTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'excludedCollectionSystems' => $excludedCollectionSystems,
                     'excludedExtraDirectories' => $excludedExtraDirectories,
                 );
@@ -741,6 +818,8 @@ class CruiseDataTransfers extends Controller {
                 $data['row'][0]->sshServer = $sshServer;
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
+                $data['row'][0]->ftpServer = $ftpServer;
+                $data['row'][0]->ftpUser = $ftpUser;
                 $data['row'][0]->excludedCollectionSystems = $excludedCollectionSystems;
                 $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
             }
@@ -767,13 +846,20 @@ class CruiseDataTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $excludedCollectionSystems = !empty($_POST['excludedCollectionSystems']) ? join(",", $_POST['excludedCollectionSystems']) : "";
             $excludedExtraDirectories = !empty($_POST['excludedExtraDirectories']) ? join(",", $_POST['excludedExtraDirectories']) : "";
 
-            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass), $data['row'][0], true);
+            $passwords = PendingPasswords::resolve('cdt', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], true);
             $rsyncPass = $passwords['rsyncPass'];
             $smbPass = $passwords['smbPass'];
             $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
+
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -801,6 +887,9 @@ class CruiseDataTransfers extends Controller {
             } elseif(!((string)(int)$bandwidthLimit == $bandwidthLimit)){
                 $error[] = 'Transfer limit must be an integer';
             }
+
+            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
 
             if ($transferType == 1) { //local directory
                 $smbServer = '';
@@ -902,6 +991,21 @@ class CruiseDataTransfers extends Controller {
                     $rsyncUser = '';
                     $rsyncPass = '';
                 }
+            } elseif ($transferType == 5) { // FTP Server
+                if(!$ftpErrors) {
+                    $localDirIsMountPoint = '0';
+                    $smbServer = '';
+                    $smbUser = '';
+                    $smbDomain = '';
+                    $smbPass = '';
+                    $rsyncServer = '';
+                    $rsyncUser = '';
+                    $rsyncPass = '';
+                    $sshServer = '';
+                    $sshUser = '';
+                    $sshUseKey = '0';
+                    $sshPass = '';
+                }
             }
 
             if(!$error){
@@ -929,6 +1033,9 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->sshUser = $sshUser;
                 $gmData['cruiseDataTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['cruiseDataTransfer']->sshPass = $sshPass;
+                $gmData['cruiseDataTransfer']->ftpServer = $ftpServer;
+                $gmData['cruiseDataTransfer']->ftpUser = $ftpUser;
+                $gmData['cruiseDataTransfer']->ftpPass = $ftpPass;
                 $gmData['cruiseDataTransfer']->excludedCollectionSystems = $excludedCollectionSystems;
                 $gmData['cruiseDataTransfer']->excludedExtraDirectories = $excludedExtraDirectories;
 
@@ -962,6 +1069,8 @@ class CruiseDataTransfers extends Controller {
             $data['row'][0]->sshServer = $sshServer;
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
+            $data['row'][0]->ftpServer = $ftpServer;
+            $data['row'][0]->ftpUser = $ftpUser;
             $data['row'][0]->excludedCollectionSystems = $excludedCollectionSystems;
             $data['row'][0]->excludedExtraDirectories = $excludedExtraDirectories;
 

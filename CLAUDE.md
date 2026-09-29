@@ -149,9 +149,13 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 
 The `connection_utils.py` module handles six transfer types: local directory, rsync server, SMB (Samba) share, SSH server, FTP server, and rclone (cloud storage). Transfer type logic branches on these in workers.
 
-`OVDM_TransferTypes` is shared by collection system and cruise data transfers. FTP Server (5) is a collection system transfer type only: the cruise data transfer form hides it until #199.
+`OVDM_TransferTypes` is shared by collection system and cruise data transfers; both support all five types. The CDT controller's `UNSUPPORTED_TRANSFER_TYPES` can hide a type from the CDT form and reject it on submit (#210); it's empty since FTP destinations were added (#199). The FTP form rules (`Helpers\FtpFields`: validation and the #211 password rule) are shared by both controllers.
 
-### FTP collection system transfers
+### FTP transfers
+
+FTP **destinations** (cruise data transfers, #199) work like SSH destinations: the transfer writes a temporary rclone remote (`prepare_ftp_config()`), creates `<destDir>/<cruiseID>` with `rclone mkdir`, and copies or syncs with rclone; no mount. Test Setup (`test_cdt_destination()`) checks the login, the destination directory and write access (`test_ftp_write_access()`).
+
+FTP **sources** (collection system transfers):
 
 FTP sources (#17) are mounted with `rclone mount` (FUSE, `fuse3`) in the transfer's temporary directory, and rsync copies from the mount point. Only the source directory (or a wildcard source's parent, `ftp_mount_base()`) is mounted, not the server root, which some accounts can't list; `mount_path()` maps a server path into the mount (#209). SMB shares are still mounted at their root, with `sourceDir` relative to the share. The FTP Server field is `host[:port]` (default 21; `[ipv6]:port`); there's no separate port column. `split_ftp_server()` parses it, and the CST controller's `_checkFtpFields()` validates it with the same rules (#224). Test Setup and the transfer share the setup steps `prepare_ftp_config()` (password available, rclone config written) and `prepare_ftp_mount()` (#214). `build_rclone_config_for_ftp()` writes the remote to a config file in the temporary directory (password obscured via stdin, never on the command line). The file list (and the staleness re-check) comes from one `rclone lsjson -R` call (`list_ftp_source()`), not from walking the mount: that avoids a `stat` per file over FTP, and `lsjson` fails on directories the server refuses to list, which the mount shows as empty (#208). `mount_ftp_source()` waits until the mount point is really mounted (older rclone returns early, #206), and must not read the daemonized rclone's output through a pipe (the daemon holds it open while mounted). Test functions for FTP stay in the `(bool, str)` style; `list_ftp_source()` returns `(bool, list | str)`.
 
@@ -169,6 +173,7 @@ For cruise data transfers, `destDir` interpretation depends on transfer type:
 - **Local Directory, no `:`** — absolute path on the local filesystem (leading `/` required)
 - **Local Directory, contains `:`** — rclone `remote:path` (no leading slash on remote name)
 - **SSH Server** — absolute path on the remote server (leading `/` required; used as `user@host:destDir/cruiseID`)
+- **FTP Server** — absolute path on the FTP server (leading `/` required; used as `<remote>:destDir/cruiseID`)
 - **Rsync / SMB** — relative path within the cruise directory (no leading slash)
 
 ## Database

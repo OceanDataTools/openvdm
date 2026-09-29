@@ -277,11 +277,7 @@ def task_test_cruise_data_transfer(worker, current_job):
     logging.info("Test destination")
     worker.send_job_status(current_job, 66, 100)
 
-    if transfer_type == 'ftp':
-        # Only a collection system transfer type; the CDT form rejects it (#210)
-        job_results['parts'].append({"partName": "Transfer type", "result": "Fail",
-                                     "reason": "FTP Server isn't available for cruise data transfers"})
-    elif ':' in cdt_cfg['destDir'] or transfer_type in ['local', 'smb']:
+    if ':' in cdt_cfg['destDir'] or transfer_type in ['local', 'smb']:
         job_results['parts'].extend(test_cdt_rclone_destination(cdt_cfg))
     else:
         job_results['parts'].extend(test_cdt_destination(cdt_cfg))
