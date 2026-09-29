@@ -20,10 +20,8 @@ import fnmatch
 import json
 import logging
 import os
-import re
 import sys
 import signal
-import subprocess
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -33,13 +31,11 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib import transfer_utils
+from server.lib.transfer_utils import TransferCommandError
 from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
-# Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-# Parses rclone --progress output (Transferred: ..., NN%) for job progress.
-RCLONE_PROGRESS_RE = re.compile(r'Transferred:\s+[\d.]+\w+\s+\/\s+[\d.]+\w+,\s+(\d+)%')
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -274,7 +270,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def run_transfer_command(self, current_job, command, file_count):
         """Run an rsync or rclone transfer command and collect the files it transferred.
 
-        Streams the command's output to report progress to the Gearman job.
+        Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
+        progress to the Gearman job and honouring ``self.stop``.
 
         Args:
             current_job: The Gearman job, for progress updates.
@@ -283,82 +280,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 run.
 
         Returns:
-            tuple[list, list, list]: ``(new_files, updated_files,
-            deleted_files)``.
+            tuple[list, list, list]: ``(new_files, updated_files, deleted_files)``.
 
         Raises:
-            subprocess.CalledProcessError: If the command exits with an error.
+            TransferCommandError: If the command exits with an error (#230).
         """
 
-        # if there are no files to transfer, then don't
-        if file_count == 0:
-            logging.debug("Skipping Transfer Command: nothing to transfer")
-            return [], [], []
+        def _progress(percent):
+            self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
 
-        logging.debug('Transfer Command: %s', ' '.join(command))
-
-        # file_index = 0
-        new_files = []
-        updated_files = []
-        deleted_files = []
-        last_percent_reported = -1
-
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        try:
-            for line in proc.stdout:
-                if self.stop:
-                    logging.debug("Stopping")
-                    proc.terminate()
-                    break
-
-                line = line.strip()
-                logging.debug("%s: %s", command[0], line)
-
-                if not line:
-                    continue
-
-                if command[0] == 'rsync':
-                    if line.startswith(('>f+', '<f+')):
-                        new_files.append(line.split(' ', 1)[1].rstrip('\n'))
-                    elif line.startswith(('>f.', '<f.')):
-                        updated_files.append(line.split(' ', 1)[1].rstrip('\n'))
-                    elif line.startswith('*deleting'):
-                        deleted_files.append(line.split(' ', 1)[1].rstrip('\n'))
-                    # Extract progress from `to-chk=` lines
-                    match = TO_CHK_RE.search(line)
-                    if match:
-                        remaining = int(match.group(1))
-                        total = int(match.group(2))
-                        if total > 0:
-                            percent = int(100 * (total - remaining) / total)
-                            logging.debug("percent: %s", percent)
-
-                            if percent != last_percent_reported:
-                                logging.info("Progress Update: %d%%", percent)
-                                self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
-                                last_percent_reported = percent
-
-                if command[0] == 'rclone':
-                    # Try to extract progress percentage from rclone's output
-                    match = RCLONE_PROGRESS_RE.search(line)
-                    if match:
-                        percent = int(match.group(1))
-                        logging.debug("percent: %s", percent)
-                        if percent != last_percent_reported:
-                            logging.info("Progress Update: %d%%", percent)
-                            self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
-                            last_percent_reported = percent
-
-            proc.wait()
-
-            if proc.returncode != 0:
-                raise subprocess.CalledProcessError(proc.returncode, command)
-
-        except Exception as e:
-            logging.error("Transfer failed: %s", e)
-            proc.terminate()
-
-        return new_files, updated_files, deleted_files
+        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop)
+        return result['new'], result['updated'], result['deleted']
 
 
     def transfer_to_destination(self, current_job):
@@ -447,7 +379,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 if cdt_cfg.get('sshUseKey') == 0:
                     cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + cmd
 
-            files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+            try:
+                files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+            except TransferCommandError as exc:
+                # Don't report a failed transfer as successful (#230)
+                return {'verdict': False, 'reason': f"Transfer failed: {exc}"}
             return {'verdict': True, 'files': files}
 
 

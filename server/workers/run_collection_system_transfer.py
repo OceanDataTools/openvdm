@@ -22,7 +22,6 @@ import glob as glob_module
 import json
 import logging
 import os
-import re
 import sys
 import signal
 import subprocess
@@ -35,12 +34,13 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
+from server.lib import transfer_utils
+from server.lib.transfer_utils import TransferCommandError
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -222,12 +222,10 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
 
 
 def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
-    """Execute an rsync transfer command and collect new/updated file lists.
+    """Run an rsync transfer command and collect the new and updated files.
 
-    Streams rsync item-change output (``>f+++++++++`` / ``>f.``) to classify
-    files as new or updated, and reports percentage progress to the Gearman
-    job via ``to-chk=`` lines.  Honours ``worker.stop`` to allow graceful
-    early termination.
+    Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
+    progress to the Gearman job and honouring ``worker.stop``.
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -240,55 +238,17 @@ def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, fi
     Returns:
         A two-tuple ``(new_files, updated_files)`` where each element is a
         list of relative file paths.
+
+    Raises:
+        TransferCommandError: If rsync exits with an error (#230).
     """
 
-    if file_count == 0:
-        logging.info("Skipping Transfer Command: nothing to transfer")
-        return [], []
+    def _progress(percent):
+        if current_job:
+            worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
 
-    logging.debug('Transfer Command: %s', ' '.join(cmd))
-
-    new_files = []
-    updated_files = []
-    last_percent_reported = -1
-
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is None:
-
-        for line in proc.stdout:
-
-            if worker.stop:
-                logging.info("Stopping")
-                proc.terminate()
-                break
-
-            line = line.strip()
-
-            if not line:
-                continue
-
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                new_files.append(filename.rstrip('\n'))
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                updated_files.append(filename.rstrip('\n'))
-
-            # Extract progress from `to-chk=` lines
-            match = TO_CHK_RE.search(line)
-            if match:
-                remaining = int(match.group(1))
-                total = int(match.group(2))
-                if total > 0:
-                    percent = int(100 * (total - remaining) / total)
-
-                    if percent != last_percent_reported:
-                        logging.info("Progress Update: %d%%", percent)
-                        if current_job:
-                            worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
-                        last_percent_reported = percent
-
-    return new_files, updated_files
+    result = transfer_utils.run_transfer_command(cmd, file_count, _progress, lambda: worker.stop)
+    return result['new'], result['updated']
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-many-instance-attributes
@@ -892,9 +852,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
                     cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
 
-                new_files, updated_files = run_transfer_command(
-                    self, current_job, cmd, len(files['include'])
-                )
+                try:
+                    new_files, updated_files = run_transfer_command(
+                        self, current_job, cmd, len(files['include'])
+                    )
+                except TransferCommandError as exc:
+                    # Don't report a failed transfer as successful (#230)
+                    return {'verdict': False, 'reason': f"Transfer failed: {exc}", 'files': []}
                 files['new'] = new_files
                 files['updated'] = updated_files
 

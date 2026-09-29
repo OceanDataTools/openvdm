@@ -1031,7 +1031,8 @@ def build_rclone_options(cfg, mode='dry-run'):
 
     Uses ``sync`` if the transfer mirrors deletions (``syncToDest``), otherwise
     ``copy``. Adds ``--create-empty-src-dirs`` unless ``skipEmptyDirs`` is set,
-    ``--dry-run`` in dry-run mode, ``--bwlimit`` for a bandwidth limit, and the
+    ``--dry-run`` in dry-run mode (otherwise ``-v``, so rclone logs each file
+    it copies or deletes), ``--bwlimit`` for a bandwidth limit, and the
     Google Cloud Storage options when the destination remote is a GCS bucket.
 
     Args:
@@ -1058,6 +1059,9 @@ def build_rclone_options(cfg, mode='dry-run'):
 
     if mode == 'dry-run':
         flags.append('--dry-run')
+    else:
+        # Log each copied/deleted file, for the transfer's file lists (#230)
+        flags.append('-v')
 
     if remote_type == 'google cloud storage':
         flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
