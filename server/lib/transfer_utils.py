@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import subprocess
+from collections import deque
 from typing import Callable, Optional
 
 # rsync --progress: "to-chk=<remaining>/<total>"
@@ -50,6 +51,41 @@ class TransferCommandError(Exception):
         self.detail = detail
         super().__init__(f"{command} exited with code {returncode}"
                          + (f": {detail}" if detail else ""))
+
+
+def redact_command(cmd: list) -> str:
+    """Return a command line for logging, with any ``sshpass -p`` password masked.
+
+    Args:
+        cmd: The command as a list of strings.
+
+    Returns:
+        The command joined with spaces, with the argument after
+        ``sshpass -p`` replaced by ``****`` (#240).
+    """
+    parts = list(cmd)
+    for i in range(len(parts) - 2):
+        if os.path.basename(parts[i]) == 'sshpass' and parts[i + 1] == '-p':
+            parts[i + 2] = '****'
+    return ' '.join(parts)
+
+
+def _rsync_failure_detail(errors: list, error_count: int, recent) -> str:
+    """Return the reason for a failed rsync command.
+
+    Args:
+        errors: The first error lines that aren't vanished listed files.
+        error_count: How many such error lines rsync printed in all.
+        recent: rsync's last output lines, used when there are no errors.
+
+    Returns:
+        The first error line, and how many more there were, or the most
+        specific line from *recent*.
+    """
+    if not errors:
+        return error_detail('rsync', recent)
+    more = error_count - 1
+    return errors[0] + (f" (and {more} more error{'s' if more > 1 else ''})" if more else '')
 
 
 def error_detail(tool: str, lines: list) -> str:
@@ -112,10 +148,15 @@ def run_transfer_command(cmd: list, file_count: int,
 
     tool = next((os.path.basename(part) for part in cmd
                  if os.path.basename(part) in ('rsync', 'rclone')), os.path.basename(cmd[0]))
-    logging.debug('Transfer Command: %s', ' '.join(cmd))
+    logging.debug('Transfer Command: %s', redact_command(cmd))
 
     last_percent = -1
-    recent = []    # last output lines, for the error message
+    recent = deque(maxlen=50)    # last output lines, for the error message
+    # rsync prints its errors as they happen, often long before it exits, so
+    # they're collected separately from the recent lines (#237)
+    errors = []           # the first errors that aren't vanished listed files
+    error_count = 0
+    vanished_count = 0
 
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
         for line in proc.stdout:
@@ -128,10 +169,17 @@ def run_transfer_command(cmd: list, file_count: int,
             line = line.strip()
             if not line:
                 continue
-            recent = (recent + [line])[-50:]
+            recent.append(line)
 
             percent = None
             if tool == 'rsync':
+                if line.startswith(('rsync:', '@ERROR')):
+                    if RSYNC_VANISHED_RE.match(line):
+                        vanished_count += 1
+                    else:
+                        error_count += 1
+                        if len(errors) < 10:
+                            errors.append(line)
                 match = RSYNC_FILE_RE.match(line)
                 if match:
                     result['new' if match.group(1) == '+' else 'updated'].append(match.group(2))
@@ -165,15 +213,18 @@ def run_transfer_command(cmd: list, file_count: int,
         return result
 
     ok_codes = RSYNC_OK_CODES if tool == 'rsync' else (0,)
-    if tool == 'rsync' and returncode == 23:
-        errors = [line for line in recent if line.startswith('rsync:')]
-        if errors and all(RSYNC_VANISHED_RE.match(line) for line in errors):
-            ok_codes = (23,)    # only listed files that have since vanished
+    if tool == 'rsync' and returncode == 23 and vanished_count and not error_count:
+        ok_codes = (23,)    # only listed files that have since vanished
     if returncode not in ok_codes:
-        error = TransferCommandError(tool, returncode, error_detail(tool, recent))
+        detail = (_rsync_failure_detail(errors, error_count, recent) if tool == 'rsync'
+                  else error_detail(tool, recent))
+        error = TransferCommandError(tool, returncode, detail)
         logging.error("Transfer failed: %s", error)
         raise error
-    if returncode != 0:
+    if returncode == 23:
+        logging.warning("rsync exited with code 23: %d listed file%s vanished before the "
+                        "transfer; treating as success", vanished_count, 's' if vanished_count > 1 else '')
+    elif returncode != 0:
         logging.warning("%s exited with code %d (%s); treating as success",
                         tool, returncode, error_detail(tool, recent))
 
