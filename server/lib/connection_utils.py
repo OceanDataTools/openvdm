@@ -286,6 +286,25 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
     return cmd
 
 
+def rsync_dest_path(server: str, dest_dir: str) -> str:
+    """Join an rsync server and a cruise data transfer's destination directory.
+
+    The CDT form saves an rsync ``destDir`` relative to the module (``backups``),
+    so it can't be appended to the server as is (#228).
+
+    Args:
+        server: rsync server, as ``host/module``.
+        dest_dir: Directory within the module, with or without a leading ``/``;
+            blank or ``/`` for the module's top level.
+
+    Returns:
+        str: ``host/module`` or ``host/module/dest_dir``, joined with one ``/``.
+    """
+
+    dest_dir = (dest_dir or '').strip('/')
+    return f"{server.rstrip('/')}/{dest_dir}" if dest_dir else server.rstrip('/')
+
+
 def test_rsync_connection(server, user, password_file=None):
     """Test that an rsync server accepts the transfer's credentials.
 
@@ -1751,7 +1770,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success, contest_detail = test_rsync_connection(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir']), cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 if contest_detail:
@@ -1764,7 +1783,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Destination directory", "result": "Pass"})
 
-            contest_success, contest_detail = test_rsync_write_access(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], tmpdir, password_file)
+            contest_success, contest_detail = test_rsync_write_access(rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir']), cdt_cfg['rsyncUser'], tmpdir, password_file)
             if not contest_success:
                 reason = f"Unable to write to: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 if contest_detail:
