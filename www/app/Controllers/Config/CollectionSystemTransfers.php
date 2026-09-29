@@ -80,6 +80,55 @@ class CollectionSystemTransfers extends Controller {
         return $output;
     }
 
+    /**
+     * Validate the FTP Server fields of a submitted transfer, or clear them.
+     *
+     * For an FTP Server transfer (type 5), checks the server, the port
+     * (default 21, must be 1-65535), the username and the password (not
+     * needed for anonymous). For other transfer types, clears the FTP
+     * fields, which only apply to FTP transfers. Shared by add, edit and
+     * their Test Setup (#213).
+     *
+     * @param mixed  $transferType submitted transfer type
+     * @param string $ftpServer    FTP server (cleared for other types)
+     * @param mixed  $ftpPort      FTP port (defaulted or reset to 21)
+     * @param string $ftpUser      FTP username (cleared for other types)
+     * @param string $ftpPass      FTP password (cleared for other types)
+     *
+     * @return array validation errors; empty if valid or not an FTP transfer
+     */
+    private function _checkFtpFields($transferType, &$ftpServer, &$ftpPort, &$ftpUser, &$ftpPass) {
+
+        if ($transferType != 5) {
+            $ftpServer = '';
+            $ftpPort = '21';
+            $ftpUser = '';
+            $ftpPass = '';
+            return array();
+        }
+
+        $errors = array();
+        if($ftpServer == ''){
+            $errors[] = 'FTP Server is required';
+        }
+
+        if($ftpPort === ''){
+            $ftpPort = '21';
+        } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
+            $errors[] = 'FTP Port must be a number from 1 to 65535';
+        }
+
+        if($ftpUser == ''){
+            $errors[] = 'FTP Username is required';
+        }
+
+        if($ftpUser != 'anonymous' && $ftpPass == ''){
+            $errors[] = 'FTP Password is required';
+        }
+
+        return $errors;
+    }
+
     private function updateDestinationDirectory() {
         $_warehouseModel = new \Models\Warehouse();
         $warehouseConfig = $_warehouseModel->getShipboardDataWarehouseConfig();
@@ -237,6 +286,9 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -339,30 +391,7 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncPass = '';
                 }
             } elseif ($transferType == 5) { // FTP Server
-                $ftpDataCheck = true;
-                if($ftpServer == ''){
-                    $error[] = 'FTP Server is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpPort === ''){
-                    $ftpPort = '21';
-                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
-                    $error[] = 'FTP Port must be a number from 1 to 65535';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser == ''){
-                    $error[] = 'FTP Username is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser != 'anonymous' && $ftpPass == ''){
-                    $error[] = 'FTP Password is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpDataCheck) {
+                if(!$ftpErrors) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
                     $smbUser = '';
@@ -376,13 +405,6 @@ class CollectionSystemTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-            }
-
-            if ($transferType != 5) { // FTP settings only apply to FTP transfers
-                $ftpServer = '';
-                $ftpPort = '21';
-                $ftpUser = '';
-                $ftpPass = '';
             }
 
             if(!$error){
@@ -492,6 +514,9 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -596,30 +621,7 @@ class CollectionSystemTransfers extends Controller {
                     $rsyncPass = '';
                 }
             } elseif ($transferType == 5) { // FTP Server
-                $ftpDataCheck = true;
-                if($ftpServer == ''){
-                    $error[] = 'FTP Server is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpPort === ''){
-                    $ftpPort = '21';
-                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
-                    $error[] = 'FTP Port must be a number from 1 to 65535';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser == ''){
-                    $error[] = 'FTP Username is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser != 'anonymous' && $ftpPass == ''){
-                    $error[] = 'FTP Password is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpDataCheck) {
+                if(!$ftpErrors) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
                     $smbUser = '';
@@ -633,13 +635,6 @@ class CollectionSystemTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-            }
-
-            if ($transferType != 5) { // FTP settings only apply to FTP transfers
-                $ftpServer = '';
-                $ftpPort = '21';
-                $ftpUser = '';
-                $ftpPass = '';
             }
 
             if(!$error){
@@ -826,6 +821,9 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -929,30 +927,7 @@ class CollectionSystemTransfers extends Controller {
                 }
 
             } elseif ($transferType == 5) { // FTP Server
-                $ftpDataCheck = true;
-                if($ftpServer == ''){
-                    $error[] = 'FTP Server is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpPort === ''){
-                    $ftpPort = '21';
-                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
-                    $error[] = 'FTP Port must be a number from 1 to 65535';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser == ''){
-                    $error[] = 'FTP Username is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser != 'anonymous' && $ftpPass == ''){
-                    $error[] = 'FTP Password is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpDataCheck) {
+                if(!$ftpErrors) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
                     $smbUser = '';
@@ -966,13 +941,6 @@ class CollectionSystemTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-            }
-
-            if ($transferType != 5) { // FTP settings only apply to FTP transfers
-                $ftpServer = '';
-                $ftpPort = '21';
-                $ftpUser = '';
-                $ftpPass = '';
             }
 
             if(!$error){
@@ -1139,6 +1107,9 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
+            $ftpErrors = $this->_checkFtpFields($transferType, $ftpServer, $ftpPort, $ftpUser, $ftpPass);
+            $error = array_merge($error, $ftpErrors);
+
             if ($transferType == 1) { //local directory
                 $smbServer = '';
                 $smbUser = '';
@@ -1242,30 +1213,7 @@ class CollectionSystemTransfers extends Controller {
                 }
 
             } elseif ($transferType == 5) { // FTP Server
-                $ftpDataCheck = true;
-                if($ftpServer == ''){
-                    $error[] = 'FTP Server is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpPort === ''){
-                    $ftpPort = '21';
-                } elseif(!ctype_digit((string)$ftpPort) || (int)$ftpPort < 1 || (int)$ftpPort > 65535){
-                    $error[] = 'FTP Port must be a number from 1 to 65535';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser == ''){
-                    $error[] = 'FTP Username is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpUser != 'anonymous' && $ftpPass == ''){
-                    $error[] = 'FTP Password is required';
-                    $ftpDataCheck = false;
-                }
-
-                if($ftpDataCheck) {
+                if(!$ftpErrors) {
                     $localDirIsMountPoint = '0';
                     $smbServer = '';
                     $smbUser = '';
@@ -1279,13 +1227,6 @@ class CollectionSystemTransfers extends Controller {
                     $sshUseKey = '0';
                     $sshPass = '';
                 }
-            }
-
-            if ($transferType != 5) { // FTP settings only apply to FTP transfers
-                $ftpServer = '';
-                $ftpPort = '21';
-                $ftpUser = '';
-                $ftpPass = '';
             }
 
             if(!$error) {
