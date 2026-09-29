@@ -343,8 +343,10 @@ def test_rsync_connection(server, user, password_file=None):
 def test_rsync_write_access(server, user, tmpdir, password_file=None):
     """Test that the transfer can write to an rsync server.
 
-    Uploads a ``write_test.txt`` file. There's currently no way to delete it
-    afterwards, so the file stays on the server.
+    Uploads a ``write_test.txt`` file, then deletes it again by syncing an
+    empty directory with ``--delete`` and a filter that only matches that file
+    (#233). A failed delete is logged as a warning but doesn't fail the test,
+    since the write worked.
 
     Args:
         server: rsync server, as ``host`` or ``host/module``.
@@ -382,6 +384,21 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         detail = str(exc)
         logging.error("rsync write test failed: %s", detail)
         return False, detail
+
+    # rsync can't delete a remote file directly: sync an empty directory to
+    # the destination (--dirs: that directory only), deleting only the test file
+    empty_dir = os.path.join(tmpdir, "write_test_empty")
+    os.mkdir(empty_dir)
+    cmd = build_rsync_command(flags, ['--dirs', '--delete', '--include=/write_test.txt', '--exclude=*'],
+                              f'{empty_dir}/', f'rsync://{user}@{server.rstrip("/")}/', None)
+
+    logging.debug("test_rsync_write_access cleanup cmd: %s", ' '.join(cmd))
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode not in [0, 24]:
+            logging.warning("Could not delete write_test.txt from rsync://%s: %s", server, proc.stderr.strip())
+    except Exception as exc:
+        logging.warning("Could not delete write_test.txt from rsync://%s: %s", server, exc)
 
     return True, ""
 
