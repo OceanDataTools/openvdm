@@ -36,7 +36,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, list_ftp_source, mount_ftp_source, mount_smb_share, test_cst_source
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ftp, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_ftp_source, mount_path, mount_smb_share, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
@@ -408,7 +408,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return log_dir
 
 
-    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False):
+    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False, mount_base=None):
         """
         Enumerate concrete source directories when source_dir contains glob wildcard characters.
         Returns a list of (concrete_source_dir, dest_basename) tuples.
@@ -429,7 +429,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         cst_cfg = self.collection_system_transfer
 
         if transfer_type in ['local', 'smb', 'ftp']:
-            local_parent = os.path.join(prefix, parent.lstrip('/')) if prefix else parent
+            local_parent = mount_path(prefix, parent, mount_base) if prefix else parent
             matched = sorted([
                 d for d in glob_module.glob(os.path.join(local_parent, pattern))
                 if os.path.isdir(d)
@@ -768,6 +768,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         prefix = None
         mntpoint = None
+        mount_base = None
         rclone_config = None
         is_darwin = False
 
@@ -804,7 +805,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     build_rclone_config_for_ftp(cst_cfg, rclone_config)
                 except (subprocess.CalledProcessError, OSError) as exc:
                     return {'verdict': False, 'reason': f'Error writing rclone config: {exc}', 'files': []}
-                success, mount_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config)
+                # Mount the source directory (or wildcard parent), not the
+                # server root, which the account may not be able to list (#209)
+                mount_base = ftp_mount_base(source_dir)
+                success, mount_detail = mount_ftp_source(cst_cfg, mntpoint, rclone_config, mount_base)
                 if not success:
                     reason = 'Failed to mount FTP server'
                     if mount_detail:
@@ -835,7 +839,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 is_darwin = check_darwin(cst_cfg)
 
             # Enumerate source directories (expands wildcards if present)
-            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin)
+            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin, mount_base)
 
             if not source_pairs:
                 return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
@@ -884,7 +888,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 elif transfer_type == 'ssh':
                     source_path = f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}:{src_dir}"
                 elif transfer_type in ['smb', 'ftp']:
-                    source_path = os.path.join(mntpoint, src_dir.lstrip('/').rstrip('/'))
+                    source_path = mount_path(mntpoint, src_dir, mount_base).rstrip('/')
 
                 source_path += '/'
 
