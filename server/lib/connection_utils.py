@@ -1529,6 +1529,12 @@ def test_cdt_destination(cdt_cfg):
         results.extend([{"partName": "Transfer type", "result": "Fail", "reason": "Unknown transfer type"}])
         return results
 
+    # Only a collection system transfer type; the CDT form rejects it (#210)
+    if transfer_type == 'ftp':
+        results.extend([{"partName": "Transfer type", "result": "Fail",
+                         "reason": "FTP Server isn't available for cruise data transfers"}])
+        return results
+
     with temporary_directory() as tmpdir:
         password_file = os.path.join(tmpdir, 'passwordFile')
 
