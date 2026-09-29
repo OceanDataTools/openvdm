@@ -58,7 +58,7 @@ $_warehouseModel = new \Models\Warehouse();
 <?php
   }
 ?>
-                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $data['row'][0]->transferType); ?></div>
+                                <div class="form-group"><label>Transfer Type</label><?php echo Form::select(array('class'=>'form-control', 'name'=>'transferType', 'data'=>$data['transferTypeOptions'], 'value'=>$data['row'][0]->transferType)); ?></div>
                                 <div class="form-group"><label>Source Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sourceDir', 'value'=> $data['row'][0]->sourceDir)); ?></div>
                                 <div class="form-group localDir"><label>Source Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $data['row'][0]->localDirIsMountPoint); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'placeholder'=>'e.g. 192.168.4.151/data', 'value'=> $data['row'][0]->rsyncServer)); ?></div>

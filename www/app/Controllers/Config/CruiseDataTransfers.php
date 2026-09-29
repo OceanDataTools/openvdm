@@ -20,18 +20,18 @@ class CruiseDataTransfers extends Controller {
             $_extraDirectoriesModel,
             $_transferTypesModel;
 
-    private function _buildTransferTypesOptions($checkedType = null) {
+    // Transfer type choices for the form's Form::select(), as ID => name,
+    // leaving out UNSUPPORTED_TRANSFER_TYPES (#226).
+    private function _buildTransferTypesOptions() {
         $transferTypes = $this->_transferTypesModel->getTransferTypes();
 
         $output = array();
-        $i=1;
 
         foreach($transferTypes as $row){
             if (in_array((int)$row->transferTypeID, self::UNSUPPORTED_TRANSFER_TYPES, true)) {
                 continue;
             }
-            $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
-            array_push($output, $option);
+            $output[$row->transferTypeID] = $row->transferType;
         }
 
         return $output;
@@ -99,7 +99,7 @@ class CruiseDataTransfers extends Controller {
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
         $data['javascript'] = array('cruiseDataTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
-        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions($_POST['transferType'] ?? '');
+        $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
         $data['skipEmptyFilesOptions'] = $this->_buildSkipEmptyFilesOptions();
         $data['syncToDestOptions'] = $this->_buildSyncToDestOptions();
