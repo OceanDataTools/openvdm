@@ -476,7 +476,10 @@ def temporary_directory(preserve_on_error: bool = False):
     """Context manager that creates a temporary directory and cleans it up on exit.
 
     If a ``mntpoint`` subdirectory exists and is mounted at cleanup time, it is
-    unmounted before the tree is removed.
+    unmounted before the tree is removed. If ``umount`` fails, a lazy unmount
+    (``umount -l``) is tried. If it is still mounted after that, the temporary
+    directory is left in place: deleting it would delete the files of the
+    mounted share or FTP server (#207).
 
     Args:
         preserve_on_error: If ``True``, skip cleanup when an exception is raised
@@ -495,11 +498,19 @@ def temporary_directory(preserve_on_error: bool = False):
     def _cleanup_temp_dir(tmpdir, mntpoint_path):
         """Helper to unmount and delete a temporary directory safely."""
         if os.path.ismount(mntpoint_path):
-            try:
-                subprocess.run(['umount', mntpoint_path], check=True)
-                logging.info("Unmounted %s before cleanup.", mntpoint_path)
-            except subprocess.CalledProcessError as exc:
-                logging.warning("Failed to unmount %s: %s", mntpoint_path, str(exc))
+            for cmd in (['umount', mntpoint_path], ['umount', '-l', mntpoint_path]):
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                if proc.returncode == 0 and not os.path.ismount(mntpoint_path):
+                    logging.info("Unmounted %s before cleanup (%s).", mntpoint_path, ' '.join(cmd[:-1]))
+                    break
+                logging.warning("Failed to unmount %s with %s: %s", mntpoint_path,
+                                ' '.join(cmd[:-1]), proc.stderr.strip())
+
+            # Never rmtree through a mount: it would delete the mounted files
+            if os.path.ismount(mntpoint_path):
+                logging.error("%s is still mounted; leaving temporary directory %s in place",
+                              mntpoint_path, tmpdir)
+                return
 
         try:
             shutil.rmtree(tmpdir)
