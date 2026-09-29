@@ -2495,37 +2495,47 @@ show_lowering = os.environ.get('OVDM_SHOW_LOWERING', 'No') == 'Yes'
 
 gm = python3_gearman.GearmanClient(['localhost:4730'])
 
-if not os.path.exists(cruise_dir):
-    # Fresh install: setupNewCruise creates the directory, MD5 files,
-    # cruise_config.json, and data dashboard manifest in one shot.
-    print('  Setting up new cruise...')
-    try:
-        gm.submit_job('setupNewCruise', '{}', wait_until_complete=True, poll_timeout=120)
-        print('  Setup new cruise: done')
-    except Exception as e:
-        print(f'  Warning: setupNewCruise failed: {e}', file=sys.stderr)
-else:
-    # Re-install: cruise directory already exists; just re-export config
-    # and rebuild the directory structure.
-    for label, task, timeout in [
-        ('Re-export cruise configuration', 'exportOVDMConfig',      30),
-        ('Rebuild cruise directory',        'rebuildCruiseDirectory', 120),
-    ]:
-        print(f'  {label}...')
-        try:
-            gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
-            print(f'  {label}: done')
-        except Exception as e:
-            print(f'  Warning: {label} failed: {e}', file=sys.stderr)
+def job_failed(request, timeout):
+    """Return why a job didn't succeed, or None if it completed and passed.
 
-def job_failed(request):
-    """Return the failure reason from a job's result, or None if it passed."""
+    A job that timed out, didn't complete, or returned no readable result
+    counts as failed (#212), as well as one with a failed part.
+    """
+    if getattr(request, 'timed_out', False):
+        return f'timed out after {timeout} s'
+    state = getattr(request, 'state', None)
+    if state != python3_gearman.constants.JOB_COMPLETE:
+        return f'job ended in state {state}'
     try:
         parts = json.loads(request.result).get('parts', [])
     except (TypeError, ValueError, AttributeError):
-        return None
+        return 'job returned no readable result'
     failed = [p for p in parts if p.get('result') == 'Fail']
     return f"{failed[0]['partName']}: {failed[0].get('reason', '')}" if failed else None
+
+if not os.path.exists(cruise_dir):
+    # Fresh install: setupNewCruise creates the directory, MD5 files,
+    # cruise_config.json, and data dashboard manifest in one shot.
+    cruise_steps = [('Setup new cruise', 'setupNewCruise', 120)]
+else:
+    # Re-install: cruise directory already exists; just re-export config
+    # and rebuild the directory structure.
+    cruise_steps = [
+        ('Re-export cruise configuration', 'exportOVDMConfig',      30),
+        ('Rebuild cruise directory',        'rebuildCruiseDirectory', 120),
+    ]
+for label, task, timeout in cruise_steps:
+    print(f'  {label}...')
+    try:
+        request = gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
+        reason = job_failed(request, timeout)
+        if reason:
+            print(f'  Warning: {label} failed: {reason}', file=sys.stderr)
+        else:
+            print(f'  {label}: done')
+    except Exception as e:
+        print(f'  Warning: {label} failed: {e}', file=sys.stderr)
+
 
 # The sample data turns on lowering components (#201); set up its lowering
 # the same way as the cruise, so the lowering-level sample transfers can run.
@@ -2546,7 +2556,7 @@ if install_sampledata and show_lowering and lowering_id:
         for label, task, timeout in steps:
             print(f'  {label}...')
             request = gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
-            reason = job_failed(request)
+            reason = job_failed(request, timeout)
             if reason:
                 lowering_ready = False
                 print(f'  Warning: {label} failed: {reason}', file=sys.stderr)
