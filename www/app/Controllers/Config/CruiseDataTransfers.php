@@ -159,6 +159,10 @@ class CruiseDataTransfers extends Controller {
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
+            } elseif($transferType != '' && $transferType != 1 && strpos($destDir, ':') !== false){
+                // ':' marks an rclone remote:path, which only Local Directory
+                // destinations use; the workers route Test Setup on it
+                $error[] = "Destination Directory can't contain ':' — rclone remote:path destinations use the Local Directory transfer type";
             }
 
             if ($bandwidthLimit === '') {
@@ -375,6 +379,10 @@ class CruiseDataTransfers extends Controller {
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
+            } elseif($transferType != '' && $transferType != 1 && strpos($destDir, ':') !== false){
+                // ':' marks an rclone remote:path, which only Local Directory
+                // destinations use; the workers route Test Setup on it
+                $error[] = "Destination Directory can't contain ':' — rclone remote:path destinations use the Local Directory transfer type";
             }
 
             if ($bandwidthLimit === '') {
@@ -633,6 +641,10 @@ class CruiseDataTransfers extends Controller {
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
+            } elseif($transferType != '' && $transferType != 1 && strpos($destDir, ':') !== false){
+                // ':' marks an rclone remote:path, which only Local Directory
+                // destinations use; the workers route Test Setup on it
+                $error[] = "Destination Directory can't contain ':' — rclone remote:path destinations use the Local Directory transfer type";
             }
 
             if ($bandwidthLimit === '') {
@@ -880,6 +892,10 @@ class CruiseDataTransfers extends Controller {
 
             if($destDir == ''){
                 $error[] = 'Destination Directory is required';
+            } elseif($transferType != '' && $transferType != 1 && strpos($destDir, ':') !== false){
+                // ':' marks an rclone remote:path, which only Local Directory
+                // destinations use; the workers route Test Setup on it
+                $error[] = "Destination Directory can't contain ':' — rclone remote:path destinations use the Local Directory transfer type";
             }
 
             if ($bandwidthLimit === '') {

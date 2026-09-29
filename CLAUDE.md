@@ -165,7 +165,7 @@ Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `t
 
 ### rclone destination convention
 
-A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). For cruise data transfers this only applies to the Local Directory type: the CDT form rejects a `:` in the destination directory of any other type, and the workers route Test Setup to `test_cdt_rclone_destination()` on the `:`, so don't relax that check without routing by transfer type. This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
 
 ### CDT destDir semantics
 
