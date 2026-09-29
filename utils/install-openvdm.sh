@@ -1949,6 +1949,14 @@ flush privileges;
 EOF
     rm -f /tmp/openvdm_sample_data_custom.sql
 
+    # The sample data includes lowering-level transfers (e.g. ROV_OpenRVDAS),
+    # which only run with lowering components on. The post-install step sets
+    # up the sample lowering.
+    echo "Turning on lowering components for the sample data"
+    mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
+EOF
+
     # Enable sample data plugins (copy .dist files only if active copy does not exist)
     echo "Enabling sample data plugins"
     local PLUGIN_DIR="${INSTALL_ROOT}/openvdm/server/plugins"
@@ -2455,9 +2463,18 @@ OVDM_CRUISE_START_DATE=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm
 OVDM_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
     "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=0;" \
     2>/dev/null | tr '\n' ',')
+OVDM_LOWERING_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=1;" \
+    2>/dev/null | tr '\n' ',')
+OVDM_LOWERING_ID=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='loweringID';" 2>/dev/null)
+OVDM_SHOW_LOWERING=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='showLoweringComponents';" 2>/dev/null)
 OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+OVDM_ROOT="${INSTALL_ROOT}/openvdm"
 
 export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
+export OVDM_LOWERING_CST_IDS OVDM_LOWERING_ID OVDM_SHOW_LOWERING OVDM_ROOT
 "${INSTALL_ROOT}/openvdm/venv/bin/python3" - <<'PYEOF'
 import os, sys, json
 
@@ -2472,6 +2489,9 @@ cruise_start_date = os.environ.get('OVDM_CRUISE_START_DATE', '')
 cst_ids = [x for x in os.environ.get('OVDM_CST_IDS', '').split(',') if x]
 cruise_dir = os.environ.get('OVDM_CRUISE_DIR', '')
 install_sampledata = os.environ.get('INSTALL_SAMPLEDATA', 'no') == 'yes'
+lowering_cst_ids = [x for x in os.environ.get('OVDM_LOWERING_CST_IDS', '').split(',') if x]
+lowering_id = os.environ.get('OVDM_LOWERING_ID', '')
+show_lowering = os.environ.get('OVDM_SHOW_LOWERING', 'No') == 'Yes'
 
 gm = python3_gearman.GearmanClient(['localhost:4730'])
 
@@ -2498,22 +2518,66 @@ else:
         except Exception as e:
             print(f'  Warning: {label} failed: {e}', file=sys.stderr)
 
-if install_sampledata and cst_ids:
-    print(f'  Running {len(cst_ids)} collection system transfer(s)...')
+def job_failed(request):
+    """Return the failure reason from a job's result, or None if it passed."""
     try:
-        jobs = []
-        for cst_id in cst_ids:
-            payload = json.dumps({
-                'cruiseID': cruise_id,
-                'cruiseStartDate': cruise_start_date,
-                'systemStatus': 'On',
-                'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}
-            })
-            jobs.append({'task': 'runCollectionSystemTransfer', 'data': payload})
-        gm.submit_multiple_jobs(jobs, background=False, wait_until_complete=True, poll_timeout=600)
-        print('  Collection system transfers: done')
+        parts = json.loads(request.result).get('parts', [])
+    except (TypeError, ValueError, AttributeError):
+        return None
+    failed = [p for p in parts if p.get('result') == 'Fail']
+    return f"{failed[0]['partName']}: {failed[0].get('reason', '')}" if failed else None
+
+# The sample data turns on lowering components (#201); set up its lowering
+# the same way as the cruise, so the lowering-level sample transfers can run.
+lowering_ready = False
+if install_sampledata and show_lowering and lowering_id:
+    try:
+        sys.path.insert(0, os.environ['OVDM_ROOT'])
+        from server.lib.openvdm import OpenVDM
+        warehouse = OpenVDM().get_shipboard_data_warehouse_config()
+        lowering_dir = os.path.join(warehouse['shipboardDataWarehouseBaseDir'], cruise_id,
+                                    warehouse['loweringDataBaseDir'], lowering_id)
+        if not os.path.exists(lowering_dir):
+            steps = [('Set up new lowering', 'setupNewLowering', 120)]
+        else:
+            steps = [('Re-export lowering configuration', 'exportLoweringConfig',     30),
+                     ('Rebuild lowering directory',       'rebuildLoweringDirectory', 120)]
+        lowering_ready = True
+        for label, task, timeout in steps:
+            print(f'  {label}...')
+            request = gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
+            reason = job_failed(request)
+            if reason:
+                lowering_ready = False
+                print(f'  Warning: {label} failed: {reason}', file=sys.stderr)
+            else:
+                print(f'  {label}: done')
     except Exception as e:
-        print(f'  Warning: collection system transfers failed: {e}', file=sys.stderr)
+        lowering_ready = False
+        print(f'  Warning: lowering setup failed: {e}', file=sys.stderr)
+
+if install_sampledata:
+    jobs = []
+    for cst_id in cst_ids:
+        jobs.append({'cruiseID': cruise_id, 'cruiseStartDate': cruise_start_date,
+                     'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}})
+    if lowering_ready:
+        for cst_id in lowering_cst_ids:
+            jobs.append({'cruiseID': cruise_id, 'loweringID': lowering_id,
+                         'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}})
+    elif lowering_cst_ids:
+        print(f'  Skipping {len(lowering_cst_ids)} lowering-level transfer(s): no lowering set up')
+
+    if jobs:
+        print(f'  Running {len(jobs)} collection system transfer(s)...')
+        try:
+            gm.submit_multiple_jobs(
+                [{'task': 'runCollectionSystemTransfer',
+                  'data': json.dumps(dict(job, systemStatus='On'))} for job in jobs],
+                background=False, wait_until_complete=True, poll_timeout=600)
+            print('  Collection system transfers: done')
+        except Exception as e:
+            print(f'  Warning: collection system transfers failed: {e}', file=sys.stderr)
 PYEOF
 echo
 
