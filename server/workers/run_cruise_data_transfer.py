@@ -358,7 +358,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
                 dry_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + dry_cmd
 
-            logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg.get("sshPass", "")}', '-p ****'))
+            logging.debug("Dry run command: %s", transfer_utils.redact_command(dry_cmd))
             proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
             if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
                 # Otherwise it looks like "nothing to transfer" (#230)

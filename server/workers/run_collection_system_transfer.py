@@ -603,7 +603,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if cst_cfg.get('sshUseKey') == 0:
                     command = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + command
 
-            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg.get("sshPass", "")}', '-p ****'))
+            logging.debug("File list Command: %s", transfer_utils.redact_command(command))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
             if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
                 # A failed or partial listing looks like missing files, and

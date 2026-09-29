@@ -26,6 +26,7 @@ from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
+from server.lib.transfer_utils import redact_command
 
 # Integer fields that PHP/PDO returns as strings but Python code compares with == 1 / == 0
 _TRANSFER_INT_FIELDS = frozenset([
@@ -157,7 +158,7 @@ def check_darwin(cfg):
     if cfg['sshUseKey'] == 0:
         cmd = ['sshpass', '-p', cfg.get('sshPass', '')] + cmd
 
-    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg.get("sshPass", "")}', '-p ****'))
+    logging.debug("check_darwin cmd: %s", redact_command(cmd))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
