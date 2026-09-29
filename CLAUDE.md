@@ -175,7 +175,7 @@ For cruise data transfers, `destDir` interpretation depends on transfer type:
 - **Local Directory, contains `:`** — rclone `remote:path` (no leading slash on remote name)
 - **SSH Server** — absolute path on the remote server (leading `/` required; used as `user@host:destDir/cruiseID`)
 - **FTP Server** — absolute path on the FTP server (leading `/` required; used as `<remote>:destDir/cruiseID`)
-- **Rsync / SMB** — path within the rsync module (part of the Rsync Server field) or SMB share (the form strips the leading slash); blank for its top level. Join rsync ones with `rsync_dest_path()` (#228)
+- **Rsync / SMB** — path within the rsync module (part of the Rsync Server field) or SMB share (the form strips the leading and trailing slashes); `/` for its top level, which the form keeps (#247). Join rsync ones with `rsync_dest_path()` (#228)
 
 ## Database
 
