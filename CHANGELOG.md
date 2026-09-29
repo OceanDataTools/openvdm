@@ -67,6 +67,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - The installer now reports a failed or timed-out cruise setup step after install (Setup New Cruise, or re-exporting the configuration and rebuilding the cruise directory on a re-install) as a warning with the reason, instead of "done" (#212)
 - Fix rsync cruise data transfers to a subdirectory of the rsync module: the Destination Directory was appended to the Rsync Server with no `/` (`host/module` + `backups` became the module `modulebackups`), so **Test Setup** and the transfer failed unless the Destination Directory was blank or started with `/`. The Destination Directory is now a directory within the module, with or without a leading `/`, and the form's help text says so (#228)
 - **Test Setup** for an rsync cruise data transfer no longer leaves a `write_test.txt` in the destination directory: the write test now deletes it again. If the rsync server refuses deletes, Test Setup still passes and a warning is logged (#233)
+- Fix collection system transfers from an rsync server or SSH server reporting success with no files when listing the source failed (e.g. the server was down or the module unavailable). With **Sync from source** on, that deleted every file already collected in the destination directory. A failed listing, a failed staleness re-listing, or a file list that can't be written now fails the transfer, and the reason includes rsync's error (e.g. `@ERROR: Unknown module`) (#238)
 
 ---
 

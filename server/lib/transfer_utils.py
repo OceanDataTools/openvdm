@@ -63,8 +63,9 @@ def error_detail(tool: str, lines: list) -> str:
         The error line, without rclone's timestamp and level, or ``''``.
     """
     if tool == 'rsync':
-        # "rsync: <cause>" is more useful than "rsync error: ... (code N)"
-        for prefix in ('rsync:', 'rsync error:'):
+        # "@ERROR: <cause>" (from an rsync daemon, e.g. an unknown module) and
+        # "rsync: <cause>" are more useful than "rsync error: ... (code N)"
+        for prefix in ('@ERROR', 'rsync:', 'rsync error:'):
             matches = [line for line in lines if line.startswith(prefix)]
             if matches:
                 return matches[-1]
