@@ -126,15 +126,16 @@ def build_filelist(source_dir: str) -> dict:
     return return_files
 
 
-def build_include_file(include_list: List[str], filepath: str) -> bool:
-    """Write *include_list* to *filepath* for use as an rsync ``--files-from`` argument.
+def write_list_file(entries: List[str], filepath: str) -> bool:
+    """Write *entries* to *filepath* for an rsync or rclone ``--files-from`` or ``--exclude-from``.
 
-    Each entry is written on its own line, followed by a NUL byte to satisfy
-    rsync's ``--from0`` option if used.
+    Each entry is written on its own line, ending in a newline. rclone reads
+    anything else after the last newline as part of the last entry, so
+    nothing else may follow it (#255).
 
     Args:
-        include_list: Relative file paths to include in the transfer.
-        filepath: Destination path for the generated include file.
+        entries: Relative file paths, or exclude patterns.
+        filepath: Path of the file to write.
 
     Returns:
         ``True`` on success, ``False`` if the file could not be written.
@@ -142,10 +143,9 @@ def build_include_file(include_list: List[str], filepath: str) -> bool:
 
     try:
         with open(filepath, mode='w', encoding="utf-8") as f:
-            f.write('\n'.join(include_list))
-            f.write('\0')
+            f.writelines(f'{entry}\n' for entry in entries)
     except IOError as exc:
-        logging.error("Error writing include file: %s", str(exc))
+        logging.error("Error writing list file %s: %s", filepath, str(exc))
         return False
 
     return True

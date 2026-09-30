@@ -30,7 +30,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError, error_detail
 from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
@@ -258,25 +258,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         rclone_args = None  # e.g. the --config for an SSH or FTP destination's rclone remote
 
 
-        def _build_exclude_file(exclude_list, filepath):
-            try:
-                with open(filepath, mode='w', encoding="utf-8") as f:
-                    f.write('\n'.join(exclude_list))
-                    f.write('\0')
-            except IOError as exc:
-                logging.error("Error writing exclude file: %s", str(exc))
-                return False
-
-            return True
-
-
         with temporary_directory() as tmpdir:
             exclude_file = os.path.join(tmpdir, 'rsyncExcludeList.txt')
 
             exclude_list = self.build_exclude_filterlist()
             logging.debug("Exclude filters: %s", json.dumps(exclude_list, indent=2))
 
-            if not _build_exclude_file(exclude_list, exclude_file):
+            if not write_list_file(exclude_list, exclude_file):
                 return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
             if transfer_type == 'smb':

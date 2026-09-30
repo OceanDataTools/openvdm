@@ -37,7 +37,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
-from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
@@ -865,7 +865,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     os.makedirs(effective_dest, exist_ok=True)
 
                 # Write file list
-                if not build_include_file(files['include'], include_file):
+                if not write_list_file(files['include'], include_file):
                     # Skipping the source would report success (#238)
                     logging.error("Error writing file list for %s", src_dir)
                     return {'verdict': False, 'reason': f"Unable to write the file list for {src_dir}",

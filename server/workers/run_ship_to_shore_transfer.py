@@ -30,7 +30,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
@@ -307,17 +307,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_cfg = self.cruise_data_transfer
         is_darwin = False
 
-        def _build_include_file(include_list, filepath):
-            try:
-                with open(filepath, mode='w', encoding="utf-8") as f:
-                    f.write('\n'.join(include_list))
-                    f.write('\n')
-            except IOError as exc:
-                logging.error("Error writing include file: %s", str(exc))
-                return False
-
-            return True
-
         with temporary_directory() as tmpdir:
 
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
@@ -329,7 +318,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
             files = results['files']
 
-            if not _build_include_file([f'{self.cruise_id}/{filepath}' for filepath in files['include']], include_file):
+            if not write_list_file([f'{self.cruise_id}/{filepath}' for filepath in files['include']], include_file):
                 return {'verdict': False, 'reason': 'Failed to write include file'}
 
 

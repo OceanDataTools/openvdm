@@ -29,7 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
-from server.lib.file_utils import build_filelist, build_include_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import build_filelist, write_list_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
 from server.lib.transfer_utils import TransferCommandError
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
@@ -258,7 +258,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         with temporary_directory() as tmpdir:    # Create temp directory
             include_file = os.path.join(tmpdir, 'rsyncFileList.txt')
-            if not build_include_file(files['include'], include_file):
+            if not write_list_file(files['include'], include_file):
                 return {'verdict': False, 'reason': "Error Saving temporary rsync filelist file"}
 
             self.send_job_status(current_job, int((end_status - start_status) * 20/100) + start_status, 100)
