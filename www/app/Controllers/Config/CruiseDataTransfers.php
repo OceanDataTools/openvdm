@@ -7,6 +7,7 @@ use Helpers\Url;
 use Helpers\Session;
 use Helpers\PendingPasswords;
 use Helpers\FtpFields;
+use Helpers\TransferFields;
 
 class CruiseDataTransfers extends Controller {
 
@@ -171,125 +172,49 @@ class CruiseDataTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
-            $error = array_merge($error, $ftpErrors);
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbPass = '';
-                $smbDomain = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
-
-            } elseif ($transferType == 2) { // Rsync Server
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { // Rsync Server
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser != 'guest' && $smbPass == ''){
                     $error[] = 'SMB Password is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                }
-            } elseif ($transferType == 5) { // FTP Server
-                if(!$ftpErrors) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             }
 
@@ -325,6 +250,8 @@ class CruiseDataTransfers extends Controller {
                     'excludedExtraDirectories' => $excludedExtraDirectories,
 
                 );
+
+                $postdata = TransferFields::clearOthers($postdata);
 
                 $this->_cruiseDataTransfersModel->insertCruiseDataTransfer($postdata);
                 Session::set('message',CRUISE_NAME . ' Data Transfer Added');
@@ -391,125 +318,49 @@ class CruiseDataTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
-            $error = array_merge($error, $ftpErrors);
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbPass = '';
-                $smbDomain = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
-
-            } elseif ($transferType == 2) { // Rsync Server
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { // Rsync Server
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbPass = '';
-                    $smbDomain = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser != 'guest' && $smbPass == ''){
                     $error[] = 'SMB Password is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                }
-            } elseif ($transferType == 5) { // FTP Server
-                if(!$ftpErrors) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             }
 
@@ -545,6 +396,8 @@ class CruiseDataTransfers extends Controller {
                     'excludedCollectionSystems' => $excludedCollectionSystems,
                     'excludedExtraDirectories' => $excludedExtraDirectories,
                 );
+
+                $gmData['cruiseDataTransfer'] = TransferFields::clearOthers($gmData['cruiseDataTransfer']);
 
                 # create the gearman client
                 $gmc= new \GearmanClient();
@@ -653,123 +506,48 @@ class CruiseDataTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
-            $error = array_merge($error, $ftpErrors);
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbPass = '';
-                $smbDomain = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
-
-            } elseif ($transferType == 2) { //rsync
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { //rsync
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { //smb
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                }
-            } elseif ($transferType == 5) { // FTP Server
-                if(!$ftpErrors) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             }
 
@@ -804,6 +582,7 @@ class CruiseDataTransfers extends Controller {
                 );
 
                 $where = array('cruiseDataTransferID' => $id);
+                $postdata = TransferFields::clearOthers($postdata);
                 $this->_cruiseDataTransfersModel->updateCruiseDataTransfer($postdata,$where);
 
                 $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
@@ -904,123 +683,48 @@ class CruiseDataTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            $ftpErrors = FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass);
-            $error = array_merge($error, $ftpErrors);
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbPass = '';
-                $smbDomain = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
-
-            } elseif ($transferType == 2) { //rsync
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { //rsync
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { //smb
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP';
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { //ssh
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                }
-            } elseif ($transferType == 5) { // FTP Server
-                if(!$ftpErrors) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             }
 
@@ -1054,6 +758,8 @@ class CruiseDataTransfers extends Controller {
                 $gmData['cruiseDataTransfer']->ftpPass = $ftpPass;
                 $gmData['cruiseDataTransfer']->excludedCollectionSystems = $excludedCollectionSystems;
                 $gmData['cruiseDataTransfer']->excludedExtraDirectories = $excludedExtraDirectories;
+
+                $gmData['cruiseDataTransfer'] = TransferFields::clearOthers($gmData['cruiseDataTransfer']);
 
                 # create the gearman client
                 $gmc= new \GearmanClient();

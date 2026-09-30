@@ -150,7 +150,7 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 
 The `connection_utils.py` module handles six transfer types: local directory, rsync server, SMB (Samba) share, SSH server, FTP server, and rclone (cloud storage). Transfer type logic branches on these in workers.
 
-`OVDM_TransferTypes` is shared by collection system and cruise data transfers; both support all five types. The CDT controller's `UNSUPPORTED_TRANSFER_TYPES` can hide a type from the CDT form and reject it on submit (#210); it's empty since FTP destinations were added (#199). The FTP form rules (`Helpers\FtpFields`: validation and the #211 password rule) are shared by both controllers.
+`OVDM_TransferTypes` is shared by collection system and cruise data transfers; both support all five types. The CDT controller's `UNSUPPORTED_TRANSFER_TYPES` can hide a type from the CDT form and reject it on submit (#210); it's empty since FTP destinations were added (#199). The FTP form rules (`Helpers\FtpFields`: validation and the #211 password rule) are shared by both controllers. `Helpers\TransferFields` lists each type's connection fields; both controllers' add/edit handlers blank the other types' fields with `clearOthers()` on the data they save or send to Test Setup (#243), so a new type's fields only need adding there.
 
 ### FTP transfers
 

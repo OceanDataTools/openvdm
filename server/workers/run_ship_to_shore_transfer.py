@@ -33,7 +33,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
-from server.lib.connection_utils import build_rclone_options, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -307,35 +307,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_cfg = self.cruise_data_transfer
         is_darwin = False
 
-        def _build_rclone_command(copy_sync, flags, extra_args, source_dir, dest_dir, include_file_path=None):
-
-            if copy_sync not in ['copy', 'sync']:
-                raise ValueError("Rclone type has to be 'copy' or 'sync'")
-
-            cmd = ['rclone', copy_sync] + [source_dir.rstrip('/')+'/', dest_dir.rstrip('/')+'/']
-            if flags is not None:
-                cmd += flags
-
-            if extra_args is not None:
-                cmd += extra_args
-
-            if include_file_path is not None:
-                cmd += ["--files-from",  include_file_path]
-
-            return cmd
-
-        def _build_rsync_command(flags, extra_args, source_dir, dest_dir, include_file_path=None):
-            logging.debug(flags)
-            cmd = ['rsync'] + flags
-            if extra_args is not None:
-                cmd += extra_args
-
-            if include_file_path is not None:
-                cmd.append(f"--files-from={include_file_path}")
-
-            cmd += [source_dir.rstrip('/')+'/', dest_dir.rstrip('/')+'/']
-            return cmd
-
         def _build_include_file(include_list, filepath):
             try:
                 with open(filepath, mode='w', encoding="utf-8") as f:
@@ -366,7 +337,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
 
-                cmd = _build_rclone_command(copy_sync, flags, None, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_data_transfer['destDir'], include_file)
+                cmd = build_rclone_command(copy_sync, flags, None, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_data_transfer['destDir'], include_file)
 
             else:
                 is_darwin = check_darwin(cdt_cfg)
@@ -374,7 +345,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
                 flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
                 extra_args = ['-e', 'ssh']
-                cmd = _build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], dest_dir, include_file)
+                cmd = build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'].rstrip('/') + '/', dest_dir.rstrip('/') + '/', include_file)
 
                 if cdt_cfg.get('sshUseKey') == 0:
                     cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + cmd
