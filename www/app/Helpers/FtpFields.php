@@ -19,28 +19,25 @@ class FtpFields
     const TRANSFER_TYPE = 5;
 
     /**
-     * Validate the FTP Server fields of a submitted transfer, or clear them.
+     * Validate the FTP Server fields of a submitted transfer.
      *
      * For an FTP Server transfer, checks the server (host, with an optional
      * :port from 1 to 65535; [brackets] around an IPv6 address with a port),
      * the username and the password (not needed for anonymous). The port
-     * defaults to 21 (#224). For other transfer types, clears the FTP fields,
-     * which only apply to FTP transfers.
+     * defaults to 21 (#224). Other transfer types' FTP fields are blanked on
+     * save by TransferFields::clearOthers() (#243).
      *
      * @param mixed  $transferType submitted transfer type
-     * @param string $ftpServer    FTP server, host[:port] (cleared for other types)
-     * @param string $ftpUser      FTP username (cleared for other types)
-     * @param string $ftpPass      FTP password (cleared for other types)
+     * @param string $ftpServer    FTP server, host[:port]
+     * @param string $ftpUser      FTP username
+     * @param string $ftpPass      FTP password
      *
      * @return array validation errors; empty if valid or not an FTP transfer
      */
-    public static function check($transferType, &$ftpServer, &$ftpUser, &$ftpPass)
+    public static function check($transferType, $ftpServer, $ftpUser, $ftpPass)
     {
 
         if ($transferType != self::TRANSFER_TYPE) {
-            $ftpServer = '';
-            $ftpUser = '';
-            $ftpPass = '';
             return array();
         }
 

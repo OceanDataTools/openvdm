@@ -33,7 +33,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError, error_detail
-from server.lib.connection_utils import FTP_REMOTE, build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -255,36 +255,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         files = { 'new':[], 'updated':[], 'deleted':[], 'exclude': [] }
         is_darwin = False
-
-
-        def _build_rclone_command(copy_sync, flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
-
-            if copy_sync not in ['copy', 'sync']:
-                raise ValueError("Rclone type has to be 'copy' or 'sync'")
-
-            cmd = ['rclone', copy_sync] + [source_dir.rstrip('/')+'/', dest_dir.rstrip('/')+'/']
-            if flags is not None:
-                cmd += flags
-
-            if extra_args is not None:
-                cmd += extra_args
-
-            if exclude_file_path is not None:
-                cmd += ["--exclude-from",  exclude_file_path]
-
-            return cmd
-
-
-        def _build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
-            cmd = ['rsync'] + flags
-            if extra_args is not None:
-                cmd += extra_args
-
-            if exclude_file_path is not None:
-                cmd.append(f"--exclude-from={exclude_file_path}")
-
-            cmd += [source_dir, dest_dir.rstrip('/')+'/']
-            return cmd
+        rclone_args = None  # e.g. the --config for an SSH or FTP destination's rclone remote
 
 
         def _build_exclude_file(exclude_list, filepath):
@@ -330,15 +301,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir'])}/"
 
             elif transfer_type == 'ssh':
-
                 is_darwin = check_darwin(cdt_cfg)
-                dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir']}"
+                rclone_config = os.path.join(tmpdir, 'rclone_config')
+                rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                rclone_args = ['--config', rclone_config]
+                dest_dir = f"{rclone_remote}:{cdt_cfg['destDir']}"
 
             elif transfer_type == 'ftp':
                 # destDir is an absolute path on the FTP server (#199)
                 success, rclone_config = prepare_ftp_config(cdt_cfg, tmpdir)
                 if not success:
                     return {'verdict': False, 'reason': rclone_config}
+                rclone_args = ['--config', rclone_config]
                 dest_dir = f"{FTP_REMOTE}:{cdt_cfg['destDir']}"
 
             else:  # local
@@ -347,18 +321,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # === DRY RUN ===
             dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
-            extra_args = []
-            if transfer_type == 'ssh':
-                extra_args += ['-e', 'ssh']
-            elif transfer_type == 'rsync':
-                extra_args += [f"--password-file={password_file}"]
-
             # The dry run only counts the files to send, and always writes
             # locally: to the temporary directory for a remote destination
-            # (':' in dest_dir), so without the remote-only arguments above
-            # (rsync rejects --password-file without an rsync daemon, #249)
+            # (':' in dest_dir), so without remote-only arguments such as
+            # --password-file (rsync rejects it without an rsync daemon, #249)
             dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
-            dry_cmd = _build_rsync_command(dry_flags, None, self.cruise_dir, dr_dest_dir, exclude_file)
+            dry_cmd = build_rsync_command(dry_flags, None, self.cruise_dir, dr_dest_dir.rstrip('/') + '/',
+                                          None, exclude_file)
 
             logging.debug("Dry run command: %s", transfer_utils.redact_command(dry_cmd))
             proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
@@ -383,69 +352,28 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return {'verdict': True, 'files': files}
 
             try:
-                # === USING RCLONE ===
-                if transfer_type in ['local','smb']:
-
-                    self.make_cruise_dir(dest_dir)
-
-                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
-
-                    cmd = _build_rclone_command(copy_sync,
-                        flags,
-                        None,
-                        self.cruise_dir,
-                        os.path.join(dest_dir, self.cruise_id), exclude_file
-                    )
-
-                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, file_count)
-
-                elif transfer_type == 'ssh':
-                    rclone_config = os.path.join(tmpdir, 'rclone_config')
-                    rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
-                    extra_args = ['--config', rclone_config]
-
-                    self.make_cruise_dir(f'{rclone_remote}:{cdt_cfg["destDir"]}', extra_args)
-
-                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
-
-                    cmd = _build_rclone_command(copy_sync,
-                        flags,
-                        extra_args,
-                        self.cruise_dir,
-                        f'{rclone_remote}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
-                    )
-
-                    logging.debug(' '.join(cmd))
-
-                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, file_count)
-
-                elif transfer_type == 'ftp':
-                    extra_args = ['--config', rclone_config]
-
-                    self.make_cruise_dir(dest_dir, extra_args)
-
-                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
-
-                    cmd = _build_rclone_command(copy_sync,
-                        flags,
-                        extra_args,
-                        self.cruise_dir,
-                        f'{dest_dir}/{self.cruise_id}', exclude_file
-                    )
-
-                    logging.debug(' '.join(cmd))
-
-                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, file_count)
-
                 # === USING RSYNC ===
-                else:
+                if transfer_type == 'rsync':
                     real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
-
-                    real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
-                    if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                        real_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + real_cmd
+                    real_cmd = build_rsync_command(real_flags, [f"--password-file={password_file}"],
+                                                   self.cruise_dir, dest_dir.rstrip('/') + '/',
+                                                   None, exclude_file)
 
                     files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, real_cmd, file_count)
+
+                # === USING RCLONE === (local directories and SMB mounts, and
+                # rclone remotes for SSH and FTP destinations)
+                else:
+                    self.make_cruise_dir(dest_dir, rclone_args)
+
+                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                    cmd = build_rclone_command(copy_sync, flags, rclone_args, self.cruise_dir,
+                                               os.path.join(dest_dir, self.cruise_id),
+                                               exclude_filepath=exclude_file)
+
+                    logging.debug("Transfer command: %s", transfer_utils.redact_command(cmd))
+
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, file_count)
             except TransferCommandError as exc:
                 # Don't report a failed transfer as successful (#230)
                 return {'verdict': False, 'reason': f"Transfer failed: {exc}"}

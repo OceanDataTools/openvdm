@@ -22,6 +22,7 @@ import subprocess
 import time
 import configparser
 from datetime import datetime
+from typing import Optional
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -261,7 +262,8 @@ def mount_smb_share(cfg, mntpoint, smb_version):
         return False, detail
 
 
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
+def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath,
+                        exclude_filepath=None):
     """Build an rsync command line as an argument list for ``subprocess``.
 
     Args:
@@ -271,6 +273,8 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
         dest_dir: The destination path, or ``None`` to list *source_dir* only.
         include_filepath: File listing the files to transfer (passed as
             ``--files-from``), or ``None``.
+        exclude_filepath: File listing patterns to skip (passed as
+            ``--exclude-from``), or ``None``.
 
     Returns:
         list[str]: The command, starting with ``rsync``.
@@ -283,7 +287,55 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
     if include_filepath is not None:
         cmd.append(f"--files-from={include_filepath}")
 
+    if exclude_filepath is not None:
+        cmd.append(f"--exclude-from={exclude_filepath}")
+
     cmd += [source_dir] if dest_dir is None else [source_dir, dest_dir]
+    return cmd
+
+
+def build_rclone_command(copy_sync: str, flags: Optional[list], extra_args: Optional[list],
+                         source_dir: str, dest_dir: str, include_filepath: Optional[str] = None,
+                         exclude_filepath: Optional[str] = None) -> list:
+    """Build an rclone copy or sync command line as an argument list for ``subprocess``.
+
+    Both directories get exactly one trailing ``/``.
+
+    Args:
+        copy_sync: ``'copy'`` or ``'sync'``, e.g. from :func:`build_rclone_options`.
+        flags: rclone options, e.g. from :func:`build_rclone_options`, or ``None``.
+        extra_args: Additional arguments added after *flags* (e.g.
+            ``['--config', path]``), or ``None``.
+        source_dir: The source path.
+        dest_dir: The destination path or ``remote:path``.
+        include_filepath: File listing the files to transfer (passed as
+            ``--files-from``), or ``None``.
+        exclude_filepath: File listing patterns to skip (passed as
+            ``--exclude-from``), or ``None``.
+
+    Returns:
+        list[str]: The command, starting with ``rclone``.
+
+    Raises:
+        ValueError: If *copy_sync* isn't ``'copy'`` or ``'sync'``.
+    """
+
+    if copy_sync not in ('copy', 'sync'):
+        raise ValueError("Rclone type has to be 'copy' or 'sync'")
+
+    cmd = ['rclone', copy_sync, source_dir.rstrip('/') + '/', dest_dir.rstrip('/') + '/']
+    if flags is not None:
+        cmd += flags
+
+    if extra_args is not None:
+        cmd += extra_args
+
+    if include_filepath is not None:
+        cmd += ["--files-from", include_filepath]
+
+    if exclude_filepath is not None:
+        cmd += ["--exclude-from", exclude_filepath]
+
     return cmd
 
 

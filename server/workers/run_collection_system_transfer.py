@@ -41,8 +41,6 @@ from server.lib.file_utils import build_include_file, is_ascii, is_default_ignor
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
-# Parses rsync --progress output (to-chk=<remaining>/<total>) for job progress.
-
 # Gearman task names this worker registers.
 TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
