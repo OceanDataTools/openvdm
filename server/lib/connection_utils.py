@@ -844,6 +844,23 @@ def test_ftp_connection(rclone_config: str, remote: str, path: str = '/') -> tup
         return False, 'rclone is not installed'
 
 
+def ere_escape(text: str) -> str:
+    """Escape *text* for use as a literal in a POSIX extended regular expression.
+
+    For ``pkill -f``/``pgrep -f`` patterns (#242). :func:`re.escape` isn't
+    suitable: it also escapes characters such as ``-``, ``#`` and ``~``, and a
+    backslash before a character that isn't special is undefined in POSIX
+    regular expressions.
+
+    Args:
+        text: The literal text.
+
+    Returns:
+        *text* with every POSIX ERE special character backslash-escaped.
+    """
+    return re.sub(r'([\\.\[\]()*+?{}|^$])', r'\\\1', text)
+
+
 def ftp_mount_base(source_dir: str) -> str:
     """Return the FTP directory to mount for a source directory.
 
@@ -1045,7 +1062,7 @@ def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str, mount_base: s
             # rclone may still be trying: stop it so it can't mount later
             subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, check=False)
-            subprocess.run(['pkill', '-f', f'rclone mount {FTP_REMOTE}:{mount_base} {mntpoint}'],
+            subprocess.run(['pkill', '-f', ere_escape(f'rclone mount {FTP_REMOTE}:{mount_base} {mntpoint}')],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             return False, detail
         time.sleep(0.2)
@@ -1582,7 +1599,9 @@ def test_cst_source(cst_cfg, source_dir):
             if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
                 # Logged in, but the source (or wildcard parent) can't be listed
                 results.extend([{"partName": "FTP server", "result": "Pass"}])
-                if mount_base != source_dir:
+                # Same rule as ftp_mount_base(): the parent is mounted only for a
+                # wildcard source; comparing the paths misreads '/data/xbt/' (#242)
+                if has_wildcard(os.path.basename(source_dir)):
                     reason = f"Unable to find parent directory: {mount_base} on FTP server"
                 else:
                     reason = f"Unable to find source directory: {source_dir} on FTP server"
