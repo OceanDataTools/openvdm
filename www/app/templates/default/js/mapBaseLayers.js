@@ -27,13 +27,14 @@ function openvdmBaseLayers () {
         }),
         'Esri Dark Gray Canvas': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
-            // Data ends at zoom 16; beyond that Esri serves a "map data not yet available" tile
-            maxNativeZoom: 16,
+            // Open-ocean data ends at zoom 12 (16 near the coast); beyond that Esri serves a
+            // "map data not yet available" tile (#253)
+            maxNativeZoom: 12,
             maxZoom: 20
         }),
         'Esri Light Gray Canvas': L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community',
-            maxNativeZoom: 16,
+            maxNativeZoom: 12,
             maxZoom: 20
         }),
         'GMRT Base': L.tileLayer.wms('https://www.gmrt.org/services/mapserver/wms_merc?', {
