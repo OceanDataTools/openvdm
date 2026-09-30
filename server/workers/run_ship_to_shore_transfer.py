@@ -340,7 +340,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             try:
                 with open(filepath, mode='w', encoding="utf-8") as f:
                     f.write('\n'.join(include_list))
-                    f.write('\0')
+                    f.write('\n')
             except IOError as exc:
                 logging.error("Error writing include file: %s", str(exc))
                 return False
