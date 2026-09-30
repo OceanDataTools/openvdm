@@ -30,7 +30,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory, write_list_file
+from server.lib.file_utils import is_ascii, set_owner_group_permissions, transfer_exclude_patterns, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError, error_detail
 from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
@@ -157,7 +157,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exclude_filterlist.extend(_find_non_ascii_files(self.cruise_dir))
         #exclude_filterlist = [ '{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
-        exclude_filterlist.extend(default_ignore_patterns)  # rsync partial files, Synology files, .DS_Store, etc
+        # rsync partial files, Synology files, .DS_Store, etc, in a form rclone
+        # also matches at the top level and in directories (#259)
+        exclude_filterlist.extend(transfer_exclude_patterns())
 
         return exclude_filterlist
 

@@ -64,6 +64,32 @@ def expand_patterns(patterns: List[str]) -> List[str]:
             expanded.add(p[3:])  # Add version without **/
     return sorted(expanded)
 
+def transfer_exclude_patterns(patterns: Optional[List[str]] = None) -> List[str]:
+    """Return glob patterns as rsync and rclone ``--exclude-from`` patterns.
+
+    rsync and rclone read these patterns differently (#259): rclone's
+    ``**/`` needs at least one directory, so ``**/.DS_Store`` misses a
+    ``.DS_Store`` at the top of the transfer, and rclone matches patterns
+    against file paths only, so ``@eaDir*`` doesn't exclude the files in an
+    ``@eaDir`` directory. For each pattern this returns the pattern without a
+    leading ``**/`` (a pattern without ``/`` matches at any depth in both) and
+    ``<pattern>/**``, which excludes the contents of a matching directory.
+
+    Args:
+        patterns: Glob patterns. Defaults to :data:`default_ignore_patterns`.
+
+    Returns:
+        The exclude patterns, without duplicates.
+    """
+
+    exclude_patterns = []
+    for p in patterns or default_ignore_patterns:
+        p = p[3:] if p.startswith("**/") else p
+        for exclude_pattern in (p, f"{p}/**"):
+            if exclude_pattern not in exclude_patterns:
+                exclude_patterns.append(exclude_pattern)
+    return exclude_patterns
+
 def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bool:
     """Return ``True`` if *filepath* matches any of the provided glob-style patterns.
 
