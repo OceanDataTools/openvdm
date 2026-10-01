@@ -1990,7 +1990,8 @@ EOF
     # Show the sample lowering's data: uncomment the example Lowering tab at
     # the end of the data dashboard config, unless it already has one (#272)
     local DASHBOARD_YAML="${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml"
-    if [ -e "${DASHBOARD_YAML}" ] && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
+    if [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
+        && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
         echo "Enabling the data dashboard's Lowering tab"
         sed -i -e '/^#- title: Lowering$/,/^$/s/^#//' "${DASHBOARD_YAML}"
     fi
