@@ -37,7 +37,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
-from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
@@ -623,12 +623,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
+        # Ignored folders aren't listed: they may be unreadable, which fails
+        # the listing (#264), or large, such as snapshots (#265)
+        exclude_patterns = transfer_exclude_patterns()
+
         # Get file list based on transfer_type
         if transfer_type == 'ftp':
             # One rclone listing, not a walk and a stat per file through the
             # mount, which is slow over FTP and shows a directory the server
             # refuses to list as empty (#208)
-            success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir)
+            success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir,
+                                               exclude_patterns)
             if not success:
                 return {'verdict': False,
                         'reason': f"Error listing source directory {raw_source_dir}: {listing}"}
@@ -642,7 +647,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             walk_errors = []
             filepaths = []
-            for root, _, filenames in os.walk(source_dir, onerror=walk_errors.append):
+            for root, dirnames, filenames in os.walk(source_dir, onerror=walk_errors.append):
+                dirnames[:] = [d for d in dirnames if not is_default_ignore_dir(os.path.join(root, d))]
                 for filename in filenames:
                     filepaths.append(os.path.join(root, filename))
 
@@ -661,6 +667,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             if cst_cfg.get('skipEmptyDirs') == 1:
                 command.append('-m')
+
+            command += [f'--exclude={pattern}' for pattern in exclude_patterns]
 
             if transfer_type == 'rsync':
                 command += [f'--password-file={rsync_password_filepath}', '--no-motd',
@@ -721,7 +729,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             time.sleep(int(staleness))
 
             if transfer_type == 'ftp':
-                success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir)
+                success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir,
+                                                   exclude_patterns)
                 if not success:
                     return {'verdict': False,
                             'reason': f"Error re-listing source directory {raw_source_dir}: {listing}"}

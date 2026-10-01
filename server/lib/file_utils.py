@@ -21,13 +21,41 @@ from pwd import getpwnam
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+# Files and folders that are never instrument data, as fnmatch patterns (where
+# ``*`` also matches ``/``). A folder is written ``**/<name>/*``. ``#`` is
+# written ``[#]``, since rsync and rclone read an exclude-file line starting
+# with ``#`` as a comment.
 default_ignore_patterns = [
+    # OS clutter
     "**/@eaDir*",
     "**/.DS_Store",
     "**/._*",
     "**/Thumbs.db",
+    "**/ehthumbs.db",
     "**/desktop.ini",
-    "**/.*.??????"
+    # rsync temporary files
+    "**/.*.??????",
+    # Linux and NFS (files still in use after deletion)
+    "**/lost+found/*",
+    "**/.Trash-*/*",
+    "**/.nfs*",
+    # Windows drives, USB and SMB
+    "**/$RECYCLE.BIN/*",
+    "**/System Volume Information/*",
+    # macOS volumes
+    "**/.Trashes/*",
+    "**/.Spotlight-V100/*",
+    "**/.fseventsd/*",
+    "**/.TemporaryItems/*",
+    "**/.DocumentRevisions-V100/*",
+    # NAS recycle bins and snapshots (Synology, NetApp, ZFS)
+    "**/[#]recycle/*",
+    "**/.snapshot/*",
+    "**/~snapshot/*",
+    "**/.zfs/*",
+    # Office lock files (Word/Excel, LibreOffice)
+    "**/~$*",
+    "**/.~lock.*#",
 ]
 
 def is_ascii(s: str) -> bool:
@@ -74,6 +102,9 @@ def transfer_exclude_patterns(patterns: Optional[List[str]] = None) -> List[str]
     ``@eaDir`` directory. For each pattern this returns the pattern without a
     leading ``**/`` (a pattern without ``/`` matches at any depth in both) and
     ``<pattern>/**``, which excludes the contents of a matching directory.
+    A folder pattern (``<name>/*``) becomes ``<name>/`` and ``<name>/**``,
+    which exclude the folder itself, so a source listing doesn't open it
+    (#265).
 
     Args:
         patterns: Glob patterns. Defaults to :data:`default_ignore_patterns`.
@@ -85,7 +116,8 @@ def transfer_exclude_patterns(patterns: Optional[List[str]] = None) -> List[str]
     exclude_patterns = []
     for p in patterns or default_ignore_patterns:
         p = p[3:] if p.startswith("**/") else p
-        for exclude_pattern in (p, f"{p}/**"):
+        candidates = (p[:-1], f"{p[:-2]}/**") if p.endswith("/*") else (p, f"{p}/**")
+        for exclude_pattern in candidates:
             if exclude_pattern not in exclude_patterns:
                 exclude_patterns.append(exclude_pattern)
     return exclude_patterns
@@ -112,6 +144,29 @@ def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bo
     return any(fnmatch.fnmatch(filepath, pattern) for pattern in patterns)
 
 
+def is_default_ignore_dir(dirpath: str, patterns: Optional[List[str]] = None) -> bool:
+    """Return ``True`` if every file under *dirpath* matches the glob-style patterns.
+
+    A listing can then skip the directory without opening it, which matters
+    for folders the transfer account can't read, and for large ones such as
+    snapshots (#265). A pattern ending in ``*`` that matches ``<dirpath>/``
+    matches every path under it, so only those patterns are checked.
+
+    Args:
+        dirpath: Absolute or relative path of the directory.
+        patterns: Optional list of glob patterns.  Defaults to
+            :data:`default_ignore_patterns`.
+
+    Returns:
+        ``True`` if the directory can be skipped.
+    """
+
+    dirpath = os.path.normpath(dirpath) + "/"
+    patterns = expand_patterns(patterns or default_ignore_patterns)
+
+    return any(fnmatch.fnmatch(dirpath, pattern) for pattern in patterns if pattern.endswith("*"))
+
+
 def build_filelist(source_dir: str) -> dict:
     """Walk *source_dir* and categorise every file as included or excluded.
 
@@ -131,7 +186,9 @@ def build_filelist(source_dir: str) -> dict:
 
     return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
 
-    for root, _, files in os.walk(source_dir):
+    for root, dirs, files in os.walk(source_dir):
+        # Don't walk ignored folders (#265)
+        dirs[:] = [d for d in dirs if not is_default_ignore_dir(os.path.join(root, d))]
 
         for filename in files:
             fullpath = os.path.join(root, filename)

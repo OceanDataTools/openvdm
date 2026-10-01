@@ -932,7 +932,8 @@ def _rfc3339_to_epoch(value: str) -> float:
     return seconds
 
 
-def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
+def list_ftp_source(rclone_config: str, remote: str, source_dir: str,
+                    exclude_patterns: Optional[list] = None) -> tuple:
     """List every file under an FTP source directory with one ``rclone lsjson -R``.
 
     Listing through the rclone mount would ``stat`` each file over FTP, and
@@ -945,6 +946,8 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
         rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
         remote: Name of the FTP remote in *rclone_config*.
         source_dir: Directory on the FTP server to list, e.g. ``/data``.
+        exclude_patterns: rclone ``--exclude`` patterns; excluded folders
+            aren't listed (#265).
 
     Returns:
         tuple[bool, list | str]: ``(True, files)`` with ``(path, size, mtime)``
@@ -953,6 +956,7 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str) -> tuple:
     """
     cmd = ['rclone', 'lsjson', '-R', '--files-only', '--no-mimetype', '--config', rclone_config,
            f"{remote}:{source_dir}", '--contimeout', '15s', '--timeout', '30s']
+    cmd += [f'--exclude={pattern}' for pattern in exclude_patterns or []]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except FileNotFoundError:
