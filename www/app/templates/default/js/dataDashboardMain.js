@@ -16,7 +16,7 @@ $(function () {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
 
-                    var scales = { x: (inverted === true) ? { type: null } : {
+                    var scales = { x: {
                         type: 'time',
                         adapters: { date: { zone: 0 } },
                         time: {
@@ -86,6 +86,10 @@ $(function () {
                             }
                         }
                     };
+
+                    if (inverted) {
+                        openvdmInvertTimeChart(chartOptions);
+                    }
 
                     const ctx = document.getElementById(placeholderID).getContext('2d');
                     new Chart(ctx, chartOptions);

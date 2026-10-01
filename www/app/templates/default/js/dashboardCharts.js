@@ -1,14 +1,18 @@
 /**
- * Depth profile charts for the data dashboard (#274).
+ * Shared chart helpers for the data dashboard.
  *
- * A profile puts depth down the vertical axis and one or more measured values
- * across, each on its own x axis, with points joined in time order. Loaded
- * automatically wherever the 'charts' script bundle is included (see
+ * - openvdmProfileChartConfig(): depth profiles (json-profile, #274). Depth
+ *   runs down the vertical axis and one or more measured values across, each
+ *   on its own x axis, with points joined in time order.
+ * - openvdmInvertTimeChart(): turns a time-series chart on its side
+ *   (json-inverted and json-reversedY-inverted, #275).
+ *
+ * Loaded automatically wherever the 'charts' script bundle is included (see
  * templates/default/footer.php), so the dashboard, lowering and main dashboard
- * scripts can call openvdmProfileChartConfig().
+ * scripts can call them.
  */
 
-/* exported openvdmProfileChartConfig */
+/* exported openvdmProfileChartConfig, openvdmInvertTimeChart */
 
 /**
  * Build the Chart.js configuration for a depth profile.
@@ -136,4 +140,61 @@ function openvdmProfileChartConfig (data, options) {
             }
         }
     };
+}
+
+/**
+ * Turn a time-series chart configuration on its side (#275).
+ *
+ * Time moves to a vertical axis on the left, earliest at the top, and each
+ * series' value axis runs across (alternating bottom/top), as the inverted
+ * charts did before the move to Chart.js. Zoom and pan follow the time axis.
+ *
+ * @param {Object} config - A Chart.js 'line' configuration as the dashboard
+ *     scripts build it: time scale 'x', and one value scale per dataset,
+ *     named by the dataset's yAxisID, with {x: time, y: value} points.
+ * @returns {Object} The same configuration, changed in place.
+ */
+function openvdmInvertTimeChart (config) {
+    var scales = config.options.scales;
+    var timeScale = scales.x;
+    delete scales.x;
+    timeScale.axis = 'y';
+    timeScale.position = 'left';
+    timeScale.reverse = true;
+    scales.time = timeScale;
+
+    config.data.datasets.forEach(function (dataset, i) {
+        var valueScale = scales[dataset.yAxisID];
+        valueScale.axis = 'x';
+        valueScale.position = (i % 2) ? 'top' : 'bottom';
+        dataset.xAxisID = dataset.yAxisID;
+        dataset.yAxisID = 'time';
+        dataset.data = dataset.data.map(function (point) {
+            return { x: point.y, y: point.x };
+        });
+    });
+    config.options.indexAxis = 'y';
+
+    var plugins = config.options.plugins || {};
+    if (plugins.legend && plugins.legend.onClick) {
+        // Hide a series together with its value axis
+        plugins.legend.onClick = function (event, legendItem, legend) {
+            var chart = legend.chart;
+            var dataset = chart.data.datasets[legendItem.datasetIndex];
+            dataset.hidden = !dataset.hidden;
+            chart.options.scales[dataset.xAxisID].display = !dataset.hidden;
+            chart.update();
+        };
+    }
+    if (plugins.zoom) {
+        if (plugins.zoom.limits && plugins.zoom.limits.x) {
+            plugins.zoom.limits = { y: plugins.zoom.limits.x };
+        }
+        ['zoom', 'pan'].forEach(function (key) {
+            if (plugins.zoom[key] && plugins.zoom[key].mode === 'x') {
+                plugins.zoom[key].mode = 'y';
+            }
+        });
+    }
+    return config;
 }

@@ -111,7 +111,8 @@ const templateGlobals = {
     openvdmBaseLayers: 'readonly', // mapBaseLayers.js
     openvdmDefaultBaseLayer: 'readonly',
     openvdmOverlayLayers: 'readonly',
-    openvdmProfileChartConfig: 'readonly', // profileChart.js
+    openvdmProfileChartConfig: 'readonly', // dashboardCharts.js
+    openvdmInvertTimeChart: 'readonly',
 };
 
 export default [

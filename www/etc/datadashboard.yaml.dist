@@ -103,6 +103,9 @@
 # For "chart" placeholders, the 'visType' is one of:
 #   json            - each series against time
 #   json-reversedY  - the same, with the y axes reversed (values increase downward)
+#   json-inverted   - each series against time, on its side: time runs down the
+#                     left (earliest at the top) and the values across
+#   json-reversedY-inverted - the same, with the value axes reversed
 #   json-profile    - a depth profile: depth down the vertical axis and the other
 #                     series across, each on its own x axis, joined in time order.
 #                     Optional keys: "depthSeries", the series label to use for

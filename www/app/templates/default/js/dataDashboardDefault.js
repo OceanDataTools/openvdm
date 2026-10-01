@@ -465,7 +465,7 @@ $(function () {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
 
-                    var scales = { x: (inverted === true) ? { type: null } : {
+                    var scales = { x: {
                         type: 'time',
                         adapters: { date: { zone: 0 } },
                         time: {
@@ -566,6 +566,10 @@ $(function () {
                         data: seriesData
                     };
 
+                    if (inverted) {
+                        openvdmInvertTimeChart(chartOptions);
+                    }
+
                     const ctx = document.getElementById(chartObject['placeholderID']).getContext('2d');
 
                     if (chartObject['chart'] !== null) {
@@ -574,7 +578,7 @@ $(function () {
                     }
 
                     chartObject['chart'] = new Chart(ctx, chartOptions);
-                    chartObject['heights'] = [200, 500];
+                    chartObject['heights'] = inverted ? [400, 800] : [200, 500];
                     $('#' + chartObject['placeholderID']).css({height: chartObject['heights'][chartObject['expanded'] ? 1 : 0]});
                 }
             }
