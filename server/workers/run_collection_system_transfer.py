@@ -250,11 +250,30 @@ def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str
     return f"{reason}: {detail}" if detail else reason
 
 
-def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
+def _copied_files(dest_dir: str, paths: list) -> list:
+    """Return the paths that exist in the destination directory.
+
+    rsync lists a file when it starts sending it, so after a failed or
+    stopped transfer the last file listed may never have been copied (#262).
+
+    Args:
+        dest_dir: The local destination directory.
+        paths: File paths relative to *dest_dir*.
+
+    Returns:
+        The paths in *paths* that are files in *dest_dir*.
+    """
+    return [path for path in paths if os.path.isfile(os.path.join(dest_dir, path))]
+
+
+def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int,
+                         dest_dir: str) -> tuple:
     """Run an rsync transfer command and collect the new and updated files.
 
     Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
-    progress to the Gearman job and honouring ``worker.stop``.
+    progress to the Gearman job and honouring ``worker.stop``. When the
+    transfer fails or is stopped, only the files that are in *dest_dir* are
+    returned, since the one rsync was sending may not have been copied (#262).
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -263,21 +282,30 @@ def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, fi
         cmd: The rsync command as a list of strings.
         file_count: Expected number of files to transfer; when 0 the command
             is skipped entirely.
+        dest_dir: The local directory rsync copies into.
 
     Returns:
         A two-tuple ``(new_files, updated_files)`` where each element is a
-        list of relative file paths.
+        list of file paths relative to *dest_dir*.
 
     Raises:
         TransferCommandError: If rsync exits with an error (#230). Its
-            ``files`` holds what rsync transferred before failing (#239).
+            ``files`` holds what rsync copied before failing (#239).
     """
 
     def _progress(percent):
         if current_job:
             worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
 
-    result = transfer_utils.run_transfer_command(cmd, file_count, _progress, lambda: worker.stop)
+    try:
+        result = transfer_utils.run_transfer_command(cmd, file_count, _progress,
+                                                     lambda: worker.stop)
+    except TransferCommandError as exc:
+        for key in ('new', 'updated'):
+            exc.files[key] = _copied_files(dest_dir, exc.files[key])
+        raise
+    if result['stopped']:
+        return _copied_files(dest_dir, result['new']), _copied_files(dest_dir, result['updated'])
     return result['new'], result['updated']
 
 
@@ -895,7 +923,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
                 try:
                     new_files, updated_files = run_transfer_command(
-                        self, current_job, cmd, len(files['include'])
+                        self, current_job, cmd, len(files['include']), effective_dest
                     )
                 except TransferCommandError as exc:
                     # Don't report a failed transfer as successful (#230), but
