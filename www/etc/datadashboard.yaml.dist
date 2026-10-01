@@ -201,7 +201,7 @@
 #      visType: json
 #  - plotType: chart
 #    id: rov-o2
-#    heading: ROV O@
+#    heading: ROV O2
 #    dataArray:
 #    - dataType: rov-o2
 #      visType: json
