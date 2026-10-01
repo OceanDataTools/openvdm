@@ -19,7 +19,7 @@
  * @param {Array} data - Visualizer data: series of {label, unit, data: [[ms, value], ...]}.
  * @param {Object} [options]
  * @param {string} [options.depthSeries='Depth'] - Label of the series on the vertical axis.
- * @param {string[]} [options.profileSeries] - Labels of the series plotted across
+ * @param {string[]} [options.profileSeries] - Labels of the series plotted across, in this order
  *     (default: all series except the depth series).
  * @param {boolean} [options.showAxes=true] - Show axes, titles and the legend;
  *     false for the main dashboard's thumbnails.
@@ -46,10 +46,12 @@ function openvdmProfileChartConfig (data, options) {
         }
     });
 
-    var profileSeries = data.filter(function (series) {
-        return series.label !== depthLabel &&
-            (!options.profileSeries || options.profileSeries.indexOf(series.label) !== -1);
-    });
+    // In the order profileSeries lists them, skipping labels not in the data
+    var profileSeries = options.profileSeries ?
+        options.profileSeries.map(function (label) {
+            return data.find(function (series) { return series.label === label && label !== depthLabel; });
+        }).filter(Boolean) :
+        data.filter(function (series) { return series.label !== depthLabel; });
     if (profileSeries.length === 0) {
         return { error: 'No series to plot against "' + depthLabel + '"' };
     }

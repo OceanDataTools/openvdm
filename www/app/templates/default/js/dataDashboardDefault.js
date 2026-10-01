@@ -402,10 +402,18 @@ $(function () {
             if (status === 'success' && data !== null) {
 
                 var placeholder = '#' + chartObject['placeholderID'];
+                var errorID = chartObject['placeholderID'] + '_error';
                 var profile = openvdmProfileChartConfig(data, profileOptions);
+                $('#' + errorID).remove();
                 if ('error' in profile) {
-                    $(placeholder).html('<strong>Error: ' + profile.error + '</strong>');
+                    // A canvas doesn't show text, so the error goes next to it
+                    if (chartObject['chart'] !== null) {
+                        chartObject['chart'].destroy();
+                        chartObject['chart'] = null;
+                    }
+                    $(placeholder).hide().after($('<div>').attr('id', errorID).append($('<strong>').text('Error: ' + profile.error)));
                 } else {
+                    $(placeholder).show();
 
                     //Zoom and pan the depth axis
                     profile.config.options.plugins.zoom = {
