@@ -75,7 +75,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
 <?php
                     }
                 } else if(in_array($data['placeholders'][$i]['dataArray'][$j]['visType'], array('json', 'json-reversedY', 'json-reversedY-inverted', 'json-inverted', 'json-profile'), true)) {
-                    // A chart; json-profile entries carry their options for profileChart.js (#274)
+                    // A chart; json-profile entries carry their options for dashboardCharts.js (#274)
 ?>
                                                     <div class="form-group">
 <?php
