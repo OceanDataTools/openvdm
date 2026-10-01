@@ -78,7 +78,7 @@ rsort($data['loweringIDs']);
 ?>
                                                     <div class='col-lg-12'>
                                                         <input class='se-checkbox' type="checkbox" value="<?php echo $dataFiles[0]['type'];?>" checked> Start/End Positions
-                                                    </div></br>
+                                                    </div>
                                                     <div class='col-lg-12'>
 <?php
                     for($k = sizeof($dataFiles)-1; $k >= 0; $k--){
