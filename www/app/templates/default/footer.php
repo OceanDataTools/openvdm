@@ -36,6 +36,8 @@ $hooks = Hooks::get();
 
     <?php echo (isset($data['jsonInvertedTypes']) ? 'var jsonInvertedTypes = [\'' . join('\', \'', $data['jsonInvertedTypes']) . '\'];' : ''); ?>
 
+    <?php echo (isset($data['jsonProfileTypes']) ? 'var jsonProfileTypes = ' . json_encode((object) $data['jsonProfileTypes'], JSON_HEX_TAG | JSON_HEX_AMP) . ';' : ''); ?>
+
 <?php
     if(isset($data['subPages'])) {
         echo '    var subPages = [];' . "\n";
@@ -76,6 +78,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'node_modules/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'node_modules/luxon/build/global/luxon.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
+            array_push($jsFileArray, Url::templatePath() . 'js/profileChart.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'node_modules/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');

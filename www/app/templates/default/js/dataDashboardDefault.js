@@ -131,6 +131,7 @@ $(function () {
         chartObject['dataType'] = tempArray.join('_');
         chartObject['expanded'] = false; //chartHeight;
         chartObject['chart'] = null;
+        chartObject['heights'] = [200, 500]; //normal, expanded
 
         return chartObject;
     }
@@ -151,17 +152,23 @@ $(function () {
 
     function chartChecked(chartObject) {
         $( '#' + chartObject['objectListID']).find(':radio:checked').each(function() {
-
-            if ($(this).hasClass( "json-reversedY-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true, false);
-            } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true, true);
-            } else if ($(this).hasClass( "json-inverted-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), false, true);
-            } else {
-                updateChart(chartObjects[i], $(this).val());
-            }
+            drawChart(chartObject, $(this));
         });
+    }
+
+    //Draw the chart for a data file's radio button, by its visType
+    function drawChart(chartObject, radio) {
+        if (radio.hasClass( "json-profile-radio" )) {
+            updateProfileChart(chartObject, radio.attr('name'), radio.val(), radio.data('profile'));
+        } else if (radio.hasClass( "json-reversedY-radio" )) {
+            updateChart(chartObject, radio.val(), true, false);
+        } else if (radio.hasClass( "json-reversedY-inverted-radio" )) {
+            updateChart(chartObject, radio.val(), true, true);
+        } else if (radio.hasClass( "json-inverted-radio" )) {
+            updateChart(chartObject, radio.val(), false, true);
+        } else {
+            updateChart(chartObject, radio.val());
+        }
     }
 
     function addLatestPositionToMap(mapObject, dataType) {
@@ -387,6 +394,65 @@ $(function () {
         updateBounds(mapObject);
     }
 
+    //Draw a depth profile (json-profile, #274). The data type comes from the
+    //data file's radio button, so the placeholder id needn't be the data type.
+    function updateProfileChart(chartObject, dataType, dataObjectJsonName, profileOptions) {
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + dataType + '/' + dataObjectJsonName;
+        $.getJSON(getVisualizerDataURL, function (data, status) {
+            if (status === 'success' && data !== null) {
+
+                var placeholder = '#' + chartObject['placeholderID'];
+                var errorID = chartObject['placeholderID'] + '_error';
+                var profile = openvdmProfileChartConfig(data, profileOptions);
+                $('#' + errorID).remove();
+                if ('error' in profile) {
+                    // A canvas doesn't show text, so the error goes next to it
+                    if (chartObject['chart'] !== null) {
+                        chartObject['chart'].destroy();
+                        chartObject['chart'] = null;
+                    }
+                    $(placeholder).hide().after($('<div>').attr('id', errorID).append($('<strong>').text('Error: ' + profile.error)));
+                } else {
+                    $(placeholder).show();
+
+                    //Zoom and pan the depth axis
+                    profile.config.options.plugins.zoom = {
+                        limits: {
+                            y: {min: 'original', max: 'original'},
+                        },
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                            },
+                            drag: {
+                                modifierKey: 'shift',
+                                enabled: true,
+                            },
+                            mode: 'y',
+                            onZoomComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'y',
+                            onPanComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                        },
+                    };
+
+                    const ctx = document.getElementById(chartObject['placeholderID']).getContext('2d');
+
+                    if (chartObject['chart'] !== null) {
+                        chartObject['chart'].destroy();
+                        $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
+                    }
+
+                    chartObject['chart'] = new Chart(ctx, profile.config);
+                    chartObject['heights'] = [400, 800];
+                    $(placeholder).css({height: chartObject['heights'][chartObject['expanded'] ? 1 : 0]});
+                }
+            }
+        });
+    }
+
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
         reversedY = reversedY || false;
         inverted = inverted || false;
@@ -508,7 +574,8 @@ $(function () {
                     }
 
                     chartObject['chart'] = new Chart(ctx, chartOptions);
-                    $('#' + chartObject['placeholderID']).css({height: chartObject['expanded'] ? 500 : 200});
+                    chartObject['heights'] = [200, 500];
+                    $('#' + chartObject['placeholderID']).css({height: chartObject['heights'][chartObject['expanded'] ? 1 : 0]});
                 }
             }
         });
@@ -617,20 +684,12 @@ $(function () {
     //Check for updates
     $.each(chartObjects, function(i) {
         $( '#' + chartObjects[i]['objectListID']).find(':radio').change(function() {
-            if ($(this).hasClass( "json-reversedY-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true, false);
-            } else if ($(this).hasClass( "json-reversedY-inverted-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), true, true);
-            } else if ($(this).hasClass( "json-inverted-radio" )) {
-                updateChart(chartObjects[i], $(this).val(), false, true);
-            } else {
-                updateChart(chartObjects[i], $(this).val());
-            }
+            drawChart(chartObjects[i], $(this));
         });
 
         $( '#' + chartObjects[i]['dataType'] + '_expand-btn').click(function() {
             chartObjects[i]['expanded'] = !chartObjects[i]['expanded'];
-            $('#' + chartObjects[i]['placeholderID']).css({height: chartObjects[i]['expanded'] ? 500 : 200});
+            $('#' + chartObjects[i]['placeholderID']).css({height: chartObjects[i]['heights'][chartObjects[i]['expanded'] ? 1 : 0]});
             $(this).removeClass(chartObjects[i]['expanded'] ? 'fa-expand' : 'fa-compress');
             $(this).addClass(chartObjects[i]['expanded'] ? 'fa-compress' : 'fa-expand');
         });
