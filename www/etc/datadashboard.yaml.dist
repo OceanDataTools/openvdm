@@ -181,11 +181,33 @@
 #    id: map
 #    heading: ROV Position
 #    dataArray:
+#    - dataType: rov-sprint
+#      visType: geoJSON
 #    - dataType: rov-usbl-pri
 #      visType: geoJSON
+#    - dataType: rov-usbl-sec
+#      visType: geoJSON
+#  - plotType: chart
+#    id: rov-comp-pres
+#    heading: ROV Comp Pressure
+#    dataArray:
+#    - dataType: rov-comp-pres
+#      visType: json
 #  - plotType: chart
 #    id: rov-ctd
 #    heading: ROV CTD
 #    dataArray:
 #    - dataType: rov-ctd
+#      visType: json
+#  - plotType: chart
+#    id: rov-o2
+#    heading: ROV O@
+#    dataArray:
+#    - dataType: rov-o2
+#      visType: json
+#  - plotType: chart
+#    id: rov-paro
+#    heading: ROV Paro Depth
+#    dataArray:
+#    - dataType: rov-paro
 #      visType: json
