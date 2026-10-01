@@ -52,7 +52,7 @@ rsort($data['loweringIDs']);
             $filecount += sizeof($dataFiles);
         }
 ?>
-                                    <div class="panel-heading"><?php echo $data['placeholders'][$i]['heading'];?><?php echo ($data['placeholders'][$i]['plotType'] == 'chart'? '<i id="' . $data['placeholders'][$i]['id'] . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i>': ''); ?>
+                                    <div class="panel-heading"><?php echo $data['placeholders'][$i]['heading'];?><?php echo ($data['placeholders'][$i]['plotType'] == 'chart'? '<i id="' . $data['placeholders'][$i]['id'] . '_expand-btn" class="expand-btn pull-right btn btn-sm btn-default fa fa-expand"></i><i id="' . $data['placeholders'][$i]['id'] . '_zoom-reset-btn" class="zoom-reset-btn pull-right btn btn-sm btn-default fa fa-rotate-left hidden"></i>': ''); ?>
                                     </div>
                                     <div class="panel-body">
                                         <?php $tag = (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?><<?php echo $tag; ?> class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;"><?php echo ($filecount == 0? 'No Data Found.': ''); ?></<?php echo $tag; ?>>

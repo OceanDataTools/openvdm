@@ -403,10 +403,34 @@ $(function () {
                 } else {
                     $(placeholder).show();
 
+                    //Zoom and pan the depth axis
+                    profile.config.options.plugins.zoom = {
+                        limits: {
+                            y: {min: 'original', max: 'original'},
+                        },
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                            },
+                            drag: {
+                                modifierKey: 'shift',
+                                enabled: true,
+                            },
+                            mode: 'y',
+                            onZoomComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'y',
+                            onPanComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                        },
+                    };
+
                     const ctx = document.getElementById(chartObject['placeholderID']).getContext('2d');
 
                     if (chartObject['chart'] !== null) {
                         chartObject['chart'].destroy();
+                        $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
                     }
 
                     chartObject['chart'] = new Chart(ctx, profile.config);
@@ -420,7 +444,7 @@ $(function () {
     function updateChart(chartObject, dataObjectJsonName, reversedY, inverted) {
         reversedY = reversedY || false;
         inverted = inverted || false;
-        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject['dataType'] + '/' + dataObjectJsonName;
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getDashboardObjectVisualizerDataByJsonName/' + cruiseID + '/' + chartObject.dataType + '/' + dataObjectJsonName;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -457,11 +481,15 @@ $(function () {
                             label: data[i].label + ' (' + data[i].unit + ')',
                             yAxisID: data[i].label,
                             borderColor: colors[i%colors.length],
+                            borderWidth: 1.5,
                             backgroundColor: colors[i%colors.length],
                         });
 
                         scales[data[i].label] = {
-                            type: 'linear',
+			    ticks: {
+			        color: colors[i%colors.length],
+			    },
+		            type: 'linear',
                             display: true,
                             reverse: (reversedY || data[i].label == "Depth") ? true : false,
                                         position: (i%2) ? 'left' : 'right',
@@ -484,9 +512,44 @@ $(function () {
                             },
                             plugins: {
                                 legend: {
-                                    position: 'bottom'
+                                    position: 'bottom',
+                                    onClick: function(event, legendItem) {
+                                        //get the index of the clicked legend
+                                        var index = legendItem.datasetIndex;
+
+                                        //toggle chosen dataset's visibility
+                                        chartObject['chart'].data.datasets[index].hidden =
+                                            !chartObject['chart'].data.datasets[index].hidden;
+
+                                        //toggle the related labels' visibility
+                                        chartObject['chart'].options.scales[chartObject['chart'].data.datasets[index].yAxisID].display =
+                                            !chartObject['chart'].options.scales[chartObject['chart'].data.datasets[index].yAxisID].display
+
+                                        chartObject['chart'].update();
+                                    }
+                                },
+                                zoom: {
+                                    limits: {
+                                        x: {min: 'original', max: 'original', minRange: 60 * 1000},
+                                    },
+                                    zoom: {
+                                        wheel: {
+                                            enabled: true,
+                                        },
+                                        drag: {
+                                            modifierKey: 'shift',
+                                            enabled: true,
+                                        },
+                                        mode: 'x',
+                                        onZoomComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                                    },
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'x',
+                                        onPanComplete({chart}) { showZoomResetBtn(chart, placeholder) }
+                                    },
                                 }
-                            }
+                            },
                         },
                         data: seriesData
                     };
@@ -499,6 +562,7 @@ $(function () {
 
                     if (chartObject['chart'] !== null) {
                         chartObject['chart'].destroy();
+                        $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
                     }
 
                     chartObject['chart'] = new Chart(ctx, chartOptions);
@@ -507,6 +571,16 @@ $(function () {
                 }
             }
         });
+    }
+
+    function showZoomResetBtn(chart, placeholder) {
+
+        if( chart.isZoomedOrPanned() ) {
+            $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').removeClass('hidden');
+        }
+        else {
+            $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
+        }
     }
 
     //Initialize the mapObjects
@@ -610,6 +684,11 @@ $(function () {
             $('#' + chartObjects[i]['placeholderID']).css({height: chartObjects[i]['heights'][chartObjects[i]['expanded'] ? 1 : 0]});
             $(this).removeClass(chartObjects[i]['expanded'] ? 'fa-expand' : 'fa-compress');
             $(this).addClass(chartObjects[i]['expanded'] ? 'fa-compress' : 'fa-expand');
+        });
+
+        $( '#' + chartObjects[i]['dataType'] + '_zoom-reset-btn').click(function() {
+            chartObjects[i]['chart'].resetZoom();
+            $(this).addClass('hidden');
         });
     });
 });
