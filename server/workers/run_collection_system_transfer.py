@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import sys
+import re
 import signal
 import subprocess
 import time
@@ -246,7 +247,11 @@ def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str
         *message* with rsync's exit code and its most specific error line.
     """
     reason = f"{message}: rsync exited with code {proc.returncode}"
-    detail = transfer_utils.error_detail('rsync', (proc.stdout + proc.stderr).splitlines())
+    lines = (proc.stdout + proc.stderr).splitlines()
+    # The sending side's error is the cause; a receiver's "read error" or
+    # "Broken pipe" that follows it is only the connection closing (#284)
+    sender_errors = [line for line in lines if line.startswith('rsync: [sender]')]
+    detail = sender_errors[0] if sender_errors else transfer_utils.error_detail('rsync', lines)
     return f"{reason}: {detail}" if detail else reason
 
 
@@ -266,14 +271,23 @@ def _copied_files(dest_dir: str, paths: list) -> list:
     return [path for path in paths if os.path.isfile(os.path.join(dest_dir, path))]
 
 
+# An rsync listing error about a directory inside the source, e.g.
+# 'rsync: [sender] opendir "/data/sub" failed: Permission denied (13)', or
+# '... opendir "/data/sub" (in module) failed: ...' from an rsync daemon
+RSYNC_SUBDIR_ERROR_RE = re.compile(r'^rsync: (?:\[sender\] )?opendir "(?P<path>[^"]*)"(?: \(in [^)]*\))? failed')
+
+
 def _rsync_listing_failure(message: str, proc: subprocess.CompletedProcess,
                            sync_from_source: bool) -> Optional[str]:
     """Return the failure reason for an rsync source listing, or ``None`` if it can be used.
 
-    Code 23 (a partial listing, e.g. an unreadable directory) fails only with
-    **Sync from source**, which would delete the unlisted files from the
-    destination (#238). Without it, rsync's errors are logged as warnings and
-    the listed files are copied (#264).
+    Code 23 (a partial listing) fails with **Sync from source**, which would
+    delete the unlisted files from the destination (#238). Without it, a
+    listing whose only errors are directories inside the source that can't be
+    read is used, and the errors are logged as warnings (#264). Any other
+    code-23 error fails the transfer, e.g. the source directory itself can't
+    be entered (``change_dir``) or listed (``opendir "<source>/."``), which
+    gives an empty listing (#284).
 
     Args:
         message: What failed, e.g. ``"Error listing source directory /data"``.
@@ -288,11 +302,13 @@ def _rsync_listing_failure(message: str, proc: subprocess.CompletedProcess,
         return None
     if proc.returncode == 23 and not sync_from_source:
         errors = [line for line in proc.stderr.splitlines() if line.startswith('rsync:')]
-        for line in errors[:10]:
-            logging.warning("Skipping unreadable source path: %s", line)
-        if len(errors) > 10:
-            logging.warning("... and %d more unreadable source paths", len(errors) - 10)
-        return None
+        matches = [RSYNC_SUBDIR_ERROR_RE.match(line) for line in errors]
+        if errors and all(match and not match.group('path').endswith('/.') for match in matches):
+            for line in errors[:10]:
+                logging.warning("Skipping unreadable source path: %s", line)
+            if len(errors) > 10:
+                logging.warning("... and %d more unreadable source paths", len(errors) - 10)
+            return None
     return _rsync_listing_error(message, proc)
 
 
@@ -759,17 +775,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                                                 proc, cst_cfg['syncFromSource'] == 1)
                 if reason:
                     return {'verdict': False, 'reason': reason}
+                current_sizes = {}
                 for line in proc.stdout.splitlines():
-                    try:
-                        file_or_dir, size, *_ , filepath = line.split(None, 4)
-                        if not file_or_dir.startswith('-'):
-                            continue
-                        idx = return_files['include'].index(filepath)
-                        if return_files['filesize'][idx] != size:
-                            del return_files['filesize'][idx]
-                            del return_files['include'][idx]
-                    except Exception as exc:
-                        logging.warning("Staleness check error: %s", str(exc))
+                    parts = line.split(None, 4)
+                    if len(parts) == 5 and parts[0].startswith('-'):
+                        current_sizes[parts[4]] = parts[1]
+                # Keep only the files listed again with the same size: a file
+                # missing from the re-listing (vanished, or in a directory that
+                # became unreadable) hasn't been checked (#284)
+                kept = [(path, size) for path, size in zip(return_files['include'], return_files['filesize'])
+                        if current_sizes.get(path) == size]
+                return_files['include'] = [path for path, _ in kept]
+                return_files['filesize'] = [size for _, size in kept]
 
         # Format final output
         del return_files['filesize']
