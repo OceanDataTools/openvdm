@@ -266,6 +266,36 @@ def _copied_files(dest_dir: str, paths: list) -> list:
     return [path for path in paths if os.path.isfile(os.path.join(dest_dir, path))]
 
 
+def _rsync_listing_failure(message: str, proc: subprocess.CompletedProcess,
+                           sync_from_source: bool) -> Optional[str]:
+    """Return the failure reason for an rsync source listing, or ``None`` if it can be used.
+
+    Code 23 (a partial listing, e.g. an unreadable directory) fails only with
+    **Sync from source**, which would delete the unlisted files from the
+    destination (#238). Without it, rsync's errors are logged as warnings and
+    the listed files are copied (#264).
+
+    Args:
+        message: What failed, e.g. ``"Error listing source directory /data"``.
+        proc: The finished rsync listing.
+        sync_from_source: Whether the transfer deletes destination files
+            that aren't in the source.
+
+    Returns:
+        The reason the transfer fails, or ``None``.
+    """
+    if proc.returncode in transfer_utils.RSYNC_OK_CODES:
+        return None
+    if proc.returncode == 23 and not sync_from_source:
+        errors = [line for line in proc.stderr.splitlines() if line.startswith('rsync:')]
+        for line in errors[:10]:
+            logging.warning("Skipping unreadable source path: %s", line)
+        if len(errors) > 10:
+            logging.warning("... and %d more unreadable source paths", len(errors) - 10)
+        return None
+    return _rsync_listing_error(message, proc)
+
+
 def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int,
                          dest_dir: str) -> tuple:
     """Run an rsync transfer command and collect the new and updated files.
@@ -648,11 +678,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             logging.debug("File list Command: %s", transfer_utils.redact_command(command))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
-            if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
-                # A failed or partial listing looks like missing files, and
-                # with syncFromSource those are deleted from the destination (#238)
-                return {'verdict': False,
-                        'reason': _rsync_listing_error(f"Error listing source directory {raw_source_dir}", proc)}
+            # A failed or partial listing looks like missing files, and
+            # with syncFromSource those are deleted from the destination (#238)
+            reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
+                                            proc, cst_cfg['syncFromSource'] == 1)
+            if reason:
+                return {'verdict': False, 'reason': reason}
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
 
@@ -714,10 +745,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return_files['filesize'] = verified_sizes
             else:
                 proc = subprocess.run(command, capture_output=True, text=True, check=False)
-                if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
-                    # Otherwise the staleness check is silently skipped (#238)
-                    return {'verdict': False,
-                            'reason': _rsync_listing_error(f"Error re-listing source directory {raw_source_dir}", proc)}
+                # Otherwise the staleness check is silently skipped (#238)
+                reason = _rsync_listing_failure(f"Error re-listing source directory {raw_source_dir}",
+                                                proc, cst_cfg['syncFromSource'] == 1)
+                if reason:
+                    return {'verdict': False, 'reason': reason}
                 for line in proc.stdout.splitlines():
                     try:
                         file_or_dir, size, *_ , filepath = line.split(None, 4)
