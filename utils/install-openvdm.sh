@@ -1987,6 +1987,15 @@ EOF
     done
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${PLUGIN_DIR}"
 
+    # Show the sample lowering's data: uncomment the example Lowering tab at
+    # the end of the data dashboard config, unless it already has one (#272)
+    local DASHBOARD_YAML="${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml"
+    if [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
+        && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
+        echo "Enabling the data dashboard's Lowering tab"
+        sed -i -e '/^#- title: Lowering$/,/^$/s/^#//' "${DASHBOARD_YAML}"
+    fi
+
     # Add Samba shares for sample data
     echo "Configuring Samba shares for sample data"
     sed -i '/### Added by openvdm_sample_data install script ###/,/### Added by openvdm_sample_data install script ###/d' \
