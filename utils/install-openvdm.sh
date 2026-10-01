@@ -1957,27 +1957,33 @@ EOF
 UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
 EOF
 
-    # Enable sample data plugins (copy .dist files only if active copy does not exist)
+    # Enable sample data plugins and the parsers they import (copy .dist files
+    # only if active copy does not exist). The parsers are read from each
+    # plugin's "from server.plugins.parsers.<name> import" lines, so the list
+    # can't fall behind the plugins (#270).
     echo "Enabling sample data plugins"
     local PLUGIN_DIR="${INSTALL_ROOT}/openvdm/server/plugins"
-    for dist_file in \
+    local plugin parser
+    for plugin in \
         em302_plugin.py \
         openrvdas_plugin.py \
         rov_openrvdas_plugin.py; do
-        if [ -e "${PLUGIN_DIR}/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/${dist_file}" ]; then
-            cp "${PLUGIN_DIR}/${dist_file}.dist" "${PLUGIN_DIR}/${dist_file}"
+        if [ ! -e "${PLUGIN_DIR}/${plugin}.dist" ]; then
+            echo "WARNING: ${plugin}.dist not found; plugin not enabled"
+            continue
         fi
-    done
-    for dist_file in \
-        geotiff_titiler_parser.py \
-        gga_parser.py \
-        met_parser.py \
-        ssv_parser.py \
-        tsg45_parser.py \
-        twind_parser.py; do
-        if [ -e "${PLUGIN_DIR}/parsers/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/parsers/${dist_file}" ]; then
-            cp "${PLUGIN_DIR}/parsers/${dist_file}.dist" "${PLUGIN_DIR}/parsers/${dist_file}"
+        if [ ! -e "${PLUGIN_DIR}/${plugin}" ]; then
+            cp "${PLUGIN_DIR}/${plugin}.dist" "${PLUGIN_DIR}/${plugin}"
         fi
+        for parser in $(grep -oE '^from server\.plugins\.parsers\.[A-Za-z0-9_]+' "${PLUGIN_DIR}/${plugin}" | sed 's/.*\.//' | sort -u); do
+            if [ -e "${PLUGIN_DIR}/parsers/${parser}.py" ]; then
+                continue
+            elif [ -e "${PLUGIN_DIR}/parsers/${parser}.py.dist" ]; then
+                cp "${PLUGIN_DIR}/parsers/${parser}.py.dist" "${PLUGIN_DIR}/parsers/${parser}.py"
+            else
+                echo "WARNING: ${plugin} imports ${parser}, but parsers/${parser}.py.dist was not found"
+            fi
+        done
     done
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${PLUGIN_DIR}"
 
