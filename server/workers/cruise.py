@@ -271,7 +271,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # Transfer files
             try:
                 files['new'], files['updated'] = run_transfer_command(
-                    self, current_job, cmd, len(files['include'])
+                    self, current_job, cmd, len(files['include']), dest_dir
                 )
             except TransferCommandError as exc:
                 return {'verdict': False, 'reason': f"PublicData transfer failed: {exc}"}
