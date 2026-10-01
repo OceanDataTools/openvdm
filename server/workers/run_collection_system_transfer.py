@@ -247,7 +247,11 @@ def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str
         *message* with rsync's exit code and its most specific error line.
     """
     reason = f"{message}: rsync exited with code {proc.returncode}"
-    detail = transfer_utils.error_detail('rsync', (proc.stdout + proc.stderr).splitlines())
+    lines = (proc.stdout + proc.stderr).splitlines()
+    # The sending side's error is the cause; a receiver's "read error" or
+    # "Broken pipe" that follows it is only the connection closing (#284)
+    sender_errors = [line for line in lines if line.startswith('rsync: [sender]')]
+    detail = sender_errors[0] if sender_errors else transfer_utils.error_detail('rsync', lines)
     return f"{reason}: {detail}" if detail else reason
 
 
