@@ -56,6 +56,52 @@ class DataDashboard extends Model {
         return $this->getDataTypeByVisType('json-inverted');
     }
 
+    /**
+     * Return the chart options of a json-profile data entry (#274).
+     *
+     * profileSeries may be a YAML list or a comma-separated string.
+     *
+     * @param array $dataObj A dataArray entry from datadashboard.yaml.
+     * @return array 'depthSeries' (default 'Depth') and 'profileSeries'
+     *     (a list of series labels, or null for all but the depth series).
+     */
+    public static function profileOptions(array $dataObj) {
+        $profileSeries = $dataObj['profileSeries'] ?? null;
+        if (is_string($profileSeries)) {
+            $profileSeries = array_filter(array_map('trim', explode(',', $profileSeries)), 'strlen');
+        }
+        return array(
+            'depthSeries' => (!empty($dataObj['depthSeries']) && is_string($dataObj['depthSeries'])) ? $dataObj['depthSeries'] : 'Depth',
+            'profileSeries' => (is_array($profileSeries) && sizeof($profileSeries) > 0) ? array_values(array_map('strval', $profileSeries)) : null,
+        );
+    }
+
+    /**
+     * Return the data types shown as a depth profile on the main dashboard page (#274).
+     *
+     * A data type that a tab also charts against time keeps its time-series
+     * tile there.
+     *
+     * @return array Data type => its profile options (see profileOptions()).
+     */
+    public function getJSONProfileTypes() {
+        $timeSeriesTypes = array_merge($this->getJSONTypes(), $this->getJSONReversedYTypes(),
+                                       $this->getJSONReversedYInvertedTypes(), $this->getJSONInvertedTypes());
+        $profileTypes = array();
+        foreach($this->_tabs as $tab) {
+            foreach($tab['placeholderArray'] as $placeholder) {
+                foreach($placeholder['dataArray'] as $data) {
+                    if (strcmp($data['visType'], 'json-profile') === 0
+                        && !isset($profileTypes[$data['dataType']])
+                        && !in_array($data['dataType'], $timeSeriesTypes)) {
+                        $profileTypes[$data['dataType']] = self::profileOptions($data);
+                    }
+                }
+            }
+        }
+        return $profileTypes;
+    }
+
     public function getGeoJSONTypes() {
         return $this->getDataTypeByVisType('geoJSON');
     }

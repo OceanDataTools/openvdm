@@ -94,6 +94,27 @@ $(function () {
         });
     }
 
+    //Draw the latest depth profile (json-profile, #274) as a thumbnail
+    function displayLatestProfile(dataType, profileOptions) {
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
+        $.getJSON(getVisualizerDataURL, function (data, status) {
+            if (status === 'success' && data !== null) {
+
+                var placeholderID = dataType + '-placeholder';
+                var profile = openvdmProfileChartConfig(data, $.extend({}, profileOptions, {showAxes: false}));
+                if ('error' in profile) {
+                    $('#' + placeholderID).html('<strong>Error: ' + profile.error + '</strong>');
+                } else {
+                    profile.config.options.onClick = function () {
+                        window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
+                    };
+                    const ctx = document.getElementById(placeholderID).getContext('2d');
+                    new Chart(ctx, profile.config);
+                }
+            }
+        });
+    }
+
     function displayLatestGeoJSON(dataType) {
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
@@ -247,6 +268,11 @@ $(function () {
                 displayLatestJSON(jsonInvertedTypes[i], false, true);
             }
         }
+        $.each(jsonProfileTypes, function (dataType, profileOptions) {
+            if ($('#' + dataType + '-placeholder').length) {
+                displayLatestProfile(dataType, profileOptions);
+            }
+        });
     }
 
     displayLatestData();

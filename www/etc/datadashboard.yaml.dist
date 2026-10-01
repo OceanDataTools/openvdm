@@ -99,6 +99,24 @@
 #      visType: geoJSON
 #    - dataType: geotiff
 #      visType: tms
+
+# For "chart" placeholders, the 'visType' is one of:
+#   json            - each series against time
+#   json-reversedY  - the same, with the y axes reversed (values increase downward)
+#   json-profile    - a depth profile: depth down the vertical axis and the other
+#                     series across, each on its own x axis, joined in time order.
+#                     Optional keys: "depthSeries", the series label to use for
+#                     depth (default: Depth), and "profileSeries", the series to
+#                     plot across (default: all the others). Give a profile its own
+#                     "id" when the same dataType is also charted against time.
+#  - plotType: chart
+#    id: ctd-profile
+#    heading: CTD Profile
+#    dataArray:
+#    - dataType: ctd
+#      visType: json-profile
+#      depthSeries: Depth
+#      profileSeries: [Temperature, Salinity]
 #
 
 - title: Position
@@ -199,6 +217,13 @@
 #    dataArray:
 #    - dataType: rov-ctd
 #      visType: json
+#  - plotType: chart
+#    id: rov-ctd-profile
+#    heading: ROV CTD Profile
+#    dataArray:
+#    - dataType: rov-ctd
+#      visType: json-profile
+#      profileSeries: [Temperature, Salinity, Sound Velocity]
 #  - plotType: chart
 #    id: rov-o2
 #    heading: ROV O2

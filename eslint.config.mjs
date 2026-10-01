@@ -102,6 +102,7 @@ const footerGlobals = {
     jsonReversedYTypes: 'readonly',
     jsonReversedYInvertedTypes: 'readonly',
     jsonInvertedTypes: 'readonly',
+    jsonProfileTypes: 'readonly',
 };
 
 // Defined in other template scripts that load before the pages using them.
@@ -110,6 +111,7 @@ const templateGlobals = {
     openvdmBaseLayers: 'readonly', // mapBaseLayers.js
     openvdmDefaultBaseLayer: 'readonly',
     openvdmOverlayLayers: 'readonly',
+    openvdmProfileChartConfig: 'readonly', // profileChart.js
 };
 
 export default [

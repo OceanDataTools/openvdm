@@ -37,6 +37,7 @@ class DataDashboard extends Controller {
         $data['jsonReversedYTypes'] = $this->_dataDashboardModel->getJSONReversedYTypes();
         $data['jsonReversedYInvertedTypes'] = $this->_dataDashboardModel->getJSONReversedYInvertedTypes();
         $data['jsonInvertedTypes'] = $this->_dataDashboardModel->getJSONInvertedTypes();
+        $data['jsonProfileTypes'] = $this->_dataDashboardModel->getJSONProfileTypes();
 
         $data['subPages'] = $this->_dataDashboardModel->getSubPages();
 
@@ -84,7 +85,10 @@ class DataDashboard extends Controller {
         if (!empty($tab['placeholderArray']) && is_array($tab['placeholderArray']) && sizeof($tab['placeholderArray'])>0) {
             foreach ($tab['placeholderArray'] as $placeholder) {
                 $placeholder['dataFiles'] = array();
-                foreach ($placeholder['dataArray'] as $dataObj) {
+                foreach ($placeholder['dataArray'] as $k => $dataObj) {
+                    if (($dataObj['visType'] ?? '') === 'json-profile') {
+                        $placeholder['dataArray'][$k]['profileOptions'] = \Models\DataDashboard::profileOptions($dataObj);
+                    }
                     $objects = $this->_dashboardDataModel->getDashboardObjectsByTypes($dataObj['dataType']);
                     array_push($placeholder['dataFiles'], $objects);
                 }
