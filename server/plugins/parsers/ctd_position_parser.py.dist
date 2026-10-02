@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Parser for Sea-Bird CTD cast positions.
+
+Parses the header of a cast's raw SBE 9plus ``.hex`` file (the NMEA position
+and times Seasave records at the start of the cast) and returns the
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: a GeoJSON point at
+the cast's position, which a map draws alongside the ship's track
+(``visType: geoJSON``). The ``.xmlcon`` isn't needed.
+"""
+
+import logging
+import re
+import sys
+from datetime import timedelta
+from os.path import basename, dirname, realpath, splitext
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, HEADER_LINES
+
+# Header position, e.g. "* NMEA Latitude = 27 33.77 N", "* NMEA Longitude = 093 46.36 W"
+NMEA_LATITUDE_RE = re.compile(r'NMEA Latitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([NS])')
+NMEA_LONGITUDE_RE = re.compile(r'NMEA Longitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([EW])')
+
+# Decimal places for the position (about 1 m)
+POSITION_DECIMALS = 5
+
+
+class CTDPositionParser(CTDProfileParser):
+    """Parser for the position of a Sea-Bird CTD ``.hex`` cast."""
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False):
+        super().__init__(start_dt=start_dt, stop_dt=stop_dt, time_format=time_format,
+                         skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+        self.latitude = None
+        self.longitude = None
+        self.scan_count = 0
+
+    def read_position(self, filepath):
+        """Read the cast's NMEA position from its header, and count its scans."""
+        header_passed = False
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for lineno, line in enumerate(hex_file):
+                if header_passed:
+                    if line.strip():
+                        self.scan_count += 1
+                    continue
+                if '*END*' in line or lineno >= HEADER_LINES:
+                    header_passed = '*END*' in line
+                    continue
+                for regex, attr in ((NMEA_LATITUDE_RE, 'latitude'), (NMEA_LONGITUDE_RE, 'longitude')):
+                    match = regex.search(line)
+                    if match:
+                        value = int(match.group(1)) + float(match.group(2)) / 60
+                        if match.group(3) in ('S', 'W'):
+                            value = -value
+                        setattr(self, attr, round(value, POSITION_DECIMALS))
+
+    def parse(self, filepath):
+        """Parse the cast's ``.hex`` header and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if the header has no
+            NMEA position, or the cast starts outside ``start_dt``/``stop_dt``.
+
+        Raises:
+            OSError: If the file can't be read.
+        """
+        self.read_header(filepath)
+        self.read_position(filepath)
+
+        if self.latitude is None or self.longitude is None:
+            logging.info("No NMEA position in the header of %s", filepath)
+            return None
+
+        properties = {'cast': splitext(basename(filepath))[0]}
+        if self.metadata['Station'] != 'N/A':
+            properties['station'] = self.metadata['Station']
+        if self.start_time:
+            if not self.scans_averaged:
+                self.scans_averaged = 1
+            end_time = self.start_time + timedelta(seconds=max(self.scan_count - 1, 0) * self.scan_interval)
+            if (self.start_dt and end_time < self.start_dt.replace(tzinfo=end_time.tzinfo)) or \
+                    (self.stop_dt and self.start_time > self.stop_dt.replace(tzinfo=self.start_time.tzinfo)):
+                logging.info("Cast %s is outside the time range", filepath)
+                return None
+            properties['start'] = self.start_time.isoformat()
+            properties['end'] = end_time.isoformat()
+            self.add_time_bounds_stat([self.start_time, end_time])
+        if self.metadata['Depth'] != 'N/A':
+            properties['bottom depth'] = self.metadata['Depth']
+
+        self.add_geobounds_stat([self.latitude, self.longitude, self.latitude, self.longitude])
+        self.add_visualization_data({
+            'type': 'FeatureCollection',
+            'features': [{
+                'type': 'Feature',
+                'geometry': {'type': 'Point', 'coordinates': [self.longitude, self.latitude]},
+                'properties': properties,
+            }],
+        })
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add no options (the profile parser's ``--plotDir`` doesn't apply).
+
+        Args:
+            parser: The ``argparse.ArgumentParser``.
+        """
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {}
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    CTDPositionParser.run_cli()
