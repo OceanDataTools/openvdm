@@ -350,12 +350,12 @@ $(function () {
                         southwest = L.latLng(parseFloat(coords[1]), parseFloat(coords[0])),
                         northeast = L.latLng(parseFloat(coords[3]), parseFloat(coords[2]));
 
-                    // Build the layer
-                    mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                        tms:true,
-                        bounds:L.latLngBounds(southwest, northeast),
-                        zIndex: 10
-                    });
+                    // Build the layer: pre-rendered tiles or a TiTiler GeoTIFF (#298)
+                    mapObject['tmsLayers'][tmsObjectJsonName] = openvdmTileLayer(data[0], cruiseDataDir, { zIndex: 10 });
+                    if (!mapObject['tmsLayers'][tmsObjectJsonName]) {
+                        delete mapObject['tmsLayers'][tmsObjectJsonName];
+                        return;
+                    }
 
                     if (parseFloat(coords[0]) < 0) {
                         southwest = southwest.wrap(360, 0);

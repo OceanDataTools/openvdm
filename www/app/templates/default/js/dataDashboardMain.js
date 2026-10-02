@@ -1,8 +1,6 @@
 $(function () {
     'use strict';
 
-    var TITILER_URL = '/titiler'
-
     function displayLatestJSON(dataType, reversedY, inverted) {
         reversedY = reversedY || false;
         inverted = inverted || false;
@@ -225,17 +223,10 @@ $(function () {
                     //Add basemap layer
                     openvdmDefaultBaseLayer().addTo(mapdb);
 
-                    // Add latest geotiff
-                    if ('tileDirectory' in data[0]) {
-                        L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                            tms:true,
-                            bounds:mapBounds
-                        }).addTo(mapdb);
-                    } else if ('tileURL' in data[0]) {
-                        const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
-                        L.tileLayer(url, {
-                            bounds:mapBounds
-                        }).addTo(mapdb);
+                    // Add latest geotiff: pre-rendered tiles or a TiTiler GeoTIFF (#298)
+                    var tileLayer = openvdmTileLayer(data[0], cruiseDataDir);
+                    if (tileLayer) {
+                        tileLayer.addTo(mapdb);
                     }
                     mapdb.fitBounds(mapBounds);
                 }

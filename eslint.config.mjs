@@ -114,6 +114,7 @@ const templateGlobals = {
     openvdmFeaturePositions: 'readonly',
     openvdmPointMarker: 'readonly',
     openvdmFeaturePopup: 'readonly',
+    openvdmTileLayer: 'readonly',
     openvdmProfileChartConfig: 'readonly', // dashboardCharts.js
     openvdmInvertTimeChart: 'readonly',
 };
