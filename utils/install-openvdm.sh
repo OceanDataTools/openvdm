@@ -1965,6 +1965,7 @@ EOF
     local PLUGIN_DIR="${INSTALL_ROOT}/openvdm/server/plugins"
     local plugin parser
     for plugin in \
+        ctd_plugin.py \
         em302_plugin.py \
         openrvdas_plugin.py \
         rov_openrvdas_plugin.py; do
