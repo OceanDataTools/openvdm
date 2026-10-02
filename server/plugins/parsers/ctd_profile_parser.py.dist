@@ -10,6 +10,8 @@ temperature, conductivity and salinity, which the dashboard can draw as a
 depth profile (``visType: json-profile`` with ``depthSeries: Pressure``).
 Optionally also saves a PNG profile plot, which needs matplotlib (not
 installed by ``requirements.txt``).
+
+Based on original code by Oscar Garcia (CSIC), ogarcia@utm.csic.es.
 """
 
 import logging
