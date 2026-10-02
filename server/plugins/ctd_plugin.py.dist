@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Plugin for Sea-Bird SBE 911plus CTD casts.
+
+Matches each cast's raw ``.hex`` file, runs it through the CTD profile parser
+(which reads the calibration from the cast's ``.xmlcon``), and returns the
+JSON-formatted plugin data used by OpenVDM's Data Dashboard under the ``ctd``
+data type. Errors that stop a cast (e.g. no ``.xmlcon``) are logged here and
+the cast is skipped. To draw the casts as depth profiles, add a chart to a
+tab in ``datadashboard.yaml`` with ``dataType: ctd``, ``visType:
+json-profile`` and ``depthSeries: Pressure``.
+"""
+
+import sys
+import os
+import fnmatch
+import argparse
+import logging
+from os.path import dirname, realpath
+
+sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
+
+from server.lib.openvdm_plugin import OpenVDMPlugin
+from server.plugins.parsers.ctd_profile_parser import CTDProfileParser
+
+# -------------------------------------------------------------------------------------
+# The data types this plugin produces and the files they come from. Patterns are
+# matched case-insensitively. Set "plot_dir" in parser_options to also save a PNG
+# profile plot of each cast there (needs matplotlib).
+# -------------------------------------------------------------------------------------
+FILE_TYPE_FILTERS = [
+    {"data_type": "ctd", "regex": "*.hex", "parser": "CTDProfile", "parser_options": {}}
+]
+
+# Errors the parser raises for a cast it can't parse (logged without a traceback)
+CAST_ERRORS = (FileNotFoundError, ValueError, OSError)
+
+
+class CTDPlugin(OpenVDMPlugin):
+    """OpenVDM plugin for Sea-Bird SBE 911plus CTD casts."""
+
+    def __init__(self):
+        super().__init__(FILE_TYPE_FILTERS)
+
+        self.PARSER_MAP = {
+            "CTDProfile": CTDProfileParser
+        }
+
+    def _matching_filters(self, filepath):
+        """Return the file type filters whose pattern matches *filepath*, ignoring case."""
+        return [f for f in self.file_type_filters
+                if fnmatch.fnmatchcase(filepath.lower(), f["regex"].lower())]
+
+    def get_data_types(self, filepath):
+        """Return the data types of the filters that match *filepath*, ignoring case.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            list[str]: The matching filters' ``data_type`` values.
+        """
+        return [f["data_type"] for f in self._matching_filters(filepath)]
+
+    def _get_parsers(self, filepath):
+        """Return ``(data_type, parser)`` pairs for the filters that match *filepath*.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            list: The matching data types and new parser instances; empty if
+            no filter matches.
+        """
+        matches = self._matching_filters(filepath)
+        if not matches:
+            logging.debug("No file type filters matched %s", filepath)
+            return []
+
+        parsers = []
+        for f in matches:
+            parser_name = f.get("parser")
+            parser_cls = self.PARSER_MAP.get(parser_name)
+            if not parser_cls:
+                logging.warning("Unknown parser '%s' for %s", parser_name, filepath)
+                continue
+            try:
+                parser = parser_cls(**f.get("parser_options", {}))
+                parsers.append((f["data_type"], parser))
+            except Exception as exc:
+                logging.exception("Failed to instantiate parser %s for %s: %s", parser_name, filepath, exc)
+        return parsers
+
+    def parse_file(self, filepath):
+        """Parse the cast and return its plugin data by data type.
+
+        Args:
+            filepath: Path to the raw data file.
+
+        Returns:
+            dict: The plugin data keyed by data type; empty if the file isn't
+            a cast, the cast has no data, or it couldn't be parsed (the reason
+            is logged).
+        """
+        parsers = self._get_parsers(filepath)
+        if not parsers:
+            return {}
+
+        results = {}
+        for data_type, parser in parsers:
+            try:
+                plugin_data = parser.parse(filepath)
+            except CAST_ERRORS as exc:
+                logging.error("CTD cast %s skipped: %s", filepath, exc)
+                continue
+            except Exception as exc:
+                logging.exception("Parser '%s' failed for file '%s': %s", data_type, filepath, exc)
+                continue
+            if plugin_data:
+                results[data_type] = plugin_data
+            else:
+                logging.warning("CTD cast %s has no data", filepath)
+        return results
+
+# -------------------------------
+# Module-level function for worker
+# -------------------------------
+def process_file(filepath):
+    """Parse a file with the CTD plugin (entry point for the data dashboard worker).
+
+    Args:
+        filepath: Path to the raw data file.
+
+    Returns:
+        dict: The plugin data by data type, as returned by
+        :meth:`CTDPlugin.parse_file`.
+    """
+    plugin = CTDPlugin()
+    return plugin.parse_file(filepath)
+
+
+# -------------------------------------------------------------------------------------
+# Required python code for running the script as a stand-alone utility
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='OpenVDM plugin for Sea-Bird CTD casts')
+    parser.add_argument('--dataType', action='store_true', help='return the dataType of the file')
+    parser.add_argument('-v', '--verbosity', dest='verbosity', default=0, action='count', help='Increase verbosity')
+    parser.add_argument('dataFile', metavar='dataFile', help='the raw data file to process')
+    args = parser.parse_args()
+
+    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
+    logging.basicConfig(format=LOGGING_FORMAT)
+
+    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    args.verbosity = min(args.verbosity, max(LOG_LEVELS))
+    logging.getLogger().setLevel(LOG_LEVELS[args.verbosity])
+
+    if not os.path.isfile(args.dataFile):
+        logging.error("File not found")
+        sys.exit(1)
+    elif os.stat(args.dataFile).st_size == 0:
+        logging.warning("File is empty")
+        sys.exit(0)
+
+    plugin = CTDPlugin()
+
+    if args.dataType:
+        data_types = plugin.get_data_types(args.dataFile)
+        if not data_types:
+            logging.warning("File is of unknown type: %s", args.dataFile)
+            sys.exit(1)
+        print(",".join(sorted(data_types)))
+        sys.exit(0)
+
+    print(plugin.get_json_str(args.dataFile))
