@@ -177,8 +177,19 @@ $(function () {
                 if ('error' in data) {
                     $('#' + mapObject['placeholderID']).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
+                    var latestFeature = data[0].features[data[0].features.length - 1];
+
+                    //A data type of map points (e.g. cast positions) has no track to
+                    //mark the end of: drop its Latest Position checkbox instead (#316)
+                    if (latestFeature && latestFeature.geometry && /Point$/.test(latestFeature.geometry.type)) {
+                        $('#' + mapObject['objectListID']).find('.lp-checkbox').filter(function () {
+                            return this.value === dataType;
+                        }).closest('div').remove();
+                        return;
+                    }
+
                     //Get the last position of the latest feature (a track or a point, #292)
-                    var positions = openvdmFeaturePositions(data[0].features[data[0].features.length - 1]);
+                    var positions = openvdmFeaturePositions(latestFeature);
                     if (positions.length === 0) {
                         return;
                     }
