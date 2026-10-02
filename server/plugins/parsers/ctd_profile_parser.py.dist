@@ -5,13 +5,15 @@ Parses a cast's raw SBE 9plus ``.hex`` file, using the calibration
 coefficients in the cast's ``.xmlcon`` file (the same basename as the
 ``.hex`` file, e.g. ``CTD001.hex`` and ``CTD001.xmlcon``; the extension may
 be in any case), and returns the
-JSON-formatted plugin data used by OpenVDM's Data Dashboard: pressure (from
-the Digiquartz sensor, temperature-compensated), temperature, conductivity
-and salinity, which the dashboard can draw as a depth profile
-(``visType: json-profile`` with ``depthSeries: Pressure``). Its stats include
-the cast's depth range, from pressure with Sea-Bird's salt-water depth formula,
-and its geographic bounds, from the NMEA position the deck unit appends to
-each scan (or the header's position if it doesn't).
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: depth, pressure
+(from the Digiquartz sensor, temperature-compensated), temperature,
+conductivity and salinity, which the dashboard can draw as a depth profile
+(``visType: json-profile`` with ``depthSeries: Depth``). Depth comes from
+pressure with Sea-Bird's salt-water depth formula, which needs the latitude:
+it's taken from the NMEA position the deck unit appends to each scan, or the
+header's position, or the ``latitude`` option; without any of them there's no
+Depth series (use ``depthSeries: Pressure``). The stats include the depth
+range and the cast's geographic bounds.
 Optionally also saves a PNG profile plot, which needs matplotlib (not
 installed by ``requirements.txt``).
 
@@ -114,6 +116,9 @@ DBAR_PER_PSI = 0.689476
 # before use, as Sea-Bird's data conversion does
 TEMP_COMP_AVERAGE_SECONDS = 30
 
+# Depth, from pressure and latitude, comes first when it's known
+DEPTH_SERIES = ('depth', 'Depth', 'm')
+
 SERIES = [
     ('pressure', 'Pressure', 'db'),
     ('temperature', 'Temperature', 'C'),
@@ -126,7 +131,7 @@ class CTDProfileParser(OpenVDMCSVParser):
     """Parser for Sea-Bird CTD ``.hex`` casts."""
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, plot_dir=None):
+                 skip_header=False, use_openvdm_api=False, plot_dir=None, latitude=None):
         """Initialise the parser.
 
         Args:
@@ -137,11 +142,15 @@ class CTDProfileParser(OpenVDMCSVParser):
             use_openvdm_api: Enable OpenVDM API message posting.
             plot_dir: Directory to save a PNG profile plot of each cast in
                 (``<cast>.png``), or ``None`` for no plot.
+            latitude: Latitude in decimal degrees to compute depth with when
+                a cast has no position (neither in its scans nor its header),
+                or ``None`` for no depth then.
         """
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
         self.plot_dir = plot_dir
+        self.default_latitude = latitude
         self.coeffs = {}
         self.bytes_per_scan = None
         self.scans_averaged = None
@@ -553,12 +562,15 @@ class CTDProfileParser(OpenVDMCSVParser):
         if self.plot_dir:
             self.save_plot(df.reset_index(drop=True), filepath)
 
+        df = self.add_depth(df, filepath)
+        series = ([DEPTH_SERIES] if 'depth' in df else []) + SERIES
+
         self.add_row_validity_stat([len(df), len(errors)])
         self.add_time_bounds_stat([df['date_time'].min().to_pydatetime(), df['date_time'].max().to_pydatetime()])
-        for col, label, unit in SERIES:
+        for col, label, unit in series:
             self.add_bounds_stat([round(df[col].min(), ROUNDING[col]),
                                   round(df[col].max(), ROUNDING[col])], label, unit)
-        self.add_position_stats(df)
+        self.add_geobounds(df)
 
         rate = len(errors) / (len(df) + len(errors))
         if rate > 0.25:
@@ -572,7 +584,7 @@ class CTDProfileParser(OpenVDMCSVParser):
         df = self.resample_data(df.set_index('date_time'), RESAMPLE_INTERVAL)
         df = self.round_data(df, ROUNDING)
 
-        for col, label, unit in SERIES:
+        for col, label, unit in series:
             viz = {'data': [], 'unit': unit, 'label': label}
             for ts, value in zip(df['date_time'], df[col]):
                 if pd.notna(value):
@@ -583,29 +595,42 @@ class CTDProfileParser(OpenVDMCSVParser):
         self.plugin_data = self._sanitize_for_json(self.plugin_data)
         return self.plugin_data
 
-    def add_position_stats(self, df):
-        """Add the cast's depth range and geographic bounds to the stats.
+    def add_depth(self, df, filepath):
+        """Fill in each scan's position and add its depth.
 
-        Each scan's position is the one the deck unit appended to it, or else
-        the header's. Without either, neither stat is added (depth needs the
-        latitude).
+        A scan's position is the one the deck unit appended to it, or else
+        the header's. Depth uses the scan's latitude, or the ``latitude``
+        option if there's no position.
 
         Args:
             df: The cast's scans, with ``pressure``, ``latitude`` and
                 ``longitude`` columns (NaN where a scan has no position).
-        """
-        positions = df[['latitude', 'longitude']]
-        if self.latitude is not None and self.longitude is not None:
-            positions = positions.fillna({'latitude': self.latitude, 'longitude': self.longitude})
-        known = positions.notna().all(axis=1)
-        if not known.any():
-            logging.info("No position for the cast, so no depth or geographic bounds")
-            return
+            filepath: Path to the cast, for the log.
 
-        depth = self.calc_depth(df['pressure'][known], positions['latitude'][known])
-        self.add_bounds_stat([round(float(depth.min()), ROUNDING['depth']),
-                              round(float(depth.max()), ROUNDING['depth'])], 'Depth', 'm')
-        lat, lon = positions['latitude'][known], positions['longitude'][known]
+        Returns:
+            pandas.DataFrame: *df* with the positions filled in and a
+            ``depth`` column, which is missing if no latitude is known.
+        """
+        if self.latitude is not None and self.longitude is not None:
+            df = df.fillna({'latitude': self.latitude, 'longitude': self.longitude})
+        latitude = df['latitude']
+        if self.default_latitude is not None:
+            latitude = latitude.fillna(self.default_latitude)
+        if latitude.isna().all():
+            logging.warning("No position for %s and no latitude option, so no depth", filepath)
+            return df
+        return df.assign(depth=self.calc_depth(df['pressure'], latitude))
+
+    def add_geobounds(self, df):
+        """Add the cast's geographic bounds to the stats, if any scan has a position.
+
+        Args:
+            df: The cast's scans, with ``latitude`` and ``longitude`` columns.
+        """
+        positions = df[['latitude', 'longitude']].dropna()
+        if positions.empty:
+            return
+        lat, lon = positions['latitude'], positions['longitude']
         self.add_geobounds_stat([round(float(value), POSITION_DECIMALS)
                                  for value in (lat.max(), lon.max(), lat.min(), lon.min())])
 
@@ -680,10 +705,12 @@ class CTDProfileParser(OpenVDMCSVParser):
         """
         parser.add_argument('--plotDir', default=None,
                             help='Save a PNG profile plot of the cast in this directory (needs matplotlib)')
+        parser.add_argument('--latitude', type=float, default=None,
+                            help='Latitude (decimal degrees) for depth when the cast has no position')
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'plot_dir': getattr(args, 'plotDir', None)}
+        return {'plot_dir': getattr(args, 'plotDir', None), 'latitude': getattr(args, 'latitude', None)}
 
 
 # -------------------------------------------------------------------------------------
