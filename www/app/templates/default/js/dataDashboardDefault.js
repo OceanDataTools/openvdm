@@ -179,8 +179,12 @@ $(function () {
                 if ('error' in data) {
                     $('#' + mapObject['placeholderID']).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    //Get the last coordinate from the latest trackline
-                    var lastCoordinate = data[0].features[data[0].features.length - 1].geometry.coordinates[data[0].features[data[0].features.length - 1].geometry.coordinates.length - 1];
+                    //Get the last position of the latest feature (a track or a point, #292)
+                    var positions = openvdmFeaturePositions(data[0].features[data[0].features.length - 1]);
+                    if (positions.length === 0) {
+                        return;
+                    }
+                    var lastCoordinate = positions[positions.length - 1];
                     var latestPosition = L.latLng(lastCoordinate[1], lastCoordinate[0]);
 
                     if (lastCoordinate[0] < 0) {
@@ -220,8 +224,12 @@ $(function () {
                             $('#' + mapObject['placeholderID']).html('<strong>Error: ' + data.error + '</strong>');
                         } else {
 
-                            //Get the last coordinate from the latest trackline
-                            var firstCoordinate = data[0].features[data[0].features.length - 1].geometry.coordinates[0];
+                            //Get the first and last positions of the latest feature (a track or a point, #292)
+                            var positions = openvdmFeaturePositions(data[0].features[data[0].features.length - 1]);
+                            if (positions.length === 0) {
+                                return;
+                            }
+                            var firstCoordinate = positions[0];
                             var startPosition = L.latLng(firstCoordinate[1], firstCoordinate[0]);
 
                             if (firstCoordinate[0] < 0) {
@@ -230,7 +238,7 @@ $(function () {
                                 startPosition = startPosition.wrap();
                             }
 
-                            var lastCoordinate = data[0].features[data[0].features.length - 1].geometry.coordinates[data[0].features[data[0].features.length - 1].geometry.coordinates.length - 1];
+                            var lastCoordinate = positions[positions.length - 1];
                             var endPosition = L.latLng(lastCoordinate[1], lastCoordinate[0]);
 
                             if (lastCoordinate[0] < 0) {
@@ -262,7 +270,7 @@ $(function () {
         mapObject['map'].removeLayer(mapObject['markers']['EndPosition-' + dataType]);
 
         //remove the bounds and re-center/re-zoom the map
-        delete mapObject['markers']['StartPositios-' + dataType];
+        delete mapObject['markers']['StartPosition-' + dataType];
         delete mapObject['markers']['EndPosition-' + dataType];
         delete mapObject['mapBounds']['StartEndPositions-' + dataType]
 
@@ -291,6 +299,8 @@ $(function () {
                     //mapObject['geoJSONLayers'][dataObjectJsonName] = L.timeDimension.layer.geoJson(data[0], {
                     mapObject['geoJSONLayers'][dataObjectJsonName] = L.geoJson(data[0], {
                         style: geoJSONStyle(mapObject, dataObjectJsonName),
+                        pointToLayer: openvdmPointMarker(geoJSONColor(mapObject, dataObjectJsonName)),
+                        onEachFeature: openvdmFeaturePopup,
                         //udpateTimeDimension: true,
                         addLastPoint: true,
                         waitForReady: true,

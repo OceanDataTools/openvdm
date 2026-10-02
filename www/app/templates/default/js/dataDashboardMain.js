@@ -128,8 +128,12 @@ $(function () {
                 if ('error' in data) {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    //Get the last coordinate from the latest trackline
-                    var lastCoordinate = data[0].features[0].geometry.coordinates[data[0].features[0].geometry.coordinates.length - 1],
+                    //Get the last position of the latest feature (a track or a point, #292)
+                    var positions = openvdmFeaturePositions(data[0].features[0]);
+                    if (positions.length === 0) {
+                        return;
+                    }
+                    var lastCoordinate = positions[positions.length - 1],
                         latLng = L.latLng(lastCoordinate[1], lastCoordinate[0]);
 
                     if (lastCoordinate[0] < 0) {
@@ -141,6 +145,7 @@ $(function () {
                     // Add latest trackline (GeoJSON)
                     var ggaData = L.geoJson(data[0], {
                         style: { weight: 3 },
+                        pointToLayer: openvdmPointMarker(),
                         coordsToLatLng: function (coords) {
                             var longitude = coords[0],
                                 latitude = coords[1];
