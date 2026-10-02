@@ -22,7 +22,7 @@ import fnmatch
 import re
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
@@ -50,6 +50,24 @@ QUALITY_TEST_RESULT_TYPES = [
 
 DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 # DEFAULT_TIME_FORMAT = "%m/%d/%Y %H:%M:%S.%f" # SCS style
+
+# ISO 8601 UTC to the second, for times shown to people (e.g. map popups)
+ISO8601_SECONDS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def format_iso8601(value):
+    """Return a time as ISO 8601 UTC to the nearest second, e.g. ``2012-04-28T12:35:00Z``.
+
+    Args:
+        value: A ``datetime``; a naive one is taken to be UTC.
+
+    Returns:
+        str: The formatted time.
+    """
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc)
+    value = (value + timedelta(microseconds=500000)).replace(microsecond=0)
+    return value.strftime(ISO8601_SECONDS_FORMAT)
 
 
 class OpenVDMParserQualityTest():
