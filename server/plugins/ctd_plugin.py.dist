@@ -5,7 +5,8 @@ Matches each cast's raw ``.hex`` file, runs it through the CTD profile parser
 (which reads the calibration from the cast's ``.xmlcon``), and returns the
 JSON-formatted plugin data used by OpenVDM's Data Dashboard under the ``ctd``
 data type. Errors that stop a cast (e.g. no ``.xmlcon``) are logged here and
-the cast is skipped. To draw the casts as depth profiles, add a chart to a
+the cast is skipped. When a cast's ``.xmlcon`` arrives or changes, the data
+dashboard re-parses the cast's ``.hex`` (``get_source_files()``). To draw the casts as depth profiles, add a chart to a
 tab in ``datadashboard.yaml`` with ``dataType: ctd``, ``visType:
 json-profile`` and ``depthSeries: Pressure``.
 """
@@ -44,6 +45,30 @@ class CTDPlugin(OpenVDMPlugin):
         self.PARSER_MAP = {
             "CTDProfile": CTDProfileParser
         }
+
+    @staticmethod
+    def get_source_files(filepath):
+        """Return the raw files to parse when *filepath* arrives or changes.
+
+        A cast's ``.xmlcon`` means its ``.hex`` (same basename, extension in
+        any case), since the cast is parsed with it; nothing if there's no
+        ``.hex`` yet. Any other file means itself.
+
+        Args:
+            filepath: Path to the new or updated file.
+
+        Returns:
+            list[str]: The files to parse.
+        """
+        stem, ext = os.path.splitext(filepath)
+        if ext.lower() != '.xmlcon':
+            return [filepath]
+        directory, base = os.path.split(stem)
+        for name in sorted(os.listdir(directory or '.')):
+            name_stem, name_ext = os.path.splitext(name)
+            if name_stem == base and name_ext.lower() == '.hex':
+                return [os.path.join(directory, name)]
+        return []
 
     def _matching_filters(self, filepath):
         """Return the file type filters whose pattern matches *filepath*, ignoring case."""
@@ -136,6 +161,19 @@ def process_file(filepath):
     """
     plugin = CTDPlugin()
     return plugin.parse_file(filepath)
+
+
+def get_source_files(filepath):
+    """Return the raw files the data dashboard worker should parse for *filepath*.
+
+    Args:
+        filepath: Path to the new or updated file.
+
+    Returns:
+        list[str]: The files to parse, as returned by
+        :meth:`CTDPlugin.get_source_files`.
+    """
+    return CTDPlugin.get_source_files(filepath)
 
 
 # -------------------------------------------------------------------------------------
