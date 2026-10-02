@@ -7,7 +7,8 @@ Registers two Gearman tasks:
   files reported by a collection system transfer and write the resulting
   dashboard JSON to the cruise directory.
 - ``rebuildDataDashboard`` — walk the entire cruise directory, run all matching
-  plugins against every file, and fully regenerate all dashboard objects.
+  plugins against every file, fully regenerate all dashboard objects, and
+  delete the dashboard files the new manifest no longer lists.
 
 Plugins are discovered at start-up from the ``pluginDir`` path in
 ``openvdm.yaml``.  Each plugin module is imported via ``importlib`` and must
@@ -259,6 +260,48 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             self.send_job_status(current_job, progress, 100)
 
         return new_manifest_entries, remove_manifest_entries
+
+    def prune_dashboard_files(self, manifest_entries):
+        """Delete the dashboard JSON files a rebuilt manifest no longer lists (#318).
+
+        Only ``.json`` files under the data dashboard directory are deleted,
+        never the manifest itself; directories left empty are removed too.
+
+        Args:
+            manifest_entries: The new manifest's entries; their ``dd_json``
+                paths are relative to the data warehouse base directory.
+
+        Returns:
+            dict: The job results part, a ``Fail`` naming the files that
+            couldn't be deleted.
+        """
+        base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
+        keep = {os.path.join(base_dir, entry['dd_json']) for entry in manifest_entries}
+        keep.add(self.data_dashboard_manifest_file_path)
+        removed = 0
+        errors = []
+        for root, dirs, files in os.walk(self.data_dashboard_dir, topdown=False):
+            for name in files:
+                path = os.path.join(root, name)
+                if not name.endswith('.json') or path in keep:
+                    continue
+                try:
+                    os.remove(path)
+                    removed += 1
+                except OSError as exc:
+                    errors.append(f"{path}: {exc.strerror}")
+            for name in dirs:
+                path = os.path.join(root, name)
+                try:
+                    if not os.listdir(path):
+                        os.rmdir(path)
+                except OSError:
+                    pass        # not empty after all, or not ours to remove
+        if removed:
+            logging.info("Removed %d old dashboard file(s)", removed)
+        if errors:
+            return {"partName": "Remove old dashboard files", "result": "Fail", "reason": "; ".join(errors)}
+        return {"partName": "Remove old dashboard files", "result": "Pass"}
 
     def on_job_execute(self, current_job):
         """Load the job's task and cruise/lowering settings, then run the job.
@@ -525,8 +568,8 @@ def task_rebuild_data_dashboard(worker, current_job):
     """Rebuild the whole data dashboard for the cruise.
 
     Re-runs each collection system transfer's plugin on every file in its
-    destination directory (cruise-level, and for each lowering), then rewrites
-    the manifest.
+    destination directory (cruise-level, and for each lowering), rewrites the
+    manifest, then deletes the dashboard files the new manifest doesn't list.
 
     Args:
         worker: The data dashboard Gearman worker.
@@ -585,6 +628,12 @@ def task_rebuild_data_dashboard(worker, current_job):
         job_results['parts'].append({"partName": "Updating manifest file", "result": "Fail", "reason": result['reason']})
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Updating manifest file", "result": "Pass"})
+
+    # Delete dashboard files the new manifest doesn't list (raw files removed
+    # from the cruise, files that no longer parse). Not after a stopped
+    # rebuild: its manifest is only partial (#318)
+    if not worker.stop:
+        job_results['parts'].append(worker.prune_dashboard_files(manifest_entries))
 
     # Set permissions
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
