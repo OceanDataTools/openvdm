@@ -4,9 +4,10 @@
  * None of these layers require an API key. Loaded automatically wherever the
  * 'leaflet' script bundle is included (see templates/default/footer.php), so
  * dashboard, lowering and custom dashboard scripts can call openvdmBaseLayers().
+ * Also holds helpers for drawing GeoJSON features, lines and points, on them.
  */
 
-/* exported openvdmBaseLayers, openvdmOverlayLayers */
+/* exported openvdmBaseLayers, openvdmOverlayLayers, openvdmFeaturePositions, openvdmPointMarker, openvdmFeaturePopup */
 
 /**
  * Build a fresh set of basemap layers for the layer switcher.
@@ -90,4 +91,80 @@ function openvdmOverlayLayers () {
             maxZoom: 20
         })
     };
+}
+
+/**
+ * Return a GeoJSON feature's positions as [longitude, latitude] pairs, in order.
+ *
+ * A Point gives one position and a LineString (a track) all of its own, so code
+ * that needs a feature's first or last position works for both (#292).
+ *
+ * @param {Object} feature - A GeoJSON Feature.
+ * @returns {Array} The positions; empty for a missing or unsupported geometry.
+ */
+function openvdmFeaturePositions (feature) {
+    var geometry = feature && feature.geometry;
+    if (!geometry || !geometry.coordinates) {
+        return [];
+    }
+    switch (geometry.type) {
+    case 'Point':
+        return [geometry.coordinates];
+    case 'MultiPoint':
+    case 'LineString':
+        return geometry.coordinates;
+    case 'MultiLineString':
+        return [].concat.apply([], geometry.coordinates);
+    default:
+        return [];
+    }
+}
+
+/**
+ * Return a Leaflet pointToLayer function drawing GeoJSON points as circle markers.
+ *
+ * Without it, L.geoJson draws points as Leaflet's default pin icons.
+ *
+ * @param {string} [color] - Fill colour, e.g. the data type's track colour.
+ * @returns {Function} A pointToLayer function for L.geoJson.
+ */
+function openvdmPointMarker (color) {
+    return function (feature, latlng) {
+        return L.circleMarker(latlng, {
+            radius: 6,
+            weight: 1,
+            color: '#000000',
+            fillColor: color || '#3388ff',
+            fillOpacity: 0.9
+        });
+    };
+}
+
+/**
+ * Leaflet onEachFeature function giving a GeoJSON point a popup of its properties.
+ *
+ * Lists the properties with simple values (e.g. station, cast, time); lines
+ * (tracks) get no popup.
+ *
+ * @param {Object} feature - The GeoJSON Feature.
+ * @param {Object} layer - Its Leaflet layer.
+ */
+function openvdmFeaturePopup (feature, layer) {
+    if (!feature.geometry || feature.geometry.type !== 'Point') {
+        return;
+    }
+    var properties = feature.properties || {};
+    var rows = Object.keys(properties).filter(function (key) {
+        var value = properties[key];
+        return value !== null && value !== undefined && typeof value !== 'object';
+    }).map(function (key) {
+        var name = document.createElement('th');
+        var value = document.createElement('td');
+        name.textContent = key;
+        value.textContent = properties[key];
+        return '<tr>' + name.outerHTML + value.outerHTML + '</tr>';
+    });
+    if (rows.length > 0) {
+        layer.bindPopup('<table class="table table-condensed">' + rows.join('') + '</table>');
+    }
 }
