@@ -16,7 +16,7 @@ from os.path import basename, dirname, realpath, splitext
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
-from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, HEADER_LINES
+from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, HEADER_LINES, SBE9_SCAN_RATE
 
 # Header position, e.g. "* NMEA Latitude = 27 33.77 N", "* NMEA Longitude = 093 46.36 W"
 NMEA_LATITUDE_RE = re.compile(r'NMEA Latitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([NS])')
@@ -81,9 +81,9 @@ class CTDPositionParser(CTDProfileParser):
         if self.metadata['Station'] != 'N/A':
             properties['station'] = self.metadata['Station']
         if self.start_time:
-            if not self.scans_averaged:
-                self.scans_averaged = 1
-            end_time = self.start_time + timedelta(seconds=max(self.scan_count - 1, 0) * self.scan_interval)
+            # One line per scan average; 1 if neither the header nor an .xmlcon says
+            interval = (self.scans_averaged or 1) / SBE9_SCAN_RATE
+            end_time = self.start_time + timedelta(seconds=max(self.scan_count - 1, 0) * interval)
             if (self.start_dt and end_time < self.start_dt.replace(tzinfo=end_time.tzinfo)) or \
                     (self.stop_dt and self.start_time > self.stop_dt.replace(tzinfo=self.start_time.tzinfo)):
                 logging.info("Cast %s is outside the time range", filepath)
@@ -115,7 +115,7 @@ class CTDPositionParser(CTDProfileParser):
         """
 
     @classmethod
-    def _extract_custom_cli_kwargs(cls, args):
+    def _extract_custom_cli_kwargs(cls, args):  # pylint: disable=unused-argument
         return {}
 
 
