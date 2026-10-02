@@ -98,15 +98,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
 
-    def _get_plugin_callable(self, cfg=None):
-        """Return the ``process_file`` function of a collection system transfer's plugin.
+    def _get_plugin_functions(self, cfg=None):
+        """Return a collection system transfer's plugin's ``process_file`` and ``get_source_files``.
+
+        ``get_source_files(filepath)`` is optional: a plugin defines it when a
+        file's arrival means other raw files must be (re)processed, e.g. a CTD
+        cast's ``.xmlcon`` calibration means its ``.hex`` (#288).
 
         Args:
             cfg: The collection system transfer; defaults to the job's transfer.
 
         Returns:
-            Callable | None: The plugin's ``process_file``, or ``None`` if the
-            transfer has no plugin file or the plugin has no ``process_file``.
+            tuple: ``(process_file, get_source_files)``. ``process_file`` is
+            ``None`` if the transfer has no plugin file or the plugin has no
+            ``process_file``; ``get_source_files`` is ``None`` if the plugin
+            doesn't define it.
 
         Raises:
             PluginLoadError: If the plugin file exists but importing it fails,
@@ -119,7 +125,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         plugin_path = os.path.join(plugin_dir, f"{plugin_name}{plugin_suffix}")
 
         if not os.path.isfile(plugin_path):
-            return None
+            return None, None
 
         try:
             spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
@@ -132,9 +138,41 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if not hasattr(plugin_module, 'process_file'):
             logging.warning("Plugin %s does not have a 'process_file(raw_path)' function", plugin_name)
-            return None
+            return None, None
 
-        return plugin_module.process_file
+        return plugin_module.process_file, getattr(plugin_module, 'get_source_files', None)
+
+    def _source_filelist(self, filelist, get_source_files):
+        """Map each file to the raw files the plugin should process for it (#288).
+
+        Args:
+            filelist: File paths relative to the cruise directory.
+            get_source_files: The plugin's ``get_source_files(filepath)``,
+                which takes and returns absolute paths.
+
+        Returns:
+            list: The files to process, relative to the cruise directory,
+            without duplicates, in order. A file the hook fails on is kept as
+            it is; a returned path outside the cruise directory is skipped.
+        """
+        sources = []
+        for filename in filelist:
+            raw_path = os.path.join(self.cruise_dir, filename)
+            try:
+                mapped = get_source_files(raw_path)
+            except Exception as exc:
+                logging.warning("Plugin get_source_files() failed for %s: %s", filename, exc)
+                mapped = [raw_path]
+            for path in mapped:
+                rel_path = os.path.relpath(path, self.cruise_dir)
+                if rel_path.startswith(os.pardir):
+                    logging.warning("Plugin get_source_files() returned %s, outside the cruise directory", path)
+                    continue
+                if rel_path != filename:
+                    logging.info("Processing %s for %s", rel_path, filename)
+                if rel_path not in sources:
+                    sources.append(rel_path)
+        return sources
 
     def _build_paths(self, filename):
         json_filename = f'{os.path.splitext(filename)[0]}.json'
@@ -152,10 +190,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         rel_raw = raw_path.replace(f'{base_dir}/', '')
         entries.append({"dd_json": rel_json, "raw_data": rel_raw})
 
-    def _process_filelist(self, current_job, filelist, plugin_callable, job_results, start=0, end=100):
+    def _process_filelist(self, current_job, filelist, plugin_callable, job_results, start=0, end=100,
+                          get_source_files=None):
+        """Process a list of files using a plugin callable.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            filelist: File paths relative to the cruise directory.
+            plugin_callable: The plugin's ``process_file``.
+            job_results: The job's results, to add parts to.
+            start: Job progress (percent) at the start.
+            end: Job progress (percent) at the end.
+            get_source_files: The plugin's optional ``get_source_files``, to
+                map each file to the raw files to process (#288).
+
+        Returns:
+            tuple: The manifest entries to add and to remove.
         """
-        Process a list of files using a plugin callable.
-        """
+        if get_source_files:
+            filelist = self._source_filelist(filelist, get_source_files)
         base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
         new_manifest_entries = []
         remove_manifest_entries = []
@@ -398,7 +451,7 @@ def task_update_data_dashboard(worker, current_job):
     worker.send_job_status(current_job, 1, 10)
 
     try:
-        plugin_callable = worker._get_plugin_callable()
+        plugin_callable, get_source_files = worker._get_plugin_functions()
     except PluginLoadError as exc:
         job_results['parts'].append({"partName": "Load plugin", "result": "Fail", "reason": str(exc)})
         return json.dumps(job_results)
@@ -419,7 +472,8 @@ def task_update_data_dashboard(worker, current_job):
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Retrieve file list", "result": "Pass"})
 
-    new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90)
+    new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90,
+                                                           get_source_files=get_source_files)
 
     # Load existing manifest
     try:
@@ -497,7 +551,7 @@ def task_rebuild_data_dashboard(worker, current_job):
     for idx, cst in enumerate(active_csts, 1):
         # A plugin that won't load fails its own transfer; the rest are still rebuilt
         try:
-            plugin_callable = worker._get_plugin_callable(cfg=cst)
+            plugin_callable, get_source_files = worker._get_plugin_functions(cfg=cst)
         except PluginLoadError as exc:
             job_results['parts'].append({"partName": f"Load plugin for {cst['name']}", "result": "Fail", "reason": str(exc)})
             plugin_load_failures.append(str(exc))
@@ -521,7 +575,8 @@ def task_rebuild_data_dashboard(worker, current_job):
 
         start = int(80 * idx / len(active_csts) + 10)
         end = int(80 * (idx + 1) / len(active_csts) + 10)
-        new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end)
+        new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end,
+                                                  get_source_files=get_source_files)
         manifest_entries.extend(new_entries)
 
     # Write updated manifest
