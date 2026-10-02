@@ -139,13 +139,12 @@ class CTDProfileParser(OpenVDMCSVParser):
         Args:
             filepath: Path to the cast's ``.hex`` file.
 
-        Returns:
-            bool: ``True`` if the cast can be parsed; ``False`` (with the reason
-            logged) if its calibration coefficients or start time are missing,
-            or its ``.xmlcon`` can't be read.
-
         Raises:
             FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
         """
         xmlcon_path = self.find_xmlcon(filepath)
         if not xmlcon_path:
@@ -154,9 +153,8 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         try:
             root = ET.parse(xmlcon_path).getroot()
-        except (ET.ParseError, OSError) as err:
-            logging.error("Could not read %s: %s", xmlcon_path, err)
-            return False
+        except ET.ParseError as err:
+            raise ValueError(f"Calibration file {xmlcon_path} isn't valid XML: {err}") from err
 
         self.scans_averaged = self._get_float(root, 'ScansToAverage')
 
@@ -167,8 +165,7 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         missing = [coeff for coeff in REQUIRED_COEFFS if self.coeffs.get(coeff) is None]
         if missing:
-            logging.error("%s is missing calibration coefficients: %s", xmlcon_path, ', '.join(missing))
-            return False
+            raise ValueError(f"Calibration file {xmlcon_path} is missing coefficients: {', '.join(missing)}")
 
         pressure_sensor = root.find(".//Sensor[@index='2']")
         self.coeffs['P_Slope'] = self._get_float(pressure_sensor, 'Slope') or DEFAULT_PRESSURE_SLOPE
@@ -176,12 +173,10 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         self.read_header(filepath)
         if not self.start_time:
-            logging.error("No start time (System UTC or System UpLoad Time) in the header of %s", filepath)
-            return False
+            raise ValueError(f"No start time (System UTC or System UpLoad Time) in the header of {filepath}")
         if not self.scans_averaged:
             logging.warning("No scans to average in %s or its header; assuming 1 (24 lines/s)", filepath)
             self.scans_averaged = 1
-        return True
 
     @property
     def scan_interval(self):
@@ -279,45 +274,44 @@ class CTDProfileParser(OpenVDMCSVParser):
             filepath: Path to the cast's ``.hex`` file.
 
         Returns:
-            dict | None: The plugin data, or ``None`` if the cast couldn't be
-            parsed (the reason is logged).
+            dict | None: The plugin data, or ``None`` if the cast has no valid
+            scans (within ``start_dt``/``stop_dt``).
 
         Raises:
             FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
         """
-        if not self.load_config(filepath):
-            return None
+        self.load_config(filepath)
 
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         header_passed = False
         scan_idx = 0
-        try:
-            with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
-                for lineno, line in enumerate(hex_file, start=1):
-                    raw = line.strip()
-                    if not header_passed:
-                        header_passed = '*END*' in raw
-                        continue
-                    if not raw:
-                        continue
-                    try:
-                        if len(raw) < 18:
-                            raise ValueError("short scan")
-                        pressure, temperature, conductivity = self.decode_scan(raw)
-                    except (ValueError, ZeroDivisionError, FloatingPointError) as err:
-                        errors.append(lineno)
-                        logging.debug("Line %s skipped: %s", lineno, err)
-                        continue
-                    raw_data['date_time'].append(self.start_time + timedelta(seconds=scan_idx * self.scan_interval))
-                    raw_data['pressure'].append(pressure)
-                    raw_data['temperature'].append(temperature)
-                    raw_data['conductivity'].append(conductivity)
-                    raw_data['salinity'].append(self.calc_salinity(conductivity, temperature, pressure))
-                    scan_idx += 1
-        except OSError as err:
-            logging.error("Failed to read file %s: %s", filepath, err)
-            return None
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for lineno, line in enumerate(hex_file, start=1):
+                raw = line.strip()
+                if not header_passed:
+                    header_passed = '*END*' in raw
+                    continue
+                if not raw:
+                    continue
+                try:
+                    if len(raw) < 18:
+                        raise ValueError("short scan")
+                    pressure, temperature, conductivity = self.decode_scan(raw)
+                except (ValueError, ZeroDivisionError, FloatingPointError) as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped: %s", lineno, err)
+                    continue
+                raw_data['date_time'].append(self.start_time + timedelta(seconds=scan_idx * self.scan_interval))
+                raw_data['pressure'].append(pressure)
+                raw_data['temperature'].append(temperature)
+                raw_data['conductivity'].append(conductivity)
+                raw_data['salinity'].append(self.calc_salinity(conductivity, temperature, pressure))
+                scan_idx += 1
 
         if not raw_data['date_time']:
             logging.warning("No valid data in file: %s", filepath)
