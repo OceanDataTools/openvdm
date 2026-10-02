@@ -23,8 +23,7 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin
-from server.plugins.parsers.ctd_profile_parser import CTDProfileParser
-from server.plugins.parsers.ctd_position_parser import CTDPositionParser
+from server.plugins.parsers.ctd_profile_parser import CTDPositionParser, CTDProfileParser
 
 # -------------------------------------------------------------------------------------
 # The data types this plugin produces and the files they come from. Patterns are
