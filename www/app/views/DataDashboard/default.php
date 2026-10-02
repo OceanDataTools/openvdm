@@ -10,15 +10,21 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                             <div class="col-lg-12">
 <?php
     for($i = 0; $i < sizeof($data['placeholders']); $i++){
+        // A card with no files for any of its data types isn't shown (#310)
+        $filecount = 0;
+        for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
+            $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
+        }
+        if ($filecount == 0) {
+            continue;
+        }
 ?>
                                 <div class="panel panel-default">
 <?php
-        $filecount = 0;
         for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
 ?>
                                 <a id="<?php echo (!empty($data['placeholders'][$i]['dataFiles'][$j]) ? $data['placeholders'][$i]['dataFiles'][$j][0]['type'] : ''); ?>"></a>
 <?php
-            $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
         }
 ?>
                                     <div class="panel-heading">
@@ -26,7 +32,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                                     </div>
                                     <div class="panel-body">
                                     <<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?> class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;">
-                                    <?php echo ($filecount == 0? 'No Data Found.': ''); ?></<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
+                                    </<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">
