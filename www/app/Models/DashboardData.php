@@ -277,6 +277,90 @@ class DashboardData extends Model {
         $this->buildManifestObj();
     }
 
+    /**
+     * Fold one file's stat into a data type's summary of the same stat.
+     *
+     * Bounds keep the lowest minimum and highest maximum, totals and
+     * validity counts are added up.
+     *
+     * @param object $typeStat The summary's stat, updated in place.
+     * @param object $fileStat The file's stat, of the same name and type.
+     */
+    private static function mergeStat($typeStat, $fileStat) {
+        switch ($fileStat->statType){
+            case "timeBounds":
+                #Start Time
+                if($fileStat->statValue[0] < $typeStat->statValue[0]){
+                    $typeStat->statValue[0] = $fileStat->statValue[0];
+                }
+
+                #End Time
+                if($fileStat->statValue[1] > $typeStat->statValue[1]){
+                    $typeStat->statValue[1] = $fileStat->statValue[1];
+                }
+
+                break;
+
+            case "geoBounds":
+                #North
+                if($fileStat->statValue[0] > $typeStat->statValue[0]){
+                    $typeStat->statValue[0] = $fileStat->statValue[0];
+                }
+
+                #East
+                if($fileStat->statValue[1] > $typeStat->statValue[1]){
+                    $typeStat->statValue[1] = $fileStat->statValue[1];
+                }
+
+                #South
+                if($fileStat->statValue[2] < $typeStat->statValue[2]){
+                    $typeStat->statValue[2] = $fileStat->statValue[2];
+                }
+
+                #West
+                if($fileStat->statValue[3] < $typeStat->statValue[3]){
+                    $typeStat->statValue[3] = $fileStat->statValue[3];
+                }
+
+                break;
+
+            case "bounds":
+                #Min
+                if($fileStat->statValue[0] < $typeStat->statValue[0]){
+                    $typeStat->statValue[0] = $fileStat->statValue[0];
+                }
+
+                #Max
+                if($fileStat->statValue[1] > $typeStat->statValue[1]){
+                    $typeStat->statValue[1] = $fileStat->statValue[1];
+                }
+
+                break;
+
+            case "totalValue":
+                #Sum values
+                $typeStat->statValue[0] += $fileStat->statValue[0];
+
+                break;
+
+            case "valueValidity":
+                #Sum values
+                $typeStat->statValue[0] += $fileStat->statValue[0];
+
+                $typeStat->statValue[1] += $fileStat->statValue[1];
+
+                break;
+            case "rowValidity":
+                #Sum values
+                $typeStat->statValue[0] += $fileStat->statValue[0];
+
+                $typeStat->statValue[1] += $fileStat->statValue[1];
+
+                break;
+
+        }
+    }
+
     public function getDataTypeStats($dataType) {
 
         $return = array((object)array());
@@ -288,94 +372,31 @@ class DashboardData extends Model {
             return $return;
         }
 
-        $dataTypeStatsObj = array((object)array());
-
-        $init = false;
+        // Stats are merged by name and type, not by their place in each file's
+        // list: files of one type don't always have the same stats (#306)
+        $dataTypeStatsObj = array();
+        $statIndex = array();
         for ($i=0; $i < sizeof($dataObjects); $i++) {
             $dataFileStatsObj = $this->getDashboardObjectStatsByJsonName($dataObjects[$i]['dd_json'], $dataType);
 
             if(isset($dataFileStatsObj[0]->error)) {
                 $return[0]->error = $dataFileStatsObj[0]->error;
                 return $return;
-            } else {
-                if(!$init){
-                    $dataTypeStatsObj = $dataFileStatsObj;
-                    $init = true;
+            }
+            if (!is_array($dataFileStatsObj)) {
+                continue;       // no stats in this file
+            }
+
+            foreach ($dataFileStatsObj as $fileStat) {
+                if (!is_object($fileStat) || !isset($fileStat->statType)) {
+                    continue;
+                }
+                $key = $fileStat->statType . '|' . ($fileStat->statName ?? '');
+                if (!isset($statIndex[$key])) {
+                    $statIndex[$key] = sizeof($dataTypeStatsObj);
+                    $dataTypeStatsObj[] = $fileStat;
                 } else {
-                    for ($j=0; $j < sizeof($dataFileStatsObj); $j++) {
-                        switch ($dataFileStatsObj[$j]->statType){
-                            case "timeBounds":
-                                #Start Time
-                                if($dataFileStatsObj[$j]->statValue[0] < $dataTypeStatsObj[$j]->statValue[0]){
-                                    $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
-                                }
-
-                                #End Time
-                                if($dataFileStatsObj[$j]->statValue[1] > $dataTypeStatsObj[$j]->statValue[1]){
-                                    $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
-                                }
-
-                                break;
-
-                            case "geoBounds":
-                                #North
-                                if($dataFileStatsObj[$j]->statValue[0] > $dataTypeStatsObj[$j]->statValue[0]){
-                                    $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
-                                }
-
-                                #East
-                                if($dataFileStatsObj[$j]->statValue[1] > $dataTypeStatsObj[$j]->statValue[1]){
-                                    $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
-                                }
-
-                                #South
-                                if($dataFileStatsObj[$j]->statValue[2] < $dataTypeStatsObj[$j]->statValue[2]){
-                                    $dataTypeStatsObj[$j]->statValue[2] = $dataFileStatsObj[$j]->statValue[2];
-                                }
-
-                                #West
-                                if($dataFileStatsObj[$j]->statValue[3] < $dataTypeStatsObj[$j]->statValue[3]){
-                                    $dataTypeStatsObj[$j]->statValue[3] = $dataFileStatsObj[$j]->statValue[3];
-                                }
-
-                                break;
-
-                            case "bounds":
-                                #Min
-                                if($dataFileStatsObj[$j]->statValue[0] < $dataTypeStatsObj[$j]->statValue[0]){
-                                    $dataTypeStatsObj[$j]->statValue[0] = $dataFileStatsObj[$j]->statValue[0];
-                                }
-
-                                #Max
-                                if($dataFileStatsObj[$j]->statValue[1] > $dataTypeStatsObj[$j]->statValue[1]){
-                                    $dataTypeStatsObj[$j]->statValue[1] = $dataFileStatsObj[$j]->statValue[1];
-                                }
-
-                                break;
-
-                            case "totalValue":
-                                #Sum values
-                                $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
-
-                                break;
-
-                            case "valueValidity":
-                                #Sum values
-                                $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
-
-                                $dataTypeStatsObj[$j]->statValue[1] += $dataFileStatsObj[$j]->statValue[1];
-
-                                break;
-                            case "rowValidity":
-                                #Sum values
-                                $dataTypeStatsObj[$j]->statValue[0] += $dataFileStatsObj[$j]->statValue[0];
-
-                                $dataTypeStatsObj[$j]->statValue[1] += $dataFileStatsObj[$j]->statValue[1];
-
-                                break;
-
-                        }
-                    }
+                    self::mergeStat($dataTypeStatsObj[$statIndex[$key]], $fileStat);
                 }
             }
         }
