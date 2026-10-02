@@ -85,6 +85,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - On data dashboard tabs (default and lowering), a data type's file names no longer wrap inside a narrow grid cell with most of the row empty: files sit side by side and only wrap between files, or when a name is wider than the whole card. The blank line after a map's Latest Position or Start/End Positions checkbox on narrower screens is gone too (#280, #282)
 - Fix GeoTIFF layers served through TiTiler (`geotiff_titiler_parser`) not showing on lowering tabs: their map requested pre-rendered tiles from an `undefined` directory. The default tab, lowering tab and main page now build tile layers with one shared function in `mapBaseLayers.js`, which handles both pre-rendered tiles and TiTiler. `custom1.js.dist` uses it too; sites with their own `custom1.js` can update its `addTMSToMap()` to match (#298)
 - Fix the data dashboard page jumping up when a different file is chosen on the last chart of a tab (default and lowering tabs), most noticeably on an expanded chart or a depth profile. Redrawing a chart briefly shrank its canvas, so a page scrolled to the bottom lost its scroll position (#302)
+- Remove leftover debug output: the data dashboard wrote a bare data type name into pages and `api/dashboardData` responses (corrupting the JSON) when a file had no visualizer data, stats or quality tests for the requested data type, and **Finalize Current Lowering** printed two timestamps before redirecting, which could stop the redirect (#308)
 
 ---
 
