@@ -2,13 +2,15 @@
 """Plugin for Sea-Bird SBE 911plus CTD casts.
 
 Matches each cast's raw ``.hex`` file, runs it through the CTD profile parser
-(which reads the calibration from the cast's ``.xmlcon``), and returns the
-JSON-formatted plugin data used by OpenVDM's Data Dashboard under the ``ctd``
-data type. Errors that stop a cast (e.g. no ``.xmlcon``) are logged here and
+(which reads the calibration from the cast's ``.xmlcon``) and the CTD position
+parser, and returns the JSON-formatted plugin data used by OpenVDM's Data
+Dashboard under the ``ctd`` (profile) and ``ctd-position`` (map point) data
+types. Errors that stop a cast (e.g. no ``.xmlcon``) are logged here and
 the cast is skipped. When a cast's ``.xmlcon`` arrives or changes, the data
 dashboard re-parses the cast's ``.hex`` (``get_source_files()``). To draw the casts as depth profiles, add a chart to a
 tab in ``datadashboard.yaml`` with ``dataType: ctd``, ``visType:
-json-profile`` and ``depthSeries: Pressure``.
+json-profile`` and ``depthSeries: Pressure``; to show where they were taken,
+add ``dataType: ctd-position`` (``visType: geoJSON``) to a map.
 """
 
 import sys
@@ -22,6 +24,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.ctd_profile_parser import CTDProfileParser
+from server.plugins.parsers.ctd_position_parser import CTDPositionParser
 
 # -------------------------------------------------------------------------------------
 # The data types this plugin produces and the files they come from. Patterns are
@@ -29,7 +32,8 @@ from server.plugins.parsers.ctd_profile_parser import CTDProfileParser
 # profile plot of each cast there (needs matplotlib).
 # -------------------------------------------------------------------------------------
 FILE_TYPE_FILTERS = [
-    {"data_type": "ctd", "regex": "*.hex", "parser": "CTDProfile", "parser_options": {}}
+    {"data_type": "ctd", "regex": "*.hex", "parser": "CTDProfile", "parser_options": {}},
+    {"data_type": "ctd-position", "regex": "*.hex", "parser": "CTDPosition", "parser_options": {}},
 ]
 
 # Errors the parser raises for a cast it can't parse (logged without a traceback)
@@ -43,7 +47,8 @@ class CTDPlugin(OpenVDMPlugin):
         super().__init__(FILE_TYPE_FILTERS)
 
         self.PARSER_MAP = {
-            "CTDProfile": CTDProfileParser
+            "CTDProfile": CTDProfileParser,
+            "CTDPosition": CTDPositionParser,
         }
 
     @staticmethod

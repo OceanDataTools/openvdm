@@ -139,6 +139,8 @@
     dataArray:
     - dataType: gga
       visType: geoJSON
+    - dataType: ctd-position
+      visType: geoJSON
     - dataType: geotiff
       visType: tms
 
