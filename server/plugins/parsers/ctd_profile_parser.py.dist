@@ -5,9 +5,10 @@ Parses a cast's raw SBE 9plus ``.hex`` file, using the calibration
 coefficients in the cast's ``.xmlcon`` file (the same basename as the
 ``.hex`` file, e.g. ``CTD001.hex`` and ``CTD001.xmlcon``; the extension may
 be in any case), and returns the
-JSON-formatted plugin data used by OpenVDM's Data Dashboard: pressure,
-temperature, conductivity and salinity, which the dashboard can draw as a
-depth profile (``visType: json-profile`` with ``depthSeries: Pressure``).
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: pressure (from
+the Digiquartz sensor, temperature-compensated), temperature, conductivity
+and salinity, which the dashboard can draw as a depth profile
+(``visType: json-profile`` with ``depthSeries: Pressure``).
 Optionally also saves a PNG profile plot, which needs matplotlib (not
 installed by ``requirements.txt``).
 
@@ -53,22 +54,39 @@ START_TIME_RE = re.compile(r'System (?:UTC|UpLoad Time)\s*=\s*(.+)')
 START_TIME_FORMAT = '%b %d %Y %H:%M:%S'
 
 # A "**" metadata line, e.g. "** Station:   001" (some write "Cast::")
-METADATA_RE = re.compile(r'^\*\*\s*(\w+)\s*:+\s*(.*)$')
+METADATA_RE = re.compile(r'^\*\*\s*(\w[\w ]*?)\s*:+\s*(.*)$')
+
+# Other names for the metadata keys
+METADATA_ALIASES = {'Bottom Depth': 'Depth'}
 
 # The SBE 9plus samples at 24 Hz; the deck unit writes the average of every
 # ScansToAverage scans, e.g. one line per second for 24
 SBE9_SCAN_RATE = 24.0
 SCANS_AVERAGED_RE = re.compile(r'Number of Scans Averaged by the Deck Unit\s*=\s*(\d+)', re.IGNORECASE)
 
-# Pressure fallbacks when the XMLCON's Slope/Offset are missing or zero.
-# See #286: these may not be right for a Digiquartz sensor.
-DEFAULT_PRESSURE_SLOPE = 0.528407
-DEFAULT_PRESSURE_OFFSET = 33306.0
+# Bytes in each scan, e.g. "* Number of Bytes Per Scan = 40"
+BYTES_PER_SCAN_RE = re.compile(r'Number of Bytes Per Scan\s*=\s*(\d+)')
 
 # Temperature (T0) and conductivity (C0) sensors in the XMLCON
 SENSOR_COEFFS = [(0, 'T0'), (1, 'C0')]
 SENSOR_COEFF_NAMES = ['G', 'H', 'I', 'J', 'F0', 'CPcor', 'CTcor']
-REQUIRED_COEFFS = ['T0_G', 'T0_H', 'T0_I', 'T0_J', 'T0_F0', 'C0_G', 'C0_H', 'C0_I', 'C0_J']
+
+# Digiquartz pressure sensor (Sensor index 2): pressure coefficients, and the
+# AD590 coefficients that turn the scan's 12-bit word into the sensor's
+# temperature. Slope and Offset, a final linear correction, are optional.
+PRESSURE_COEFF_NAMES = ['C1', 'C2', 'C3', 'D1', 'D2', 'T1', 'T2', 'T3', 'T4', 'T5', 'AD590M', 'AD590B']
+
+REQUIRED_COEFFS = ['T0_G', 'T0_H', 'T0_I', 'T0_J', 'T0_F0', 'C0_G', 'C0_H', 'C0_I', 'C0_J'] + \
+    [f'P_{name}' for name in PRESSURE_COEFF_NAMES]
+
+# Conductivity cell thermal expansion (CTcor) and pressure (CPcor) corrections
+# when the XMLCON doesn't give them
+DEFAULT_CTCOR = 3.25e-6
+DEFAULT_CPCOR = -9.57e-8
+
+# The Digiquartz equation gives absolute pressure in psia
+ATMOSPHERE_PSIA = 14.7
+DBAR_PER_PSI = 0.689476
 
 SERIES = [
     ('pressure', 'Pressure', 'db'),
@@ -99,6 +117,7 @@ class CTDProfileParser(OpenVDMCSVParser):
                          use_openvdm_api=use_openvdm_api)
         self.plot_dir = plot_dir
         self.coeffs = {}
+        self.bytes_per_scan = None
         self.scans_averaged = None
         self.start_time = None
         self.metadata = {key: 'N/A' for key in METADATA_KEYS}
@@ -162,16 +181,24 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         for index, name in SENSOR_COEFFS:
             sensor = root.find(f".//Sensor[@index='{index}']")
+            # A conductivity sensor has two coefficient sets; the G-J one is equation 1
+            if sensor is not None and sensor.find(".//Coefficients[@equation='1']") is not None:
+                sensor = sensor.find(".//Coefficients[@equation='1']")
             for coeff in SENSOR_COEFF_NAMES:
                 self.coeffs[f'{name}_{coeff}'] = self._get_float(sensor, coeff)
+
+        pressure_sensor = root.find(".//Sensor[@index='2']")
+        for coeff in PRESSURE_COEFF_NAMES + ['Slope', 'Offset']:
+            self.coeffs[f'P_{coeff}'] = self._get_float(pressure_sensor, coeff)
 
         missing = [coeff for coeff in REQUIRED_COEFFS if self.coeffs.get(coeff) is None]
         if missing:
             raise ValueError(f"Calibration file {xmlcon_path} is missing coefficients: {', '.join(missing)}")
 
-        pressure_sensor = root.find(".//Sensor[@index='2']")
-        self.coeffs['P_Slope'] = self._get_float(pressure_sensor, 'Slope') or DEFAULT_PRESSURE_SLOPE
-        self.coeffs['P_Offset'] = self._get_float(pressure_sensor, 'Offset') or DEFAULT_PRESSURE_OFFSET
+        for coeff, default in (('P_Slope', 1.0), ('P_Offset', 0.0),
+                               ('C0_CTcor', DEFAULT_CTCOR), ('C0_CPcor', DEFAULT_CPCOR)):
+            if self.coeffs.get(coeff) is None:
+                self.coeffs[coeff] = default
 
         self.read_header(filepath)
         if not self.start_time:
@@ -194,8 +221,14 @@ class CTDProfileParser(OpenVDMCSVParser):
                     break
 
                 match = METADATA_RE.match(line.strip())
-                if match and match.group(1) in self.metadata:
-                    self.metadata[match.group(1)] = match.group(2).strip()
+                if match:
+                    key = METADATA_ALIASES.get(match.group(1), match.group(1))
+                    if key in self.metadata:
+                        self.metadata[key] = match.group(2).strip()
+
+                match = BYTES_PER_SCAN_RE.search(line)
+                if match and not self.bytes_per_scan:
+                    self.bytes_per_scan = int(match.group(1))
 
                 match = SCANS_AVERAGED_RE.search(line)
                 if match and not self.scans_averaged:
@@ -227,8 +260,9 @@ class CTDProfileParser(OpenVDMCSVParser):
         temp68 = temp * 1.00024
         ratio = (cond * 10.0) / 42.914
         rt = 0.6766097 + temp68 * (2.00564e-2 + temp68 * (1.104259e-4 + temp68 * (-6.9698e-7 + temp68 * 1.0031e-9)))
-        rp = 1 + (pres * (2.2838e-7 + pres * (-1.6107e-11 + pres * 2.6203e-15))) / \
-            (1 + temp68 * (1.4936e-2 + temp68 * (-5.896e-4 + temp68 * 1.3932e-4)))
+        # PSS-78 pressure correction
+        rp = 1 + (pres * (2.070e-5 + pres * (-6.370e-10 + pres * 3.989e-15))) / \
+            (1 + temp68 * (3.426e-2 + temp68 * 4.464e-4) + ratio * (4.215e-1 - 3.107e-3 * temp68))
         rt_ratio = max(0, ratio / (rp * rt))
         a = [0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081]
         b = [0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144]
@@ -239,12 +273,48 @@ class CTDProfileParser(OpenVDMCSVParser):
             (b[0] + x * (b[1] + x * (b[2] + x * (b[3] + x * (b[4] + x * b[5])))))
         return salinity + d_salinity
 
+    def calc_pressure(self, freq, temp_word):
+        """Return pressure from the Digiquartz sensor's frequency and temperature word.
+
+        Sea-Bird's SBE 911plus Digiquartz equation: the sensor's temperature
+        ``U = AD590M * N + AD590B`` sets ``C = C1 + C2 U + C3 U^2``,
+        ``D = D1 + D2 U`` and ``T0 = T1 + T2 U + T3 U^2 + T4 U^3 + T5 U^4``;
+        with the period ``T`` in microseconds, absolute pressure is
+        ``C (1 - T0^2/T^2) (1 - D (1 - T0^2/T^2))`` psia, then corrected with
+        ``Slope`` and ``Offset`` and converted to decibars below the surface.
+
+        Args:
+            freq: Pressure sensor frequency in Hz.
+            temp_word: The scan's 12-bit pressure sensor temperature word.
+
+        Returns:
+            float: Pressure in decibars.
+
+        Raises:
+            ValueError: If the frequency isn't positive.
+        """
+        if freq <= 0:
+            raise ValueError("zero pressure frequency")
+        k = self.coeffs
+        temp = k['P_AD590M'] * temp_word + k['P_AD590B']
+        c = k['P_C1'] + k['P_C2'] * temp + k['P_C3'] * temp ** 2
+        d = k['P_D1'] + k['P_D2'] * temp
+        t0 = (k['P_T1'] + k['P_T2'] * temp + k['P_T3'] * temp ** 2
+              + k['P_T4'] * temp ** 3 + k['P_T5'] * temp ** 4)
+        period = 1e6 / freq
+        x = 1 - (t0 / period) ** 2
+        psia = c * x * (1 - d * x)
+        psia = k['P_Slope'] * psia + k['P_Offset']
+        return (psia - ATMOSPHERE_PSIA) * DBAR_PER_PSI
+
     def decode_scan(self, raw):
         """Return a scan's pressure, temperature and conductivity.
 
         Args:
-            raw: A data line from the ``.hex`` file: temperature,
-                conductivity and pressure frequencies as 3-byte hex words.
+            raw: A data line from the ``.hex`` file. It starts with the
+                temperature, conductivity and pressure frequencies (3-byte
+                words) and ends with the 12-bit pressure sensor temperature,
+                a 4-bit status and an 8-bit scan count.
 
         Returns:
             tuple: ``(pressure, temperature, conductivity)`` in decibars,
@@ -256,17 +326,19 @@ class CTDProfileParser(OpenVDMCSVParser):
         freq_t = int(raw[0:6], 16) / 256.0
         freq_c = int(raw[6:12], 16) / 256.0
         freq_p = int(raw[12:18], 16) / 256.0
+        temp_word = int(raw[-6:-3], 16)
         if freq_t <= 0:
             raise ValueError("zero temperature frequency")
 
         coeffs = self.coeffs
-        pressure = (freq_p - coeffs['P_Offset']) * coeffs['P_Slope']
+        pressure = self.calc_pressure(freq_p, temp_word)
         ln_f = np.log(coeffs['T0_F0'] / freq_t)
         temperature = 1.0 / (coeffs['T0_G'] + coeffs['T0_H'] * ln_f + coeffs['T0_I'] * ln_f ** 2
                              + coeffs['T0_J'] * ln_f ** 3) - 273.15
         freq_c_khz = freq_c / 1000
         conductivity = (coeffs['C0_G'] + coeffs['C0_H'] * freq_c_khz ** 2 + coeffs['C0_I'] * freq_c_khz ** 3
-                        + coeffs['C0_J'] * freq_c_khz ** 4) / (10 * (1 + 3.25e-6 * temperature - 9.57e-8 * pressure))
+                        + coeffs['C0_J'] * freq_c_khz ** 4) / \
+            (10 * (1 + coeffs['C0_CTcor'] * temperature + coeffs['C0_CPcor'] * pressure))
         return pressure, temperature, conductivity
 
     def parse(self, filepath):
@@ -301,7 +373,9 @@ class CTDProfileParser(OpenVDMCSVParser):
                 if not raw:
                     continue
                 try:
-                    if len(raw) < 18:
+                    if self.bytes_per_scan and len(raw) != 2 * self.bytes_per_scan:
+                        raise ValueError(f"scan is {len(raw)} characters, expected {2 * self.bytes_per_scan}")
+                    if len(raw) < 24:
                         raise ValueError("short scan")
                     pressure, temperature, conductivity = self.decode_scan(raw)
                 except (ValueError, ZeroDivisionError, FloatingPointError) as err:
