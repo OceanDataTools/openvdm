@@ -9,7 +9,7 @@ types. Errors that stop a cast (e.g. no ``.xmlcon``) are logged here and
 the cast is skipped. When a cast's ``.xmlcon`` arrives or changes, the data
 dashboard re-parses the cast's ``.hex`` (``get_source_files()``). To draw the casts as depth profiles, add a chart to a
 tab in ``datadashboard.yaml`` with ``dataType: ctd``, ``visType:
-json-profile`` and ``depthSeries: Pressure``; to show where they were taken,
+json-profile`` and ``depthSeries: Depth``; to show where they were taken,
 add ``dataType: ctd-position`` (``visType: geoJSON``) to a map.
 """
 
@@ -29,7 +29,9 @@ from server.plugins.parsers.ctd_position_parser import CTDPositionParser
 # -------------------------------------------------------------------------------------
 # The data types this plugin produces and the files they come from. Patterns are
 # matched case-insensitively. Set "plot_dir" in parser_options to also save a PNG
-# profile plot of each cast there (needs matplotlib).
+# profile plot of each cast there (needs matplotlib). For casts with no position
+# (no NMEA in their scans or header), set "latitude" in the ctd filter's
+# parser_options so depth can be computed, e.g. {"latitude": 27.5}.
 # -------------------------------------------------------------------------------------
 FILE_TYPE_FILTERS = [
     {"data_type": "ctd", "regex": "*.hex", "parser": "CTDProfile", "parser_options": {}},

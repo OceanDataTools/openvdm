@@ -193,7 +193,7 @@
     dataArray:
     - dataType: ctd
       visType: json-profile
-      depthSeries: Pressure
+      depthSeries: Depth
       profileSeries: [Temperature, Salinity, Conductivity]
   - plotType: chart
     id: xbt-profile

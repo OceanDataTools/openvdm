@@ -9,21 +9,13 @@ the cast's position, which a map draws alongside the ship's track
 """
 
 import logging
-import re
 import sys
 from datetime import timedelta
 from os.path import basename, dirname, realpath, splitext
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
-from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, HEADER_LINES, SBE9_SCAN_RATE
-
-# Header position, e.g. "* NMEA Latitude = 27 33.77 N", "* NMEA Longitude = 093 46.36 W"
-NMEA_LATITUDE_RE = re.compile(r'NMEA Latitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([NS])')
-NMEA_LONGITUDE_RE = re.compile(r'NMEA Longitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([EW])')
-
-# Decimal places for the position (about 1 m)
-POSITION_DECIMALS = 5
+from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, SBE9_SCAN_RATE
 
 
 class CTDPositionParser(CTDProfileParser):
@@ -33,29 +25,18 @@ class CTDPositionParser(CTDProfileParser):
                  skip_header=False, use_openvdm_api=False):
         super().__init__(start_dt=start_dt, stop_dt=stop_dt, time_format=time_format,
                          skip_header=skip_header, use_openvdm_api=use_openvdm_api)
-        self.latitude = None
-        self.longitude = None
         self.scan_count = 0
 
-    def read_position(self, filepath):
-        """Read the cast's NMEA position from its header, and count its scans."""
+    def count_scans(self, filepath):
+        """Count the cast's scans (the non-blank lines after the header's ``*END*``)."""
         header_passed = False
         with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
-            for lineno, line in enumerate(hex_file):
+            for line in hex_file:
                 if header_passed:
                     if line.strip():
                         self.scan_count += 1
-                    continue
-                if '*END*' in line or lineno >= HEADER_LINES:
-                    header_passed = '*END*' in line
-                    continue
-                for regex, attr in ((NMEA_LATITUDE_RE, 'latitude'), (NMEA_LONGITUDE_RE, 'longitude')):
-                    match = regex.search(line)
-                    if match:
-                        value = int(match.group(1)) + float(match.group(2)) / 60
-                        if match.group(3) in ('S', 'W'):
-                            value = -value
-                        setattr(self, attr, round(value, POSITION_DECIMALS))
+                elif '*END*' in line:
+                    header_passed = True
 
     def parse(self, filepath):
         """Parse the cast's ``.hex`` header and return plugin data dict.
@@ -71,7 +52,7 @@ class CTDPositionParser(CTDProfileParser):
             OSError: If the file can't be read.
         """
         self.read_header(filepath)
-        self.read_position(filepath)
+        self.count_scans(filepath)
 
         if self.latitude is None or self.longitude is None:
             logging.info("No NMEA position in the header of %s", filepath)
