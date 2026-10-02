@@ -211,8 +211,7 @@ class XBTPositionParser(XBTParser):
             properties['max depth'] = round(float(np.nanmax(cast.depth_m)), 1)
 
         latitude, longitude = round(cast.latitude, 5), round(cast.longitude, 5)
-        self.add_time_bounds_stat([launch, launch])
-        self.add_geobounds_stat([latitude, longitude, latitude, longitude])
+        # Only the map point: the cast's stats are the profile data type's (#314)
         self.add_visualization_data({
             'type': 'FeatureCollection',
             'features': [{

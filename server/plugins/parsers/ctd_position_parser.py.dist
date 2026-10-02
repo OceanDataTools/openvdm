@@ -71,11 +71,10 @@ class CTDPositionParser(CTDProfileParser):
                 return None
             properties['start'] = self.start_time.isoformat()
             properties['end'] = end_time.isoformat()
-            self.add_time_bounds_stat([self.start_time, end_time])
         if self.metadata['Depth'] != 'N/A':
             properties['bottom depth'] = self.metadata['Depth']
 
-        self.add_geobounds_stat([self.latitude, self.longitude, self.latitude, self.longitude])
+        # Only the map point: the cast's stats are the profile data type's (#314)
         self.add_visualization_data({
             'type': 'FeatureCollection',
             'features': [{
