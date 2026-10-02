@@ -446,9 +446,12 @@ $(function () {
                         $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
                     }
 
-                    chartObject['chart'] = new Chart(ctx, profile.config);
+                    // Size the canvas before drawing. destroy() puts back the canvas's style from
+                    // when the chart was made; a canvas that shrinks, even briefly, pulls the page
+                    // up when it's scrolled to the bottom (#302)
                     chartObject['heights'] = [400, 800];
                     $(placeholder).css({height: chartObject['heights'][chartObject['expanded'] ? 1 : 0]});
+                    chartObject['chart'] = new Chart(ctx, profile.config);
                 }
             }
         });
@@ -578,9 +581,12 @@ $(function () {
                         $( placeholder.replace('_placeholder', '') + '_zoom-reset-btn').addClass('hidden');
                     }
 
-                    chartObject['chart'] = new Chart(ctx, chartOptions);
+                    // Size the canvas before drawing. destroy() puts back the canvas's style from
+                    // when the chart was made; a canvas that shrinks, even briefly, pulls the page
+                    // up when it's scrolled to the bottom (#302)
                     chartObject['heights'] = inverted ? [400, 800] : [200, 500];
                     $('#' + chartObject['placeholderID']).css({height: chartObject['heights'][chartObject['expanded'] ? 1 : 0]});
+                    chartObject['chart'] = new Chart(ctx, chartOptions);
                 }
             }
         });
