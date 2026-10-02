@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Parser for Sippican/Lockheed Martin MK21 XBT casts.
+
+Parses a cast's ``.EDF`` export with the xbt-edf-qc library, applies its
+automated CSIRO XBT QC Cookbook checks to the cast on its own, and returns the
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: temperature and
+sound velocity against depth without the points QC flags as bad
+(``visType: json-profile`` with ``depthSeries: Depth``), and the cast's
+position as a map point (``visType: geoJSON``). Checks that compare casts with
+each other (ship speed, repeat casts) don't run. Needs xbt-edf-qc
+(https://github.com/botheredbybees/xbt-edf-qc), which ``requirements.txt``
+doesn't install; the sample data install does, with
+``pip install --no-deps "xbt-edf-qc @ git+https://github.com/botheredbybees/xbt-edf-qc.git@a784145a2dc9462d8071747b5dfcfcfd2c3fee70" global-land-mask``.
+"""
+
+import logging
+import sys
+from datetime import timedelta, timezone
+from os.path import basename, dirname, realpath, splitext
+
+import numpy as np
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.lib.openvdm_plugin import OpenVDMCSVParser
+
+try:
+    from parse_xbt_edf import (EDFParseError, GTSPP_GOOD, apply_qc, is_test_probe_cast,
+                               parse_edf)
+except ImportError as err:
+    raise ImportError(
+        "xbt_parser needs the xbt-edf-qc library: pip install --no-deps "
+        "\"xbt-edf-qc @ git+https://github.com/botheredbybees/xbt-edf-qc.git\" global-land-mask"
+    ) from err
+
+__all__ = ['XBTParser', 'XBTPositionParser', 'EDFParseError']
+
+ROUNDING = {
+    'depth': 2,
+    'temperature': 3,
+    'sound_velocity': 2,
+}
+
+# Dashboard series: column, label, unit
+SERIES = [
+    ('depth', 'Depth', 'm'),
+    ('temperature', 'Temperature', 'C'),
+    ('sound_velocity', 'Sound Velocity', 'm/s'),
+]
+
+# Share of temperature points flagged as bad (besides the surface transient)
+# above which the profile's test fails
+TEMPERATURE_FAIL_RATE = 0.25
+
+# QC history codes (xbt-edf-qc) and what they mean for OpenVDM's quality tests
+SURFACE_TRANSIENT = 'CS'                 # top few metres, expected on every cast
+PROFILE_WARNINGS = {'WB', 'SP', 'RC'}    # wire break, spikes, out-of-range values
+POSITION_ON_LAND = 'PL'
+PROBE_TYPE = 'PR'
+
+
+def _as_utc(value):
+    """Return *value*, a datetime, as UTC; a naive one is taken to be UTC (as the EDF records)."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+class XBTParser(OpenVDMCSVParser):
+    """Parser for an MK21 XBT cast's temperature and sound velocity profile."""
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False):
+        super().__init__(None, ['date_time', 'depth', 'temperature', 'sound_velocity'],
+                         start_dt=start_dt, stop_dt=stop_dt, time_format=time_format,
+                         skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+
+    def _outside_time_range(self, start, end):
+        """Return True if the cast (start to end) is outside ``start_dt``/``stop_dt``."""
+        return bool((self.start_dt and end < _as_utc(self.start_dt))
+                    or (self.stop_dt and start > _as_utc(self.stop_dt)))
+
+    def parse(self, filepath):
+        """Parse the XBT cast and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.EDF`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` for a test probe cast
+            (the recorder's self-test), a cast without good data, or one
+            outside ``start_dt``/``stop_dt``.
+
+        Raises:
+            EDFParseError: If the file can't be read or parsed.
+        """
+        cast = parse_edf(filepath, voyage_id='')
+        if is_test_probe_cast(cast):
+            logging.info("Skipping test probe cast %s", filepath)
+            return None
+
+        qc = apply_qc([cast])[0]
+        launch = _as_utc(cast.launch_time)
+        times = [launch + timedelta(seconds=float(s)) for s in cast.elapsed_s]
+        if not times or self._outside_time_range(times[0], times[-1]):
+            return None
+
+        good_depth = (qc.depth_qc == GTSPP_GOOD) & np.isfinite(cast.depth_m)
+        good = {
+            'depth': good_depth,
+            'temperature': good_depth & (qc.temperature_qc == GTSPP_GOOD)
+            & np.isfinite(cast.temperature_c),
+        }
+        # The recorder computes sound velocity from temperature, so bad temperatures mean bad
+        # sound velocities too (the library's checks flag temperature)
+        good['sound_velocity'] = good['temperature'] & (qc.sound_velocity_qc == GTSPP_GOOD) \
+            & np.isfinite(cast.sound_velocity_ms)
+        values = {'depth': cast.depth_m, 'temperature': cast.temperature_c,
+                  'sound_velocity': cast.sound_velocity_ms}
+        if not good['temperature'].any():
+            logging.warning("No good temperature data in %s", filepath)
+            return None
+
+        codes = [entry.qc_flag for entry in qc.history]
+        bad_temperature = int((~good['temperature'] & np.isfinite(cast.temperature_c)).sum())
+        self.add_row_validity_stat([int(good['temperature'].sum()), bad_temperature])
+        self.add_time_bounds_stat([times[0], times[-1]])
+        self.add_geobounds_stat([round(cast.latitude, 5), round(cast.longitude, 5),
+                                 round(cast.latitude, 5), round(cast.longitude, 5)])
+        for col, label, unit in SERIES:
+            if good[col].any():
+                selected = values[col][good[col]]
+                self.add_bounds_stat([round(float(selected.min()), ROUNDING[col]),
+                                      round(float(selected.max()), ROUNDING[col])], label, unit)
+        self.add_quality_tests(qc, codes)
+
+        # Depth is the profile's vertical axis: a series is drawn only where it and depth are good
+        for col, label, unit in SERIES:
+            if not good[col].any():
+                continue
+            viz = {'label': label, 'unit': unit, 'data': [
+                [int(times[i].timestamp() * 1000), round(float(values[col][i]), ROUNDING[col])]
+                for i in np.flatnonzero(good[col])
+            ]}
+            self.add_visualization_data(viz)
+
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+    def add_quality_tests(self, qc, codes):
+        """Add OpenVDM quality tests from the cast's QC results.
+
+        Args:
+            qc: The cast's ``CastQC`` from xbt-edf-qc.
+            codes: The QC history codes that fired, e.g. ``['CS', 'SP']``.
+        """
+        # Temperature profile: too many flagged points beyond the expected surface
+        # transient fail it; a wire break (the profile ends there), spikes or
+        # out-of-range values warn
+        real = np.isfinite(qc.cast.temperature_c)
+        flagged = (qc.temperature_qc != GTSPP_GOOD) & real
+        surface = [entry for entry in qc.history if entry.qc_flag == SURFACE_TRANSIENT]
+        if surface:
+            flagged &= qc.cast.depth_m > max(entry.stop_depth for entry in surface)
+        rate = flagged.sum() / max(real.sum(), 1)
+        if rate > TEMPERATURE_FAIL_RATE:
+            self.add_quality_test_failed('Temperature profile')
+        elif PROFILE_WARNINGS & set(codes):
+            self.add_quality_test_warning('Temperature profile')
+        else:
+            self.add_quality_test_passed('Temperature profile')
+
+        if POSITION_ON_LAND in codes or (qc.latitude_qc, qc.longitude_qc) != (GTSPP_GOOD, GTSPP_GOOD):
+            self.add_quality_test_failed('Position')
+        else:
+            self.add_quality_test_passed('Position')
+
+        if PROBE_TYPE in codes:
+            self.add_quality_test_warning('Probe type')
+        else:
+            self.add_quality_test_passed('Probe type')
+
+
+class XBTPositionParser(XBTParser):
+    """Parser for the launch position of an MK21 XBT cast."""
+
+    def parse(self, filepath):
+        """Parse the XBT cast's position and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.EDF`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` for a test probe cast or
+            one launched outside ``start_dt``/``stop_dt``.
+
+        Raises:
+            EDFParseError: If the file can't be read or parsed.
+        """
+        cast = parse_edf(filepath, voyage_id='')
+        if is_test_probe_cast(cast):
+            logging.info("Skipping test probe cast %s", filepath)
+            return None
+        launch = _as_utc(cast.launch_time)
+        if self._outside_time_range(launch, launch):
+            return None
+
+        properties = {'cast': splitext(basename(filepath))[0], 'probe type': cast.probe_type,
+                      'launch': launch.isoformat()}
+        if cast.serial_number.strip():
+            properties['serial number'] = cast.serial_number.strip()
+        if np.isfinite(cast.depth_m).any():
+            properties['max depth'] = round(float(np.nanmax(cast.depth_m)), 1)
+
+        latitude, longitude = round(cast.latitude, 5), round(cast.longitude, 5)
+        self.add_time_bounds_stat([launch, launch])
+        self.add_geobounds_stat([latitude, longitude, latitude, longitude])
+        self.add_visualization_data({
+            'type': 'FeatureCollection',
+            'features': [{
+                'type': 'Feature',
+                'geometry': {'type': 'Point', 'coordinates': [longitude, latitude]},
+                'properties': properties,
+            }],
+        })
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    XBTParser.run_cli()

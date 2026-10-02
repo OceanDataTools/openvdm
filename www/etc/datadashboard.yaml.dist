@@ -141,6 +141,8 @@
       visType: geoJSON
     - dataType: ctd-position
       visType: geoJSON
+    - dataType: xbt-position
+      visType: geoJSON
     - dataType: geotiff
       visType: tms
 
@@ -193,6 +195,14 @@
       visType: json-profile
       depthSeries: Pressure
       profileSeries: [Temperature, Salinity, Conductivity]
+  - plotType: chart
+    id: xbt-profile
+    heading: XBT Casts
+    dataArray:
+    - dataType: xbt
+      visType: json-profile
+      depthSeries: Depth
+      profileSeries: [Temperature, Sound Velocity]
 
 # Example tab for lowering data (e.g. from the ROV OpenRVDAS plugin). The "lowering"
 # view adds a drop-down to choose the lowering and shows only that lowering's files.
