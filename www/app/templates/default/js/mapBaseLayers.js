@@ -7,7 +7,10 @@
  * Also holds helpers for drawing GeoJSON features, lines and points, on them.
  */
 
-/* exported openvdmBaseLayers, openvdmOverlayLayers, openvdmFeaturePositions, openvdmPointMarker, openvdmFeaturePopup */
+/* exported openvdmBaseLayers, openvdmOverlayLayers, openvdmFeaturePositions, openvdmPointMarker, openvdmFeaturePopup, openvdmTileLayer */
+
+// Where Apache serves TiTiler (see the installer's ProxyPass /titiler/)
+var OPENVDM_TITILER_URL = '/titiler';
 
 /**
  * Build a fresh set of basemap layers for the layer switcher.
@@ -167,4 +170,34 @@ function openvdmFeaturePopup (feature, layer) {
     if (rows.length > 0) {
         layer.bindPopup('<table class="table table-condensed">' + rows.join('') + '</table>');
     }
+}
+
+/**
+ * Build the tile layer for a data dashboard "tms" object (#298).
+ *
+ * Handles both kinds: pre-rendered TMS tiles in the cruise data directory
+ * (``tileDirectory``, from geotiff_parser) and GeoTIFFs served through TiTiler
+ * (``tileURL``, from geotiff_titiler_parser). The layer is limited to the
+ * object's ``mapBounds`` ("west,south,east,north").
+ *
+ * @param {Object} tms - The object's visualizer data.
+ * @param {string} dataDir - The cruise data directory URL path (cruiseDataDir).
+ * @param {Object} [options] - Extra L.tileLayer options, e.g. zIndex.
+ * @returns {Object|null} The L.tileLayer, or null if the object has neither.
+ */
+function openvdmTileLayer (tms, dataDir, options) {
+    var coords = String(tms.mapBounds).split(',').map(parseFloat);
+    var layerOptions = Object.assign({
+        bounds: L.latLngBounds(L.latLng(coords[1], coords[0]), L.latLng(coords[3], coords[2]))
+    }, options || {});
+
+    if (tms.tileDirectory) {
+        return L.tileLayer(location.protocol + '//' + location.host + dataDir + '/' + tms.tileDirectory + '/{z}/{x}/{y}.png',
+            Object.assign({ tms: true }, layerOptions));
+    }
+    if (tms.tileURL) {
+        return L.tileLayer(OPENVDM_TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(tms.tileURL),
+            layerOptions);
+    }
+    return null;
 }
