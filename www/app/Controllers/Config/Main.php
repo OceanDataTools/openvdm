@@ -760,8 +760,6 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
             } else {
                 $prev_time = strtotime($loweringEndDate);
-                var_dump($prev_time);
-                var_dump($roundedTimestamp);
                 if ($prev_time > $roundedTimestamp) {
                     $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
                 }
