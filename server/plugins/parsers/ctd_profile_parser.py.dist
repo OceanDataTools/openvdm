@@ -1,0 +1,446 @@
+#!/usr/bin/env python3
+"""Parser for Sea-Bird CTD casts.
+
+Parses a cast's raw SBE 9plus ``.hex`` file, using the calibration
+coefficients in the cast's ``.xmlcon`` file (the same basename as the
+``.hex`` file, e.g. ``CTD001.hex`` and ``CTD001.xmlcon``; the extension may
+be in any case), and returns the
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: pressure,
+temperature, conductivity and salinity, which the dashboard can draw as a
+depth profile (``visType: json-profile`` with ``depthSeries: Pressure``).
+Optionally also saves a PNG profile plot, which needs matplotlib (not
+installed by ``requirements.txt``).
+
+Based on original code by Oscar Garcia (CSIC), ogarcia@utm.csic.es.
+"""
+
+import logging
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from os.path import basename, dirname, join, realpath, splitext
+
+import numpy as np
+import pandas as pd
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.lib.openvdm_plugin import OpenVDMCSVParser
+
+PROC_COLS = ['date_time', 'pressure', 'temperature', 'conductivity', 'salinity']
+
+ROUNDING = {
+    'pressure': 3,
+    'temperature': 4,
+    'conductivity': 5,
+    'salinity': 4,
+}
+
+# Scans are averaged into this interval, so a long cast doesn't produce tens
+# of thousands of points per series
+RESAMPLE_INTERVAL = '5s'
+
+# Header lines (marked "**") whose values label the plot
+METADATA_KEYS = ['Ship', 'Cruise', 'Date', 'Station', 'Cast', 'Depth']
+
+# Number of header lines searched for the metadata and the start time
+HEADER_LINES = 250
+
+# Start time of the cast, e.g. "* System UTC = Apr 12 2014 14:23:05"
+START_TIME_RE = re.compile(r'System (?:UTC|UpLoad Time)\s*=\s*(.+)')
+START_TIME_FORMAT = '%b %d %Y %H:%M:%S'
+
+# A "**" metadata line, e.g. "** Station:   001" (some write "Cast::")
+METADATA_RE = re.compile(r'^\*\*\s*(\w+)\s*:+\s*(.*)$')
+
+# The SBE 9plus samples at 24 Hz; the deck unit writes the average of every
+# ScansToAverage scans, e.g. one line per second for 24
+SBE9_SCAN_RATE = 24.0
+SCANS_AVERAGED_RE = re.compile(r'Number of Scans Averaged by the Deck Unit\s*=\s*(\d+)', re.IGNORECASE)
+
+# Pressure fallbacks when the XMLCON's Slope/Offset are missing or zero.
+# See #286: these may not be right for a Digiquartz sensor.
+DEFAULT_PRESSURE_SLOPE = 0.528407
+DEFAULT_PRESSURE_OFFSET = 33306.0
+
+# Temperature (T0) and conductivity (C0) sensors in the XMLCON
+SENSOR_COEFFS = [(0, 'T0'), (1, 'C0')]
+SENSOR_COEFF_NAMES = ['G', 'H', 'I', 'J', 'F0', 'CPcor', 'CTcor']
+REQUIRED_COEFFS = ['T0_G', 'T0_H', 'T0_I', 'T0_J', 'T0_F0', 'C0_G', 'C0_H', 'C0_I', 'C0_J']
+
+SERIES = [
+    ('pressure', 'Pressure', 'db'),
+    ('temperature', 'Temperature', 'C'),
+    ('conductivity', 'Conductivity', 'S/m'),
+    ('salinity', 'Salinity', 'PSU'),
+]
+
+
+class CTDProfileParser(OpenVDMCSVParser):
+    """Parser for Sea-Bird CTD ``.hex`` casts."""
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False, plot_dir=None):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: Unused; the cast's times come from its header.
+            skip_header: Unused; the header ends at ``*END*``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            plot_dir: Directory to save a PNG profile plot of each cast in
+                (``<cast>.png``), or ``None`` for no plot.
+        """
+        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
+        self.plot_dir = plot_dir
+        self.coeffs = {}
+        self.scans_averaged = None
+        self.start_time = None
+        self.metadata = {key: 'N/A' for key in METADATA_KEYS}
+
+    @staticmethod
+    def find_xmlcon(filepath):
+        """Return the cast's ``.xmlcon`` file (same basename, extension in any case), or ``None``."""
+        base = basename(splitext(filepath)[0])
+        directory = dirname(realpath(filepath))
+        for name in sorted(os.listdir(directory)):
+            stem, ext = splitext(name)
+            if stem == base and ext.lower() == '.xmlcon':
+                return join(directory, name)
+        return None
+
+    @staticmethod
+    def _get_float(parent, tag):
+        """Return the number in *parent*'s first ``<tag>``, or ``None`` if it's missing or not a number.
+
+        Args:
+            parent: XML element to search, or ``None``.
+            tag: Element name to find at any depth.
+
+        Returns:
+            float | None: The value.
+        """
+        if parent is None:
+            return None
+        node = parent.find(f".//{tag}")
+        if node is None or not node.text:
+            return None
+        try:
+            return float(node.text)
+        except ValueError:
+            return None
+
+    def load_config(self, filepath):
+        """Read the calibration, sample rate, start time and metadata for the cast.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
+        """
+        xmlcon_path = self.find_xmlcon(filepath)
+        if not xmlcon_path:
+            expected = splitext(filepath)[0] + '.xmlcon'
+            raise FileNotFoundError(f"No calibration file for {filepath}: expected {expected}")
+
+        try:
+            root = ET.parse(xmlcon_path).getroot()
+        except ET.ParseError as err:
+            raise ValueError(f"Calibration file {xmlcon_path} isn't valid XML: {err}") from err
+
+        self.scans_averaged = self._get_float(root, 'ScansToAverage')
+
+        for index, name in SENSOR_COEFFS:
+            sensor = root.find(f".//Sensor[@index='{index}']")
+            for coeff in SENSOR_COEFF_NAMES:
+                self.coeffs[f'{name}_{coeff}'] = self._get_float(sensor, coeff)
+
+        missing = [coeff for coeff in REQUIRED_COEFFS if self.coeffs.get(coeff) is None]
+        if missing:
+            raise ValueError(f"Calibration file {xmlcon_path} is missing coefficients: {', '.join(missing)}")
+
+        pressure_sensor = root.find(".//Sensor[@index='2']")
+        self.coeffs['P_Slope'] = self._get_float(pressure_sensor, 'Slope') or DEFAULT_PRESSURE_SLOPE
+        self.coeffs['P_Offset'] = self._get_float(pressure_sensor, 'Offset') or DEFAULT_PRESSURE_OFFSET
+
+        self.read_header(filepath)
+        if not self.start_time:
+            raise ValueError(f"No start time (System UTC or System UpLoad Time) in the header of {filepath}")
+        if not self.scans_averaged:
+            logging.warning("No scans to average in %s or its header; assuming 1 (24 lines/s)", filepath)
+            self.scans_averaged = 1
+
+    @property
+    def scan_interval(self):
+        """Seconds between the lines of the ``.hex`` file."""
+        return self.scans_averaged / SBE9_SCAN_RATE
+
+    def read_header(self, filepath):
+        """Read the cast's start time and ``**`` metadata lines from its header."""
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for _ in range(HEADER_LINES):
+                line = hex_file.readline()
+                if not line or '*END*' in line:
+                    break
+
+                match = METADATA_RE.match(line.strip())
+                if match and match.group(1) in self.metadata:
+                    self.metadata[match.group(1)] = match.group(2).strip()
+
+                match = SCANS_AVERAGED_RE.search(line)
+                if match and not self.scans_averaged:
+                    self.scans_averaged = float(match.group(1))
+
+                match = START_TIME_RE.search(line)
+                if match and not self.start_time:
+                    try:
+                        self.start_time = datetime.strptime(match.group(1).strip(), START_TIME_FORMAT) \
+                            .replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        logging.warning("Unreadable start time in %s: %s", filepath, line.strip())
+
+    @staticmethod
+    def calc_salinity(cond, temp, pres):
+        """Return practical salinity (PSS-78) from conductivity, temperature and pressure.
+
+        Args:
+            cond: Conductivity in S/m.
+            temp: Temperature in degrees C (ITS-90).
+            pres: Pressure in decibars.
+
+        Returns:
+            float: Salinity in PSU; 0.0 for zero, negative or missing
+            conductivity (e.g. out of the water).
+        """
+        if cond <= 0 or np.isnan(cond):
+            return 0.0
+        temp68 = temp * 1.00024
+        ratio = (cond * 10.0) / 42.914
+        rt = 0.6766097 + temp68 * (2.00564e-2 + temp68 * (1.104259e-4 + temp68 * (-6.9698e-7 + temp68 * 1.0031e-9)))
+        rp = 1 + (pres * (2.2838e-7 + pres * (-1.6107e-11 + pres * 2.6203e-15))) / \
+            (1 + temp68 * (1.4936e-2 + temp68 * (-5.896e-4 + temp68 * 1.3932e-4)))
+        rt_ratio = max(0, ratio / (rp * rt))
+        a = [0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081]
+        b = [0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144]
+        x = np.sqrt(rt_ratio)
+        salinity = a[0] + x * (a[1] + x * (a[2] + x * (a[3] + x * (a[4] + x * a[5]))))
+        d_temp = temp68 - 15.0
+        d_salinity = (d_temp / (1 + 0.0162 * d_temp)) * \
+            (b[0] + x * (b[1] + x * (b[2] + x * (b[3] + x * (b[4] + x * b[5])))))
+        return salinity + d_salinity
+
+    def decode_scan(self, raw):
+        """Return a scan's pressure, temperature and conductivity.
+
+        Args:
+            raw: A data line from the ``.hex`` file: temperature,
+                conductivity and pressure frequencies as 3-byte hex words.
+
+        Returns:
+            tuple: ``(pressure, temperature, conductivity)`` in decibars,
+            degrees C and S/m.
+
+        Raises:
+            ValueError: If the line isn't hex or a frequency is zero.
+        """
+        freq_t = int(raw[0:6], 16) / 256.0
+        freq_c = int(raw[6:12], 16) / 256.0
+        freq_p = int(raw[12:18], 16) / 256.0
+        if freq_t <= 0:
+            raise ValueError("zero temperature frequency")
+
+        coeffs = self.coeffs
+        pressure = (freq_p - coeffs['P_Offset']) * coeffs['P_Slope']
+        ln_f = np.log(coeffs['T0_F0'] / freq_t)
+        temperature = 1.0 / (coeffs['T0_G'] + coeffs['T0_H'] * ln_f + coeffs['T0_I'] * ln_f ** 2
+                             + coeffs['T0_J'] * ln_f ** 3) - 273.15
+        freq_c_khz = freq_c / 1000
+        conductivity = (coeffs['C0_G'] + coeffs['C0_H'] * freq_c_khz ** 2 + coeffs['C0_I'] * freq_c_khz ** 3
+                        + coeffs['C0_J'] * freq_c_khz ** 4) / (10 * (1 + 3.25e-6 * temperature - 9.57e-8 * pressure))
+        return pressure, temperature, conductivity
+
+    def parse(self, filepath):
+        """Parse the cast's ``.hex`` file and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if the cast has no valid
+            scans (within ``start_dt``/``stop_dt``).
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
+        """
+        self.load_config(filepath)
+
+        raw_data = {col: [] for col in self.proc_cols}
+        errors = []
+        header_passed = False
+        scan_idx = 0
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for lineno, line in enumerate(hex_file, start=1):
+                raw = line.strip()
+                if not header_passed:
+                    header_passed = '*END*' in raw
+                    continue
+                if not raw:
+                    continue
+                try:
+                    if len(raw) < 18:
+                        raise ValueError("short scan")
+                    pressure, temperature, conductivity = self.decode_scan(raw)
+                except (ValueError, ZeroDivisionError, FloatingPointError) as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped: %s", lineno, err)
+                    continue
+                raw_data['date_time'].append(self.start_time + timedelta(seconds=scan_idx * self.scan_interval))
+                raw_data['pressure'].append(pressure)
+                raw_data['temperature'].append(temperature)
+                raw_data['conductivity'].append(conductivity)
+                raw_data['salinity'].append(self.calc_salinity(conductivity, temperature, pressure))
+                scan_idx += 1
+
+        if not raw_data['date_time']:
+            logging.warning("No valid data in file: %s", filepath)
+            return None
+
+        df = pd.DataFrame(raw_data)
+        df = df.replace([np.inf, -np.inf], np.nan).dropna()
+        if df.empty:
+            logging.warning("Dataframe empty after filtering: %s", filepath)
+            return None
+
+        if self.start_dt or self.stop_dt:
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
+
+        if self.plot_dir:
+            self.save_plot(df.reset_index(drop=True), filepath)
+
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df['date_time'].min().to_pydatetime(), df['date_time'].max().to_pydatetime()])
+        for col, label, unit in SERIES:
+            self.add_bounds_stat([round(df[col].min(), ROUNDING[col]),
+                                  round(df[col].max(), ROUNDING[col])], label, unit)
+
+        rate = len(errors) / (len(df) + len(errors))
+        if rate > 0.25:
+            self.add_quality_test_failed('Rows')
+        elif rate > 0.10:
+            self.add_quality_test_warning('Rows')
+        else:
+            self.add_quality_test_passed('Rows')
+
+        df = self.resample_data(df.set_index('date_time'), RESAMPLE_INTERVAL)
+        df = self.round_data(df, ROUNDING)
+
+        for col, label, unit in SERIES:
+            viz = {'data': [], 'unit': unit, 'label': label}
+            for ts, value in zip(df['date_time'], df[col]):
+                if pd.notna(value):
+                    viz['data'].append([int(pd.Timestamp(ts).timestamp() * 1000), value])
+            self.add_visualization_data(viz)
+
+        self.send_error_msg(errors, filepath)
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+    def save_plot(self, df, filepath):
+        """Save a PNG profile plot of the cast to ``plot_dir`` (``<cast>.png``).
+
+        Temperature, conductivity and salinity against pressure, with the
+        downcast drawn darker than the upcast. A failure is logged and
+        doesn't stop the parsing.
+
+        Args:
+            df: The cast's scans, in time order.
+            filepath: Path to the cast's ``.hex`` file.
+        """
+        try:
+            import matplotlib  # pylint: disable=import-outside-toplevel
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+            from matplotlib import patches  # pylint: disable=import-outside-toplevel
+        except ImportError:
+            logging.warning("matplotlib isn't installed; no plot saved for %s", filepath)
+            return
+
+        output_image = join(self.plot_dir, splitext(basename(filepath))[0] + '.png')
+        fig, ax_t = plt.subplots(figsize=(11, 12))
+        try:
+            fig.subplots_adjust(top=0.72, right=0.75, left=0.10, bottom=0.08)
+
+            header_text = (
+                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {self.metadata['Date']}\n"
+                f"Station: {self.metadata['Station']}  |  Cast: {self.metadata['Cast']}  |  Depth: {self.metadata['Depth']} m\n"
+                f"File: {basename(filepath)}  |  System Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            fig.patches.append(patches.Rectangle((0.05, 0.88), 0.70, 0.08, linewidth=0.8, edgecolor='black',
+                                                 facecolor='none', transform=fig.transFigure))
+            fig.text(0.40, 0.92, header_text, transform=fig.transFigure, fontsize=11, family='monospace',
+                     ha='center', va='center', linespacing=1.6)
+
+            ax_t.set_ylabel("Pressure [db]", fontweight='bold')
+            ax_t.set_ylim(df['pressure'].max() + 20, -10)
+            ax_t.grid(True, linestyle=':', alpha=0.4)
+
+            # Downcast to the deepest scan, upcast after it
+            idx_max = df['pressure'].idxmax()
+            down, up = df.iloc[:idx_max + 1], df.iloc[idx_max:]
+
+            ax_c = ax_t.twiny()
+            ax_s = ax_t.twiny()
+            ax_s.spines['top'].set_position(('axes', 1.12))
+            for axis, col, label, down_color, up_color, labelpad in [
+                (ax_t, 'temperature', "Temperature [°C]", '#990000', '#FF9999', None),
+                (ax_c, 'conductivity', "Conductivity [S/m]", '#006600', '#99FF99', 15),
+                (ax_s, 'salinity', "Salinity [PSU]", '#000099', '#9999FF', 15),
+            ]:
+                axis.plot(down[col], down['pressure'], color=down_color, lw=2.5)
+                axis.plot(up[col], up['pressure'], color=up_color, lw=1.2, alpha=0.6)
+                axis.set_xlabel(label, color=down_color, fontweight='bold', labelpad=labelpad)
+
+            fig.savefig(output_image, bbox_inches='tight', dpi=200)
+            logging.info("Saved plot %s", output_image)
+        except (OSError, ValueError) as err:
+            logging.warning("Could not save plot %s: %s", output_image, err)
+        finally:
+            plt.close(fig)
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add CTD-profile-specific command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--plotDir', default=None,
+                            help='Save a PNG profile plot of the cast in this directory (needs matplotlib)')
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'plot_dir': getattr(args, 'plotDir', None)}
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    CTDProfileParser.run_cli()
