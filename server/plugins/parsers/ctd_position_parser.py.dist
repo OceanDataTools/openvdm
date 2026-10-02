@@ -15,6 +15,7 @@ from os.path import basename, dirname, realpath, splitext
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
+from server.lib.openvdm_plugin import format_iso8601
 from server.plugins.parsers.ctd_profile_parser import CTDProfileParser, SBE9_SCAN_RATE
 
 
@@ -69,8 +70,8 @@ class CTDPositionParser(CTDProfileParser):
                     (self.stop_dt and self.start_time > self.stop_dt.replace(tzinfo=self.start_time.tzinfo)):
                 logging.info("Cast %s is outside the time range", filepath)
                 return None
-            properties['start'] = self.start_time.isoformat()
-            properties['end'] = end_time.isoformat()
+            properties['start'] = format_iso8601(self.start_time)
+            properties['end'] = format_iso8601(end_time)
         if self.metadata['Depth'] != 'N/A':
             properties['bottom depth'] = self.metadata['Depth']
 

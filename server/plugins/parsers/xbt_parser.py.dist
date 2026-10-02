@@ -22,7 +22,7 @@ import numpy as np
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
-from server.lib.openvdm_plugin import OpenVDMCSVParser
+from server.lib.openvdm_plugin import OpenVDMCSVParser, format_iso8601
 
 try:
     from parse_xbt_edf import (EDFParseError, GTSPP_GOOD, apply_qc, is_test_probe_cast,
@@ -204,7 +204,7 @@ class XBTPositionParser(XBTParser):
             return None
 
         properties = {'cast': splitext(basename(filepath))[0], 'probe type': cast.probe_type,
-                      'launch': launch.isoformat()}
+                      'launch': format_iso8601(launch)}
         if cast.serial_number.strip():
             properties['serial number'] = cast.serial_number.strip()
         if np.isfinite(cast.depth_m).any():
