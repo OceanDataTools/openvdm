@@ -2,7 +2,9 @@
 """Parser for Sea-Bird CTD casts.
 
 Parses a cast's raw SBE 9plus ``.hex`` file, using the calibration
-coefficients in the matching ``.XMLCON`` file (same name, any case), and returns the
+coefficients in the cast's ``.xmlcon`` file (the same basename as the
+``.hex`` file, e.g. ``CTD001.hex`` and ``CTD001.xmlcon``; the extension may
+be in any case), and returns the
 JSON-formatted plugin data used by OpenVDM's Data Dashboard: pressure,
 temperature, conductivity and salinity, which the dashboard can draw as a
 depth profile (``visType: json-profile`` with ``depthSeries: Pressure``).
@@ -101,7 +103,7 @@ class CTDProfileParser(OpenVDMCSVParser):
 
     @staticmethod
     def find_xmlcon(filepath):
-        """Return the cast's ``.XMLCON`` file (same name, extension in any case), or ``None``."""
+        """Return the cast's ``.xmlcon`` file (same basename, extension in any case), or ``None``."""
         base = basename(splitext(filepath)[0])
         directory = dirname(realpath(filepath))
         for name in sorted(os.listdir(directory)):
@@ -139,13 +141,16 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         Returns:
             bool: ``True`` if the cast can be parsed; ``False`` (with the reason
-            logged) if its ``.XMLCON``, calibration coefficients or start
-            time are missing.
+            logged) if its calibration coefficients or start time are missing,
+            or its ``.xmlcon`` can't be read.
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
         """
         xmlcon_path = self.find_xmlcon(filepath)
         if not xmlcon_path:
-            logging.error("No XMLCON file for %s", filepath)
-            return False
+            expected = splitext(filepath)[0] + '.xmlcon'
+            raise FileNotFoundError(f"No calibration file for {filepath}: expected {expected}")
 
         try:
             root = ET.parse(xmlcon_path).getroot()
@@ -268,7 +273,18 @@ class CTDProfileParser(OpenVDMCSVParser):
         return pressure, temperature, conductivity
 
     def parse(self, filepath):
-        """Parse the cast's ``.hex`` file and return plugin data dict."""
+        """Parse the cast's ``.hex`` file and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if the cast couldn't be
+            parsed (the reason is logged).
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
+        """
         if not self.load_config(filepath):
             return None
 
