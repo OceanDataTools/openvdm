@@ -322,6 +322,8 @@ sudo cp www/app/Core/Config.php www/app/Core/Config.php.214
 sudo mv server/etc/openvdm.yaml server/etc/openvdm.yaml.214
 sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.214
 ```
+   `Config.php` is copied, not moved: the installer rewrites it anyway, and it reads the worker API key from it. If the installer stops before it gets that far, the web app keeps its working `Config.php`. The two YAML files have to be moved, because the installer only builds them when they're missing.
+
    Don't skip the two renames. If you keep 2.14's `openvdm.yaml`, the installer only appends `workerApiKey` and `transferPublicData` to it. If you keep 2.14's `datadashboard.yaml`, it misses 2.16's panels and keeps a Position tab setting that breaks its map (#185).
 4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data. The 2.14 installer left `www/` owned by root, and the OpenVDM user does the updating, so give it the whole checkout first. If you installed 2.14 from a tag (e.g. `2.14.1`), answer `master` at the installer's branch question.
 ```
@@ -411,7 +413,7 @@ sudo supervisorctl restart openvdm:*
 
 Transfer logs are no longer kept in the cruise directory. 2.15 moved them to `/var/log/openvdm` (`TRANSFER_LOG_DIR` in `Config.php`), and `openvdm_214_to_215.sql` removes the old Transfer_Logs extra directory and ship-to-shore transfer. Existing cruises' `OpenVDM/TransferLogs` folders are left as they are.
 
-For what changed in each release, see [CHANGELOG.md](CHANGELOG.md). Also see "Upgrading from 2.15" below for its optional `SITETITLE` change, and its note on directories made by `bin/build_remote_directory.py`.
+For what changed in each release, see [CHANGELOG.md](CHANGELOG.md). Also see "Upgrading from 2.15" below for its note on directories made by `bin/build_remote_directory.py`.
 
 ## Upgrading from 2.15.
 
@@ -419,8 +421,14 @@ OpenVDM v2.16 adds FTP Server as a collection system transfer type (#17), which 
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). Both now run as the OpenVDM user instead of root. On Debian and Ubuntu the installer also moves Node.js (nvm) from root's home directory to the OpenVDM user's, so that user can run npm, and removes the old `/root/.nvm` and its lines in root's `.bashrc`. If root installed other global npm packages in `/root/.nvm`, it's kept and the installer says so. It asks the same questions as the original install, with your previous answers as the defaults:
+   First set two settings files aside as `.215` copies.
+   - **`Config.php`:** the installer rewrites it from the 2.16 template on every run, so any changes you've made to it are lost. Copy it rather than moving it: the installer reads the worker API key from it, and if the installer stops before rewriting it, the web app keeps working.
+   - **`datadashboard.yaml`:** the installer builds a new one from its 2.16 template only when there isn't one, so move it.
+   - **`server/etc/openvdm.yaml`:** keep it as it is. 2.16 didn't change its settings.
 ```
 cd <openvdm_root>
+sudo cp www/app/Core/Config.php www/app/Core/Config.php.215
+sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.215
 git pull
 sudo ./utils/install-openvdm.sh
 ```
@@ -454,11 +462,20 @@ cp geotiff_titiler_parser.py.dist geotiff_titiler_parser.py
 ```
 The other `.dist` files changed in this release have documentation-only changes and don't need copying.
 
-5. Update two settings files by hand (the installer doesn't change your copies):
-   - In `www/etc/datadashboard.yaml`, delete the `- lowering` line from the Position tab's `jsArray`. The shipped Position tab listed both `dataDashboardDefault` and `lowering`; each one builds every map on the page, so loading both logs `Map container is already initialized` (#185). The same applies to any other tab that lists both: keep `lowering` (without `dataDashboardDefault`) only on tabs that use the `lowering` view. `lowering.js` and the `lowering` view themselves are fixed by the code update: their maps, charts and start/end positions hadn't loaded since 2.14. To add a lowering tab, see the commented-out example Lowering tab at the end of `www/etc/datadashboard.yaml.dist`.
-   - Optional: to show the new version in the web interface's title, change `SITETITLE` in `www/app/Core/Config.php` to `'Open Vessel Data Management v2.16.0'`.
-
-   No other settings in `Config.php`, `openvdm.yaml` or `datadashboard.yaml` changed.
+5. Merge your settings into the two files the installer rebuilt. `diff` shows the differences:
+```
+cd <openvdm_root>
+diff www/etc/datadashboard.yaml.215 www/etc/datadashboard.yaml
+diff www/app/Core/Config.php.215 www/app/Core/Config.php
+```
+   Make your changes in the 2.16 files; don't copy the `.215` files back.
+   - **`www/etc/datadashboard.yaml`:** add your own tabs and panels. The new file has 2.16's:
+     - CTD and XBT cast positions on the Position map;
+     - CTD Casts and XBT Casts depth profiles on the Seawater tab;
+     - a commented-out example Lowering tab.
+   - **Its Position tab** no longer lists `lowering` in `jsArray`. 2.15's listed both `dataDashboardDefault` and `lowering`; each one builds every map on the page, so loading both logs `Map container is already initialized` (#185). Keep `lowering`, without `dataDashboardDefault`, only on tabs that use the `lowering` view. `lowering.js` and the `lowering` view themselves are fixed by the code update: their maps, charts and start/end positions hadn't loaded since 2.14.
+   - **`www/app/Core/Config.php`:** copy over only the settings you'd changed yourself. The installer has already set `SITETITLE` to v2.16.0.
+   - Keep the `.215` copies until the upgrade is working. Git doesn't ignore them, so `git status` lists them as untracked.
 6. Restart the OpenVDM workers so they load the updated code and plugins:
 ```
 sudo supervisorctl restart openvdm:*
