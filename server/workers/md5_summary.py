@@ -380,7 +380,9 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
     """Gearman task: update the MD5 summary for new and updated files.
 
     Hashes the files listed in the job payload's ``files``, merges them into
-    the existing summary, and rewrites the summary and its checksum file.
+    the existing summary, and rewrites the summary and its checksum file. If
+    there's no summary yet, builds it for the whole cruise instead
+    (``task_rebuild_md5_summary``).
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -407,6 +409,22 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
         return json.dumps({
             'parts': [{"partName": "Update MD5 Summary", "result": "Ignore", "reason": "Nothing to update"}]
         })
+
+    # No summary yet: the cruise didn't come from Setup New Cruise (e.g. an
+    # upgraded install, or a directory made by Rebuild Cruise Directory).
+    # Build it for the whole cruise, as Rebuild MD5 Summary does, rather than
+    # a summary of just these files. MD5 jobs run one at a time, so later
+    # updates then add to it (#348)
+    if not os.path.exists(worker.md5_summary_filepath):
+        logging.info("No MD5 Summary file yet; building it for the whole cruise: %s",
+                     worker.md5_summary_filepath)
+        rebuild_results = json.loads(task_rebuild_md5_summary(worker, current_job))
+        rebuild_results['parts'].insert(0, {
+            "partName": "Reading pre-existing MD5 Summary file",
+            "result": "Pass",
+            "reason": "None yet; built it for the whole cruise"
+        })
+        return json.dumps(rebuild_results)
 
     if new_files or updated_files:
         filelist.extend(new_files)
