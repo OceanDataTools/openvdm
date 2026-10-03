@@ -45,7 +45,9 @@ function exit_gracefully {
     if [ -n "$INSTALL_ROOT" ]; then
         deactivate 2>/dev/null || true
     fi
-    return -1 2> /dev/null || exit -1  # exit correctly if sourced/bashed
+    # Stop the installer. ("return" here only left this function when it was
+    # called from another function, so the install carried on, #334.)
+    exit 1
 }
 
 #########################################################################
@@ -1711,9 +1713,24 @@ function install_openvdm {
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            sudo -u ${OPENVDM_USER} git pull
-            sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH
-            sudo -u ${OPENVDM_USER} git pull
+            # The OpenVDM user updates the checkout, so it must own all of it:
+            # earlier installers left parts of it owned by root (2.14 set www/
+            # to root:root), and a git pull that can't replace those files
+            # fails partway, leaving the old code in place (#334)
+            chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm
+            # npm rewrites www/package-lock.json during the build; that isn't a
+            # site change, and it would block the update
+            sudo -u ${OPENVDM_USER} git checkout -- www/package-lock.json 2>/dev/null
+            # Update to the branch (or tag) asked for, and stop if that fails.
+            # A tag is checked out as is; a branch is then fast-forwarded.
+            if ! sudo -u ${OPENVDM_USER} git fetch --tags origin \
+                || ! sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH \
+                || { sudo -u ${OPENVDM_USER} git symbolic-ref -q HEAD > /dev/null \
+                     && ! sudo -u ${OPENVDM_USER} git pull --ff-only; }; then
+                echo "ERROR: Couldn't update ${INSTALL_ROOT}/openvdm to '${OPENVDM_BRANCH}' (see git's message above)."
+                echo "       If local changes to tracked files are blocking it, 'git -C ${INSTALL_ROOT}/openvdm status' lists them."
+                exit_gracefully
+            fi
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing

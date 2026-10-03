@@ -316,12 +316,16 @@ cd <openvdm_root>
 sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_2.14_backup.sql
 ```
 3. Keep a copy of `www/app/Core/Config.php`. The installer rewrites it from the 2.16 template, so you'll need to make any changes you'd made to it again.
-4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data.
+4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data. The 2.14 installer left `www/` owned by root, and the OpenVDM user does the updating, so give it the whole checkout first. If you installed 2.14 from a tag (e.g. `2.14.1`), answer `master` at the installer's branch question.
 ```
 cd <openvdm_root>
-git pull
+sudo chown -R <openvdm_user>:<openvdm_user> <openvdm_root>
+sudo -u <openvdm_user> git fetch origin
+sudo -u <openvdm_user> git checkout master
+sudo -u <openvdm_user> git pull --ff-only
 sudo ./utils/install-openvdm.sh
 ```
+   Check that the update worked: `grep -c "date = ''" www/app/Models/TransferLogs.php` prints `1` on 2.16, and `0` if you're still on 2.14's code.
    The installer:
    - moves PHP to 8.2;
    - installs Python 3.11 or later, and rebuilds OpenVDM's virtual environment (`<openvdm_root>/venv`) when it was made with another Python version: 2.14's uses Python 3.11, and the installer picks the newest Python 3.11+ the OS offers (3.14 on current Rocky 9). Anything you installed into the venv yourself (for example matplotlib) has to be installed again.
