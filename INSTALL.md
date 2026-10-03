@@ -332,7 +332,7 @@ sudo chown -R <openvdm_user>:<openvdm_user> <openvdm_root>
 sudo -u <openvdm_user> git fetch origin
 sudo -u <openvdm_user> git checkout master
 sudo -u <openvdm_user> git pull --ff-only
-sudo ./utils/install-openvdm.sh
+sudo bash ./utils/install-openvdm.sh
 ```
    Check that the update worked: `grep -c "date = ''" www/app/Models/TransferLogs.php` prints `1` on 2.16, and `0` if you're still on 2.14's code.
    The installer:
@@ -430,7 +430,7 @@ cd <openvdm_root>
 sudo cp www/app/Core/Config.php www/app/Core/Config.php.215
 sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.215
 git pull
-sudo ./utils/install-openvdm.sh
+sudo bash ./utils/install-openvdm.sh
 ```
 If your `server/etc/openvdm.yaml` is older than 2.15.5, the installer also adds the two settings added in that release: `workerApiKey`, set to the same key as `WORKER_API_KEY` in `www/app/Core/Config.php`, and `transferPublicData`, set from your PublicData answer. Without `workerApiKey` the workers don't receive transfer passwords from the web app, so transfers that use a password fail. Without `transferPublicData`, older releases' Rebuild Cruise Directory and cruise setup/finalize crashed with `KeyError: 'transferPublicData'`; 2.16.0 defaults it to `True` (#187). To check:
 ```

@@ -14,7 +14,8 @@
 #
 # It should be re-run whenever the code has been refreshed. Preferably
 # by first running 'git pull' to get the latest copy of the script,
-# and then running 'utils/install-openvdm.sh' to run that script.
+# and then running 'sudo bash ./utils/install-openvdm.sh' to run that
+# script (it isn't executable, so run it with bash).
 #
 # The script has been designed to be idempotent, that is, it can be
 # run over again with no ill effects.
