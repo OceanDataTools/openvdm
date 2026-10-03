@@ -671,9 +671,12 @@ function _install_packages_rhel {
         dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
     fi
 
-    # On RHEL 9, MySQL is delivered as an AppStream module; enable it before install.
+    # On RHEL 9, enable the mysql:8.0 module stream if the system has one.
+    # Current RHEL 9 releases ship MySQL 8.0 as a normal AppStream package and
+    # only an 8.4 stream, so there's nothing to enable (#350).
     # On RHEL 10+, MySQL AppStream is removed — MariaDB is the default instead.
-    if [ "$OS_VERSION_MAJOR" -ge 9 ] && [ "$OS_VERSION_MAJOR" -lt 10 ]; then
+    if [ "$OS_VERSION_MAJOR" -ge 9 ] && [ "$OS_VERSION_MAJOR" -lt 10 ] \
+        && dnf -q module list mysql 2>/dev/null | grep -qE '^mysql +8\.0( |$)'; then
         dnf module reset mysql -y
         dnf module enable mysql:8.0 -y
     fi
