@@ -21,6 +21,7 @@ import tempfile
 import subprocess
 import time
 import configparser
+import fnmatch
 from datetime import datetime
 from typing import Optional
 from os.path import dirname, realpath
@@ -617,12 +618,91 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     return True, ""
 
 
+# OpenSSH's default private keys in ~/.ssh, in the order ssh tries them
+DEFAULT_SSH_IDENTITIES = ('id_rsa', 'id_ecdsa', 'id_ecdsa_sk', 'id_ed25519', 'id_ed25519_sk',
+                          'id_xmss', 'id_dsa')
+
+
+def _ssh_host_matches(patterns: list, host: str) -> bool:
+    """Return True if ssh_config host patterns match *host*.
+
+    As ssh does: patterns may use ``*`` and ``?``, matching is case-sensitive,
+    and a matching negated pattern (``!pattern``) rules them out.
+    """
+    matched = False
+    for pattern in patterns:
+        negated = pattern.startswith('!')
+        if fnmatch.fnmatchcase(host, pattern.lstrip('!')):
+            if negated:
+                return False
+            matched = True
+    return matched
+
+
+def ssh_identity_file(host: str, user: str = '', ssh_dir: Optional[str] = None) -> Optional[str]:
+    """Return the private key ssh would use to log in to *host*.
+
+    The first ``IdentityFile`` that exists in the ``Host`` blocks of
+    ``~/.ssh/config`` (and ``Match all`` / ``Match host`` blocks) that match
+    *host*, with ``*``/``?`` wildcards, ``!`` negation, case-insensitive
+    keywords, ``keyword value`` or ``keyword=value``, ``~`` and the
+    ``%d %h %r %u %%`` tokens; or else the first of OpenSSH's default keys
+    that exists (``id_rsa``, ``id_ecdsa``, ``id_ed25519`` ...). Other ``Match``
+    criteria aren't evaluated, so those blocks are skipped, and ``Include``
+    isn't followed (#340).
+
+    Args:
+        host: The SSH server, as given in the transfer (``sshServer``).
+        user: The remote user (``sshUser``), for the ``%r`` token.
+        ssh_dir: The ``.ssh`` directory to use; defaults to ``~/.ssh``.
+
+    Returns:
+        The key's path, or ``None`` if there's no key.
+    """
+    home = os.path.expanduser('~')
+    ssh_dir = ssh_dir or os.path.join(home, '.ssh')
+    tokens = {'d': home, 'h': host, 'r': user, 'u': os.environ.get('USER', ''), '%': '%'}
+
+    configured = []
+    config_path = os.path.join(ssh_dir, 'config')
+    if os.path.isfile(config_path):
+        applies = True  # options before the first Host line apply to every host
+        with open(config_path, encoding='utf-8', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = re.split(r'\s*=\s*|\s+', line, maxsplit=1)
+                keyword, value = parts[0].lower(), (parts[1].strip() if len(parts) > 1 else '')
+                if keyword == 'host':
+                    applies = _ssh_host_matches(value.split(), host)
+                elif keyword == 'match':
+                    # "Match all" and "Match host a,b,!c"; other criteria aren't evaluated
+                    criteria = value.split()
+                    if criteria and criteria[0].lower() == 'all' and len(criteria) == 1:
+                        applies = True
+                    elif len(criteria) == 2 and criteria[0].lower() == 'host':
+                        applies = _ssh_host_matches(criteria[1].split(','), host)
+                    else:
+                        applies = False
+                elif keyword == 'identityfile' and applies and value:
+                    value = re.sub(r'%(.)', lambda m: tokens.get(m.group(1), m.group(0)), value.strip('"'))
+                    if value.startswith('~'):
+                        value = home + value[1:]
+                    configured.append(value if os.path.isabs(value) else os.path.join(home, value))
+
+    for path in configured + [os.path.join(ssh_dir, name) for name in DEFAULT_SSH_IDENTITIES]:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def build_rclone_config_for_ssh(cfg, rclone_config):
     """Write an rclone SFTP remote for a transfer's SSH server to a config file.
 
     The remote authenticates with the transfer's password (obscured with
-    ``rclone obscure``) or, when ``sshUseKey`` is set, with the ``IdentityFile``
-    configured for the host in ``~/.ssh/config`` (default ``~/.ssh/id_rsa``).
+    ``rclone obscure``) or, when ``sshUseKey`` is set, with the private key
+    ssh would use for the host (``ssh_identity_file()``).
 
     Args:
         cfg: Transfer configuration with ``sshServer``, ``sshUser``,
@@ -634,24 +714,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
 
     Raises:
         subprocess.CalledProcessError: If ``rclone obscure`` fails.
+        FileNotFoundError: If ``sshUseKey`` is set and there's no SSH key.
     """
     cfg = normalize_transfer_config(cfg)
-    ssh_config_path = os.path.expanduser("~/.ssh/config")
-    identity_file = os.path.expanduser("~/.ssh/id_rsa")
     target_host = cfg["sshServer"]
     rclone_remote = target_host.replace('.','_')
-
-    if os.path.exists(ssh_config_path):
-        with open(ssh_config_path) as f:
-            found_host = False
-            for line in f:
-                line = line.strip()
-                if line.startswith("Host "):
-                    hosts = line.split()[1:]
-                    found_host = target_host in hosts
-                elif found_host and line.startswith("IdentityFile"):
-                    identity_file = line.split(maxsplit=1)[1]
-                    break
 
     # Build rclone config section
     out = configparser.ConfigParser()
@@ -676,6 +743,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
             logging.error("Failed to obscure password with rclone: %s", e)
             raise
     else:
+        identity_file = ssh_identity_file(target_host, cfg["sshUser"])
+        if identity_file is None:
+            raise FileNotFoundError(
+                f"No SSH key for {target_host}: none configured in ~/.ssh/config and none of "
+                f"~/.ssh/{', '.join(DEFAULT_SSH_IDENTITIES)} exists")
         out[rclone_remote]["key_file"] = identity_file
 
     # Print for debugging

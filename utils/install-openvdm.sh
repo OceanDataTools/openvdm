@@ -1660,31 +1660,67 @@ function setup_timezone {
 
 ###########################################################################
 ###########################################################################
+# Generate an SSH key for root, of ssh-keygen's default type on this system
+# (RSA before OpenSSH 9.5, Ed25519 since), falling back to RSA if that fails
+# (e.g. Ed25519 in FIPS mode). The key is named after its type, as ssh-keygen
+# would name it: ~/.ssh/id_rsa, id_ecdsa or id_ed25519 (#340).
+function _generate_root_ssh_key {
+    local _TMP _TYPE _NAME
+    _TMP=$(mktemp -u ~/.ssh/openvdm_key.XXXXXX)
+    if ! ssh-keygen -q -N "" -f "${_TMP}" < /dev/null; then
+        echo "Couldn't generate an SSH key of the default type; generating RSA"
+        ssh-keygen -q -N "" -t rsa -f "${_TMP}" < /dev/null || return 1
+    fi
+    # "3072 SHA256:... root@host (RSA)" -> rsa
+    _TYPE=$(ssh-keygen -l -f "${_TMP}.pub" | sed -n 's/.*(\([A-Za-z0-9-]*\))$/\1/p' | tr '[:upper:]-' '[:lower:]_')
+    _NAME="id_${_TYPE:-rsa}"
+    mv "${_TMP}" ~/.ssh/${_NAME}
+    mv "${_TMP}.pub" ~/.ssh/${_NAME}.pub
+    chmod 600 ~/.ssh/${_NAME} ~/.ssh/${_NAME}.pub
+    echo "Generated SSH key ~/.ssh/${_NAME}"
+}
+
+###########################################################################
+###########################################################################
 # Set system ssh
 function setup_ssh {
 
-    # Generate SSH keypair for root if missing
-    if [ ! -d ~/.ssh ] || [ ! -e ~/.ssh/id_rsa.pub ]; then
-        mkdir -p ~/.ssh
-        chmod 700 ~/.ssh
-        ssh-keygen -q -N "" -t rsa -f ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
+    # Root's SSH keys (the workers run as root and use them for SSH transfers):
+    # the ones it already has under OpenSSH's default names, whatever their
+    # type, or a new one of this system's default type if it has none (#340)
+    local _NAME _PUB
+    local _PUBS=()
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    for _NAME in id_rsa id_ecdsa id_ecdsa_sk id_ed25519 id_ed25519_sk id_xmss id_dsa; do
+        if [ -e ~/.ssh/${_NAME} ] && [ ! -e ~/.ssh/${_NAME}.pub ]; then
+            # A key without its .pub: recreate the .pub rather than replace the key
+            ssh-keygen -y -f ~/.ssh/${_NAME} > ~/.ssh/${_NAME}.pub 2>/dev/null || rm -f ~/.ssh/${_NAME}.pub
+        fi
+        if [ -e ~/.ssh/${_NAME} ] && [ -s ~/.ssh/${_NAME}.pub ]; then
+            _PUBS+=("${HOME}/.ssh/${_NAME}.pub")
+        fi
+    done
+    if [ ${#_PUBS[@]} -eq 0 ]; then
+        _generate_root_ssh_key || { echo "ERROR: Couldn't generate an SSH key for root"; exit_gracefully; }
+        for _NAME in id_rsa id_ecdsa id_ed25519; do
+            [ -s ~/.ssh/${_NAME}.pub ] && _PUBS+=("${HOME}/.ssh/${_NAME}.pub")
+        done
     fi
 
-    # Authorize root's key for passwordless login as root
-    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
-        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-        chmod 600 ~/.ssh/authorized_keys
-    fi
-
-    # Authorize root's key for passwordless login as OPENVDM_USER
-    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
-        mkdir -p "/home/${OPENVDM_USER}/.ssh"
-        chmod 700 "/home/${OPENVDM_USER}/.ssh"
-        cat ~/.ssh/id_rsa.pub >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-        chmod 600 "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-        chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
-    fi
+    # Authorize root's keys for passwordless login as root and as OPENVDM_USER
+    mkdir -p "/home/${OPENVDM_USER}/.ssh"
+    chmod 700 "/home/${OPENVDM_USER}/.ssh"
+    for _PUB in "${_PUBS[@]}"; do
+        if ! grep -qF "$(cat "${_PUB}")" ~/.ssh/authorized_keys 2>/dev/null; then
+            cat "${_PUB}" >> ~/.ssh/authorized_keys
+        fi
+        if ! grep -qF "$(cat "${_PUB}")" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
+            cat "${_PUB}" >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+        fi
+    done
+    chmod 600 ~/.ssh/authorized_keys "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
 
     # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
     ssh -o StrictHostKeyChecking=accept-new "${OPENVDM_USER}@${HOSTNAME}" ls > /dev/null

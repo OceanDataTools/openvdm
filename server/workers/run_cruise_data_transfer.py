@@ -293,7 +293,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             elif transfer_type == 'ssh':
                 is_darwin = check_darwin(cdt_cfg)
                 rclone_config = os.path.join(tmpdir, 'rclone_config')
-                rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                try:
+                    rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                except FileNotFoundError as exc:
+                    return {'verdict': False, 'reason': str(exc)}
                 rclone_args = ['--config', rclone_config]
                 dest_dir = f"{rclone_remote}:{cdt_cfg['destDir']}"
 
