@@ -324,7 +324,7 @@ sudo ./utils/install-openvdm.sh
 ```
    The installer:
    - moves PHP to 8.2;
-   - installs Python 3.11 or later, and rebuilds OpenVDM's virtual environment (`<openvdm_root>/venv`) when it was made with another Python version. On Rocky 9, 2.14's was made with the system Python 3.9. Anything you installed into the venv yourself (for example matplotlib) has to be installed again.
+   - installs Python 3.11 or later, and rebuilds OpenVDM's virtual environment (`<openvdm_root>/venv`) when it was made with another Python version: 2.14's uses Python 3.11, and the installer picks the newest Python 3.11+ the OS offers (3.14 on current Rocky 9). Anything you installed into the venv yourself (for example matplotlib) has to be installed again.
    - rewrites `Config.php` from the 2.16 template, with the database password you give it and your existing worker API key;
    - adds `workerApiKey` and `transferPublicData` to your `server/etc/openvdm.yaml`, leaving the rest of the file as it is;
    - rewrites the Apache, Samba and Supervisor configuration;
