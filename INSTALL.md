@@ -300,7 +300,53 @@ pip install -r requirements.txt
 
 ## Upgrading from 2.14.
 
-OpenVDM v2.15 moves away from PHP 7.3 to PHP 8.2.  This isn't a trivial change and will require the installation of PHP 8.2 and reconfiguration of Apache to use the new version.  Recommend backing up the OpenVDM database and reinstalling OpenVDM onto a fresh OS install using the updated ./utils/install_openvdm.sh script. 
+OpenVDM 2.15 moved from PHP 7.3 to PHP 8.2, and the installer changed with it, so a 2.14 server can't be updated in place. Install 2.16 on a fresh OS instead, then bring the 2.14 database, settings and cruise data across. The two database update scripts below take a 2.14 database to the 2.16 schema.
+
+**On the 2.14 server:**
+
+1. Set OpenVDM to Off and wait until no transfers or tasks are running.
+2. Back up the database. The script asks for the MySQL root password twice:
+```
+cd <openvdm_root>
+sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_2.14_backup.sql
+```
+3. Copy the backup to the new server, along with your copies of the files you've customized. You'll merge your changes into the 2.16 versions of these files (steps 9 and 10), so don't copy them over the new ones:
+   - `server/etc/openvdm.yaml`, for your hooks and `postHookCommands`;
+   - `www/etc/datadashboard.yaml`;
+   - your plugins and parsers: the `server/plugins/*_plugin.py` and `server/plugins/parsers/*_parser.py` files (not the `.dist` templates);
+   - anything else you've changed, for example `www/app/templates/default/js/custom1.js` or scripts in `bin/`.
+4. If the new server won't use the same disk, copy the cruise data (`<data root>/CruiseData`, `/data/CruiseData` by default) to it. Keep the files owned by the OpenVDM user.
+
+**On the new server:**
+
+5. Install OpenVDM 2.16 on a fresh OS (see [Install OpenVDM and it's dependencies](#install-openvdm-and-its-dependencies)). Where the 2.14 install's answers still apply, give the same ones, especially the OpenVDM user and the data root directory. Don't install the sample data.
+6. Stop the workers:
+```
+sudo supervisorctl stop openvdm:*
+```
+7. Restore the 2.14 backup over the new database, then update it to 2.16 by running the two update scripts, in this order. The backup replaces every table, including the web interface's users: afterwards, log in with your 2.14 accounts, not the one the installer created. Each command asks for the MySQL root password, and prints nothing when it succeeds:
+```
+cd <openvdm_root>
+mysql -u root -p openvdm < ~/openvdm_2.14_backup.sql
+mysql -u root -p openvdm < ./database/openvdm_214_to_215.sql
+mysql -u root -p openvdm < ./database/openvdm_215_to_216.sql
+```
+Run each script once. Running `openvdm_215_to_216.sql` again stops with `Duplicate column name 'ftpServer'` and changes nothing. If you see any other errors, save them and contact OceanDataTools; the backup can be restored and the steps repeated.
+8. The database keeps the 2.14 server's data warehouse settings. In the web interface, open **Configuration**, the **System** tab, and click **Edit** on the **Shipboard Data Warehouse (SBDW)** row, and check that the server IP and username are the new server's, and that the directories match what you gave the installer.
+9. Merge your customizations into the 2.16 files:
+   - `server/etc/openvdm.yaml`: add your hooks and `postHookCommands` to the new file. Don't copy the 2.14 file over it: the new one has settings 2.14 didn't, such as `workerApiKey`, which must match `WORKER_API_KEY` in `www/app/Core/Config.php`, and `transferPublicData`.
+   - `www/app/Core/Config.php`: keep the installer's file. If you changed other settings in 2.14's, make the same changes in this one.
+   - `www/etc/datadashboard.yaml`: start from the new file and add your own tabs and panels to it. In any tab you bring across, keep `lowering` in `jsArray` only on tabs that use the `lowering` view, and never together with `dataDashboardDefault` (#185).
+10. Recreate your plugins and parsers. A collection system transfer's plugin is named after the transfer (`<transfer name in lower case>_plugin.py`). For each one you use, copy the 2.16 `.dist` template it came from to that name and make your 2.14 changes in the copy. The same goes for the parsers it imports. Many plugins and parsers were fixed in 2.15 and 2.16, so don't copy the 2.14 files back. `diff <your 2.14 copy> <file>.dist` shows what you'd changed.
+11. Start the workers and set OpenVDM back to On:
+```
+sudo supervisorctl start openvdm:*
+```
+12. In the web interface, on the **Configuration** page under **Maintenance Tasks**, run **Rebuild Cruise Directory**, **Re-export the OpenVDM Configuration**, **Rebuild Data Dashboard** and **Rebuild MD5 Summary**. If you use lowerings, also run **Rebuild Lowering Directory** and **Re-export the Lowering Configuration**. These tasks are named with your cruise and lowering names, for example "Rebuild Cruise Directory".
+
+Transfer logs are no longer kept in the cruise directory. 2.15 moved them to `/var/log/openvdm` (`TRANSFER_LOG_DIR` in `Config.php`), and `openvdm_214_to_215.sql` removes the old Transfer_Logs extra directory and ship-to-shore transfer. Existing cruises' `OpenVDM/TransferLogs` folders are left as they are.
+
+For what changed in each release, see [CHANGELOG.md](CHANGELOG.md). Most of the "Upgrading from 2.15" steps below are already covered by the fresh install and the steps above.
 
 ## Upgrading from 2.15.
 
@@ -353,7 +399,7 @@ The other `.dist` files changed in this release have documentation-only changes 
 sudo supervisorctl restart openvdm:*
 ```
 7. Set OpenVDM back to On.
-8. If you use either GeoTIFF parser, rebuild the data dashboard so existing Geographic Bounds stats are regenerated in the right order. While logged in to the web interface, open `http://<openvdm_host>/config/rebuildDataDashboard`. There's no button for this. This rebuilds the current cruise only; dashboard stats for earlier cruises keep the old (mislabelled) order.
+8. If you use either GeoTIFF parser, rebuild the data dashboard so existing Geographic Bounds stats are regenerated in the right order. Run **Rebuild Data Dashboard** under **Maintenance Tasks** on the **Configuration** page. This rebuilds the current cruise only; dashboard stats for earlier cruises keep the old (mislabelled) order.
 9. If you've run `bin/build_remote_directory.py` to create template directories on a local-directory collection system, fix the permissions of the directories it created:
 ```
 chmod 755 <directory>
