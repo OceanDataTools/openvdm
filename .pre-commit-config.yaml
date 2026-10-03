@@ -4,3 +4,23 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        language: node
+        entry: eslint --no-warn-ignored
+        files: ^www/app/templates/default/js/.*\.js(\.dist)?$
+        exclude: ^www/app/templates/default/js/sb-admin-2\.js$
+        additional_dependencies: ['eslint@10.11.0']
+      - id: php-lint
+        name: php -l
+        language: system
+        entry: bash -c 'command -v php >/dev/null || { echo "php not installed, skipping PHP syntax check"; exit 0; }; for f in "$@"; do php -l "$f" >/dev/null || exit 1; done' --
+        files: ^www/.*\.php(\.dist)?$
+      - id: phpstan
+        name: phpstan
+        language: system
+        entry: bash -c 'cd www && if [ ! -x vendor/bin/phpstan ]; then echo "PHPStan not installed (run composer install in www/), skipping"; exit 0; fi; vendor/bin/phpstan analyse --no-progress --memory-limit=1G'
+        files: ^www/(app/.*\.php(\.dist)?|phpstan.*\.neon|phpstan-bootstrap\.php)$
+        pass_filenames: false

@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
-"""
-FILE:  connection_utils.py
+"""Utilities for testing and connecting to remote systems.
 
-DESCRIPTION:  utilities used to connect with remote systems
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2025-07-05
- REVISION:  2025-08-18
+Provides the connection checks and command builders used by the transfer
+workers for the transfer types: local directory, rsync server, SMB share,
+SSH server, FTP server and rclone remote. Low-level connection tests return
+``(bool, str)`` tuples (success flag plus detail); the higher-level
+source/destination tests return ``list[dict]`` with
+``partName``/``result``/``reason`` keys.
 """
 
+import calendar
 import glob
+import json
 import os
+import re
 import sys
 import uuid
 import logging
 import tempfile
 import subprocess
+import time
 import configparser
+import fnmatch
+from datetime import datetime
+from typing import Optional
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
+from server.lib.transfer_utils import redact_command
 
 # Integer fields that PHP/PDO returns as strings but Python code compares with == 1 / == 0
 _TRANSFER_INT_FIELDS = frozenset([
@@ -37,15 +42,30 @@ _TRANSFER_INT_FIELDS = frozenset([
 
 
 def has_wildcard(s):
-    """Return True if string contains glob special characters (* ? [)."""
+    """Return whether a string contains glob wildcard characters (``*``, ``?``, ``[``).
+
+    Args:
+        s: The string to check, e.g. a source directory.
+
+    Returns:
+        bool: ``True`` if *s* contains a wildcard.
+    """
     return any(c in s for c in ('*', '?', '['))
 
 
 def normalize_transfer_config(cfg):
-    """
-    Return a copy of cfg with known integer fields cast from string to int.
-    PHP/PDO returns all DB column values as strings; callers that compare
-    with == 1 / == 0 need proper Python ints.
+    """Return a copy of a transfer configuration with its integer fields as ints.
+
+    PHP/PDO returns every database column as a string, so fields such as
+    ``transferType``, ``sshUseKey`` or ``removeSourceFiles`` arrive as ``'1'``;
+    callers that compare with ``== 1`` / ``== 0`` need real ints. Values that
+    can't be converted are left unchanged.
+
+    Args:
+        cfg: A collection system or cruise data transfer configuration.
+
+    Returns:
+        dict: A copy of *cfg* with the known integer fields converted.
     """
     result = dict(cfg)
     for field in _TRANSFER_INT_FIELDS:
@@ -58,8 +78,14 @@ def normalize_transfer_config(cfg):
 
 
 def get_transfer_type(transfer_type):
-    """
-    Return a human-readable transfer type
+    """Return the name of a transfer type code.
+
+    Args:
+        transfer_type: The ``transferType`` value (``1``-``5``, as int or str).
+
+    Returns:
+        str | None: ``'local'`` (1), ``'rsync'`` (2), ``'smb'`` (3),
+        ``'ssh'`` (4) or ``'ftp'`` (5), or ``None`` for any other value.
     """
 
     transfer_type = str(transfer_type)
@@ -76,28 +102,57 @@ def get_transfer_type(transfer_type):
     if  transfer_type == "4": # SSH server
         return 'ssh'
 
+    if  transfer_type == "5": # FTP server
+        return 'ftp'
+
     return None
 
 
 def get_rclone_remote_type(remote_name, config_path=None):
+        """Return the type of an rclone remote from the rclone config file.
+
+        Args:
+            remote_name: Name of the remote (the part of ``remote:path`` before ``:``).
+            config_path: rclone config file. Defaults to
+                ``~/.config/rclone/rclone.conf``.
+
+        Returns:
+            The remote's ``type`` (e.g. ``'local'``, ``'smb'``, ``'sftp'``,
+            ``'google cloud storage'``), or ``None`` if the config file doesn't
+            exist or doesn't define the remote (or its type).
+        """
         # Default rclone config path
         if config_path is None:
             config_path = os.path.expanduser("~/.config/rclone/rclone.conf")
 
         if not os.path.isfile(config_path):
-            logging.error("rclone config file %s not found.  assuming local", config_path)
-            return "local"
+            logging.error("rclone config file %s not found", config_path)
+            return None
 
         config = configparser.ConfigParser()
         config.read(config_path)
 
-        remote_section = config[remote_name] if remote_name in config else {}
-        return remote_section.get('type', 'local')
+        if remote_name not in config:
+            logging.error("rclone remote %s not found in %s", remote_name, config_path)
+            return None
+
+        return config[remote_name].get('type')
 
 
 def check_darwin(cfg):
-    """
-    Return true if server is MacOS (Darwin)
+    """Return whether a transfer's SSH server runs macOS (Darwin).
+
+    Runs ``uname -s`` on the server over SSH, using ``sshpass`` when the
+    transfer doesn't use a key. rsync on macOS doesn't support
+    ``--protect-args``.
+
+    Args:
+        cfg: Transfer configuration with ``sshServer``, ``sshUser``,
+            ``sshUseKey`` and ``sshPass``.
+
+    Returns:
+        bool: ``True`` if the server reports ``Darwin``; ``False`` otherwise,
+        including when the SSH command fails.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -105,7 +160,7 @@ def check_darwin(cfg):
     if cfg['sshUseKey'] == 0:
         cmd = ['sshpass', '-p', cfg.get('sshPass', '')] + cmd
 
-    logging.debug("check_darwin cmd: %s", ' '.join(cmd).replace(f'-p {cfg.get("sshPass", "")}', '-p ****'))
+    logging.debug("check_darwin cmd: %s", redact_command(cmd))
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
@@ -115,8 +170,20 @@ def check_darwin(cfg):
 
 
 def detect_smb_version(cfg):
-    """
-    Return the SMB version used on the remote server
+    """Detect which SMB protocol version to mount a transfer's server with.
+
+    Lists the server's shares with ``smbclient`` (as guest if ``smbUser`` is
+    ``'guest'``). Windows XP-era servers (``OS=[Windows 5.1]``) get ``'1.0'``;
+    all others get ``'2.1'``.
+
+    Args:
+        cfg: Transfer configuration with ``smbServer``, ``smbDomain``,
+            ``smbUser`` and ``smbPass``.
+
+    Returns:
+        tuple[str | None, str]: ``(version, "")`` on success, or ``(None,
+        detail)`` with the error output if the server can't be reached or
+        authentication fails.
     """
 
     if cfg.get('smbUser') == 'guest':
@@ -152,8 +219,21 @@ def detect_smb_version(cfg):
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
-    """
-    Mount the SMB Share to the mntpoint
+    """Mount a transfer's SMB share (CIFS) on a local directory.
+
+    The share is mounted read-write if the transfer removes source files
+    (``removeSourceFiles``), otherwise read-only. On failure the mount point is
+    unmounted again. Requires root.
+
+    Args:
+        cfg: Transfer configuration with ``smbServer`` (the share path),
+            ``smbDomain``, ``smbUser`` and ``smbPass``.
+        mntpoint: Existing local directory to mount the share on.
+        smb_version: SMB protocol version, from :func:`detect_smb_version`.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -183,10 +263,22 @@ def mount_smb_share(cfg, mntpoint, smb_version):
         return False, detail
 
 
-def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath):
-    """
-    Build the cmd array for a rsync command.  The cmd array will be passed to
-    subprocess
+def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath,
+                        exclude_filepath=None):
+    """Build an rsync command line as an argument list for ``subprocess``.
+
+    Args:
+        flags: rsync options, e.g. from :func:`build_rsync_options`.
+        extra_args: Additional arguments added after *flags*, or ``None``.
+        source_dir: The source path.
+        dest_dir: The destination path, or ``None`` to list *source_dir* only.
+        include_filepath: File listing the files to transfer (passed as
+            ``--files-from``), or ``None``.
+        exclude_filepath: File listing patterns to skip (passed as
+            ``--exclude-from``), or ``None``.
+
+    Returns:
+        list[str]: The command, starting with ``rsync``.
     """
 
     cmd = ['rsync'] + flags
@@ -196,14 +288,88 @@ def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepat
     if include_filepath is not None:
         cmd.append(f"--files-from={include_filepath}")
 
+    if exclude_filepath is not None:
+        cmd.append(f"--exclude-from={exclude_filepath}")
+
     cmd += [source_dir] if dest_dir is None else [source_dir, dest_dir]
     return cmd
 
 
-def test_rsync_connection(server, user, password_file=None):
+def build_rclone_command(copy_sync: str, flags: Optional[list], extra_args: Optional[list],
+                         source_dir: str, dest_dir: str, include_filepath: Optional[str] = None,
+                         exclude_filepath: Optional[str] = None) -> list:
+    """Build an rclone copy or sync command line as an argument list for ``subprocess``.
+
+    Both directories get exactly one trailing ``/``.
+
+    Args:
+        copy_sync: ``'copy'`` or ``'sync'``, e.g. from :func:`build_rclone_options`.
+        flags: rclone options, e.g. from :func:`build_rclone_options`, or ``None``.
+        extra_args: Additional arguments added after *flags* (e.g.
+            ``['--config', path]``), or ``None``.
+        source_dir: The source path.
+        dest_dir: The destination path or ``remote:path``.
+        include_filepath: File listing the files to transfer (passed as
+            ``--files-from``), or ``None``.
+        exclude_filepath: File listing patterns to skip (passed as
+            ``--exclude-from``), or ``None``.
+
+    Returns:
+        list[str]: The command, starting with ``rclone``.
+
+    Raises:
+        ValueError: If *copy_sync* isn't ``'copy'`` or ``'sync'``.
     """
-    Test the connection to a rsync server.
-    Returns (success: bool, detail: str).
+
+    if copy_sync not in ('copy', 'sync'):
+        raise ValueError("Rclone type has to be 'copy' or 'sync'")
+
+    cmd = ['rclone', copy_sync, source_dir.rstrip('/') + '/', dest_dir.rstrip('/') + '/']
+    if flags is not None:
+        cmd += flags
+
+    if extra_args is not None:
+        cmd += extra_args
+
+    if include_filepath is not None:
+        cmd += ["--files-from", include_filepath]
+
+    if exclude_filepath is not None:
+        cmd += ["--exclude-from", exclude_filepath]
+
+    return cmd
+
+
+def rsync_dest_path(server: str, dest_dir: str) -> str:
+    """Join an rsync server and a cruise data transfer's destination directory.
+
+    The CDT form saves an rsync ``destDir`` relative to the module (``backups``),
+    so it can't be appended to the server as is (#228).
+
+    Args:
+        server: rsync server, as ``host/module``.
+        dest_dir: Directory within the module, with or without a leading ``/``;
+            blank or ``/`` for the module's top level.
+
+    Returns:
+        str: ``host/module`` or ``host/module/dest_dir``, joined with one ``/``.
+    """
+
+    dest_dir = (dest_dir or '').strip('/')
+    return f"{server.rstrip('/')}/{dest_dir}" if dest_dir else server.rstrip('/')
+
+
+def test_rsync_connection(server, user, password_file=None):
+    """Test that an rsync server accepts the transfer's credentials.
+
+    Args:
+        server: rsync server, as ``host`` or ``host/module``.
+        user: rsync username.
+        password_file: File holding the rsync password, or ``None``.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -229,11 +395,22 @@ def test_rsync_connection(server, user, password_file=None):
 
 
 def test_rsync_write_access(server, user, tmpdir, password_file=None):
-    """
-    Verify the transfer has write access to the rsync server.  This is done via
-    a write_test.txt file.  Currently there is no way to delete this file after
-    completing the test.
-    Returns (success: bool, detail: str).
+    """Test that the transfer can write to an rsync server.
+
+    Uploads a ``write_test.txt`` file, then deletes it again by syncing an
+    empty directory with ``--delete`` and a filter that only matches that file
+    (#233). A failed delete is logged as a warning but doesn't fail the test,
+    since the write worked.
+
+    Args:
+        server: rsync server, as ``host`` or ``host/module``.
+        user: rsync username.
+        tmpdir: Local temporary directory to create the test file in.
+        password_file: File holding the rsync password, or ``None``.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     flags = ['--no-motd', '--contimeout=5']
@@ -262,13 +439,45 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
         logging.error("rsync write test failed: %s", detail)
         return False, detail
 
+    # rsync can't delete a remote file directly: sync an empty directory to
+    # the destination (--dirs: that directory only), deleting only the test file
+    empty_dir = os.path.join(tmpdir, "write_test_empty")
+    os.mkdir(empty_dir)
+    cmd = build_rsync_command(flags, ['--dirs', '--delete', '--include=/write_test.txt', '--exclude=*'],
+                              f'{empty_dir}/', f'rsync://{user}@{server.rstrip("/")}/', None)
+
+    logging.debug("test_rsync_write_access cleanup cmd: %s", ' '.join(cmd))
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode not in [0, 24]:
+            logging.warning("Could not delete write_test.txt from rsync://%s: %s", server, proc.stderr.strip())
+    except Exception as exc:
+        logging.warning("Could not delete write_test.txt from rsync://%s: %s", server, exc)
+
     return True, ""
 
 
 def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
-    """
-    Build the cmd array for a ssh command.  The cmd array will be passed to
-    subprocess
+    """Build an ssh command line as an argument list for ``subprocess``.
+
+    Both forms use a 5 s connection timeout and skip host key checking. With a
+    key the command runs in batch mode; with a password it's prefixed with
+    ``sshpass`` and public-key authentication is disabled.
+
+    Args:
+        flags: Extra ssh options, or ``None``.
+        user: SSH username.
+        server: SSH server hostname or address.
+        post_cmd: Command to run on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        list[str]: The command.
+
+    Raises:
+        ValueError: If there's no password and *use_pubkey* is false.
     """
 
     passwd = passwd or ''
@@ -282,9 +491,18 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
 
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
-    """
-    Test the connection to a ssh server.
-    Returns (success: bool, detail: str).
+    """Test that an SSH server accepts the transfer's credentials.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
@@ -308,9 +526,19 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
 
 
 def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
-    """
-    Verify the presence of a directory on the ssh server.
-    Returns (success: bool, detail: str).
+    """Test that a directory exists on an SSH server.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        remote_dir: Absolute path of the directory on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     passwd = passwd or ''
@@ -335,9 +563,19 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
-    """
-    Verify write access to the directory on the remote ssh server.
-    Returns (success: bool, detail: str).
+    """Test that the transfer can create and delete a file in a directory on an SSH server.
+
+    Args:
+        server: SSH server hostname or address.
+        user: SSH username.
+        dest_dir: Absolute path of the directory on the server.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
     """
 
     passwd = passwd or ''
@@ -380,24 +618,107 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
     return True, ""
 
 
-def build_rclone_config_for_ssh(cfg, rclone_config):
-    cfg = normalize_transfer_config(cfg)
-    ssh_config_path = os.path.expanduser("~/.ssh/config")
-    identity_file = os.path.expanduser("~/.ssh/id_rsa")
-    target_host = cfg["sshServer"]
-    rclone_remote = target_host.replace('.','_')
+# OpenSSH's default private keys in ~/.ssh, in the order ssh tries them
+DEFAULT_SSH_IDENTITIES = ('id_rsa', 'id_ecdsa', 'id_ecdsa_sk', 'id_ed25519', 'id_ed25519_sk',
+                          'id_xmss', 'id_dsa')
 
-    if os.path.exists(ssh_config_path):
-        with open(ssh_config_path) as f:
-            found_host = False
+
+def _ssh_host_matches(patterns: list, host: str) -> bool:
+    """Return True if ssh_config host patterns match *host*.
+
+    As ssh does: patterns may use ``*`` and ``?``, matching is case-sensitive,
+    and a matching negated pattern (``!pattern``) rules them out.
+    """
+    matched = False
+    for pattern in patterns:
+        negated = pattern.startswith('!')
+        if fnmatch.fnmatchcase(host, pattern.lstrip('!')):
+            if negated:
+                return False
+            matched = True
+    return matched
+
+
+def ssh_identity_file(host: str, user: str = '', ssh_dir: Optional[str] = None) -> Optional[str]:
+    """Return the private key ssh would use to log in to *host*.
+
+    The first ``IdentityFile`` that exists in the ``Host`` blocks of
+    ``~/.ssh/config`` (and ``Match all`` / ``Match host`` blocks) that match
+    *host*, with ``*``/``?`` wildcards, ``!`` negation, case-insensitive
+    keywords, ``keyword value`` or ``keyword=value``, ``~`` and the
+    ``%d %h %r %u %%`` tokens; or else the first of OpenSSH's default keys
+    that exists (``id_rsa``, ``id_ecdsa``, ``id_ed25519`` ...). Other ``Match``
+    criteria aren't evaluated, so those blocks are skipped, and ``Include``
+    isn't followed (#340).
+
+    Args:
+        host: The SSH server, as given in the transfer (``sshServer``).
+        user: The remote user (``sshUser``), for the ``%r`` token.
+        ssh_dir: The ``.ssh`` directory to use; defaults to ``~/.ssh``.
+
+    Returns:
+        The key's path, or ``None`` if there's no key.
+    """
+    home = os.path.expanduser('~')
+    ssh_dir = ssh_dir or os.path.join(home, '.ssh')
+    tokens = {'d': home, 'h': host, 'r': user, 'u': os.environ.get('USER', ''), '%': '%'}
+
+    configured = []
+    config_path = os.path.join(ssh_dir, 'config')
+    if os.path.isfile(config_path):
+        applies = True  # options before the first Host line apply to every host
+        with open(config_path, encoding='utf-8', errors='replace') as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("Host "):
-                    hosts = line.split()[1:]
-                    found_host = target_host in hosts
-                elif found_host and line.startswith("IdentityFile"):
-                    identity_file = line.split(maxsplit=1)[1]
-                    break
+                if not line or line.startswith('#'):
+                    continue
+                parts = re.split(r'\s*=\s*|\s+', line, maxsplit=1)
+                keyword, value = parts[0].lower(), (parts[1].strip() if len(parts) > 1 else '')
+                if keyword == 'host':
+                    applies = _ssh_host_matches(value.split(), host)
+                elif keyword == 'match':
+                    # "Match all" and "Match host a,b,!c"; other criteria aren't evaluated
+                    criteria = value.split()
+                    if criteria and criteria[0].lower() == 'all' and len(criteria) == 1:
+                        applies = True
+                    elif len(criteria) == 2 and criteria[0].lower() == 'host':
+                        applies = _ssh_host_matches(criteria[1].split(','), host)
+                    else:
+                        applies = False
+                elif keyword == 'identityfile' and applies and value:
+                    value = re.sub(r'%(.)', lambda m: tokens.get(m.group(1), m.group(0)), value.strip('"'))
+                    if value.startswith('~'):
+                        value = home + value[1:]
+                    configured.append(value if os.path.isabs(value) else os.path.join(home, value))
+
+    for path in configured + [os.path.join(ssh_dir, name) for name in DEFAULT_SSH_IDENTITIES]:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def build_rclone_config_for_ssh(cfg, rclone_config):
+    """Write an rclone SFTP remote for a transfer's SSH server to a config file.
+
+    The remote authenticates with the transfer's password (obscured with
+    ``rclone obscure``) or, when ``sshUseKey`` is set, with the private key
+    ssh would use for the host (``ssh_identity_file()``).
+
+    Args:
+        cfg: Transfer configuration with ``sshServer``, ``sshUser``,
+            ``sshUseKey`` and ``sshPass``.
+        rclone_config: Path of the rclone config file to write.
+
+    Returns:
+        The remote's name: the SSH server with ``.`` replaced by ``_``.
+
+    Raises:
+        subprocess.CalledProcessError: If ``rclone obscure`` fails.
+        FileNotFoundError: If ``sshUseKey`` is set and there's no SSH key.
+    """
+    cfg = normalize_transfer_config(cfg)
+    target_host = cfg["sshServer"]
+    rclone_remote = target_host.replace('.','_')
 
     # Build rclone config section
     out = configparser.ConfigParser()
@@ -422,6 +743,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
             logging.error("Failed to obscure password with rclone: %s", e)
             raise
     else:
+        identity_file = ssh_identity_file(target_host, cfg["sshUser"])
+        if identity_file is None:
+            raise FileNotFoundError(
+                f"No SSH key for {target_host}: none configured in ~/.ssh/config and none of "
+                f"~/.ssh/{', '.join(DEFAULT_SSH_IDENTITIES)} exists")
         out[rclone_remote]["key_file"] = identity_file
 
     # Print for debugging
@@ -436,9 +762,468 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     return rclone_remote
 
 
-def build_rclone_options(cfg, mode='dry-run'):
+# Keep connection tests quick when a server can't be reached; by default rclone
+# retries for minutes.
+RCLONE_TEST_FLAGS = ['--contimeout', '15s', '--timeout', '30s',
+                     '--retries', '1', '--low-level-retries', '1']
+
+FTP_REMOTE = 'ftp_source'
+
+# How long mount_ftp_source() waits for the mount to appear
+FTP_MOUNT_TIMEOUT = 30
+
+
+def rclone_error(stderr: str) -> str:
+    """Return rclone's last error line, without its timestamp/level prefix.
+
+    Args:
+        stderr: rclone's error output.
+
+    Returns:
+        The last non-empty line, or a placeholder if there is none.
     """
-    Build the relevant rsync options for the given transfer
+    lines = [line.strip() for line in (stderr or '').splitlines() if line.strip()]
+    if not lines:
+        return 'rclone failed with no error message'
+    # Fatal errors ("Failed to ...") have a timestamp but no level
+    return re.sub(r'^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\s+(?:[A-Z]+\s*:\s*)?', '', lines[-1])
+
+
+FTP_DEFAULT_PORT = 21
+
+
+def split_ftp_server(value: str) -> tuple:
+    """Split an FTP Server field into host and port.
+
+    The field is ``host``, ``host:port``, ``[ipv6]:port`` or a bare IPv6
+    address; the port defaults to 21 (#224).
+
+    Args:
+        value: The transfer's ``ftpServer``.
+
+    Returns:
+        tuple[str, int]: The host (IPv6 without brackets) and the port.
+
+    Raises:
+        ValueError: If the port isn't a number from 1 to 65535, or the
+            brackets of an IPv6 address don't match.
+    """
+    value = (value or '').strip()
+    if value.startswith('['):
+        match = re.match(r'^\[([^\]]+)\](?::(\d*))?$', value)
+        if not match:
+            raise ValueError(f"Invalid FTP server: {value}")
+        host, port = match.group(1), match.group(2)
+    elif value.count(':') == 1:
+        host, port = value.split(':')
+    else:
+        host, port = value, None   # hostname, IPv4, or bare IPv6 (default port)
+
+    if port is None or port == '':
+        return host, FTP_DEFAULT_PORT
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ValueError(f"Invalid FTP port in {value}: must be a number from 1 to 65535")
+    return host, int(port)
+
+
+def ftp_server_label(value: str) -> str:
+    """Return an FTP Server field as ``host:port``, for messages.
+
+    Args:
+        value: The transfer's ``ftpServer``.
+
+    Returns:
+        ``host:port`` (``[ipv6]:port``), or *value* unchanged if it can't
+        be parsed.
+    """
+    try:
+        host, port = split_ftp_server(value)
+    except ValueError:
+        return value
+    return f"[{host}]:{port}" if ':' in host else f"{host}:{port}"
+
+
+def build_rclone_config_for_ftp(cfg: dict, rclone_config: str) -> str:
+    """Write an rclone FTP remote for a transfer's FTP server to a config file.
+
+    The password is obscured with ``rclone obscure``, reading it from stdin so
+    it doesn't appear in the process list. Anonymous access without a
+    password uses the conventional password ``anonymous``.
+
+    Args:
+        cfg: Transfer configuration with ``ftpServer`` (``host[:port]``, see
+            :func:`split_ftp_server`), ``ftpUser`` and ``ftpPass``.
+        rclone_config: Path of the rclone config file to write.
+
+    Returns:
+        The remote's name, :data:`FTP_REMOTE`.
+
+    Raises:
+        subprocess.CalledProcessError: If ``rclone obscure`` fails.
+        ValueError: If ``ftpServer`` has an invalid port.
+    """
+    cfg = normalize_transfer_config(cfg)
+    host, port = split_ftp_server(cfg["ftpServer"])
+
+    out = configparser.ConfigParser()
+    out[FTP_REMOTE] = {
+        "type": "ftp",
+        # rclone joins host and port with ":", so an IPv6 host needs brackets
+        "host": f"[{host}]" if ':' in host else host,
+        "port": str(port),
+        "user": cfg.get("ftpUser") or "anonymous",
+    }
+
+    password = cfg.get("ftpPass") or ("anonymous" if out[FTP_REMOTE]["user"] == "anonymous" else "")
+    if password:
+        result = subprocess.run(["rclone", "obscure", "-"], input=password,
+                                capture_output=True, text=True, check=True)
+        out[FTP_REMOTE]["pass"] = result.stdout.strip()
+
+    with open(rclone_config, "w", encoding="utf-8") as f:
+        out.write(f)
+    os.chmod(rclone_config, 0o600)
+
+    return FTP_REMOTE
+
+
+def test_ftp_connection(rclone_config: str, remote: str, path: str = '/') -> tuple:
+    """Test logging in to an FTP server by listing a directory.
+
+    List the directory the transfer will use (see :func:`ftp_mount_base`)
+    rather than ``/``, which some accounts can't list (#209). A failure
+    whose detail says the directory wasn't found (rclone's ``directory not
+    found``, or the server's own wording such as ``No such directory``) means
+    the login worked but *path* can't be listed.
+
+    Args:
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        remote: Name of the FTP remote in *rclone_config*.
+        path: Directory on the server to list.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with rclone's error.
+    """
+    cmd = ['rclone', 'lsf', f'{remote}:{path}', '--config', rclone_config,
+           '--max-depth', '1'] + RCLONE_TEST_FLAGS
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return True, ""
+    except subprocess.CalledProcessError as exc:
+        return False, _ftp_rclone_error(exc.stderr)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+
+
+def ere_escape(text: str) -> str:
+    """Escape *text* for use as a literal in a POSIX extended regular expression.
+
+    For ``pkill -f``/``pgrep -f`` patterns (#242). :func:`re.escape` isn't
+    suitable: it also escapes characters such as ``-``, ``#`` and ``~``, and a
+    backslash before a character that isn't special is undefined in POSIX
+    regular expressions.
+
+    Args:
+        text: The literal text.
+
+    Returns:
+        *text* with every POSIX ERE special character backslash-escaped.
+    """
+    return re.sub(r'([\\.\[\]()*+?{}|^$])', r'\\\1', text)
+
+
+def ftp_mount_base(source_dir: str) -> str:
+    """Return the FTP directory to mount for a source directory.
+
+    The source directory itself, or for a wildcard source (wildcards only in
+    the last component) its parent. Mounting the server root instead would
+    need the account to be able to list ``/`` and every directory down to
+    the source, which some servers don't allow (#209).
+
+    Args:
+        source_dir: The transfer's source directory on the FTP server.
+
+    Returns:
+        The absolute directory to mount.
+    """
+    base = os.path.dirname(source_dir) if has_wildcard(os.path.basename(source_dir)) else source_dir
+    return '/' + base.strip('/') if base.strip('/') else '/'
+
+
+def mount_path(mntpoint: str, path: str, mount_base: str = None) -> str:
+    """Return where *path* on the remote is in a mount of *mount_base*.
+
+    Args:
+        mntpoint: Local mount point.
+        path: Path on the remote (FTP) or within the share (SMB).
+        mount_base: Remote directory mounted at *mntpoint*; ``None`` (or
+            ``/``) when the root of the server or share is mounted.
+
+    Returns:
+        The local path.
+    """
+    if not mount_base or mount_base == '/':
+        return os.path.join(mntpoint, path.lstrip('/'))
+    rel = os.path.relpath('/' + path.strip('/'), mount_base)
+    return mntpoint if rel == '.' else os.path.join(mntpoint, rel)
+
+
+def _ftp_rclone_error(stderr: str) -> str:
+    """Return rclone's error for an FTP remote, without the internal remote name.
+
+    Drops the ``Failed to create file system for "ftp_source:/": `` prefix,
+    which only names :data:`FTP_REMOTE`.
+    """
+    return re.sub(r'^Failed to create file system for "[^"]*": (NewFs: )?', '',
+                  rclone_error(stderr))
+
+
+def _rfc3339_to_epoch(value: str) -> float:
+    """Convert an rclone ``ModTime`` (RFC 3339, up to nanoseconds) to seconds since the epoch.
+
+    Args:
+        value: e.g. ``2019-08-11T19:03:35Z`` or ``2019-08-11T19:03:35.123456789-04:00``.
+
+    Returns:
+        The time as a Unix timestamp.
+
+    Raises:
+        ValueError: If *value* isn't in that format.
+    """
+    match = re.match(r'^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$', value)
+    if not match:
+        raise ValueError(f"Unrecognized time: {value}")
+    base, fraction, zone = match.groups()
+    seconds = calendar.timegm(datetime.strptime(base, '%Y-%m-%dT%H:%M:%S').timetuple())
+    if fraction:
+        seconds += float(f"0.{fraction}")
+    if zone != 'Z':
+        sign = 1 if zone[0] == '+' else -1
+        seconds -= sign * (int(zone[1:3]) * 3600 + int(zone[4:6]) * 60)
+    return seconds
+
+
+def list_ftp_source(rclone_config: str, remote: str, source_dir: str,
+                    exclude_patterns: Optional[list] = None) -> tuple:
+    """List every file under an FTP source directory with one ``rclone lsjson -R``.
+
+    Listing through the rclone mount would ``stat`` each file over FTP, and
+    shows a subdirectory the server refuses to list as empty. ``lsjson``
+    lists each directory once and fails on such errors, so a listing that
+    can't be trusted fails the transfer instead of looking like missing files
+    (#206, #208).
+
+    Args:
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        remote: Name of the FTP remote in *rclone_config*.
+        source_dir: Directory on the FTP server to list, e.g. ``/data``.
+        exclude_patterns: rclone ``--exclude`` patterns; excluded folders
+            aren't listed (#265).
+
+    Returns:
+        tuple[bool, list | str]: ``(True, files)`` with ``(path, size, mtime)``
+        tuples (*path* relative to *source_dir*, *mtime* in seconds since the
+        epoch), or ``(False, detail)`` with rclone's error.
+    """
+    cmd = ['rclone', 'lsjson', '-R', '--files-only', '--no-mimetype', '--config', rclone_config,
+           f"{remote}:{source_dir}", '--contimeout', '15s', '--timeout', '30s']
+    cmd += [f'--exclude={pattern}' for pattern in exclude_patterns or []]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    except subprocess.CalledProcessError as exc:
+        return False, _ftp_rclone_error(exc.stderr)
+
+    try:
+        return True, [(entry['Path'], int(entry['Size']), _rfc3339_to_epoch(entry['ModTime']))
+                      for entry in json.loads(proc.stdout)]
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, f"Unreadable rclone lsjson output: {exc}"
+
+
+def test_ftp_write_access(rclone_config: str, remote: str, path: str) -> tuple:
+    """Test writing to a directory on an FTP server.
+
+    Uploads a small test file to *path* and deletes it again, with the same
+    timeouts as the other rclone tests.
+
+    Args:
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        remote: Name of the FTP remote in *rclone_config*.
+        path: Directory on the server.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with rclone's error.
+    """
+    remote_file = f"{remote}:{path.rstrip('/')}/.openvdm-write-test-{uuid.uuid4().hex}.txt"
+    with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as tmp:
+        tmp.write('OpenVDM write test')
+    try:
+        for cmd in (['rclone', 'copyto', tmp.name, remote_file],
+                    ['rclone', 'deletefile', remote_file]):
+            subprocess.run(cmd + ['--config', rclone_config] + RCLONE_TEST_FLAGS,
+                           capture_output=True, text=True, check=True)
+        return True, ""
+    except subprocess.CalledProcessError as exc:
+        return False, _ftp_rclone_error(exc.stderr)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    finally:
+        os.remove(tmp.name)
+
+
+def mount_ftp_source(cfg: dict, mntpoint: str, rclone_config: str, mount_base: str = '/') -> tuple:
+    """Mount a directory of a transfer's FTP server on a local directory with ``rclone mount``.
+
+    *mount_base* (from :func:`ftp_mount_base`: the source directory, or a
+    wildcard source's parent) is mounted read-write if the transfer removes
+    source files (``removeSourceFiles``), otherwise read-only. Use
+    :func:`mount_path` to find a server path in the mount. The files to copy are listed
+    with :func:`list_ftp_source`, not through the mount, so rclone's default
+    directory cache is fine. :func:`~server.lib.file_utils.temporary_directory`
+    unmounts it. Requires
+    FUSE (``fuse3``) and root.
+
+    Success means *mntpoint* is actually mounted: rclone versions without
+    ``--daemon-wait`` (e.g. 1.53 on Ubuntu 22.04) return before the mount is
+    ready, and walking an unmounted directory would look like an empty
+    source (#206).
+
+    Args:
+        cfg: Transfer configuration.
+        mntpoint: Existing local directory to mount the server on.
+        rclone_config: rclone config file, from :func:`build_rclone_config_for_ftp`.
+        mount_base: Directory on the FTP server to mount.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with rclone's error.
+    """
+    cfg = normalize_transfer_config(cfg)
+    log_file = os.path.join(os.path.dirname(rclone_config), 'rclone_mount.log')
+
+    cmd = ['rclone', 'mount', f'{FTP_REMOTE}:{mount_base}', mntpoint, '--config', rclone_config,
+           '--daemon', '--contimeout', '15s', '--timeout', '30s',
+           '--log-level', 'ERROR', '--log-file', log_file]
+    if cfg.get('removeSourceFiles', 0) != 1:
+        cmd.append('--read-only')
+
+    logging.debug("mount_ftp_source cmd: %s", ' '.join(cmd))
+    # The daemonized rclone inherits stdout/stderr and keeps them open while
+    # mounted, so they go to the log file: waiting on a pipe would never end.
+    try:
+        with open(log_file, 'a', encoding='utf-8') as log:
+            subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=log, check=True)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    except subprocess.CalledProcessError:
+        with open(log_file, encoding='utf-8') as f:
+            detail = rclone_error(f.read())
+        logging.error("Failed to mount FTP server: %s", detail)
+        subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=False)
+        return False, detail
+
+    deadline = time.monotonic() + FTP_MOUNT_TIMEOUT
+    while not os.path.ismount(mntpoint):
+        if time.monotonic() > deadline:
+            with open(log_file, encoding='utf-8') as f:
+                log_text = f.read()
+            detail = (rclone_error(log_text) if log_text.strip()
+                      else f"not mounted after {FTP_MOUNT_TIMEOUT} s")
+            logging.error("FTP server mount not ready: %s", detail)
+            # rclone may still be trying: stop it so it can't mount later
+            subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, check=False)
+            subprocess.run(['pkill', '-f', ere_escape(f'rclone mount {FTP_REMOTE}:{mount_base} {mntpoint}')],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            return False, detail
+        time.sleep(0.2)
+
+    logging.info("Mounted FTP server %s on %s", cfg['ftpServer'], mntpoint)
+    return True, ""
+
+
+FTP_PASS_MISSING = ("ftpPass not available — worker API token may be misconfigured "
+                    "or the password is not set for this transfer")
+
+
+def prepare_ftp_config(cfg: dict, tmpdir: str) -> tuple:
+    """Check an FTP transfer's password is available and write its rclone config.
+
+    First step of setting up an FTP source, shared by Test Setup and the
+    transfer (#214). Test Setup then tests the connection; both then call
+    :func:`prepare_ftp_mount`.
+
+    Args:
+        cfg: Collection system transfer configuration.
+        tmpdir: The transfer's temporary directory; the config is written there.
+
+    Returns:
+        tuple[bool, str]: ``(True, rclone_config_path)``, or ``(False,
+        reason)`` if the password wasn't sent by the web app (worker API
+        token), the FTP Server field has an invalid port, rclone isn't
+        installed, or the config can't be written.
+    """
+    cfg = normalize_transfer_config(cfg)
+    if cfg.get('ftpUser') != 'anonymous' and cfg.get('ftpPass') is None:
+        return False, FTP_PASS_MISSING
+
+    rclone_config = os.path.join(tmpdir, 'rclone.conf')
+    try:
+        build_rclone_config_for_ftp(cfg, rclone_config)
+    except FileNotFoundError:
+        return False, 'rclone is not installed'
+    except ValueError as exc:
+        return False, str(exc)
+    except (subprocess.CalledProcessError, OSError) as exc:
+        return False, f"Unable to write rclone config: {exc}"
+    return True, rclone_config
+
+
+def prepare_ftp_mount(cfg: dict, tmpdir: str, rclone_config: str, mount_base: str) -> tuple:
+    """Mount an FTP transfer's source at ``<tmpdir>/mntpoint``.
+
+    Second step of setting up an FTP source, shared by Test Setup and the
+    transfer (#214). :func:`~server.lib.file_utils.temporary_directory`
+    unmounts it.
+
+    Args:
+        cfg: Collection system transfer configuration.
+        tmpdir: The transfer's temporary directory.
+        rclone_config: rclone config file, from :func:`prepare_ftp_config`.
+        mount_base: Directory on the FTP server to mount, from
+            :func:`ftp_mount_base`.
+
+    Returns:
+        tuple[bool, str]: ``(True, mntpoint)``, or ``(False, detail)`` with
+        rclone's error.
+    """
+    mntpoint = os.path.join(tmpdir, 'mntpoint')
+    os.makedirs(mntpoint, mode=0o755, exist_ok=True)
+    success, detail = mount_ftp_source(cfg, mntpoint, rclone_config, mount_base)
+    return (True, mntpoint) if success else (False, detail)
+
+
+def build_rclone_options(cfg, mode='dry-run'):
+    """Return the rclone subcommand and options for a cruise data transfer.
+
+    Uses ``sync`` if the transfer mirrors deletions (``syncToDest``), otherwise
+    ``copy``. Adds ``--create-empty-src-dirs`` unless ``skipEmptyDirs`` is set,
+    ``--dry-run`` in dry-run mode (otherwise ``-v``, so rclone logs each file
+    it copies or deletes), ``--bwlimit`` for a bandwidth limit, and the
+    Google Cloud Storage options when the destination remote is a GCS bucket.
+
+    Args:
+        cfg: Cruise data transfer configuration.
+        mode: ``'dry-run'`` to only list what would be transferred; any other
+            value for a real transfer.
+
+    Returns:
+        tuple[str, list[str]]: ``('copy' | 'sync', flags)``.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -456,6 +1241,9 @@ def build_rclone_options(cfg, mode='dry-run'):
 
     if mode == 'dry-run':
         flags.append('--dry-run')
+    else:
+        # Log each copied/deleted file, for the transfer's file lists (#230)
+        flags.append('-v')
 
     if remote_type == 'google cloud storage':
         flags.extend(["--gcs-bucket-policy-only", "--local-no-set-modtime"])
@@ -467,8 +1255,23 @@ def build_rclone_options(cfg, mode='dry-run'):
 
 
 def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
-    """
-    Build the relevant rsync options for the given transfer
+    """Return the rsync options for a transfer.
+
+    Dry runs use ``-trinv --dry-run --stats``; real transfers use ``-triv
+    --progress`` plus ``--bwlimit``, ``--remove-source-files`` and ``--delete``
+    as configured (and ``--no-motd`` for rsync servers). Both add
+    ``--min-size=1`` (``skipEmptyFiles``), ``-m`` (``skipEmptyDirs``), and
+    ``--protect-args`` unless the other end is macOS.
+
+    Args:
+        cfg: Collection system or cruise data transfer configuration.
+        mode: ``'dry-run'`` to only list what would be transferred; any other
+            value for a real transfer.
+        is_darwin: The remote end runs macOS, whose rsync doesn't support
+            ``--protect-args`` (see :func:`check_darwin`).
+
+    Returns:
+        list[str]: The rsync options.
     """
 
     cfg = normalize_transfer_config(cfg)
@@ -508,6 +1311,19 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
 
 
 def test_local_destination(dest_dir, is_mountpoint=0):
+    """Test a local destination directory for a cruise data transfer.
+
+    Checks that the directory exists, optionally that its top-level mount point
+    (the first two path components, e.g. ``/mnt/usb``) is mounted, and that it's
+    writable.
+
+    Args:
+        dest_dir: Absolute path of the destination directory.
+        is_mountpoint: ``1`` if the directory must be on a mounted filesystem.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
     results = []
 
     dest_dir_exists = os.path.isdir(dest_dir)
@@ -541,7 +1357,7 @@ def test_local_destination(dest_dir, is_mountpoint=0):
         results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
 
     if not test_write_access(dest_dir):
-        reason = f"Unable to delete source files from: {dest_dir} on SMB share"
+        reason = f"Unable to write to destination directory: {dest_dir}"
         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
         return results
@@ -551,6 +1367,24 @@ def test_local_destination(dest_dir, is_mountpoint=0):
 
 
 def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
+    """Test an SMB share destination for a cruise data transfer.
+
+    Reports the SMB server check, mounts the share at *mntpoint*, then runs
+    :func:`test_local_destination` on the destination directory within it. The
+    caller is responsible for unmounting the share.
+
+    Args:
+        cdt_cfg: Cruise data transfer configuration (SMB server, share,
+            credentials and ``destDir``).
+        mntpoint: Local directory to mount the share on.
+        smb_version: Detected SMB protocol version, or empty if detection
+            failed.
+        smb_detail: Error detail from SMB version detection, used as the
+            failure reason.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
     results = []
 
     if not smb_version:
@@ -591,9 +1425,91 @@ def test_smb_destination(cdt_cfg, mntpoint, smb_version, smb_detail=""):
     return results
 
 
-def test_cst_source(cst_cfg, source_dir):
+def _test_mounted_source(mntpoint: str, source_dir: str, remove_source_files: bool,
+                         location: str, mount_base: str = None) -> list:
+    """Check a source directory on a mounted SMB share or FTP server.
+
+    Checks that the source directory exists (for a wildcard source, that its
+    parent exists and at least one directory matches) and, if the transfer
+    removes source files, that the directory is writable.
+
+    Args:
+        mntpoint: Where the share or server is mounted.
+        source_dir: Source directory within the mount; may end in a wildcard.
+        remove_source_files: Whether the transfer deletes source files.
+        location: Where the source is, for failure reasons (e.g. ``'SMB share'``).
+        mount_base: Remote directory mounted at *mntpoint* (see
+            :func:`mount_path`); ``None`` for the root of a share.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
-    Test the connection to the collection system transfer
+    results = []
+
+    if has_wildcard(source_dir):
+        wildcard_parent = os.path.dirname(source_dir)
+        wildcard_pattern = os.path.basename(source_dir)
+        mnt_parent = mount_path(mntpoint, wildcard_parent, mount_base)
+        if not os.path.isdir(mnt_parent):
+            reason = f"Unable to find parent directory: {wildcard_parent} on {location}"
+            results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+            if remove_source_files:
+                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+            return results
+        matches = sorted([d for d in glob.glob(os.path.join(mnt_parent, wildcard_pattern)) if os.path.isdir(d)])
+        if not matches:
+            reason = f"No directories matching wildcard pattern: {source_dir} on {location}"
+            results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+            if remove_source_files:
+                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+            return results
+        results.extend([{"partName": "Source directory", "result": "Pass"}])
+        if remove_source_files:
+            if not test_write_access(matches[0]):
+                reason = f"Unable to delete source files from: {matches[0]} on {location}"
+                results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                return results
+            results.extend([{"partName": "Write test", "result": "Pass"}])
+        return results
+
+    mnt_source_dir = mount_path(mntpoint, source_dir, mount_base)
+    if not os.path.isdir(mnt_source_dir):
+        reason = f"Unable to find source directory: {source_dir} on {location}"
+        results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+
+        if remove_source_files:
+            results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+        return results
+
+    results.extend([{"partName": "Source directory", "result": "Pass"}])
+
+    if remove_source_files:
+        if not test_write_access(mnt_source_dir):
+            reason = f"Unable to delete source files from: {source_dir} on {location}"
+            results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+            return results
+
+        results.extend([{"partName": "Write test", "result": "Pass"}])
+
+    return results
+
+
+def test_cst_source(cst_cfg, source_dir):
+    """Test a collection system transfer's source.
+
+    Checks the transfer type, then, depending on it, the SMB server and share,
+    rsync, SSH or FTP connection (and FTP mount), the source directory (and, if required, that it's
+    a mount point), and write access when the transfer removes source files.
+
+    Args:
+        cst_cfg: Collection system transfer configuration.
+        source_dir: The source directory to test (with any cruise/lowering
+            substitutions already applied).
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
 
     cst_cfg = normalize_transfer_config(cst_cfg)
@@ -737,50 +1653,76 @@ def test_cst_source(cst_cfg, source_dir):
 
             results.extend([{"partName": "SMB share", "result": "Pass"}])
 
-            if source_has_wildcard:
-                smb_parent = os.path.join(mntpoint, wildcard_parent.lstrip('/'))
-                if not os.path.isdir(smb_parent):
-                    reason = f"Unable to find parent directory: {wildcard_parent} on SMB share"
-                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
-                    if cst_cfg['removeSourceFiles'] == 1:
-                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-                    return results
-                matches = sorted([d for d in glob.glob(os.path.join(smb_parent, wildcard_pattern)) if os.path.isdir(d)])
-                if not matches:
-                    reason = f"No directories matching wildcard pattern: {source_dir} on SMB share"
-                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
-                    if cst_cfg['removeSourceFiles'] == 1:
-                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-                    return results
-                results.extend([{"partName": "Source directory", "result": "Pass"}])
+            results.extend(_test_mounted_source(mntpoint, source_dir,
+                                                cst_cfg['removeSourceFiles'] == 1, 'SMB share'))
+
+        # Tests for FTP
+        if transfer_type == 'ftp':
+
+            config_success, rclone_config = prepare_ftp_config(cst_cfg, tmpdir)
+            if not config_success:
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Source directory", "result": "Fail", "reason": rclone_config}
+                ])
+                return results
+
+            server = ftp_server_label(cst_cfg['ftpServer'])
+            mount_base = ftp_mount_base(source_dir)
+            contest_success, contest_detail = test_ftp_connection(rclone_config, FTP_REMOTE, mount_base)
+
+            # rclone says "directory not found"; servers vary, e.g. "501 No such directory."
+            if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
+                # Logged in, but the source (or wildcard parent) can't be listed
+                results.extend([{"partName": "FTP server", "result": "Pass"}])
+                # Same rule as ftp_mount_base(): the parent is mounted only for a
+                # wildcard source; comparing the paths misreads '/data/xbt/' (#242)
+                if has_wildcard(os.path.basename(source_dir)):
+                    reason = f"Unable to find parent directory: {mount_base} on FTP server"
+                else:
+                    reason = f"Unable to find source directory: {source_dir} on FTP server"
+                results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
                 if cst_cfg['removeSourceFiles'] == 1:
-                    if not test_write_access(matches[0]):
-                        reason = f"Unable to delete source files from: {matches[0]} on SMB share"
-                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-                        return results
-                    results.extend([{"partName": "Write test", "result": "Pass"}])
-            else:
-                smb_source_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
-                source_dir_exists = os.path.isdir(smb_source_dir)
-                if not source_dir_exists:
-                    reason = f"Unable to find source directory: {source_dir} on SMB share"
-                    results.extend([{"partName": "Source directory", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                return results
 
-                    if cst_cfg['removeSourceFiles'] == 1:
-                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
-
-                    return results
-
-                results.extend([{"partName": "Source directory", "result": "Pass"}])
+            if not contest_success:
+                reason = f"Could not connect to FTP server: {server} as {cst_cfg['ftpUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
+                ])
 
                 if cst_cfg['removeSourceFiles'] == 1:
-                    if not test_write_access(smb_source_dir):
-                        reason = f"Unable to delete source files from: {source_dir} on SMB share"
-                        results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
-                        return results
+                return results
 
-                    results.extend([{"partName": "Write test", "result": "Pass"}])
+            results.extend([{"partName": "FTP server", "result": "Pass"}])
+
+            mnt_success, mount_result = prepare_ftp_mount(cst_cfg, tmpdir, rclone_config, mount_base)
+            if not mnt_success:
+                reason = f"Could not mount FTP server: {server}"
+                if mount_result:
+                    reason += f" — {mount_result}"
+                results.extend([
+                    {"partName": "Mount FTP server", "result": "Fail", "reason": reason},
+                    {"partName": "Source directory", "result": "Fail", "reason": reason}
+                ])
+
+                if cst_cfg['removeSourceFiles'] == 1:
+                    results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+                return results
+
+            results.extend([{"partName": "Mount FTP server", "result": "Pass"}])
+            mntpoint = mount_result
+
+            results.extend(_test_mounted_source(mntpoint, source_dir,
+                                                cst_cfg['removeSourceFiles'] == 1, 'FTP server',
+                                                mount_base))
 
         # Tests for rsync
         if transfer_type == 'rsync':
@@ -892,8 +1834,17 @@ def test_cst_source(cst_cfg, source_dir):
         return results
 
 def test_cdt_destination(cdt_cfg):
-    """
-    Test the connection to the cruise data transfer
+    """Test a cruise data transfer's destination.
+
+    Checks, depending on the transfer type, the local directory (or rclone
+    remote), rsync server, SMB share, SSH server or FTP server, the
+    destination directory, and write access.
+
+    Args:
+        cdt_cfg: Cruise data transfer configuration.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
 
     cdt_cfg = normalize_transfer_config(cdt_cfg)
@@ -984,7 +1935,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Rsync connection", "result": "Pass"})
 
-            contest_success, contest_detail = test_rsync_connection(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], password_file)
+            contest_success, contest_detail = test_rsync_connection(rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir']), cdt_cfg['rsyncUser'], password_file)
             if not contest_success:
                 reason = f"Unable to find destination directory: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 if contest_detail:
@@ -997,7 +1948,7 @@ def test_cdt_destination(cdt_cfg):
 
             results.append({"partName": "Destination directory", "result": "Pass"})
 
-            contest_success, contest_detail = test_rsync_write_access(f"{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}", cdt_cfg['rsyncUser'], tmpdir, password_file)
+            contest_success, contest_detail = test_rsync_write_access(rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir']), cdt_cfg['rsyncUser'], tmpdir, password_file)
             if not contest_success:
                 reason = f"Unable to write to: {cdt_cfg['destDir']} on the Rsync Server: {cdt_cfg['rsyncServer']}"
                 if contest_detail:
@@ -1070,75 +2021,119 @@ def test_cdt_destination(cdt_cfg):
 
             results.extend([{"partName": "Write test", "result": "Pass"}])
 
+        # Tests for FTP (#199): destDir is an absolute path on the server
+        if transfer_type == 'ftp':
+            dest_dir = cdt_cfg['destDir']
+            config_success, rclone_config = prepare_ftp_config(cdt_cfg, tmpdir)
+            if not config_success:
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Destination directory", "result": "Fail", "reason": rclone_config},
+                    {"partName": "Write test", "result": "Fail", "reason": rclone_config}
+                ])
+                return results
+
+            server = ftp_server_label(cdt_cfg['ftpServer'])
+            contest_success, contest_detail = test_ftp_connection(rclone_config, FTP_REMOTE, dest_dir)
+
+            # rclone says "directory not found"; servers vary, e.g. "501 No such directory."
+            if not contest_success and re.search(r'directory not found|no such', contest_detail, re.I):
+                reason = f"Unable to find destination directory: {dest_dir} on FTP server"
+                results.extend([
+                    {"partName": "FTP server", "result": "Pass"},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
+
+            if not contest_success:
+                reason = f"Could not connect to FTP server: {server} as {cdt_cfg['ftpUser']}"
+                if contest_detail:
+                    reason += f" — {contest_detail}"
+                results.extend([
+                    {"partName": "FTP server", "result": "Fail", "reason": reason},
+                    {"partName": "Destination directory", "result": "Fail", "reason": reason},
+                    {"partName": "Write test", "result": "Fail", "reason": reason}
+                ])
+                return results
+
+            results.extend([
+                {"partName": "FTP server", "result": "Pass"},
+                {"partName": "Destination directory", "result": "Pass"}
+            ])
+
+            write_success, write_detail = test_ftp_write_access(rclone_config, FTP_REMOTE, dest_dir)
+            if not write_success:
+                reason = f"Unable to write to: {dest_dir} on FTP server"
+                if write_detail:
+                    reason += f" — {write_detail}"
+                results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+                return results
+
+            results.append({"partName": "Write test", "result": "Pass"})
+
         return results
 
 def test_cdt_rclone_destination(cfg):
+    """Test an rclone destination for a cruise data transfer.
 
-    def _gcs_bucket_exists(remote_path):
+    ``destDir`` is either a local path or an rclone ``remote:path``. Local
+    directories and SMB shares get their own tests. Any other rclone remote
+    (SFTP, FTP, S3, Google Cloud Storage, Google Drive, WebDAV, ...) is tested
+    with rclone itself: for bucket-based remotes (S3, GCS, B2, Azure Blob, ...)
+    that the bucket exists, otherwise that the destination directory exists,
+    then that a test file can be written and deleted. Failures include
+    rclone's error message.
+
+    Args:
+        cfg: Cruise data transfer configuration.
+
+    Returns:
+        list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
+    """
+
+    def _run_rclone(args):
+        """Run ``rclone <args>``; return ``(True, stdout)`` or ``(False, error)``."""
         try:
-            subprocess.run(
-                ["rclone", "lsd", remote_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True
-            )
-            return True
-        except subprocess.CalledProcessError:
-            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
-            return False
+            proc = subprocess.run(['rclone'] + args + RCLONE_TEST_FLAGS,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  check=True, text=True)
+            return True, proc.stdout
+        except subprocess.CalledProcessError as exc:
+            return False, rclone_error(exc.stderr)
+        except FileNotFoundError:
+            return False, 'rclone is not installed'
 
-    def _verify_write_access(remote_path, bucket=False):
+    def _remote_features(remote_name):
+        """Return ``(True, features)`` for the remote, or ``(False, error)`` if rclone can't open it."""
+        success, output = _run_rclone(['backend', 'features', f'{remote_name}:'])
+        if not success:
+            return False, output
+        try:
+            return True, json.loads(output).get('Features', {})
+        except ValueError:
+            return True, {}
+
+    def _verify_write_access(remote_path, gcs=False):
+        """Copy a small file to ``remote_path`` and delete it; return ``(ok, error)``."""
         temp_file = tempfile.NamedTemporaryFile(delete=False)
         temp_file.write(b"rclone write test")
         temp_file.close()
 
         # Create a unique name to avoid conflicts
         remote_test_path = f"{remote_path.rstrip('/')}/.rclone-write-test-{uuid.uuid4().hex}.txt"
-        cmd = ["rclone", "copyto", temp_file.name, remote_test_path]
+        cmd = ["copyto", temp_file.name, remote_test_path]
 
-        if bucket:
+        if gcs:
             cmd += ["--gcs-bucket-policy-only", "--local-no-set-modtime"]
 
         try:
-            # Attempt to copy the file to the bucket
-            subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True,
-            )
-
-            # Attempt to delete the test file from the bucket
-            subprocess.run(
-                ["rclone", "deletefile", remote_test_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True,
-            )
-
-            return True
-        except subprocess.CalledProcessError:
-            #logging.exception(str(e))
-            return False
+            success, detail = _run_rclone(cmd)
+            if not success:
+                return False, detail
+            return _run_rclone(["deletefile", remote_test_path])
         finally:
             os.remove(temp_file.name)
-
-    def _verify_sftp_destination(remote_path):
-        try:
-            subprocess.run(
-                ["rclone", "lsf", remote_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True
-            )
-            return True
-        except subprocess.CalledProcessError:
-            # Optional: inspect e.stderr for specific errors like "bucket does not exist"
-            return False
 
     results = []
     if ':' not in cfg['destDir']:
@@ -1146,7 +2141,7 @@ def test_cdt_rclone_destination(cfg):
         remote_path = cfg['destDir']
         remote_type = get_transfer_type(cfg['transferType'])
     else:
-        remote_name, remote_path = cfg['destDir'].split(':')
+        remote_name, remote_path = cfg['destDir'].split(':', 1)
         remote_type = get_rclone_remote_type(remote_name)
 
         if remote_type is None:
@@ -1161,6 +2156,7 @@ def test_cdt_rclone_destination(cfg):
 
     if remote_type == 'local':
         results.extend(test_local_destination(remote_path, cfg.get('localDirIsMountPoint', 0)))
+        return results
 
     if remote_type == 'smb':
         with temporary_directory() as tmpdir:
@@ -1169,50 +2165,61 @@ def test_cdt_rclone_destination(cfg):
             smb_version, smb_detail = detect_smb_version(cfg)
 
             results.extend(test_smb_destination(cfg, mntpoint, smb_version, smb_detail))
+        return results
 
-    if remote_type == 'google cloud storage':
-        if '/' not in remote_path:
-            remote_path += '/'
-        bucket_name, dest_dir = remote_path.split('/',1)
-        if not _gcs_bucket_exists(f"{remote_name}:{bucket_name}"):
-            reason = f"GCS bucket {bucket_name} does not exist"
-            results.extend([
-                {"partName": "Verify GCS bucket", "result": "Fail", "reason": reason},
-                {"partName": "Write test", "result": "Fail", "reason": reason}
-            ])
+    if remote_name is None:
+        return results
 
-            return results
+    # Any other rclone remote. Opening it also connects to it, so a remote
+    # that can't be reached fails here rather than timing out again below.
+    is_gcs = remote_type == 'google cloud storage'
+    success, features = _remote_features(remote_name)
+    if not success:
+        # Label it as the check that would have run: bucket or directory
+        if is_gcs:
+            part_name = "Verify GCS bucket"
+        elif remote_type in ('s3', 'b2', 'azureblob', 'swift', 'oracleobjectstorage', 'qingstor'):
+            part_name = "Verify bucket"
+        else:
+            part_name = "Destination directory"
+        reason = f"Unable to connect to rclone remote {remote_name}: {features}"
+        results.extend([
+            {"partName": part_name, "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+        return results
 
-        results.append({"partName": "Verify GCS bucket", "result": "Pass"})
+    if is_gcs or features.get('BucketBased', False):
+        # Buckets have no real directories, so check the bucket itself
+        part_name = "Verify GCS bucket" if is_gcs else "Verify bucket"
+        bucket_name = remote_path.lstrip('/').split('/', 1)[0]
+        if not bucket_name:
+            reason = f"No bucket in destination {cfg['destDir']}; use {remote_name}:<bucket>/<path>"
+            success = False
+        else:
+            success, detail = _run_rclone(['lsd', f"{remote_name}:{bucket_name}"])
+            reason = f"Bucket {bucket_name} not found or not accessible: {detail}"
+    else:
+        part_name = "Destination directory"
+        success, detail = _run_rclone(['lsf', cfg['destDir']])
+        reason = f"Destination directory {cfg['destDir']} not found or not accessible: {detail}"
 
-        if not _verify_write_access(f"{remote_name}:{remote_path}", True):
-            reason = f"No write access to {remote_name}:{remote_path}"
-            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+    if not success:
+        results.extend([
+            {"partName": part_name, "result": "Fail", "reason": reason},
+            {"partName": "Write test", "result": "Fail", "reason": reason}
+        ])
+        return results
 
-            return results
+    results.append({"partName": part_name, "result": "Pass"})
 
-        results.append({"partName": "Write test", "result": "Pass"})
+    success, detail = _verify_write_access(cfg['destDir'], gcs=is_gcs)
+    if not success:
+        reason = f"No write access to {cfg['destDir']}: {detail}"
+        results.append({"partName": "Write test", "result": "Fail", "reason": reason})
+        return results
 
-    if remote_type == 'sftp':
-        dest_dir = remote_path
-        if not _verify_sftp_destination(cfg['destDir']):
-            reason = f"Destination directory {dest_dir} does not exist"
-            results.extend([
-                {"partName": "Destination directory", "result": "Fail", "reason": reason},
-                {"partName": "Write test", "result": "Fail", "reason": reason}
-            ])
-
-            return results
-
-        results.append({"partName": "Destination directory", "result": "Pass"})
-
-        if not _verify_write_access(cfg['destDir']):
-            reason = f"No write access to {cfg['destDir']}"
-            results.append({"partName": "Write test", "result": "Fail", "reason": reason})
-
-            return results
-
-        results.append({"partName": "Write test", "result": "Pass"})
+    results.append({"partName": "Write test", "result": "Pass"})
 
     return results
 

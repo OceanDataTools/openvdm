@@ -11,6 +11,7 @@
 
 namespace Controllers\Api;
 use Core\Controller;
+use Helpers\TransferCredentials;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -46,55 +47,33 @@ class CollectionSystemTransfers extends Controller {
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
     }
 
-    private function _is_worker_request(): bool {
-        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
-        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
-    }
-
-    private function _strip_credentials(array $rows): array {
-        return array_map(function($row) {
-            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
-            return $row;
-        }, $rows);
-    }
-
     public function getCollectionSystemTransfers(){
         $result = $this->_collectionSystemTransfersModel->getCollectionSystemTransfers();
-        if (!$this->_is_worker_request()) {
-            $result = $this->_strip_credentials($result);
-        }
+        $result = TransferCredentials::forResponse($result);
         echo json_encode($result);
     }
 
     public function getActiveCollectionSystemTransfers($sortField = 'name'){
         $result = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers($sortField);
-        if (!$this->_is_worker_request()) {
-            $result = $this->_strip_credentials($result);
-        }
+        $result = TransferCredentials::forResponse($result);
         echo json_encode($result);
     }
 
     public function getCruiseOnlyCollectionSystemTransfers(){
         $result = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
-        if (!$this->_is_worker_request()) {
-            $result = $this->_strip_credentials($result);
-        }
+        $result = TransferCredentials::forResponse($result);
         echo json_encode($result);
     }
 
     public function getLoweringOnlyCollectionSystemTransfers(){
         $result = $this->_collectionSystemTransfersModel->getLoweringOnlyCollectionSystemTransfers();
-        if (!$this->_is_worker_request()) {
-            $result = $this->_strip_credentials($result);
-        }
+        $result = TransferCredentials::forResponse($result);
         echo json_encode($result);
     }
 
     public function getCollectionSystemTransfer($id){
         $result = $this->_collectionSystemTransfersModel->getCollectionSystemTransfer($id);
-        if (!$this->_is_worker_request()) {
-            $result = $this->_strip_credentials($result);
-        }
+        $result = TransferCredentials::forResponse($result);
         echo json_encode($result);
     }
 

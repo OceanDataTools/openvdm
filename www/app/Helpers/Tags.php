@@ -62,11 +62,11 @@ class Tags
         $string = str_replace('[sitetitle]', SITETITLE, $string);
 
         //site email address
-        $string = str_replace('[siteemail]', SITEEMAIL, $string);
+        $string = str_replace('[siteemail]', defined('SITEEMAIL') ? SITEEMAIL : '', $string);
 
         //feedburner subscribe form
         $string = preg_replace_callback("(\[feedburner(.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             $username = (isset($params['username']) ? $params['username'] : '');
 
@@ -82,7 +82,7 @@ class Tags
 
         //google plus box
         $string = preg_replace_callback("(\[googleplusbox(.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
             $username = (isset($params['username']) ? $params['username'] : '');
 
             return "<script src='https://apis.google.com/js/platform.js' async defer></script>
@@ -91,7 +91,7 @@ class Tags
 
         //twitter follow button
         $string = preg_replace_callback("(\[twitterfollowbutton(.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             if (!isset($params['count'])) {
                 $params['count'] = null;
@@ -112,7 +112,7 @@ class Tags
 
         //twitter share button
         $string = preg_replace_callback("(\[twittersharebutton(.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             if (!isset($params['count'])) {
                 $params['count'] = null;
@@ -134,7 +134,7 @@ class Tags
 
         //youtube embeds
         $string = preg_replace_callback("(\[youtube (.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             //if key exits use it
             $video = (isset($params['video']) ? $params['video'] : '');
@@ -147,7 +147,7 @@ class Tags
 
         //youtube subscribe
         $string = preg_replace_callback("(\[youtubesub(.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             if (!isset($params['count'])) {
                 $params['count'] = null;
@@ -167,7 +167,7 @@ class Tags
 
         //vimeo embeds
         $string = preg_replace_callback("(\[vimeo (.*?)])is", function ($matches) {
-            $params = tags::clean($matches);
+            $params = Tags::clean($matches);
 
             //if key exits use it
             $video = (isset($params['video']) ? $params['video'] : '');

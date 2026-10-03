@@ -15,6 +15,7 @@ $_POST += [
     'localDirIsMountPoint' => '', 'rsyncServer' => '', 'rsyncUser' => '',
     'rsyncPass' => '', 'smbServer' => '', 'smbDomain' => '', 'smbUser' => '',
     'smbPass' => '', 'sshServer' => '', 'sshUser' => '', 'sshUseKey' => '', 'sshPass' => '',
+    'ftpServer' => '', 'ftpUser' => '', 'ftpPass' => '',
 ];
 
 ?>
@@ -50,7 +51,7 @@ $_POST += [
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=> $_POST['name']));?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=> $_POST['longName'])); ?></div>
-                                <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=> $_POST['destDir'])); ?></div>
+                                <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'placeholder'=>'e.g. XBT', 'value'=> $_POST['destDir'])); ?></div>
                                 <div class="form-group"><label>Include Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'includeFilter', 'value'=> $_POST['includeFilter'])); ?></div>
                                 <div class="form-group"><label>Exclude Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'excludeFilter', 'value'=> $_POST['excludeFilter'])); ?></div>
                                 <div class="form-group"><label>Ignore Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'ignoreFilter', 'value'=> $_POST['ignoreFilter'])); ?></div>
@@ -69,20 +70,23 @@ $_POST += [
 <?php
   }
 ?>
-                                <div class="form-group"><label>Transfer Type</label><?php echo FormCustom::radioInline($data['transferTypeOptions'], $_POST['transferType'] ?? ''); ?></div>
+                                <div class="form-group"><label>Transfer Type</label><?php echo Form::select(array('class'=>'form-control', 'name'=>'transferType', 'placeholder'=>'Select a transfer type…', 'data'=>$data['transferTypeOptions'], 'value'=>$_POST['transferType'] ?? '')); ?></div>
                                 <div class="form-group"><label>Source Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sourceDir', 'value'=> $_POST['sourceDir'])); ?></div>
                                 <div class="form-group localDir"><label>Source Directory is mountpoint?</label><?php echo FormCustom::radioInline($data['useLocalMountPointOptions'], $_POST['localDirIsMountPoint']); ?></div>
-                                <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'value'=> $_POST['rsyncServer'])); ?></div>
+                                <div class="form-group rsyncServer"><label>Rsync Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncServer', 'placeholder'=>'e.g. 192.168.4.151/data', 'value'=> $_POST['rsyncServer'])); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncUser', 'value'=> $_POST['rsyncUser'])); ?></div>
                                 <div class="form-group rsyncServer"><label>Rsync Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'rsyncPass', 'value'=> $_POST['rsyncPass'], 'type'=>'password')); ?></div>
-                                <div class="form-group smbShare"><label>SMB Server/Share</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbServer', 'value'=> $_POST['smbServer'])); ?></div>
+                                <div class="form-group smbShare"><label>SMB Server/Share</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbServer', 'placeholder'=>'e.g. //192.168.4.151/data', 'value'=> $_POST['smbServer'])); ?></div>
                                 <div class="form-group smbShare"><label>SMB Domain</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbDomain', 'value'=> $_POST['smbDomain'])); ?></div>
                                 <div class="form-group smbShare"><label>SMB Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbUser', 'value'=> $_POST['smbUser'])); ?></div>
                                 <div class="form-group smbShare"><label>SMB Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'smbPass', 'value'=> $_POST['smbPass'], 'type'=>'password')); ?></div>
-                                <div class="form-group sshServer"><label>SSH Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshServer', 'value'=> $_POST['sshServer'])); ?></div>
+                                <div class="form-group sshServer"><label>SSH Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshServer', 'placeholder'=>'e.g. 192.168.4.151', 'value'=> $_POST['sshServer'])); ?></div>
                                 <div class="form-group sshServer"><label>SSH Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshUser', 'value'=> $_POST['sshUser'])); ?></div>
                                 <div class="form-group sshServer"><label>Use SSH Public/Private key?</label><?php echo FormCustom::radioInline($data['useSSHKeyOptions'], $_POST['sshUseKey']); ?></div>
                                 <div class="form-group sshServer"><label>SSH Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'sshPass', 'value'=> $_POST['sshPass'], 'type'=>'password')); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Server</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpServer', 'placeholder'=>'e.g. 192.168.4.151 or 192.168.4.151:2121', 'value'=> $_POST['ftpServer'])); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Username</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpUser', 'value'=> $_POST['ftpUser'])); ?></div>
+                                <div class="form-group ftpServer"><label>FTP Password</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'ftpPass', 'value'=> $_POST['ftpPass'], 'type'=>'password')); ?></div>
                             </div>
                         </div>
                         <div class="row">
@@ -113,10 +117,10 @@ $_POST += [
 <?php
   }
 ?>
-            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).</p>
+            <p>The <strong>Transfer Type</strong> defines how OpenVDM will transfer the data from the Collection System to the Data Warehouse.  <strong>Local Directory</strong> is a transfer of data that is located on the Data Warehouse but is outside of the <?php echo CRUISE_NAME; ?> Data Directory.  <strong>Rsync Server</strong> is a transfer of data from a Collection System running Rsync and SSH servers. <strong>SMB Share</strong> is a transfer of data from a Collection System with a SMB (Windows) Share.  <strong>SSH Server</strong> is a transfer of cruise data to a destination system via Secure Shell (SSH).  <strong>FTP Server</strong> is a transfer of data from a Collection System running an FTP server.</p>
             <p>The <strong>Source Directory</strong> is the location of the data files on the collection system.</p>
             <p class="localDir">The <strong>Source Directory is mountpoint</strong> specifies whether OpenVDM should confirm a device (external HDD) is connected at that location.</p>
-            <p class="rsyncServer">The <strong>Rsync Server</strong> is the IP address and share name of the Collection System (i.e. "192.168.4.151").</p>
+            <p class="rsyncServer">The <strong>Rsync Server</strong> is the IP address of the Collection System and the rsync module to copy from (i.e. "192.168.4.151/data").</p>
             <p class="rsyncServer">The <strong>Rsync Username</strong> is the rsync username with permission to access the data on the Collection System (i.e. "shipTech").  If the rsync server allows anonymous access set this field to "anonymous" and no password will be required.</p>
             <p class="rsyncServer">The <strong>Rsync Password</strong> is the rsync password for the Rsync Username. Not required if Rsync Username is set to "anonymous".</p>
             <p class="smbShare">The <strong>SMB Server/Share</strong> is the SMB Server/Share of the Collection System (i.e. "//192.168.4.151/data").</p>
@@ -127,6 +131,9 @@ $_POST += [
             <p class="sshServer">The <strong>SSH Username</strong> is the SSH username with permission to access the data on the Collection System (i.e. "shipTech").</p>
             <p class="sshServer">The <strong>Use SSH Public/Private key?</strong> instructs OpenVDM to authenticate this connection using SSH public/private keys instead of a password</p>
             <p class="sshServer">The <strong>SSH Password</strong> is the SSH password for the Rsync Username.</p>
+            <p class="ftpServer">The <strong>FTP Server</strong> is the hostname or IP address of the Collection System (i.e. "192.168.4.151"), followed by <strong>:port</strong> if the FTP server doesn't use port 21 (i.e. "192.168.4.151:2121", or "[2001:db8::1]:2121" for an IPv6 address).  For an FTP Server, the <strong>Source Directory</strong> is the path on the FTP server (i.e. "/data").</p>
+            <p class="ftpServer">The <strong>FTP Username</strong> is the FTP username with permission to access the data on the Collection System (i.e. "shipTech").  If the FTP server allows anonymous access set this field to "anonymous" and no password will be required.</p>
+            <p class="ftpServer">The <strong>FTP Password</strong> is the FTP password for the FTP Username. Not required if FTP Username is set to "anonymous".</p>
             <p>Click the <strong>Add</strong> button to add the new collection system transfer to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
             <p><strong>Shorthand notation</strong> for file filters, source and destination directories:<br/>
                 <ul>

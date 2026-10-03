@@ -11,22 +11,11 @@
 
 namespace Controllers\Api;
 use Core\Controller;
+use Helpers\TransferCredentials;
 
 class Warehouse extends Controller {
 
     private $_warehouseModel;
-
-    private function _is_worker_request(): bool {
-        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
-        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
-    }
-
-    private function _strip_credentials(array $rows): array {
-        return array_map(function($row) {
-            unset($row->rsyncPass, $row->smbPass, $row->sshPass);
-            return $row;
-        }, $rows);
-    }
 
     private function translateOVDMVariables($text) {
 
@@ -347,10 +336,8 @@ class Warehouse extends Controller {
         $response['cruiseDataTransfersConfig'] = $cruiseDataTransfersModel->getCruiseDataTransfersConfig();
         $response['shipToShoreTransfersConfig'] = $shipToShoreTransfersModel->getShipToShoreTransfersConfig();
 
-        if (!$this->_is_worker_request()) {
-            $response['collectionSystemTransfersConfig'] = $this->_strip_credentials($response['collectionSystemTransfersConfig']);
-            $response['cruiseDataTransfersConfig'] = $this->_strip_credentials($response['cruiseDataTransfersConfig']);
-        }
+        $response['collectionSystemTransfersConfig'] = TransferCredentials::forResponse($response['collectionSystemTransfersConfig']);
+        $response['cruiseDataTransfersConfig'] = TransferCredentials::forResponse($response['cruiseDataTransfersConfig']);
 
         if($this->_warehouseModel->getShowLoweringComponents()) {
             $response['loweringDataBaseDir'] = $this->_warehouseModel->getLoweringDataBaseDir();
@@ -378,9 +365,7 @@ class Warehouse extends Controller {
         $response['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getLoweringOnlyCollectionSystemTransfers();
 
-        if (!$this->_is_worker_request()) {
-            $response['collectionSystemTransfersConfig'] = $this->_strip_credentials($response['collectionSystemTransfersConfig']);
-        }
+        $response['collectionSystemTransfersConfig'] = TransferCredentials::forResponse($response['collectionSystemTransfersConfig']);
 
         foreach ($response['collectionSystemTransfersConfig'] as $key => $collectionSystemTransfersConfig) {
             $collectionSystemTransfersConfig->sourceDir = $this->translateOVDMVariables($collectionSystemTransfersConfig->sourceDir);

@@ -36,6 +36,8 @@ $hooks = Hooks::get();
 
     <?php echo (isset($data['jsonInvertedTypes']) ? 'var jsonInvertedTypes = [\'' . join('\', \'', $data['jsonInvertedTypes']) . '\'];' : ''); ?>
 
+    <?php echo (isset($data['jsonProfileTypes']) ? 'var jsonProfileTypes = ' . json_encode((object) $data['jsonProfileTypes'], JSON_HEX_TAG | JSON_HEX_AMP) . ';' : ''); ?>
+
 <?php
     if(isset($data['subPages'])) {
         echo '    var subPages = [];' . "\n";
@@ -55,7 +57,7 @@ $jsFileArray = array(
     DIR . 'node_modules/jquery/dist/jquery.min.js',
     DIR . 'node_modules/bootstrap/dist/js/bootstrap.min.js',
     DIR . 'node_modules/metismenu/dist/metisMenu.min.js',
-    DIR . 'node_modules/js-cookie/src/js.cookie.js',
+    DIR . 'node_modules/js-cookie/dist/js.cookie.min.js',
     DIR . 'node_modules/list.js/dist/list.min.js',
     Url::templatePath() . 'js/sb-admin-2.js',
     Url::templatePath() . 'js/header.js',
@@ -68,6 +70,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'node_modules/leaflet/dist/leaflet.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-fullscreen/dist/Leaflet.fullscreen.min.js');
             array_push($jsFileArray, DIR . 'node_modules/leaflet-easyprint/dist/bundle.js');
+            array_push($jsFileArray, Url::templatePath() . 'js/mapBaseLayers.js');
         } else if ($jsFile === 'leaflet-timedimension') {
             array_push($jsFileArray, DIR . 'node_modules/leaflet-timedimension/dist/leaflet.timedimension.min.js');
         } else if ($jsFile === 'charts') {
@@ -75,6 +78,7 @@ if (isset($data['javascript'])){
             array_push($jsFileArray, DIR . 'node_modules/chart.js/dist/chart.min.js');
             array_push($jsFileArray, DIR . 'node_modules/luxon/build/global/luxon.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-adapter-luxon/dist/chartjs-adapter-luxon.umd.min.js');
+            array_push($jsFileArray, Url::templatePath() . 'js/dashboardCharts.js');
         } else if ($jsFile === 'charts-zoom') {
             array_push($jsFileArray, DIR . 'node_modules/hammerjs/hammer.min.js');
             array_push($jsFileArray, DIR . 'node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js');

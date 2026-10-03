@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  em302_plugin.py
+"""Plugin for Kongsberg EM302 multibeam GeoTIFF products.
 
-USAGE:  em302_plugin.py [-h] [--dataType] <dataFile>
-
-DESCRIPTION:  This python script interprets geotiff files created by the EM302
-    Multibeam Mapping System.  The script returns the data type of the file or
-    a json-formatted summary of the file and a WMS-compatible tile pyramid
-    version of the original file to databoard_data directory in the cruise data
-    directory.  The json-formatted file is used by OpenVDM as part of it's Data
-    dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [--dataType] Return the datatype of the file as defined in the
-                fileTypeFilter array.
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-10-23
- REVISION:  2025-04-12
+Matches GeoTIFF files from the EM302 multibeam echosounder, runs them through
+the TiTiler GeoTIFF parser, and returns the JSON-formatted plugin data used by
+OpenVDM's Data Dashboard.
 """
 
 import sys
@@ -48,9 +28,7 @@ FILE_TYPE_FILTERS = [
 
 
 class EM302Plugin(OpenVDMPlugin):
-    """
-    OpenVDM plugin for the EM302 MBES
-    """
+    """OpenVDM plugin for Kongsberg EM302 multibeam GeoTIFF products."""
 
     def __init__(self):
         super().__init__(FILE_TYPE_FILTERS)
@@ -80,6 +58,7 @@ class EM302Plugin(OpenVDMPlugin):
         return parsers
 
     def parse_file(self, filepath):
+        """Run every matching parser on the file and return their plugin data by data type."""
         parsers = self._get_parsers(filepath)
         if not parsers:
             logging.debug("No parsers matched file %s", filepath)

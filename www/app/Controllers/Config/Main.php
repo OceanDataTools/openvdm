@@ -27,17 +27,30 @@ class Main extends Controller {
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
     }
 
+    /**
+     * The data the Configuration page (Config/main) shows. Read it after any
+     * job the page reports on, so the page shows that job's effect. Every
+     * action that renders the page uses this, so none leaves a key out (#336).
+     *
+     * @return array<string, mixed>
+     */
+    private function mainPageData() {
+        return array(
+            'title' => 'Configuration',
+            'javascript' => array('main_config'),
+            'tasks' => $this->_tasksModel->getActiveTasks(),
+            'collectionSystemTransfers' => $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName'),
+            'requiredCruiseDataTransfers' => $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers(),
+            'cruiseDataTransfers' => $this->_cruiseDataTransfersModel->getCruiseDataTransfers(),
+            'cruiseFinalizedOn' => $this->_warehouseModel->getCruiseFinalizedDate()['cruiseFinalizedOn'],
+            'loweringID' => $this->_warehouseModel->getLoweringID(),
+            'loweringFinalizedOn' => $this->_warehouseModel->getLoweringFinalizedDate()['loweringFinalizedOn'],
+        );
+    }
+
     public function index(){
 
-        $data['title'] = 'Configuration';
-        $data['javascript'] = array('main_config');
-        $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
-        $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
-        $data['cruiseFinalizedOn'] = $this->_warehouseModel->getCruiseFinalizedDate()['cruiseFinalizedOn'];
-        $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['loweringFinalizedOn'] = $this->_warehouseModel->getLoweringFinalizedDate()['loweringFinalizedOn'];
+        $data = $this->mainPageData();
 
         View::rendertemplate('header',$data);
         View::render('Config/main',$data);
@@ -113,7 +126,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -262,7 +275,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -340,15 +353,7 @@ class Main extends Controller {
         #submit job to Gearman
         #$job_handle = $gmc->doBackground("updateCruiseDirectory", json_encode($gmData));
         $data['jobResults'] = json_decode($gmc->doNormal("rebuildCruiseDirectory", json_encode($gmData)));
-
-        #additional data needed for view
-        $data['title'] = 'Configuration';
-        $data['javascript'] = array('main_config');
-        $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
-        $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data = array_merge($data, $this->mainPageData());
 
         $data['jobName'] = 'Rebuild ' . CRUISE_NAME . ' Directory';
 
@@ -373,15 +378,7 @@ class Main extends Controller {
         #submit job to Gearman
         #$job_handle = $gmc->doBackground("updateCruiseDirectory", json_encode($gmData));
         $data['jobResults'] = json_decode($gmc->doNormal("rebuildLoweringDirectory", json_encode($gmData)));
-
-        #additional data needed for view
-        $data['title'] = 'Configuration';
-        $data['javascript'] = array('main_config');
-        $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
-        $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data = array_merge($data, $this->mainPageData());
 
         $data['jobName'] = 'Rebuild ' . LOWERING_NAME . ' Directory';
 
@@ -485,7 +482,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = CRUISE_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -524,15 +521,9 @@ class Main extends Controller {
                 $data['jobResults'] = json_decode($gmc->doNormal("setupNewCruise", json_encode($gmData)));
 
 
-                #additional data needed for view
-                $data['title'] = 'Configuration';
-                $data['javascript'] = array('main_config');
                 $data['cruiseID'] = $this->_warehouseModel->getCruiseID();
                 $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
-                $data['tasks'] = $this->_tasksModel->getActiveTasks();
-                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
-                $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-                $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+                $data = array_merge($data, $this->mainPageData());
 
                 $data['jobName'] = 'Setup New ' . CRUISE_NAME;
 
@@ -569,6 +560,15 @@ class Main extends Controller {
 
             if(isset($_POST['showLoweringComponents'])) {
                 $this->_warehouseModel->showLoweringComponents();
+
+                # Rebuild the current cruise's directory so it gets the lowering
+                # base directory, as Edit Cruise does
+                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
+                if (!empty($gmData['cruiseID'])) {
+                    $gmc= new \GearmanClient();
+                    $gmc->addServer();
+                    $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
+                }
             }
 
             if(isset($_POST['disableSSDW'])) {
@@ -640,7 +640,7 @@ class Main extends Controller {
                         if ($start && $end && $end <= $start) {
                             $error[] = LOWERING_NAME . ' End Date must be after Start Date';
                         }
-                    } catch (Exception $e) {
+                    } catch (\Exception $e) {
                         $error[] = 'Invalid date format encountered.';
                     }
                 }
@@ -666,14 +666,7 @@ class Main extends Controller {
 
                 #submit job to Gearman
                 $data['jobResults'] = json_decode($gmc->doNormal("setupNewLowering", json_encode($gmData)));
-
-
-                #additional data needed for view
-                $data['title'] = 'Configuration';
-                $data['javascript'] = array('main_config');
-                $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-                $data['tasks'] = $this->_tasksModel->getActiveTasks();
-                $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers('longName');
+                $data = array_merge($data, $this->mainPageData());
 
                 $data['jobName'] = 'Setup New ' . LOWERING_NAME;
 
@@ -751,8 +744,6 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
             } else {
                 $prev_time = strtotime($loweringEndDate);
-                var_dump($prev_time);
-                var_dump($roundedTimestamp);
                 if ($prev_time > $roundedTimestamp) {
                     $this->_warehouseModel->setLoweringEndDate(array('value' => date('Y/m/d H:i', $roundedTimestamp)));
                 }
@@ -791,14 +782,7 @@ class Main extends Controller {
         #submit job to Gearman
         #$job_handle = $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
         $data['jobResults'] = json_decode($gmc->doNormal("exportOVDMConfig", json_encode($gmData)));
-
-        $data['title'] = 'Configuration';
-        $data['javascript'] = array('main_config');
-        $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
-        $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data = array_merge($data, $this->mainPageData());
 
         $data['jobName'] = 'Export OpenVDM Configuration';
 
@@ -820,14 +804,7 @@ class Main extends Controller {
         #submit job to Gearman
         #$job_handle = $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
         $data['jobResults'] = json_decode($gmc->doNormal("exportLoweringConfig", json_encode($gmData)));
-
-        $data['title'] = 'Configuration';
-        $data['javascript'] = array('main_config');
-        $data['tasks'] = $this->_tasksModel->getActiveTasks();
-        $data['loweringID'] = $this->_warehouseModel->getLoweringID();
-        $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getActiveCollectionSystemTransfers();
-        $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        $data['cruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfers();
+        $data = array_merge($data, $this->mainPageData());
 
         $data['jobName'] = 'Export ' . LOWERING_NAME . ' Configuration';
 

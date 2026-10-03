@@ -10,15 +10,21 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                             <div class="col-lg-12">
 <?php
     for($i = 0; $i < sizeof($data['placeholders']); $i++){
+        // A card with no files for any of its data types isn't shown (#310)
+        $filecount = 0;
+        for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
+            $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
+        }
+        if ($filecount == 0) {
+            continue;
+        }
 ?>
                                 <div class="panel panel-default">
 <?php
-        $filecount = 0;
         for($j=0; $j < sizeof($data['placeholders'][$i]['dataFiles']); $j++){
 ?>
                                 <a id="<?php echo (!empty($data['placeholders'][$i]['dataFiles'][$j]) ? $data['placeholders'][$i]['dataFiles'][$j][0]['type'] : ''); ?>"></a>
 <?php
-            $filecount += sizeof($data['placeholders'][$i]['dataFiles'][$j]);
         }
 ?>
                                     <div class="panel-heading">
@@ -26,7 +32,7 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
                                     </div>
                                     <div class="panel-body">
                                     <<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?> class="<?php echo $data['placeholders'][$i]['plotType']; ?>" id="<?php echo $data['placeholders'][$i]['id'];?>_placeholder" style="min-height:<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? '493': '200'); ?>px;">
-                                    <?php echo ($filecount == 0? 'No Data Found.': ''); ?></<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
+                                    </<?php echo (strcmp($data['placeholders'][$i]['plotType'], 'map') === 0? 'div': 'canvas'); ?>>
                                     </div>
                                     <div class="panel-footer">
                                         <div class="objectList" id="<?php echo $data['placeholders'][$i]['id'];?>_objectList-placeholder">
@@ -55,80 +61,46 @@ $loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading
 ?>
                                                     <div class='col-lg-12'>
                                                         <input class='lp-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type'];?>" checked> Latest Position
-                                                    </div></br>
+                                                    </div>
+                                                    <div class='col-lg-12'>
 <?php
                     for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
 ?>
-                                                    <div class='col-lg-4 col-sm-6'>
+                                                    <span class='file-entry'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                    </div>
+                                                    </span>
 <?php
                     }
+?>
+                                                    </div>
+<?php
                 } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'tms')===0) {
+?>
+                                                    <div class='col-lg-12'>
+<?php
                     for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
 ?>
-                                                    <div class='col-lg-4 col-sm-6'>
+                                                    <span class='file-entry'>
                                                         <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-checkbox' type="checkbox" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][0]['type'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>" checked> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
                                                         <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                    </div>
-<?php
-                    }
-                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json')===0) {
-?>
-                                                    <div class="form-group">
-<?php
-                    for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
-?>
-                                                        <div class='col-lg-4 col-sm-6'>
-                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]['dataFiles'][$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
-                                                            <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                        </div>
+                                                    </span>
 <?php
                     }
 ?>
                                                     </div>
 <?php
-                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-reversedY')===0) {
+                } else if(in_array($data['placeholders'][$i]['dataArray'][$j]['visType'], array('json', 'json-reversedY', 'json-reversedY-inverted', 'json-inverted', 'json-profile'), true)) {
+                    // A chart; json-profile entries carry their options for dashboardCharts.js (#274)
 ?>
-                                                    <div class="form-group">
+                                                    <div class="form-group col-lg-12">
 <?php
                     for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
 ?>
-                                                        <div class='col-lg-4 col-sm-6'>
-                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]['dataFiles'][$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
+                                                        <span class='file-entry'>
+                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' <?php echo (isset($data['placeholders'][$i]['dataArray'][$j]['profileOptions']) ? "data-profile='" . htmlspecialchars(json_encode($data['placeholders'][$i]['dataArray'][$j]['profileOptions']), ENT_QUOTES) . "' " : ''); ?>name="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]['dataFiles'][$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
                                                             <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                        </div>
-<?php
-                    }
-?>
-                                                    </div>
-<?php
-                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-reversedY-inverted')===0) {
-?>
-                                                    <div class="form-group">
-<?php
-                    for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
-?>
-                                                        <div class='col-lg-4 col-sm-6'>
-                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]['dataFiles'][$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
-                                                            <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                        </div>
-<?php
-                    }
-?>
-                                                    </div>
-<?php
-                } else if(strcmp($data['placeholders'][$i]['dataArray'][$j]['visType'], 'json-inverted')===0) {
-?>
-                                                    <div class="form-group">
-<?php
-                    for($k = sizeof($data['placeholders'][$i]['dataFiles'][$j])-1; $k >= 0; $k--){
-?>
-                                                        <div class='col-lg-4 col-sm-6'>
-                                                            <input class='<?php echo $data['placeholders'][$i]['dataArray'][$j]['visType']; ?>-radio' name="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['type'];?>" type="radio" value="<?php echo $data['placeholders'][$i]['dataFiles'][$j][$k]['dd_json'];?>"  <?php echo ($k === sizeof($data['placeholders'][$i]['dataFiles'][$j])-1? 'checked' : '');   ?>> <?php echo end(explode('/',$data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']));?>
-                                                            <a href="<?php echo $data['dataWarehouseApacheDir'] . '/' . $data['placeholders'][$i]['dataFiles'][$j][$k]['raw_data']; ?>" download target="_blank"><i class="fa fa-download"></i></a>
-                                                        </div>
+                                                        </span>
 <?php
                     }
 ?>

@@ -21,6 +21,7 @@ import signal
 import sys
 import subprocess
 import time
+import traceback
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -32,6 +33,7 @@ from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'CREATE_LOWERING': 'setupNewLowering',
     'FINALIZE_LOWERING': 'finalizeCurrentLowering',
@@ -66,8 +68,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def build_logfile_dirpath(self):
-        """
-        Build the path to save transfer logfiles
+        """Return the transfer log directory, creating it if needed.
+
+        Returns:
+            str: The directory from ``OpenVDM.get_transfer_log_dir()``.
         """
 
         log_dir = self.ovdm.get_transfer_log_dir()
@@ -76,9 +80,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def update_md5_summary(self, files):
-        """
-        Submit an UPDATE_MD5_SUMMARY job to Gearman that adds the list of
-        files to the MD5 manifest.
+        """Submit an ``updateMD5Summary`` Gearman job for the given files.
+
+        Args:
+            files: ``{'new': [...], 'updated': [...], 'deleted': [...]}`` with
+                paths relative to the cruise directory; missing keys are
+                treated as empty.
         """
 
         gm_data = {
@@ -97,8 +104,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def export_lowering_config(self, finalize=False):
-        """
-        Export the current OpenVDM configuration to the specified filepath
+        """Write the current lowering configuration to the lowering config file.
+
+        When the file already exists, its ``loweringFinalizedOn`` value is
+        kept. Queues an MD5 summary update for the file.
+
+        Args:
+            finalize: Mark the configuration as finalized (sets
+                ``loweringFinalizedOn``).
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         lowering_config_fn = self.shipboard_data_warehouse_config['loweringConfigFn']
@@ -145,8 +162,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseID``, ``loweringID``,
+        ``loweringStartDate``, ``loweringEndDate``; any it omits default to the
+        current cruise/lowering settings), loads what the task needs from the
+        OpenVDM API, then runs the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
 
         self.stop = False
@@ -232,15 +260,26 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
@@ -261,8 +300,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        After a lowering is set up or finalized, submits the hook tasks
+        configured for that task in ``openvdm.yaml``.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -360,8 +413,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
 def task_setup_new_lowering(worker, current_job):
-    """
-    Setup a new lowering
+    """Gearman task: set up a new lowering.
+
+    Creates the lowering directory structure and exports the lowering config.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -411,8 +473,18 @@ def task_setup_new_lowering(worker, current_job):
     return json.dumps(job_results)
 
 def task_finalize_current_lowering(worker, current_job):
-    """
-    Finalize the current lowering
+    """Gearman task: finalize the current lowering.
+
+    Checks the lowering directory exists, runs the lowering's collection system
+    transfers one last time, and exports the finalized lowering config.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -478,8 +550,18 @@ def task_finalize_current_lowering(worker, current_job):
 
 
 def task_export_lowering_config(worker, current_job):
-    """
-    Export the lowering configuration to file
+    """Gearman task: write the lowering config file.
+
+    Exports the current lowering configuration to the lowering's config file
+    (``loweringConfigFn``) and queues an MD5 summary update for it.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
     """
 
     job_results = {'parts':[]}
@@ -526,8 +608,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -536,8 +621,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

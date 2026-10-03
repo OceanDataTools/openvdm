@@ -1,0 +1,806 @@
+#!/usr/bin/env python3
+"""Parser for Sea-Bird CTD casts.
+
+Parses a cast's raw SBE 9plus ``.hex`` file, using the calibration
+coefficients in the cast's ``.xmlcon`` file (the same basename as the
+``.hex`` file, e.g. ``CTD001.hex`` and ``CTD001.xmlcon``; the extension may
+be in any case), and returns the
+JSON-formatted plugin data used by OpenVDM's Data Dashboard: depth, pressure
+(from the Digiquartz sensor, temperature-compensated), temperature,
+conductivity and salinity, which the dashboard can draw as a depth profile
+(``visType: json-profile`` with ``depthSeries: Depth``). Depth comes from
+pressure with Sea-Bird's salt-water depth formula, which needs the latitude:
+it's taken from the NMEA position the deck unit appends to each scan, or the
+header's position, or the ``latitude`` option; without any of them there's no
+Depth series (use ``depthSeries: Pressure``). The stats include the depth
+range and the cast's geographic bounds.
+Optionally also saves a PNG profile plot, which needs matplotlib (not
+installed by ``requirements.txt``).
+
+``CTDPositionParser``, for the cast's position, reads only the header (the
+NMEA position and times Seasave records at the start of the cast; no
+``.xmlcon`` needed) and returns a GeoJSON point, which a map draws alongside
+the ship's track (``visType: geoJSON``).
+
+Based on original code by Oscar Garcia (CSIC), ogarcia@utm.csic.es.
+"""
+
+import logging
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from os.path import basename, dirname, join, realpath, splitext
+
+import numpy as np
+import pandas as pd
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+
+from server.lib.openvdm_plugin import OpenVDMCSVParser, format_iso8601
+
+PROC_COLS = ['date_time', 'pressure', 'temperature', 'conductivity', 'salinity']
+
+ROUNDING = {
+    'pressure': 3,
+    'temperature': 4,
+    'conductivity': 5,
+    'salinity': 4,
+    'depth': 3,
+}
+
+# Scans are averaged into this interval, so a long cast doesn't produce tens
+# of thousands of points per series
+RESAMPLE_INTERVAL = '5s'
+
+# Header lines (marked "**") whose values label the plot
+METADATA_KEYS = ['Ship', 'Cruise', 'Date', 'Station', 'Cast', 'Depth']
+
+# Number of header lines searched for the metadata and the start time
+HEADER_LINES = 250
+
+# Start time of the cast, e.g. "* System UTC = Apr 12 2014 14:23:05"
+START_TIME_RE = re.compile(r'System (?:UTC|UpLoad Time)\s*=\s*(.+)')
+START_TIME_FORMAT = '%b %d %Y %H:%M:%S'
+
+# A "**" metadata line, e.g. "** Station:   001" (some write "Cast::")
+METADATA_RE = re.compile(r'^\*\*\s*(\w[\w ]*?)\s*:+\s*(.*)$')
+
+# Other names for the metadata keys
+METADATA_ALIASES = {'Bottom Depth': 'Depth'}
+
+# The SBE 9plus samples at 24 Hz; the deck unit writes the average of every
+# ScansToAverage scans, e.g. one line per second for 24
+SBE9_SCAN_RATE = 24.0
+SCANS_AVERAGED_RE = re.compile(r'Number of Scans Averaged by the Deck Unit\s*=\s*(\d+)', re.IGNORECASE)
+
+# Bytes in each scan, e.g. "* Number of Bytes Per Scan = 40"
+BYTES_PER_SCAN_RE = re.compile(r'Number of Bytes Per Scan\s*=\s*(\d+)')
+
+# Header position, e.g. "* NMEA Latitude = 27 33.77 N", "* NMEA Longitude = 093 46.36 W"
+NMEA_LATITUDE_RE = re.compile(r'NMEA Latitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([NS])')
+NMEA_LONGITUDE_RE = re.compile(r'NMEA Longitude\s*=\s*(\d+)\s+(\d+(?:\.\d+)?)\s*([EW])')
+
+# Decimal places for positions (about 1 m)
+POSITION_DECIMALS = 5
+
+# What comes before the NMEA position the deck unit can append to each scan
+# (SBE 11plus manual): 3 bytes per frequency channel and 12 bits per voltage
+# word, less those the XMLCON suppresses, then 3 bytes if surface PAR is added
+FREQUENCY_CHANNELS = 5
+VOLTAGE_WORDS = 8
+SURFACE_PAR_BYTES = 3
+NMEA_POSITION_BYTES = 7
+
+# The pressure sensor temperature, status and scan count end each scan
+SCAN_TRAILER_BYTES = 3
+
+# Temperature (T0) and conductivity (C0) sensors in the XMLCON
+SENSOR_COEFFS = [(0, 'T0'), (1, 'C0')]
+SENSOR_COEFF_NAMES = ['G', 'H', 'I', 'J', 'F0', 'CPcor', 'CTcor']
+
+# Digiquartz pressure sensor (Sensor index 2): pressure coefficients, and the
+# AD590 coefficients that turn the scan's 12-bit word into the sensor's
+# temperature. Slope and Offset, a final linear correction, are optional.
+PRESSURE_COEFF_NAMES = ['C1', 'C2', 'C3', 'D1', 'D2', 'T1', 'T2', 'T3', 'T4', 'T5', 'AD590M', 'AD590B']
+
+REQUIRED_COEFFS = ['T0_G', 'T0_H', 'T0_I', 'T0_J', 'T0_F0', 'C0_G', 'C0_H', 'C0_I', 'C0_J'] + \
+    [f'P_{name}' for name in PRESSURE_COEFF_NAMES]
+
+# Conductivity cell thermal expansion (CTcor) and pressure (CPcor) corrections
+# when the XMLCON doesn't give them
+DEFAULT_CTCOR = 3.25e-6
+DEFAULT_CPCOR = -9.57e-8
+
+# The Digiquartz equation gives absolute pressure in psia
+ATMOSPHERE_PSIA = 14.7
+DBAR_PER_PSI = 0.689476
+
+# The pressure sensor's temperature word is averaged over this many seconds
+# before use, as Sea-Bird's data conversion does
+TEMP_COMP_AVERAGE_SECONDS = 30
+
+# Depth, from pressure and latitude, comes first when it's known
+DEPTH_SERIES = ('depth', 'Depth', 'm')
+
+SERIES = [
+    ('pressure', 'Pressure', 'db'),
+    ('temperature', 'Temperature', 'C'),
+    ('conductivity', 'Conductivity', 'S/m'),
+    ('salinity', 'Salinity', 'PSU'),
+]
+
+
+class CTDProfileParser(OpenVDMCSVParser):
+    """Parser for Sea-Bird CTD ``.hex`` casts."""
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False, plot_dir=None, latitude=None):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: Unused; the cast's times come from its header.
+            skip_header: Unused; the header ends at ``*END*``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            plot_dir: Directory to save a PNG profile plot of each cast in
+                (``<cast>.png``), or ``None`` for no plot.
+            latitude: Latitude in decimal degrees to compute depth with when
+                a cast has no position (neither in its scans nor its header),
+                or ``None`` for no depth then.
+        """
+        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
+        self.plot_dir = plot_dir
+        self.default_latitude = latitude
+        self.coeffs = {}
+        self.bytes_per_scan = None
+        self.scans_averaged = None
+        self.start_time = None
+        self.latitude = None
+        self.longitude = None
+        self.nmea_offset = None
+        self.metadata = {key: 'N/A' for key in METADATA_KEYS}
+
+    @staticmethod
+    def find_xmlcon(filepath):
+        """Return the cast's ``.xmlcon`` file (same basename, extension in any case), or ``None``."""
+        base = basename(splitext(filepath)[0])
+        directory = dirname(realpath(filepath))
+        for name in sorted(os.listdir(directory)):
+            stem, ext = splitext(name)
+            if stem == base and ext.lower() == '.xmlcon':
+                return join(directory, name)
+        return None
+
+    @staticmethod
+    def _get_float(parent, tag):
+        """Return the number in *parent*'s first ``<tag>``, or ``None`` if it's missing or not a number.
+
+        Args:
+            parent: XML element to search, or ``None``.
+            tag: Element name to find at any depth.
+
+        Returns:
+            float | None: The value.
+        """
+        if parent is None:
+            return None
+        node = parent.find(f".//{tag}")
+        if node is None or not node.text:
+            return None
+        try:
+            return float(node.text)
+        except ValueError:
+            return None
+
+    def load_config(self, filepath):
+        """Read the calibration, sample rate, start time and metadata for the cast.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
+        """
+        xmlcon_path = self.find_xmlcon(filepath)
+        if not xmlcon_path:
+            expected = splitext(filepath)[0] + '.xmlcon'
+            raise FileNotFoundError(f"No calibration file for {filepath}: expected {expected}")
+
+        try:
+            root = ET.parse(xmlcon_path).getroot()
+        except ET.ParseError as err:
+            raise ValueError(f"Calibration file {xmlcon_path} isn't valid XML: {err}") from err
+
+        self.scans_averaged = self._get_float(root, 'ScansToAverage')
+        self.nmea_offset = self._nmea_offset(root)
+
+        for index, name in SENSOR_COEFFS:
+            sensor = root.find(f".//Sensor[@index='{index}']")
+            # A conductivity sensor has two coefficient sets; the G-J one is equation 1
+            if sensor is not None and sensor.find(".//Coefficients[@equation='1']") is not None:
+                sensor = sensor.find(".//Coefficients[@equation='1']")
+            for coeff in SENSOR_COEFF_NAMES:
+                self.coeffs[f'{name}_{coeff}'] = self._get_float(sensor, coeff)
+
+        pressure_sensor = root.find(".//Sensor[@index='2']")
+        for coeff in PRESSURE_COEFF_NAMES + ['Slope', 'Offset']:
+            self.coeffs[f'P_{coeff}'] = self._get_float(pressure_sensor, coeff)
+
+        missing = [coeff for coeff in REQUIRED_COEFFS if self.coeffs.get(coeff) is None]
+        if missing:
+            raise ValueError(f"Calibration file {xmlcon_path} is missing coefficients: {', '.join(missing)}")
+
+        for coeff, default in (('P_Slope', 1.0), ('P_Offset', 0.0),
+                               ('C0_CTcor', DEFAULT_CTCOR), ('C0_CPcor', DEFAULT_CPCOR)):
+            if self.coeffs.get(coeff) is None:
+                self.coeffs[coeff] = default
+
+        self.read_header(filepath)
+        if not self.start_time:
+            raise ValueError(f"No start time (System UTC or System UpLoad Time) in the header of {filepath}")
+        if not self.scans_averaged:
+            logging.warning("No scans to average in %s or its header; assuming 1 (24 lines/s)", filepath)
+            self.scans_averaged = 1
+
+    def _nmea_offset(self, root):
+        """Return where the NMEA position is in each scan, from the XMLCON.
+
+        Args:
+            root: The XMLCON's root element.
+
+        Returns:
+            int | None: The position's byte offset, or ``None`` if the deck
+            unit doesn't append one.
+        """
+        if self._get_float(root, 'NmeaPositionDataAdded') != 1:
+            return None
+        frequencies = FREQUENCY_CHANNELS - int(self._get_float(root, 'FrequencyChannelsSuppressed') or 0)
+        voltages = VOLTAGE_WORDS - int(self._get_float(root, 'VoltageWordsSuppressed') or 0)
+        offset = 3 * frequencies + (3 * voltages + 1) // 2
+        if self._get_float(root, 'SurfaceParVoltageAdded') == 1:
+            offset += SURFACE_PAR_BYTES
+        return offset
+
+    @property
+    def scan_interval(self):
+        """Seconds between the lines of the ``.hex`` file."""
+        return self.scans_averaged / SBE9_SCAN_RATE
+
+    def read_header(self, filepath):
+        """Read the cast's start time, position and ``**`` metadata lines from its header."""
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for _ in range(HEADER_LINES):
+                line = hex_file.readline()
+                if not line or '*END*' in line:
+                    break
+
+                match = METADATA_RE.match(line.strip())
+                if match:
+                    key = METADATA_ALIASES.get(match.group(1), match.group(1))
+                    if key in self.metadata:
+                        self.metadata[key] = match.group(2).strip()
+
+                for regex, attr in ((NMEA_LATITUDE_RE, 'latitude'), (NMEA_LONGITUDE_RE, 'longitude')):
+                    match = regex.search(line)
+                    if match and getattr(self, attr) is None:
+                        value = int(match.group(1)) + float(match.group(2)) / 60
+                        if match.group(3) in ('S', 'W'):
+                            value = -value
+                        setattr(self, attr, round(value, POSITION_DECIMALS))
+
+                match = BYTES_PER_SCAN_RE.search(line)
+                if match and not self.bytes_per_scan:
+                    self.bytes_per_scan = int(match.group(1))
+
+                match = SCANS_AVERAGED_RE.search(line)
+                if match and not self.scans_averaged:
+                    self.scans_averaged = float(match.group(1))
+
+                match = START_TIME_RE.search(line)
+                if match and not self.start_time:
+                    try:
+                        self.start_time = datetime.strptime(match.group(1).strip(), START_TIME_FORMAT) \
+                            .replace(tzinfo=timezone.utc)
+                    except ValueError:
+                        logging.warning("Unreadable start time in %s: %s", filepath, line.strip())
+
+    @staticmethod
+    def calc_depth(pres, lat):
+        """Return depth in salt water, as Sea-Bird's data conversion does (``depSM``).
+
+        UNESCO Technical Paper in Marine Science 44 (Fofonoff and Millard,
+        1983), with gravity varying with latitude and pressure.
+
+        Args:
+            pres: Pressure in decibars (number or array).
+            lat: Latitude in decimal degrees (number or array).
+
+        Returns:
+            Depth in metres.
+        """
+        x = np.sin(np.radians(lat)) ** 2
+        gravity = 9.780318 * (1.0 + (5.2788e-3 + 2.36e-5 * x) * x) + 1.092e-6 * pres
+        return ((((-1.82e-15 * pres + 2.279e-10) * pres - 2.2512e-5) * pres + 9.72659) * pres) / gravity
+
+    @staticmethod
+    def decode_position(raw, offset):
+        """Return the NMEA position the deck unit appended to a scan.
+
+        Args:
+            raw: A data line from the ``.hex`` file.
+            offset: The position's byte offset in the scan.
+
+        Returns:
+            tuple: ``(latitude, longitude)`` in decimal degrees, or NaNs if
+            the scan has no fix.
+
+        Raises:
+            ValueError: If the position bytes aren't hex.
+        """
+        pos = bytes.fromhex(raw[2 * offset:2 * (offset + NMEA_POSITION_BYTES)])
+        if len(pos) < NMEA_POSITION_BYTES or not any(pos[:6]):
+            return np.nan, np.nan
+        lat = (pos[0] << 16 | pos[1] << 8 | pos[2]) / 50000.0
+        lon = (pos[3] << 16 | pos[4] << 8 | pos[5]) / 50000.0
+        return (-lat if pos[6] & 0x80 else lat), (-lon if pos[6] & 0x40 else lon)
+
+    @staticmethod
+    def calc_salinity(cond, temp, pres):
+        """Return practical salinity (PSS-78) from conductivity, temperature and pressure.
+
+        Args:
+            cond: Conductivity in S/m.
+            temp: Temperature in degrees C (ITS-90).
+            pres: Pressure in decibars.
+
+        Returns:
+            float: Salinity in PSU; 0.0 for zero, negative or missing
+            conductivity (e.g. out of the water).
+        """
+        if cond <= 0 or np.isnan(cond):
+            return 0.0
+        temp68 = temp * 1.00024
+        ratio = (cond * 10.0) / 42.914
+        rt = 0.6766097 + temp68 * (2.00564e-2 + temp68 * (1.104259e-4 + temp68 * (-6.9698e-7 + temp68 * 1.0031e-9)))
+        # PSS-78 pressure correction
+        rp = 1 + (pres * (2.070e-5 + pres * (-6.370e-10 + pres * 3.989e-15))) / \
+            (1 + temp68 * (3.426e-2 + temp68 * 4.464e-4) + ratio * (4.215e-1 - 3.107e-3 * temp68))
+        rt_ratio = max(0, ratio / (rp * rt))
+        a = [0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081]
+        b = [0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144]
+        x = np.sqrt(rt_ratio)
+        salinity = a[0] + x * (a[1] + x * (a[2] + x * (a[3] + x * (a[4] + x * a[5]))))
+        d_temp = temp68 - 15.0
+        d_salinity = (d_temp / (1 + 0.0162 * d_temp)) * \
+            (b[0] + x * (b[1] + x * (b[2] + x * (b[3] + x * (b[4] + x * b[5])))))
+        return salinity + d_salinity
+
+    def calc_pressure(self, freq, temp_word):
+        """Return pressure from the Digiquartz sensor's frequency and temperature word.
+
+        Sea-Bird's SBE 911plus Digiquartz equation: the sensor's temperature
+        ``U = AD590M * N + AD590B`` sets ``C = C1 + C2 U + C3 U^2``,
+        ``D = D1 + D2 U`` and ``T0 = T1 + T2 U + T3 U^2 + T4 U^3 + T5 U^4``;
+        with the period ``T`` in microseconds, absolute pressure is
+        ``C (1 - T0^2/T^2) (1 - D (1 - T0^2/T^2))`` psia. It's converted to
+        decibars below the surface, then corrected with ``Slope`` and
+        ``Offset`` (in decibars), as Sea-Bird's data conversion does.
+
+        Args:
+            freq: Pressure sensor frequency in Hz.
+            temp_word: The 12-bit pressure sensor temperature word, usually
+                averaged (see :meth:`average_temp_words`).
+
+        Returns:
+            float: Pressure in decibars.
+
+        Raises:
+            ValueError: If the frequency isn't positive.
+        """
+        if freq <= 0:
+            raise ValueError("zero pressure frequency")
+        k = self.coeffs
+        temp = k['P_AD590M'] * temp_word + k['P_AD590B']
+        c = k['P_C1'] + k['P_C2'] * temp + k['P_C3'] * temp ** 2
+        d = k['P_D1'] + k['P_D2'] * temp
+        t0 = (k['P_T1'] + k['P_T2'] * temp + k['P_T3'] * temp ** 2
+              + k['P_T4'] * temp ** 3 + k['P_T5'] * temp ** 4)
+        period = 1e6 / freq
+        x = 1 - (t0 / period) ** 2
+        psia = c * x * (1 - d * x)
+        dbar = (psia - ATMOSPHERE_PSIA) * DBAR_PER_PSI
+        return k['P_Slope'] * dbar + k['P_Offset']
+
+    def average_temp_words(self, temp_words):
+        """Return the pressure sensor temperature words averaged over the preceding 30 seconds.
+
+        A trailing average, as Sea-Bird's data conversion uses; before the
+        cast has run 30 seconds, the first word fills the window.
+
+        Args:
+            temp_words: Each scan's 12-bit temperature word, in time order.
+
+        Returns:
+            list[float]: The averaged words.
+        """
+        if not temp_words:
+            return []
+        window = max(1, round(TEMP_COMP_AVERAGE_SECONDS / self.scan_interval))
+        padded = np.concatenate([np.full(window, temp_words[0], dtype=float),
+                                 np.asarray(temp_words, dtype=float)])
+        cumulative = np.cumsum(padded)
+        return list((cumulative[window:] - cumulative[:-window]) / window)
+
+    def decode_scan(self, raw, temp_word=None):
+        """Return a scan's pressure, temperature and conductivity.
+
+        Args:
+            raw: A data line from the ``.hex`` file. It starts with the
+                temperature, conductivity and pressure frequencies (3-byte
+                words) and ends with the 12-bit pressure sensor temperature,
+                a 4-bit status and an 8-bit scan count.
+            temp_word: The pressure sensor temperature word to use, e.g.
+                averaged; defaults to the scan's own.
+
+        Returns:
+            tuple: ``(pressure, temperature, conductivity)`` in decibars,
+            degrees C and S/m.
+
+        Raises:
+            ValueError: If the line isn't hex or a frequency is zero.
+        """
+        freq_t = int(raw[0:6], 16) / 256.0
+        freq_c = int(raw[6:12], 16) / 256.0
+        freq_p = int(raw[12:18], 16) / 256.0
+        if temp_word is None:
+            temp_word = int(raw[-6:-3], 16)
+        if freq_t <= 0:
+            raise ValueError("zero temperature frequency")
+
+        coeffs = self.coeffs
+        pressure = self.calc_pressure(freq_p, temp_word)
+        ln_f = np.log(coeffs['T0_F0'] / freq_t)
+        temperature = 1.0 / (coeffs['T0_G'] + coeffs['T0_H'] * ln_f + coeffs['T0_I'] * ln_f ** 2
+                             + coeffs['T0_J'] * ln_f ** 3) - 273.15
+        freq_c_khz = freq_c / 1000
+        conductivity = (coeffs['C0_G'] + coeffs['C0_H'] * freq_c_khz ** 2 + coeffs['C0_I'] * freq_c_khz ** 3
+                        + coeffs['C0_J'] * freq_c_khz ** 4) / \
+            (10 * (1 + coeffs['C0_CTcor'] * temperature + coeffs['C0_CPcor'] * pressure))
+        return pressure, temperature, conductivity
+
+    def parse(self, filepath):
+        """Parse the cast's ``.hex`` file and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if the cast has no valid
+            scans (within ``start_dt``/``stop_dt``).
+
+        Raises:
+            FileNotFoundError: If the cast has no ``.xmlcon`` file.
+            ValueError: If the ``.xmlcon`` isn't valid XML or is missing
+                calibration coefficients, or the ``.hex`` header has no start
+                time.
+            OSError: If a file can't be read.
+        """
+        self.load_config(filepath)
+
+        raw_data = {col: [] for col in self.proc_cols + ['latitude', 'longitude']}
+        errors = []
+        if self.nmea_offset is not None and self.bytes_per_scan and \
+                self.nmea_offset + NMEA_POSITION_BYTES > self.bytes_per_scan - SCAN_TRAILER_BYTES:
+            logging.warning("Scans in %s are too short for the NMEA position the XMLCON says they have",
+                            filepath)
+            self.nmea_offset = None
+
+        # First pass: check each scan and collect its pressure sensor
+        # temperature word, which is averaged over time before use
+        scans = []          # (line number, scan number, data line, temperature word)
+        header_passed = False
+        scan_no = -1
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for lineno, line in enumerate(hex_file, start=1):
+                raw = line.strip()
+                if not header_passed:
+                    header_passed = '*END*' in raw
+                    continue
+                if not raw:
+                    continue
+                scan_no += 1
+                try:
+                    if self.bytes_per_scan and len(raw) != 2 * self.bytes_per_scan:
+                        raise ValueError(f"scan is {len(raw)} characters, expected {2 * self.bytes_per_scan}")
+                    if len(raw) < 24:
+                        raise ValueError("short scan")
+                    scans.append((lineno, scan_no, raw, int(raw[-6:-3], 16)))
+                except ValueError as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped: %s", lineno, err)
+
+        # Second pass: convert each scan; its time comes from its place in the file
+        temp_words = self.average_temp_words([scan[3] for scan in scans])
+        for (lineno, scan_no, raw, _), temp_word in zip(scans, temp_words):
+            try:
+                pressure, temperature, conductivity = self.decode_scan(raw, temp_word)
+                latitude, longitude = (np.nan, np.nan) if self.nmea_offset is None \
+                    else self.decode_position(raw, self.nmea_offset)
+            except (ValueError, ZeroDivisionError, FloatingPointError) as err:
+                errors.append(lineno)
+                logging.debug("Line %s skipped: %s", lineno, err)
+                continue
+            raw_data['date_time'].append(self.start_time + timedelta(seconds=scan_no * self.scan_interval))
+            raw_data['pressure'].append(pressure)
+            raw_data['temperature'].append(temperature)
+            raw_data['conductivity'].append(conductivity)
+            raw_data['salinity'].append(self.calc_salinity(conductivity, temperature, pressure))
+            raw_data['latitude'].append(latitude)
+            raw_data['longitude'].append(longitude)
+        errors.sort()
+
+        if not raw_data['date_time']:
+            logging.warning("No valid data in file: %s", filepath)
+            return None
+
+        df = pd.DataFrame(raw_data)
+        df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=self.proc_cols)
+        if df.empty:
+            logging.warning("Dataframe empty after filtering: %s", filepath)
+            return None
+
+        if self.start_dt or self.stop_dt:
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
+
+        if self.plot_dir:
+            self.save_plot(df.reset_index(drop=True), filepath)
+
+        df = self.add_depth(df, filepath)
+        series = ([DEPTH_SERIES] if 'depth' in df else []) + SERIES
+
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df['date_time'].min().to_pydatetime(), df['date_time'].max().to_pydatetime()])
+        for col, label, unit in series:
+            self.add_bounds_stat([round(df[col].min(), ROUNDING[col]),
+                                  round(df[col].max(), ROUNDING[col])], label, unit)
+        self.add_geobounds(df)
+
+        rate = len(errors) / (len(df) + len(errors))
+        if rate > 0.25:
+            self.add_quality_test_failed('Rows')
+        elif rate > 0.10:
+            self.add_quality_test_warning('Rows')
+        else:
+            self.add_quality_test_passed('Rows')
+
+        df = df.drop(columns=['latitude', 'longitude'])
+        df = self.resample_data(df.set_index('date_time'), RESAMPLE_INTERVAL)
+        df = self.round_data(df, ROUNDING)
+
+        for col, label, unit in series:
+            viz = {'data': [], 'unit': unit, 'label': label}
+            for ts, value in zip(df['date_time'], df[col]):
+                if pd.notna(value):
+                    viz['data'].append([int(pd.Timestamp(ts).timestamp() * 1000), value])
+            self.add_visualization_data(viz)
+
+        self.send_error_msg(errors, filepath)
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+    def add_depth(self, df, filepath):
+        """Fill in each scan's position and add its depth.
+
+        A scan's position is the one the deck unit appended to it, or else
+        the header's. Depth uses the scan's latitude, or the ``latitude``
+        option if there's no position.
+
+        Args:
+            df: The cast's scans, with ``pressure``, ``latitude`` and
+                ``longitude`` columns (NaN where a scan has no position).
+            filepath: Path to the cast, for the log.
+
+        Returns:
+            pandas.DataFrame: *df* with the positions filled in and a
+            ``depth`` column, which is missing if no latitude is known.
+        """
+        if self.latitude is not None and self.longitude is not None:
+            df = df.fillna({'latitude': self.latitude, 'longitude': self.longitude})
+        latitude = df['latitude']
+        if self.default_latitude is not None:
+            latitude = latitude.fillna(self.default_latitude)
+        if latitude.isna().all():
+            logging.warning("No position for %s and no latitude option, so no depth", filepath)
+            return df
+        return df.assign(depth=self.calc_depth(df['pressure'], latitude))
+
+    def add_geobounds(self, df):
+        """Add the cast's geographic bounds to the stats, if any scan has a position.
+
+        Args:
+            df: The cast's scans, with ``latitude`` and ``longitude`` columns.
+        """
+        positions = df[['latitude', 'longitude']].dropna()
+        if positions.empty:
+            return
+        lat, lon = positions['latitude'], positions['longitude']
+        self.add_geobounds_stat([round(float(value), POSITION_DECIMALS)
+                                 for value in (lat.max(), lon.max(), lat.min(), lon.min())])
+
+    def save_plot(self, df, filepath):
+        """Save a PNG profile plot of the cast to ``plot_dir`` (``<cast>.png``).
+
+        Temperature, conductivity and salinity against pressure, with the
+        downcast drawn darker than the upcast. A failure is logged and
+        doesn't stop the parsing.
+
+        Args:
+            df: The cast's scans, in time order.
+            filepath: Path to the cast's ``.hex`` file.
+        """
+        try:
+            import matplotlib  # pylint: disable=import-outside-toplevel
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt  # pylint: disable=import-outside-toplevel
+            from matplotlib import patches  # pylint: disable=import-outside-toplevel
+        except ImportError:
+            logging.warning("matplotlib isn't installed; no plot saved for %s", filepath)
+            return
+
+        output_image = join(self.plot_dir, splitext(basename(filepath))[0] + '.png')
+        fig, ax_t = plt.subplots(figsize=(11, 12))
+        try:
+            fig.subplots_adjust(top=0.72, right=0.75, left=0.10, bottom=0.08)
+
+            header_text = (
+                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {self.metadata['Date']}\n"
+                f"Station: {self.metadata['Station']}  |  Cast: {self.metadata['Cast']}  |  Depth: {self.metadata['Depth']} m\n"
+                f"File: {basename(filepath)}  |  System Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            fig.patches.append(patches.Rectangle((0.05, 0.88), 0.70, 0.08, linewidth=0.8, edgecolor='black',
+                                                 facecolor='none', transform=fig.transFigure))
+            fig.text(0.40, 0.92, header_text, transform=fig.transFigure, fontsize=11, family='monospace',
+                     ha='center', va='center', linespacing=1.6)
+
+            ax_t.set_ylabel("Pressure [db]", fontweight='bold')
+            ax_t.set_ylim(df['pressure'].max() + 20, -10)
+            ax_t.grid(True, linestyle=':', alpha=0.4)
+
+            # Downcast to the deepest scan, upcast after it
+            idx_max = df['pressure'].idxmax()
+            down, up = df.iloc[:idx_max + 1], df.iloc[idx_max:]
+
+            ax_c = ax_t.twiny()
+            ax_s = ax_t.twiny()
+            ax_s.spines['top'].set_position(('axes', 1.12))
+            for axis, col, label, down_color, up_color, labelpad in [
+                (ax_t, 'temperature', "Temperature [°C]", '#990000', '#FF9999', None),
+                (ax_c, 'conductivity', "Conductivity [S/m]", '#006600', '#99FF99', 15),
+                (ax_s, 'salinity', "Salinity [PSU]", '#000099', '#9999FF', 15),
+            ]:
+                axis.plot(down[col], down['pressure'], color=down_color, lw=2.5)
+                axis.plot(up[col], up['pressure'], color=up_color, lw=1.2, alpha=0.6)
+                axis.set_xlabel(label, color=down_color, fontweight='bold', labelpad=labelpad)
+
+            fig.savefig(output_image, bbox_inches='tight', dpi=200)
+            logging.info("Saved plot %s", output_image)
+        except (OSError, ValueError) as err:
+            logging.warning("Could not save plot %s: %s", output_image, err)
+        finally:
+            plt.close(fig)
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add CTD-profile-specific command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--plotDir', default=None,
+                            help='Save a PNG profile plot of the cast in this directory (needs matplotlib)')
+        parser.add_argument('--latitude', type=float, default=None,
+                            help='Latitude (decimal degrees) for depth when the cast has no position')
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'plot_dir': getattr(args, 'plotDir', None), 'latitude': getattr(args, 'latitude', None)}
+
+
+class CTDPositionParser(CTDProfileParser):
+    """Parser for the position of a Sea-Bird CTD ``.hex`` cast."""
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,
+                 skip_header=False, use_openvdm_api=False):
+        super().__init__(start_dt=start_dt, stop_dt=stop_dt, time_format=time_format,
+                         skip_header=skip_header, use_openvdm_api=use_openvdm_api)
+        self.scan_count = 0
+
+    def count_scans(self, filepath):
+        """Count the cast's scans (the non-blank lines after the header's ``*END*``)."""
+        header_passed = False
+        with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
+            for line in hex_file:
+                if header_passed:
+                    if line.strip():
+                        self.scan_count += 1
+                elif '*END*' in line:
+                    header_passed = True
+
+    def parse(self, filepath):
+        """Parse the cast's ``.hex`` header and return plugin data dict.
+
+        Args:
+            filepath: Path to the cast's ``.hex`` file.
+
+        Returns:
+            dict | None: The plugin data, or ``None`` if the header has no
+            NMEA position, or the cast starts outside ``start_dt``/``stop_dt``.
+
+        Raises:
+            OSError: If the file can't be read.
+        """
+        self.read_header(filepath)
+        self.count_scans(filepath)
+
+        if self.latitude is None or self.longitude is None:
+            logging.info("No NMEA position in the header of %s", filepath)
+            return None
+
+        properties = {'cast': splitext(basename(filepath))[0]}
+        if self.metadata['Station'] != 'N/A':
+            properties['station'] = self.metadata['Station']
+        if self.start_time:
+            # One line per scan average; 1 if neither the header nor an .xmlcon says
+            interval = (self.scans_averaged or 1) / SBE9_SCAN_RATE
+            end_time = self.start_time + timedelta(seconds=max(self.scan_count - 1, 0) * interval)
+            if (self.start_dt and end_time < self.start_dt.replace(tzinfo=end_time.tzinfo)) or \
+                    (self.stop_dt and self.start_time > self.stop_dt.replace(tzinfo=self.start_time.tzinfo)):
+                logging.info("Cast %s is outside the time range", filepath)
+                return None
+            properties['start'] = format_iso8601(self.start_time)
+            properties['end'] = format_iso8601(end_time)
+        if self.metadata['Depth'] != 'N/A':
+            properties['bottom depth'] = self.metadata['Depth']
+
+        # Only the map point: the cast's stats are the profile data type's (#314)
+        self.add_visualization_data({
+            'type': 'FeatureCollection',
+            'features': [{
+                'type': 'Feature',
+                'geometry': {'type': 'Point', 'coordinates': [self.longitude, self.latitude]},
+                'properties': properties,
+            }],
+        })
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)
+        return self.plugin_data
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add no options (the profile parser's ``--plotDir`` and ``--latitude`` don't apply).
+
+        Args:
+            parser: The ``argparse.ArgumentParser``.
+        """
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):  # pylint: disable=unused-argument
+        return {}
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    CTDProfileParser.run_cli()

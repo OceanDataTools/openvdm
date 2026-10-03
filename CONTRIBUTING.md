@@ -130,15 +130,26 @@ When your contribution is ready, submit a pull request, requesting that it be me
 
 ### Git Commits and Pull Requests
 
-Prior to submitting any pull request, please ensure that the code passes all unit tests. 
-You can run the battery of unit tests via:
+Prior to submitting any pull request, please run the checks below and make sure they pass. Install the pre-commit hooks once so they also run on every commit:
 
 ```
-./manage.py test
+cd <openvdm_root>
+source ./venv/bin/activate
+pre-commit install
+cd www && composer install && cd ..     # installs PHPStan (a dev dependency)
 ```
 
-A commit for any new module or functionality should, if at all possible, be accompanied by a new unit test. Remember:
-unit tests are what your teeth feel like after you floss. Write them!
+Then, before opening a pull request:
+
+```
+source ./venv/bin/activate
+python -m pytest server        # see CLAUDE.md for the three expected false-positive errors
+pre-commit run --all-files     # ruff, ESLint, php -l and PHPStan
+```
+
+The PHP checks use your locally installed PHP (8.3 matches production) and are skipped with a message if PHP or PHPStan isn't installed.
+
+There is no automated test suite for the PHP or JavaScript, so changes to the web UI also need a manual check in a browser. New Python functionality should, if at all possible, be accompanied by a new unit test.
 
 Always write a clear log message for your commits. One-line messages are fine for small changes, but bigger changes
 should look like this:
@@ -170,47 +181,18 @@ our coding conventions (below) and make sure all of your commits are atomic (one
  
 ### JavaScript Styleguide
 
-All JavaScript must adhere to [JavaScript Standard Style](https://standardjs.com/).
+Match the style of the existing code: 4-space indentation, semicolons, `var`, and page scripts wrapped in jQuery `$(function () { ... })`.
 
-* Prefer the object spread operator (`{...anotherObj}`) to `Object.assign()`
-* Inline `export`s with expressions whenever possible
-  ```js
-  // Use this:
-  export default class ClassName {
+* ESLint (`eslint.config.mjs`) checks for bugs only (undefined names, unused and duplicate variables, unreachable code), not formatting. It runs from pre-commit.
+* Variables defined outside the file being linted (libraries, the inline `<script>` in `www/app/templates/default/footer.php`, helpers such as `mapBaseLayers.js`) must be listed in the config's globals. A script that defines a helper for other files marks it with `/* exported name */`.
 
-  }
+### PHP Styleguide
 
-  // Instead of:
-  class ClassName {
+Follow the existing MVC conventions in `www/app/`.
 
-  }
-  export default ClassName
-  ```
-
-* Place class properties in the following order:
-    * Class methods and properties (methods starting with `static`)
-    * Instance methods and properties
-* Use `count + 1` instead of `count+1`
-* Use spaces after commas (unless separated by newlines)
-* Use parentheses if it improves code clarity.
-* Prefer alphabetic keywords to symbolic keywords:
-    * `a is b` instead of `a == b`
-* Avoid spaces inside the curly-braces of hash literals:
-    * `{a: 1, b: 2}` instead of `{ a: 1, b: 2 }`
-* Include a single line of whitespace between methods.
-* Capitalize initialisms and acronyms in names, except for the first word, which
-  should be lower-case:
-  * `getURI` instead of `getUri`
-  * `uriToOpen` instead of `URIToOpen`
-* Use `slice()` to copy an array
-* Add an explicit `return` when your function ends with a `for`/`while` loop and
-  you don't want it to return a collected array.
-* Use `this` instead of a standalone `@`
-  * `return this` instead of `return @`
-* Place class properties in the following order:
-    * Class methods and properties (methods starting with a `@`)
-    * Instance methods and properties
-* [Avoid platform-dependent code](https://flight-manual.atom.io/hacking-atom/sections/cross-platform-compatibility/)
+* PHPStan (`www/phpstan.neon`, level 1) runs from pre-commit. Findings that existed when it was added are recorded in `www/phpstan-baseline.neon`. New code must not add to it. When you fix a baselined finding, regenerate the baseline from `www/`: `vendor/bin/phpstan analyse --generate-baseline phpstan-baseline.neon`
+* Give class properties a type (e.g. `private \Models\Warehouse $_warehouseModel;`) when you add or touch them. Untyped properties are `mixed` to PHPStan, so calls to methods that don't exist on them aren't caught.
+* Declare every property the class uses. Dynamic properties are deprecated as of PHP 8.2.
 
 ### Documentation Styleguide
 

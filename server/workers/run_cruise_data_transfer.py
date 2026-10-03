@@ -20,23 +20,24 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import signal
 import subprocess
 import time
+import traceback
 from os.path import dirname, realpath
 from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, default_ignore_patterns, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rclone_config_for_ssh, build_rclone_options, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.file_utils import is_ascii, set_owner_group_permissions, transfer_exclude_patterns, temporary_directory, write_list_file
+from server.lib import transfer_utils
+from server.lib.transfer_utils import TransferCommandError, error_detail
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-RCLONE_PROGRESS_RE = re.compile(r'Transferred:\s+[\d.]+\w+\s+\/\s+[\d.]+\w+,\s+(\d+)%')
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }
@@ -68,8 +69,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def build_exclude_filterlist(self):
-        """
-        Build exclude filter for the transfer
+        """Return the rsync/rclone exclude patterns for the cruise data transfer.
+
+        Excludes the collection systems and extra directories the transfer is
+        set to skip, and lowering config files where configured, plus files
+        with non-ASCII names.
+
+        Returns:
+            list[str]: Exclude patterns, relative to the cruise directory.
         """
 
         #exclude non-ascii filenames
@@ -150,14 +157,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         exclude_filterlist.extend(_find_non_ascii_files(self.cruise_dir))
         #exclude_filterlist = [ '{self.cruise_id}/{path_filter}' for path_filter in exclude_filterlist ]
-        exclude_filterlist.extend(default_ignore_patterns)  # rsync partial files, Synology files, .DS_Store, etc
+        # rsync partial files, Synology files, .DS_Store, etc, in a form rclone
+        # also matches at the top level and in directories (#259)
+        exclude_filterlist.extend(transfer_exclude_patterns())
 
         return exclude_filterlist
 
 
     def test_destination(self):
-        """
-        Test the transfer destination
+        """Run the connection tests for the transfer's destination.
+
+        Uses ``test_cdt_rclone_destination()`` for rclone destinations (a
+        ``remote:path`` ``destDir``) and ``test_cdt_destination()`` otherwise.
+
+        Returns:
+            list[dict]: Test parts with ``partName``/``result``/``reason``
+            keys.
         """
         if ':' in self.cruise_data_transfer['destDir']:
             return test_cdt_rclone_destination(self.cruise_data_transfer)
@@ -166,8 +181,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def make_cruise_dir(self, dest_dir, extra_args=None):
-        """
-        Run the rsync command and return the list of new/updated files
+        """Create the cruise directory on an rclone destination (``rclone mkdir``).
+
+        Failures are logged, not raised.
+
+        Args:
+            dest_dir: rclone destination (``remote:path``).
+            extra_args: Extra rclone arguments (e.g. ``['--config', path]``),
+                or ``None``.
         """
 
         # Build rclone command
@@ -188,93 +209,43 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def run_transfer_command(self, current_job, command, file_count):
+        """Run an rsync or rclone transfer command and collect the files it transferred.
+
+        Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
+        progress to the Gearman job and honouring ``self.stop``.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            command: The rsync or rclone command as an argument list.
+            file_count: Number of files expected; with ``0`` the command isn't
+                run.
+
+        Returns:
+            tuple[list, list, list]: ``(new_files, updated_files, deleted_files)``.
+
+        Raises:
+            TransferCommandError: If the command exits with an error (#230).
         """
-        Run the rsync command and return the list of new/updated files
-        """
 
-        def _process_rsync_line(line, last_percent):
-            if line.startswith(('>f+', '<f+')):
-                new_files.append(line.split(' ', 1)[1].rstrip('\n'))
-            elif line.startswith(('>f.', '<f.')):
-                updated_files.append(line.split(' ', 1)[1].rstrip('\n'))
+        def _progress(percent):
+            self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
 
-            # Extract progress from `to-chk=` lines
-            match = TO_CHK_RE.search(line)
-            if match:
-                remaining = int(match.group(1))
-                total = int(match.group(2))
-                if total > 0:
-                    percent = max(last_percent, min(100, int(100 * (total - remaining) / total)))
-
-                    if percent != last_percent:
-                        logging.info("Progress Update: %d%%", percent)
-                        self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
-                        last_percent = percent
-
-            return last_percent
-
-        def _process_rclone_line(line, last_percent):
-            # Try to extract progress percentage from rclone's output
-            match = RCLONE_PROGRESS_RE.search(line)
-            if match:
-                percent = max(last_percent, min(100, int(match.group(1))))
-
-                if percent != last_percent:
-                    logging.info("Progress Update: %d%%", percent)
-                    self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
-                    last_percent = percent
-
-            return last_percent
-
-        # if there are no files to transfer, then don't
-        if file_count == 0:
-            logging.debug("Skipping Transfer Command: nothing to transfer")
-            return [], []
-
-        logging.debug('Transfer Command: %s', ' '.join(command))
-
-        # file_index = 0
-        new_files = []
-        updated_files = []
-        last_percent_reported = -1
-
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        # while proc.poll() is None:
-        try:
-
-            for line in proc.stdout:
-                if self.stop:
-                    logging.debug("Stopping")
-                    proc.terminate()
-                    break
-
-                line = line.strip()
-
-                if not line:
-                    continue
-
-                if command[0] == 'rsync':
-                    last_percent_reported = _process_rsync_line(line, last_percent_reported)
-
-
-                if command[0] == 'rclone':
-                    last_percent_reported = _process_rclone_line(line, last_percent_reported)
-
-            proc.wait()
-
-            if proc.returncode != 0:
-                raise subprocess.CalledProcessError(proc.returncode, command)
-
-        except Exception as e:
-            logging.error("Transfer failed: %s", e)
-            proc.terminate()
-
-        return new_files, updated_files
+        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop)
+        return result['new'], result['updated'], result['deleted']
 
 
     def transfer_to_destination(self, current_job):
-        """
-        Unified transfer function to handle local, SMB, rsync, and SSH transfers
+        """Copy the cruise directory to the transfer's destination.
+
+        Handles local directories, SMB shares, rsync servers, SSH servers, FTP
+        servers and rclone remotes, applying the transfer's exclude filters.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+
+        Returns:
+            dict: ``{'verdict': True, 'files': ...}`` with the transferred
+            files, or ``{'verdict': False, 'reason': ...}``.
         """
 
         cdt_cfg = self.cruise_data_transfer
@@ -284,50 +255,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             logging.error("Unknown Transfer Type")
             return {'verdict': False, 'reason': 'Unknown Transfer Type'}
 
-        files = { 'new':[], 'updated':[], 'exclude': [] }
+        files = { 'new':[], 'updated':[], 'deleted':[], 'exclude': [] }
         is_darwin = False
-
-
-        def _build_rclone_command(copy_sync, flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
-
-            if copy_sync not in ['copy', 'sync']:
-                raise ValueError("Rclone type has to be 'copy' or 'sync'")
-
-            cmd = ['rclone', copy_sync] + [source_dir.rstrip('/')+'/', dest_dir.rstrip('/')+'/']
-            if flags is not None:
-                cmd += flags
-
-            if extra_args is not None:
-                cmd += extra_args
-
-            if exclude_file_path is not None:
-                cmd += ["--exclude-from",  exclude_file_path]
-
-            return cmd
-
-
-        def _build_rsync_command(flags, extra_args, source_dir, dest_dir, exclude_file_path=None):
-            cmd = ['rsync'] + flags
-            if extra_args is not None:
-                cmd += extra_args
-
-            if exclude_file_path is not None:
-                cmd.append(f"--exclude-from={exclude_file_path}")
-
-            cmd += [source_dir, dest_dir.rstrip('/')+'/']
-            return cmd
-
-
-        def _build_exclude_file(exclude_list, filepath):
-            try:
-                with open(filepath, mode='w', encoding="utf-8") as f:
-                    f.write('\n'.join(exclude_list))
-                    f.write('\0')
-            except IOError as exc:
-                logging.error("Error writing exclude file: %s", str(exc))
-                return False
-
-            return True
+        rclone_args = None  # e.g. the --config for an SSH or FTP destination's rclone remote
 
 
         with temporary_directory() as tmpdir:
@@ -336,7 +266,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             exclude_list = self.build_exclude_filterlist()
             logging.debug("Exclude filters: %s", json.dumps(exclude_list, indent=2))
 
-            if not _build_exclude_file(exclude_list, exclude_file):
+            if not write_list_file(exclude_list, exclude_file):
                 return {'verdict': False, 'reason': 'Failed to write exclude file'}
 
             if transfer_type == 'smb':
@@ -358,12 +288,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 with open(password_file, 'w', encoding='utf-8') as f:
                     f.write(cdt_cfg['rsyncPass'])
                 os.chmod(password_file, 0o600)
-                dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{cdt_cfg['rsyncServer']}{cdt_cfg['destDir']}/"
+                dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir'])}/"
 
             elif transfer_type == 'ssh':
-
                 is_darwin = check_darwin(cdt_cfg)
-                dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir']}"
+                rclone_config = os.path.join(tmpdir, 'rclone_config')
+                try:
+                    rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
+                except FileNotFoundError as exc:
+                    return {'verdict': False, 'reason': str(exc)}
+                rclone_args = ['--config', rclone_config]
+                dest_dir = f"{rclone_remote}:{cdt_cfg['destDir']}"
+
+            elif transfer_type == 'ftp':
+                # destDir is an absolute path on the FTP server (#199)
+                success, rclone_config = prepare_ftp_config(cdt_cfg, tmpdir)
+                if not success:
+                    return {'verdict': False, 'reason': rclone_config}
+                rclone_args = ['--config', rclone_config]
+                dest_dir = f"{FTP_REMOTE}:{cdt_cfg['destDir']}"
 
             else:  # local
                 dest_dir = cdt_cfg['destDir']
@@ -371,19 +314,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             # === DRY RUN ===
             dry_flags = build_rsync_options(cdt_cfg, mode='dry-run', is_darwin=is_darwin)
 
-            extra_args = []
-            if transfer_type == 'ssh':
-                extra_args += ['-e', 'ssh']
-            elif transfer_type == 'rsync':
-                extra_args += [f"--password-file={password_file}"]
-
+            # The dry run only counts the files to send, and always writes
+            # locally: to the temporary directory for a remote destination
+            # (':' in dest_dir), so without remote-only arguments such as
+            # --password-file (rsync rejects it without an rsync daemon, #249)
             dr_dest_dir = f'{tmpdir}/{self.cruise_id}' if ':' in dest_dir else f'{dest_dir.rstrip("/")}/{self.cruise_id}'
-            dry_cmd = _build_rsync_command(dry_flags, extra_args, self.cruise_dir, dr_dest_dir, exclude_file)
-            if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                dry_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + dry_cmd
+            dry_cmd = build_rsync_command(dry_flags, None, self.cruise_dir, dr_dest_dir.rstrip('/') + '/',
+                                          None, exclude_file)
 
-            logging.debug("Dry run command: %s", ' '.join(dry_cmd).replace(f'-p {cdt_cfg.get("sshPass", "")}', '-p ****'))
+            logging.debug("Dry run command: %s", transfer_utils.redact_command(dry_cmd))
             proc = subprocess.run(dry_cmd, capture_output=True, text=True, check=False)
+            if proc.returncode not in transfer_utils.RSYNC_OK_CODES:
+                # Otherwise it looks like "nothing to transfer" (#230)
+                detail = error_detail('rsync', (proc.stdout + proc.stderr).splitlines())
+                reason = f"Dry run failed: rsync exited with code {proc.returncode}"
+                if detail:
+                    reason += f": {detail}"
+                logging.error(reason)
+                return {'verdict': False, 'reason': reason}
 
             file_count = 0
             for line in proc.stdout.splitlines():
@@ -396,51 +344,32 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.debug("Nothing to transfer")
                 return {'verdict': True, 'files': files}
 
-            # === USING RCLONE ===
-            if transfer_type in ['local','smb']:
+            try:
+                # === USING RSYNC ===
+                if transfer_type == 'rsync':
+                    real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
+                    real_cmd = build_rsync_command(real_flags, [f"--password-file={password_file}"],
+                                                   self.cruise_dir, dest_dir.rstrip('/') + '/',
+                                                   None, exclude_file)
 
-                self.make_cruise_dir(dest_dir)
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, real_cmd, file_count)
 
-                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                # === USING RCLONE === (local directories and SMB mounts, and
+                # rclone remotes for SSH and FTP destinations)
+                else:
+                    self.make_cruise_dir(dest_dir, rclone_args)
 
-                cmd = _build_rclone_command(copy_sync,
-                    flags,
-                    None,
-                    self.cruise_dir,
-                    os.path.join(dest_dir, self.cruise_id), exclude_file
-                )
+                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                    cmd = build_rclone_command(copy_sync, flags, rclone_args, self.cruise_dir,
+                                               os.path.join(dest_dir, self.cruise_id),
+                                               exclude_filepath=exclude_file)
 
-                files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
+                    logging.debug("Transfer command: %s", transfer_utils.redact_command(cmd))
 
-            elif transfer_type == 'ssh':
-                rclone_config = os.path.join(tmpdir, 'rclone_config')
-                rclone_remote = build_rclone_config_for_ssh(cdt_cfg, rclone_config)
-                extra_args = ['--config', rclone_config]
-
-                self.make_cruise_dir(f'{rclone_remote}:{cdt_cfg["destDir"]}', extra_args)
-
-                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
-
-                cmd = _build_rclone_command(copy_sync,
-                    flags,
-                    extra_args,
-                    self.cruise_dir,
-                    f'{rclone_remote}:{cdt_cfg["destDir"]}/{self.cruise_id}', exclude_file
-                )
-
-                logging.debug(' '.join(cmd))
-
-                files['new'], files['updated'] = self.run_transfer_command(current_job, cmd, file_count)
-
-            # === USING RSYNC ===
-            else:
-                real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
-
-                real_cmd = _build_rsync_command(real_flags, extra_args, self.cruise_dir, dest_dir, exclude_file)
-                if transfer_type == 'ssh' and cdt_cfg.get('sshUseKey') == 0:
-                    real_cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + real_cmd
-
-                files['new'], files['updated'] = self.run_transfer_command(current_job, real_cmd, file_count)
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, file_count)
+            except TransferCommandError as exc:
+                # Don't report a failed transfer as successful (#230)
+                return {'verdict': False, 'reason': f"Transfer failed: {exc}"}
 
             # === PERMISSIONS (local only) ===
             if transfer_type == 'local' and ':' not in dest_dir and cdt_cfg.get('localDirIsMountPoint') == 0:
@@ -456,8 +385,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``cruiseDataTransfer``, ``cruiseID``,
+        ``systemStatus``; any it omits default to the current cruise/lowering
+        settings), loads what the task needs from the OpenVDM API, then runs
+        the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
 
@@ -509,15 +449,26 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the cruise data transfer's status to error and sends it back to
+        Gearman as a failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
@@ -538,8 +489,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the cruise data transfer's status to error, with that part's reason;
+        ``Ignore`` leaves the status unchanged; anything else sets it to idle.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -608,8 +569,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
 def task_run_cruise_data_transfer(worker, current_job):
-    """
-    Run the cruise data transfer
+    """Gearman task: run a cruise data transfer.
+
+    Checks the transfer isn't already running and is enabled, tests the
+    destination, then copies the cruise directory to it.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``) and ``files`` (the transferred files).
     """
 
     time.sleep(randint(0,2))
@@ -689,8 +660,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -699,8 +673,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

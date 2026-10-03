@@ -12,6 +12,15 @@ namespace Core;
 
 /**
  * Router class will load requested controller / closure based on url.
+ *
+ * Route definitions are handled by __callstatic(); the method name is the
+ * HTTP method to match ("any" matches all).
+ *
+ * @method static void any(string $route, string|callable $callback)
+ * @method static void get(string $route, string|callable $callback)
+ * @method static void post(string $route, string|callable $callback)
+ * @method static void put(string $route, string|callable $callback)
+ * @method static void delete(string $route, string|callable $callback)
  */
 class Router
 {

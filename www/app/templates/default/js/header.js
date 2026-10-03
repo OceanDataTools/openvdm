@@ -245,16 +245,16 @@ $(function () {
                 var i = document.createElement("i");
                 i.setAttribute("class", "fa fa-angle-right");
 
-                var s = document.createElement("strong");
+                s = document.createElement("strong");
                 s.innerHTML = "Read All Messages ";
                 s.appendChild(i);
 
-                var a = document.createElement("a");
+                a = document.createElement("a");
                 a.setAttribute("class", "text-center");
                 a.setAttribute("href", siteRoot + "config/messages");
                 a.appendChild(s);
 
-                var li = document.createElement("li");
+                li = document.createElement("li");
                 li.appendChild(a);
                 ul.appendChild(li);
 
@@ -305,7 +305,7 @@ $(function () {
                         pb.setAttribute("class", "progress progress-striped active");
                         pb.appendChild(pb2);
 
-                        var s = document.createElement("strong");
+                        s = document.createElement("strong");
                         s.innerHTML = data[i]['jobName'];
 
                         var sp = document.createElement("span");
@@ -320,7 +320,7 @@ $(function () {
                         d.appendChild(p);
                         d.appendChild(pb);
 
-                        var a = document.createElement("a");
+                        a = document.createElement("a");
                         a.setAttribute("class", "OVDM_job");
                         a.setAttribute("jobID", data[i]['jobID']);
                         a.setAttribute("href", "#");

@@ -116,3 +116,9 @@ thead {
 .pl-5 { padding-left:3rem!important; }
 .px-5 { padding-right:3rem!important;padding-left:3rem!important; }
 .py-5 { padding-top:3rem!important;padding-bottom:3rem!important; }
+/* Data dashboard tabs: a data type's files sit side by side and wrap
+   between files, not inside a narrow grid cell (#280, #282) */
+.objectList .file-entry {
+  display: inline-block;
+  margin-right: 2em;
+}

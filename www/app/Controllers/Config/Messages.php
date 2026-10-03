@@ -1,5 +1,5 @@
 <?php
-namespace controllers\config;
+namespace Controllers\Config;
 use Core\Controller;
 use Core\View;
 use Helpers\Url;

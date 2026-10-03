@@ -122,14 +122,6 @@ $(function () {
 
     function updateErrorLogSummary(errorFilesPanel) {
         var updateTransferLogSummaryURL = siteRoot + 'api/transferLogs/getExcludeLogsSummary';
-        var options = {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        };
         $.getJSON(updateTransferLogSummaryURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -174,14 +166,6 @@ $(function () {
 
     function updateShipboardLogSummary(shipboardFilesPanel) {
         var updateTransferLogSummaryURL = siteRoot + 'api/transferLogs/getShipboardLogsSummary/' + transferLogNum;
-        var options = {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        };
         $.getJSON(updateTransferLogSummaryURL, function (data, status) {
             if (status === 'success' && data !== null) {
 
@@ -227,14 +211,6 @@ $(function () {
 
     function updateShipToShoreLogSummary(shipToShoreFilesPanel) {
         var updateTransferLogSummaryURL = siteRoot + 'api/transferLogs/getShipToShoreLogsSummary/' + transferLogNum;
-        var options = {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        };
 
          $.getJSON(updateTransferLogSummaryURL, function (data, status) {
             if (status === 'success' && data !== null) {

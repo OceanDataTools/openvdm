@@ -1,13 +1,24 @@
 $(function () {
     'use strict';
 
-    var transferTypeOptions = [
-        {"value" : 1, "text" : "Local Directory"},
-        {"value" : 2, "text" : "Rsync Server"},
-        {"value" : 3, "text" : "SMB Share"},
-        {"value" : 4, "text" : "SSH Server"},
-        {"value" : 5, "text" : "NFS Share"},
-    ];
+    // Class of each transfer type's form fields and help text, keyed by
+    // transfer type ID (OVDM_TransferTypes.transferTypeID) (#226)
+    var transferTypeFieldClasses = {
+        1: 'localDir',
+        2: 'rsyncServer',
+        3: 'smbShare',
+        4: 'sshServer',
+        5: 'ftpServer'
+    };
+
+    // Source Directory placeholder for each transfer type, keyed by type value (#227)
+    var sourceDirPlaceholders = {
+        1: 'e.g. /mnt/xbt',
+        2: 'e.g. /EM302',
+        3: 'e.g. /XBT',
+        4: 'e.g. /data/openrvdas',
+        5: 'e.g. /data'
+    };
 
     // ---------------------------------------------------------------------------
     // Field normalization helpers
@@ -51,6 +62,20 @@ $(function () {
         return val.trim();
     }
 
+    function normalizeFtpServer(val) {
+        val = val.trim();
+        // Strip protocol prefix
+        val = val.replace(/^ftp:\/\//i, '');
+        // Replace backslashes with forward slashes, then strip leading slashes
+        val = val.replace(/\\/g, '/').replace(/^\/+/, '');
+        // FTP server field is host[:port] only — strip any path component
+        var slashIdx = val.indexOf('/');
+        if (slashIdx !== -1) {
+            val = val.substring(0, slashIdx);
+        }
+        return val.trim();
+    }
+
     function normalizeSourceDir(val) {
         val = val.trim();
         // Replace backslashes with forward slashes
@@ -81,20 +106,23 @@ $(function () {
     // Apply normalization based on the currently selected transfer type
     // ---------------------------------------------------------------------------
 
+    function currentTransferType() {
+        return $('select[name=transferType]').val() || '';
+    }
+
     function normalizeFieldsForTransferType(transferType) {
-        if (transferType === '') { transferType = '1'; }
-
-        var transferTypeText = transferTypeOptions[parseInt(transferType, 10) - 1].text;
-
-        switch (transferTypeText) {
-        case 'Rsync Server':
+        switch (transferType) {
+        case '2': // Rsync Server
             $('input[name=rsyncServer]').val(normalizeRsyncServer($('input[name=rsyncServer]').val()));
             break;
-        case 'SMB Share':
+        case '3': // SMB Share
             $('input[name=smbServer]').val(normalizeSmbServer($('input[name=smbServer]').val()));
             break;
-        case 'SSH Server':
+        case '4': // SSH Server
             $('input[name=sshServer]').val(normalizeSshServer($('input[name=sshServer]').val()));
+            break;
+        case '5': // FTP Server
+            $('input[name=ftpServer]').val(normalizeFtpServer($('input[name=ftpServer]').val()));
             break;
         }
 
@@ -116,48 +144,12 @@ $(function () {
     }
 
     function setTransferTypeFields(transferType) {
+        // Show only the selected type's fields; none until a type is chosen
+        $.each(transferTypeFieldClasses, function (id, fieldClass) {
+            $('.' + fieldClass).toggle(id === transferType);
+        });
 
-        if (transferType === '') { transferType = '1'; }
-        var transferTypeText = transferTypeOptions[parseInt(transferType, 10) - 1].text;
-
-        switch (transferTypeText) {
-        case "Local Directory":
-            $(".localDir").show();
-            $(".rsyncServer").hide();
-            $(".smbShare").hide();
-            $(".sshServer").hide();
-            $(".nfsShare").hide();
-            break;
-        case "Rsync Server":
-            $(".localDir").hide();
-            $(".rsyncServer").show();
-            $(".smbShare").hide();
-            $(".sshServer").hide();
-            $(".nfsShare").hide();
-            break;
-        case "SMB Share":
-            $(".localDir").hide();
-            $(".rsyncServer").hide();
-            $(".smbShare").show();
-            $(".sshServer").hide();
-            $(".nfsShare").hide();
-            break;
-        case "SSH Server":
-            $(".localDir").hide();
-            $(".rsyncServer").hide();
-            $(".smbShare").hide();
-            $(".sshServer").show();
-            $(".nfsShare").hide();
-            break;
-        case "NFS Share":
-            $(".localDir").hide();
-            $(".rsyncServer").hide();
-            $(".smbShare").hide();
-            $(".sshServer").hide();
-            $(".nfsShare").show();
-            break;
-        default:
-        }
+        $('input[name=sourceDir]').attr('placeholder', sourceDirPlaceholders[transferType] || '');
     }
 
     function setCustomStalenessField(staleness) {
@@ -170,7 +162,7 @@ $(function () {
 
     function setCustomRemoveSourceField() {
         const staleness = $('input[name=staleness]:checked').val();
-        const transferType = $('input[name=transferType]:checked').val();
+        const transferType = currentTransferType();
 
 	if(staleness == 0 || transferType == 2){
             $(".removeSource").hide();
@@ -179,13 +171,13 @@ $(function () {
         }
     }
 
-    setTransferTypeFields($('input[name=transferType]:checked').val());
+    setTransferTypeFields(currentTransferType());
     setSSHUseKeyField($('input[name=sshUseKey]:checked').val())
     setCustomStalenessField($('input[name=staleness]:checked').val())
     setCustomRemoveSourceField()
 
-    $('input[name=transferType]').change(function () {
-        setTransferTypeFields($(this).val());
+    $('select[name=transferType]').change(function () {
+        setTransferTypeFields(currentTransferType());
         setCustomRemoveSourceField()
     });
 
@@ -230,6 +222,14 @@ $(function () {
         $(this).val($(this).val().trim());
     });
 
+    $('input[name=ftpServer]').on('blur', function () {
+        $(this).val(normalizeFtpServer($(this).val()));
+    });
+
+    $('input[name=ftpUser], input[name=ftpPass]').on('blur', function () {
+        $(this).val($(this).val().trim());
+    });
+
     $('input[name=sourceDir]').on('blur', function () {
         $(this).val(normalizeSourceDir($(this).val()));
     });
@@ -249,7 +249,7 @@ $(function () {
         $('input[type="text"], input[type="password"], input:not([type])').each(function () {
             $(this).val($(this).val().trim());
         });
-        normalizeFieldsForTransferType($('input[name=transferType]:checked').val());
+        normalizeFieldsForTransferType(currentTransferType());
     });
 
 });

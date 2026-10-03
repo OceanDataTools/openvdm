@@ -1,0 +1,121 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Variable \$error in isset\(\) is never defined\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Core/Error.php
+
+		-
+			message: '#^Call to static method customErrorMsg\(\) on an unknown class Helpers\\Logger\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Call to static method newMessage\(\) on an unknown class Helpers\\Logger\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Method Helpers\\Database\:\:get\(\) should return Helpers\\Database but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/Database.php
+
+		-
+			message: '#^Variable \$dates might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Helpers/Date.php
+
+		-
+			message: '#^Variable \$counter might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: app/Helpers/Paginator.php
+
+		-
+			message: '#^Method Helpers\\PhpMailer\\Exception\:\:errorMessage\(\) should return string but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Helpers/PhpMailer/Exception.php
+
+		-
+			message: '#^Caught class Helpers\\PhpMailer\\phpmailerException not found\.$#'
+			identifier: class.notFound
+			count: 6
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Class Helpers\\PhpMailer\\Smtp referenced with incorrect case\: Helpers\\PhpMailer\\SMTP\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\html2text not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\phpmailerException not found\.$#'
+			identifier: class.notFound
+			count: 22
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Path in require_once\(\) "extras/class\.html2text\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Variable \$_SERVER in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/PhpMailer/PhpMailer.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\ntlm_sasl_client_class not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Instantiated class Helpers\\PhpMailer\\stdClass not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Path in require_once\(\) "extras/ntlm_sasl_client\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: app/Helpers/PhpMailer/Smtp.php
+
+		-
+			message: '#^Variable \$_FILES in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_GET in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 2
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_POST in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php
+
+		-
+			message: '#^Variable \$_PUT in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: app/Helpers/Request.php

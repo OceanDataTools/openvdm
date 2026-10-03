@@ -16,9 +16,9 @@ class Messages extends Model {
     public function getMessagesTotal($search=''){
         if($search !== ''){
             $like = '%' . $search . '%';
-            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageTitle LIKE :title OR messageBody LIKE :body", array(':title' => $like, ':body' => $like)));
+            return (int) $this->db->select("SELECT COUNT(*) AS total FROM ".PREFIX."Messages WHERE messageTitle LIKE :title OR messageBody LIKE :body", array(':title' => $like, ':body' => $like))[0]->total;
         }
-        return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages"));
+        return (int) $this->db->select("SELECT COUNT(*) AS total FROM ".PREFIX."Messages")[0]->total;
     }
 
     public function getNewMessages($limit, $search='') {
@@ -32,9 +32,9 @@ class Messages extends Model {
     public function getNewMessagesTotal($search=''){
         if($search !== ''){
             $like = '%' . $search . '%';
-            return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :title OR messageBody LIKE :body)", array(':title' => $like, ':body' => $like)));
+            return (int) $this->db->select("SELECT COUNT(*) AS total FROM ".PREFIX."Messages WHERE messageViewed = 0 AND (messageTitle LIKE :title OR messageBody LIKE :body)", array(':title' => $like, ':body' => $like))[0]->total;
         }
-        return sizeof($this->db->select("SELECT messageID FROM ".PREFIX."Messages WHERE messageViewed = 0"));
+        return (int) $this->db->select("SELECT COUNT(*) AS total FROM ".PREFIX."Messages WHERE messageViewed = 0")[0]->total;
     }
 
     public function getMessage($id){

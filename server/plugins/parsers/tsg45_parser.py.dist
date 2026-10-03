@@ -1,32 +1,10 @@
 #!/usr/bin/env python3
-"""
-FILE:  tsg45_parser.py
+"""Parser for Sea-Bird SBE 45 thermosalinograph data.
 
-USAGE:  tsg45_parser.py [-h] [-v+] [--timeFormat] [--startDT] [--stopDT] [--sbe38] <dataFile>
-
-DESCRIPTION:  Parse the supplied SBE45 TSG file and return the json-
-              formatted string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            [--timeFormat] date/time format to use when parsing datafile, default
-                           yyyy-mm-ddTHH:MM:SS.sssZ
-            [--startTS] optional start crop time (strptime format)
-            [--stopTS] optional stop crop time (strptime format)
-            [--sbe38] file includes temp data from external SBE38
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   numpy==2.4.0
-                   pandas==2.3.0
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-12-30
+Parses timestamped log files containing Sea-Bird SBE 45 thermosalinograph
+readings (temperature, conductivity, salinity and sound velocity), optionally
+with external SBE 38 temperature, and returns the JSON-formatted plugin data
+used by OpenVDM's Data Dashboard.
 """
 
 import sys
@@ -61,24 +39,36 @@ ROUNDING = {
 
 
 class SBE45TSGParser(OpenVDMCSVParser):
-    """Parser for SBE45 TSG files, fully refactored like GGAParser."""
+    """Parser for Sea-Bird SBE 45 thermosalinograph log files."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False, sbe38=False,
                  col_names=False):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            sbe38: The file also includes temperature from an external SBE 38.
+            col_names: Data rows include column names.
+        """
         self.sbe38 = sbe38
         self.col_names = col_names
-        proc_cols = PROC_COLS
-        if sbe38:
-            proc_cols.append('sbe38_temp_c')
+        # Build a new list; appending to PROC_COLS would change it for every
+        # later instance in the process.
+        proc_cols = PROC_COLS + ['sbe38_temp_c'] if sbe38 else list(PROC_COLS)
 
         super().__init__(proc_cols, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
 
     def parse(self, filepath):
+        """Parse the SBE 45 TSG file and populate the plugin data."""
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
 
@@ -222,6 +212,11 @@ class SBE45TSGParser(OpenVDMCSVParser):
     # -----------------------------
     @classmethod
     def add_cli_arguments(cls, parser):
+        """Add SBE 45 TSG-specific command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
         parser.add_argument('--sbe38', action='store_true', default=False, help='File includes temp data from external SBE38')
         parser.add_argument('--col_names', action='store_true', default=False, help='Data rows includes column names')
 

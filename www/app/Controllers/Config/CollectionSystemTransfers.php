@@ -1,25 +1,27 @@
 <?php
 
-namespace controllers\config;
+namespace Controllers\Config;
 use Core\Controller;
 use Core\View;
 use Helpers\Url;
 use Helpers\Session;
+use Helpers\PendingPasswords;
+use Helpers\FtpFields;
+use Helpers\TransferFields;
 
 class CollectionSystemTransfers extends Controller {
 
     private $_collectionSystemTransfersModel,
             $_transferTypesModel;
 
+    // Transfer type choices for the form's Form::select(), as ID => name (#226).
     private function _buildTransferTypesOptions() {
         $transferTypes = $this->_transferTypesModel->getTransferTypes();
 
         $output = array();
-        $i=1;
 
         foreach($transferTypes as $row){
-            $option = array('id'=>'transferType'.$i++, 'name'=>'transferType', 'value'=>$row->transferTypeID, 'label'=>$row->transferType);
-            array_push($output, $option);
+            $output[$row->transferTypeID] = $row->transferType;
         }
 
         return $output;
@@ -78,6 +80,7 @@ class CollectionSystemTransfers extends Controller {
         $output = array(array('id'=>'cruiseOrLowering0', 'name'=>'cruiseOrLowering', 'value'=>'0', 'label'=>CRUISE_NAME), array('id'=>'cruiseOrLowering1', 'name'=>'cruiseOrLowering', 'value'=>'1', 'label'=>LOWERING_NAME));
         return $output;
     }
+
 
     private function updateDestinationDirectory() {
         $_warehouseModel = new \Models\Warehouse();
@@ -177,6 +180,9 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
@@ -232,106 +238,50 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbPass = '';
-                $smbDomain = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            } elseif ($transferType == 2) { // Rsync Server
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { // Rsync Server
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
 
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $sshDataCheck = false;
 
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
                 }
             }
 
@@ -362,12 +312,17 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
                     'status' => $status,
                     'enable' => $enable,
                 );
+
+                $postdata = TransferFields::clearOthers($postdata);
 
                 $this->_collectionSystemTransfersModel->insertCollectionSystemTransfer($postdata);
                 Session::set('message','Collection System Transfer Added');
@@ -399,6 +354,9 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
@@ -434,108 +392,50 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbDomain = '';
-                $smbPass = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            } elseif ($transferType == 2) { // Rsync Server
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { // Rsync Server
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
 
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbPass = '';
-                    $smbDomain = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $sshDataCheck = false;
 
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
                 }
             }
 
@@ -568,12 +468,17 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => (int)$sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
                     'status' => 4,
                     'enable' => 0,
                 );
+
+                $gmData['collectionSystemTransfer'] = TransferFields::clearOthers($gmData['collectionSystemTransfer']);
 
                 # create the gearman client
                 $gmc= new \GearmanClient();
@@ -614,6 +519,11 @@ class CollectionSystemTransfers extends Controller {
         $data['stalenessOptions'] = ($data['row'][0]->staleness == "0")? $this->_buildStalenessOptions(): $this->_buildStalenessOptions($data['row'][0]->staleness);
         $error = [];
 
+        # a fresh page load discards any password remembered from an earlier "Test Setup"
+        if(!isset($_POST['submit']) && !isset($_POST['inlineTest'])){
+            PendingPasswords::clear('cst', $id);
+        }
+
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
@@ -640,19 +550,21 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], false);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
+
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -703,106 +615,48 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbDomain = '';
-                $smbPass = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            } elseif ($transferType == 2) { //rsync
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { //rsync
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
                 }
 
             }
@@ -834,6 +688,9 @@ class CollectionSystemTransfers extends Controller {
                     'sshUser' => $sshUser,
                     'sshUseKey' => $sshUseKey,
                     'sshPass' => $sshPass,
+                    'ftpServer' => $ftpServer,
+                    'ftpUser' => $ftpUser,
+                    'ftpPass' => $ftpPass,
                     'includeFilter' => $includeFilter,
                     'excludeFilter' => $excludeFilter,
                     'ignoreFilter' => $ignoreFilter,
@@ -841,6 +698,7 @@ class CollectionSystemTransfers extends Controller {
 
 
                 $where = array('collectionSystemTransferID' => $id);
+                $postdata = TransferFields::clearOthers($postdata);
                 $this->_collectionSystemTransfersModel->updateCollectionSystemTransfer($postdata,$where);
 
                 if($data['row'][0]->destDir != $destDir){
@@ -848,6 +706,7 @@ class CollectionSystemTransfers extends Controller {
 		}
 
                 $filter = !empty($_GET['filter']) ? '?filter='.$_GET['filter'] : "";
+                PendingPasswords::clear('cst', $id);
                 Session::set('message','Collection System Transfers Updated');
                 Url::redirect('config/collectionSystemTransfers'.$filter);
             } else {
@@ -874,6 +733,8 @@ class CollectionSystemTransfers extends Controller {
                 $data['row'][0]->sshServer = $sshServer;
                 $data['row'][0]->sshUser = $sshUser;
                 $data['row'][0]->sshUseKey = $sshUseKey;
+                $data['row'][0]->ftpServer = $ftpServer;
+                $data['row'][0]->ftpUser = $ftpUser;
                 $data['row'][0]->includeFilter = $includeFilter;
                 $data['row'][0]->excludeFilter = $excludeFilter;
                 $data['row'][0]->ignoreFilter = $ignoreFilter;
@@ -905,19 +766,21 @@ class CollectionSystemTransfers extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
+            $ftpServer = $_POST['ftpServer'] ?? '';
+            $ftpUser = $_POST['ftpUser'] ?? '';
+            $ftpPass = $_POST['ftpPass'] ?? '';
             $includeFilter = $_POST['includeFilter'] ?? '';
             $excludeFilter = $_POST['excludeFilter'] ?? '';
             $ignoreFilter = $_POST['ignoreFilter'] ?? '';
 
-            if ($rsyncPass === '' && !empty($data['row'][0]->rsyncPass)) {
-                $rsyncPass = $data['row'][0]->rsyncPass;
-            }
-            if ($smbPass === '' && !empty($data['row'][0]->smbPass)) {
-                $smbPass = $data['row'][0]->smbPass;
-            }
-            if ($sshPass === '' && !empty($data['row'][0]->sshPass)) {
-                $sshPass = $data['row'][0]->sshPass;
-            }
+            $passwords = PendingPasswords::resolve('cst', $id, array('rsyncPass' => $rsyncPass, 'smbPass' => $smbPass, 'sshPass' => $sshPass, 'ftpPass' => $ftpPass), $data['row'][0], true);
+            $rsyncPass = $passwords['rsyncPass'];
+            $smbPass = $passwords['smbPass'];
+            $sshPass = $passwords['sshPass'];
+            $ftpPass = $passwords['ftpPass'];
+
+            // Don't send a password saved for another FTP login (#211)
+            $ftpPass = FtpFields::resolvePassword($ftpUser, $ftpPass, $_POST['ftpPass'] ?? '', $data['row'][0]);
 
             if($name == ''){
                 $error[] = 'Name is required';
@@ -952,106 +815,48 @@ class CollectionSystemTransfers extends Controller {
                 $error[] = 'Transfer limit must be an integer';
             }
 
-            if ($transferType == 1) { //local directory
-                $smbServer = '';
-                $smbUser = '';
-                $smbDomain = '';
-                $smbPass = '';
-                $rsyncServer = '';
-                $rsyncUser = '';
-                $rsyncPass = '';
-                $sshServer = '';
-                $sshUser = '';
-                $sshUseKey = '0';
-                $sshPass = '';
+            $error = array_merge($error, FtpFields::check($transferType, $ftpServer, $ftpUser, $ftpPass));
 
-            } elseif ($transferType == 2) { //rsync
-                $rsyncDataCheck = true;
+            if ($transferType == 2) { //rsync
                 if($rsyncServer == ''){
                     $error[] = 'Rsync Server is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser == ''){
                     $error[] = 'Rsync Username is required';
-                    $rsyncDataCheck = false;
                 }
 
                 if($rsyncUser != 'anonymous' && $rsyncPass == ''){
                     $error[] = 'Rsync Password is required';
-                    $rsyncDataCheck = false;
-                }
-
-                if($rsyncDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
 
             } elseif ($transferType == 3) { // SMB Share
-                $smbDataCheck = true;
                 if($smbServer == ''){
                     $error[] = 'SMB Server is required';
-                    $smbDataCheck = false;
                 }
 
                 if($smbUser == ''){
                     $error[] = 'SMB Username is required';
-                    $smbDataCheck = false;
                 }
 
 //                if($smbUser != 'guest' && $smbPass == ''){
 //                    $error[] = 'SMB Password is required';
-//                    $smbDataCheck = false;
 //                }
 
                 if($smbDomain == ''){
                     $smbDomain = 'WORKGROUP'; // Default value
-                    $smbDataCheck = false;
-                }
-
-                if($smbDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
-                    $sshServer = '';
-                    $sshUser = '';
-                    $sshUseKey = '0';
-                    $sshPass = '';
                 }
             } elseif ($transferType == 4) { // SSH Server
-                $sshDataCheck = true;
                 if($sshServer == ''){
                     $error[] = 'SSH Server is required';
-                    $sshDataCheck = false;
                 }
 
                 if($sshUser == ''){
                     $error[] = 'SSH Username is required';
-                    $sshDataCheck = false;
                 }
 
                 if((($sshPass == '') || is_null($sshPass)) && ($sshUseKey == 0)){
                     $error[] = 'SSH Password is required';
-                    $sshDataCheck = false;
-                }
-
-                if($sshDataCheck) {
-                    $localDirIsMountPoint = '0';
-                    $smbServer = '';
-                    $smbUser = '';
-                    $smbDomain = '';
-                    $smbPass = '';
-                    $rsyncServer = '';
-                    $rsyncUser = '';
-                    $rsyncPass = '';
                 }
 
             }
@@ -1085,9 +890,14 @@ class CollectionSystemTransfers extends Controller {
                 $gmData['collectionSystemTransfer']->sshUser = $sshUser;
                 $gmData['collectionSystemTransfer']->sshUseKey = (int)$sshUseKey;
                 $gmData['collectionSystemTransfer']->sshPass = $sshPass;
+                $gmData['collectionSystemTransfer']->ftpServer = $ftpServer;
+                $gmData['collectionSystemTransfer']->ftpUser = $ftpUser;
+                $gmData['collectionSystemTransfer']->ftpPass = $ftpPass;
                 $gmData['collectionSystemTransfer']->includeFilter = $includeFilter;
                 $gmData['collectionSystemTransfer']->excludeFilter = $excludeFilter;
                 $gmData['collectionSystemTransfer']->ignoreFilter = $ignoreFilter;
+
+                $gmData['collectionSystemTransfer'] = TransferFields::clearOthers($gmData['collectionSystemTransfer']);
 
                 # create the gearman client
                 $gmc= new \GearmanClient();
@@ -1123,10 +933,14 @@ class CollectionSystemTransfers extends Controller {
             $data['row'][0]->sshServer = $sshServer;
             $data['row'][0]->sshUser = $sshUser;
             $data['row'][0]->sshUseKey = $sshUseKey;
+            $data['row'][0]->ftpServer = $ftpServer;
+            $data['row'][0]->ftpUser = $ftpUser;
             $data['row'][0]->includeFilter = $includeFilter;
             $data['row'][0]->excludeFilter = $excludeFilter;
             $data['row'][0]->ignoreFilter = $ignoreFilter;
         }
+
+        $data['pendingPasswords'] = PendingPasswords::flags('cst', $id);
 
         View::rendertemplate('header',$data);
         View::render('Config/editCollectionSystemTransfers',$data,$error);

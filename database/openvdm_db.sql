@@ -65,6 +65,9 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `sshUser` tinytext,
   `sshUseKey` int(1) unsigned NOT NULL DEFAULT '0',
   `sshPass` tinytext,
+  `ftpServer` tinytext,
+  `ftpUser` tinytext,
+  `ftpPass` tinytext,
   `includeFilter` text,
   `excludeFilter` text,
   `ignoreFilter` text,
@@ -103,11 +106,11 @@ VALUES
   (4,'cruiseID','ODT2601'),
   (5,'cruiseName','Explore the Deep'),
   (6,'cruiseStartDate','2026/01/01 00:00'),
-  (7,'cruiseStartPort','Newport, RI'),
+  (7,'cruiseStartPort','Pascagoula, MS'),
   (8,'cruiseEndDate','2026/02/01 00:00'),
-  (9,'cruiseEndPort','Norfolk, VA'),
+  (9,'cruiseEndPort','Galveston, TX'),
   (10,'cruisePI','Dave Lovalvo'),
-  (11,'cruiseLocation','New England Seamounts'),
+  (11,'cruiseLocation','Gulf of Mexico'),
   (12,'cruiseSize','0'),
   (13,'cruiseSizeUpdated','2026/01/01 00:00:00'),
   (14,'loweringID','ROV0001'),
@@ -151,6 +154,9 @@ CREATE TABLE `OVDM_CruiseDataTransfers` (
   `sshUser` tinytext,
   `sshUseKey` int(1) unsigned NOT NULL DEFAULT '0',
   `sshPass` tinytext,
+  `ftpServer` tinytext,
+  `ftpUser` tinytext,
+  `ftpPass` tinytext,
   `status` int(11) unsigned NOT NULL DEFAULT '3',
   `enable` tinyint(1) NOT NULL DEFAULT '0',
   `required` tinyint(1) NOT NULL DEFAULT '0',
@@ -291,7 +297,7 @@ LOCK TABLES `OVDM_ShipToShoreTransfers` WRITE;
 
 INSERT INTO `OVDM_ShipToShoreTransfers` (`shipToShoreTransferID`, `name`, `longName`, `priority`, `collectionSystem`, `extraDirectory`, `includeFilter`, `enable`, `required`)
 VALUES
-  (1,'DashboardData','Dashboard Data',1,0,2,'*',1,1),
+  (1,'DashboardData','Dashboard Data',1,0,1,'*',1,1),
   (3,'MD5Summary','MD5 Summary',1,0,0,'{md5_summary_fn},{md5_summary_md5_fn}',1,1),
   (4,'OVDM_Config','OpenVDM Configuration',1,0,0,'{cruise_config_fn}',1,1);
 
@@ -357,7 +363,8 @@ VALUES
   (1,'Local Directory'),
   (2,'Rsync Server'),
   (3,'SMB Share'),
-  (4,'SSH Server');
+  (4,'SSH Server'),
+  (5,'FTP Server');
 
 /*!40000 ALTER TABLE `OVDM_TransferTypes` ENABLE KEYS */;
 UNLOCK TABLES;
