@@ -121,8 +121,9 @@ browser.
 Enable Supervisor Web-interface?  (no) yes
 Enable user/pass on Supervisor Web-interface?  (no) yes
 Username? (survey) 
-Password? (survey) weak_password
+Password? (weak_password) 
 ```
+The password defaults to the OpenVDM user's password.
 
 ```
 #####################################################################
