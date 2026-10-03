@@ -1721,6 +1721,11 @@ function setup_ssh {
     done
     chmod 600 ~/.ssh/authorized_keys "/home/${OPENVDM_USER}/.ssh/authorized_keys"
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
+    # SELinux: sshd only reads authorized_keys labelled ssh_home_t; make sure
+    # both .ssh directories are, as ssh-copy-id does
+    if command -v restorecon > /dev/null && command -v selinuxenabled > /dev/null && selinuxenabled; then
+        restorecon -R ~/.ssh "/home/${OPENVDM_USER}/.ssh"
+    fi
 
     # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
     ssh -o StrictHostKeyChecking=accept-new "${OPENVDM_USER}@${HOSTNAME}" ls > /dev/null
