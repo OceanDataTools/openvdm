@@ -302,7 +302,7 @@ pip install -r requirements.txt
 
 OpenVDM 2.15 moved from PHP 7.3 to PHP 8.2, and 2.16 needs Python 3.11 or later. There are two ways to upgrade a 2.14 server. Both use the same two database update scripts, which take a 2.14 database to the 2.16 schema.
 
-- **In place:** re-run the 2.16 installer on the same server. Use this on Rocky Linux or AlmaLinux 8 or 9, where the installer moves PHP to 8.2 from the Remi repository. On Ubuntu and Debian, 2.14 ran PHP 7.3 as Apache's PHP module (`libapache2-mod-php7.3`), and the 2.16 installer doesn't switch Apache off it. Use the fresh-OS route there.
+- **In place:** re-run the 2.16 installer on the same server. Use this on Rocky Linux or AlmaLinux 8 or 9, where the installer moves PHP to 8.2 from the Remi repository. This route has been tested end to end on Rocky Linux 9. On Ubuntu and Debian, 2.14 ran PHP 7.3 as Apache's PHP module (`libapache2-mod-php7.3`), and the 2.16 installer doesn't switch Apache off it. Use the fresh-OS route there.
 - **On a fresh OS:** install 2.16 on a new or reinstalled server, and bring the 2.14 database, settings and cruise data across.
 
 Whichever you choose, if the server is a virtual machine, take a snapshot first.
@@ -315,7 +315,14 @@ Whichever you choose, if the server is a virtual machine, take a snapshot first.
 cd <openvdm_root>
 sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_2.14_backup.sql
 ```
-3. Keep a copy of `www/app/Core/Config.php`. The installer rewrites it from the 2.16 template, so you'll need to make any changes you'd made to it again.
+3. Set your configuration files aside as `.214` copies. The installer builds `openvdm.yaml` and `datadashboard.yaml` from their 2.16 `.dist` templates only when they don't exist, and it always rewrites `Config.php`, so this gets you clean 2.16 files. You'll merge your changes back in from the copies afterwards.
+```
+cd <openvdm_root>
+sudo cp www/app/Core/Config.php www/app/Core/Config.php.214
+sudo mv server/etc/openvdm.yaml server/etc/openvdm.yaml.214
+sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.214
+```
+   Don't skip the two renames. If you keep 2.14's `openvdm.yaml`, the installer only appends `workerApiKey` and `transferPublicData` to it. If you keep 2.14's `datadashboard.yaml`, it misses 2.16's panels and keeps a Position tab setting that breaks its map (#185).
 4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data. The 2.14 installer left `www/` owned by root, and the OpenVDM user does the updating, so give it the whole checkout first. If you installed 2.14 from a tag (e.g. `2.14.1`), answer `master` at the installer's branch question.
 ```
 cd <openvdm_root>
@@ -329,8 +336,8 @@ sudo ./utils/install-openvdm.sh
    The installer:
    - moves PHP to 8.2;
    - installs Python 3.11 or later, and rebuilds OpenVDM's virtual environment (`<openvdm_root>/venv`) when it was made with another Python version: 2.14's uses Python 3.11, and the installer picks the newest Python 3.11+ the OS offers (3.14 on current Rocky 9). Anything you installed into the venv yourself (for example matplotlib) has to be installed again.
-   - rewrites `Config.php` from the 2.16 template, with the database password you give it and your existing worker API key;
-   - adds `workerApiKey` and `transferPublicData` to your `server/etc/openvdm.yaml`, leaving the rest of the file as it is;
+   - rewrites `Config.php` from the 2.16 template, with the database password you give it;
+   - builds a new `server/etc/openvdm.yaml` and `www/etc/datadashboard.yaml` from their `.dist` templates. It generates a worker API key and writes it to both `openvdm.yaml` and `Config.php`;
    - rewrites the Apache, Samba and Supervisor configuration;
    - leaves the database alone.
 5. Update the database to 2.16 by running the two update scripts, in this order. Each asks for the MySQL root password and prints nothing when it succeeds:
@@ -352,7 +359,7 @@ mysql -u root -p openvdm < ./database/openvdm_215_to_216.sql
 cd <openvdm_root>
 sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_2.14_backup.sql
 ```
-3. Copy the backup to the new server, along with your copies of the files you've customized. You'll merge your changes into the 2.16 versions of these files, so don't copy them over the new ones:
+3. Copy the backup to the new server, along with your copies of the files you've customized. You'll merge your changes into the 2.16 versions of these files, so don't copy them over the new ones. Once 2.16 is installed, put the first three next to the new files as `server/etc/openvdm.yaml.214`, `www/app/Core/Config.php.214` and `www/etc/datadashboard.yaml.214`:
    - `server/etc/openvdm.yaml`, for your hooks and `postHookCommands`;
    - `www/app/Core/Config.php`;
    - `www/etc/datadashboard.yaml`;
@@ -376,25 +383,31 @@ mysql -u root -p openvdm < ./database/openvdm_215_to_216.sql
 ```
    Run each script once. Running `openvdm_215_to_216.sql` again stops with `Duplicate column name 'ftpServer'` and changes nothing. If you see any other errors, save them and contact OceanDataTools; the backup can be restored and the steps repeated.
 8. The database keeps the 2.14 server's data warehouse settings. In the web interface, open **Configuration**, the **System** tab, and click **Edit** on the **Shipboard Data Warehouse (SBDW)** row. Check that the server IP and username are the new server's, and that the directories match what you gave the installer.
-9. Add your hooks and `postHookCommands` to the new `server/etc/openvdm.yaml`. Don't copy the 2.14 file over it: the new one has settings 2.14 didn't have, such as `workerApiKey`, which must match `WORKER_API_KEY` in `www/app/Core/Config.php`, and `transferPublicData`.
-10. Continue with [After either route](#after-either-route).
+9. Continue with [After either route](#after-either-route).
 
 ### After either route
 
-1. `www/app/Core/Config.php`: keep the installer's file. If you'd changed other settings in 2.14's, make the same changes in this one.
-2. `www/etc/datadashboard.yaml`: in place, you still have 2.14's file; on a fresh OS, the installer's 2.16 one.
-   - In 2.14's file, delete the `- lowering` line from the Position tab's `jsArray`. Keep `lowering` in `jsArray` only on tabs that use the `lowering` view, and never together with `dataDashboardDefault` (#185).
-   - Compare your file with `www/etc/datadashboard.yaml.dist` for panels added since 2.14, such as profile charts.
-   - On a fresh OS, add your own tabs and panels from 2.14's file.
-3. Bring each plugin and parser you use up to its 2.16 `.dist` template, then make your changes in it again. Many plugins and parsers were fixed in 2.15 and 2.16, so don't keep or copy back the 2.14 versions.
+1. Merge your 2.14 settings into the 2.16 files. `diff` shows the differences:
+```
+cd <openvdm_root>
+diff server/etc/openvdm.yaml.214 server/etc/openvdm.yaml
+diff www/etc/datadashboard.yaml.214 www/etc/datadashboard.yaml
+diff www/app/Core/Config.php.214 www/app/Core/Config.php
+```
+   Make your changes in the 2.16 files. Don't copy the `.214` files back.
+   - `server/etc/openvdm.yaml`: add your hooks and `postHookCommands`, and any other settings you'd changed. Keep the new file's `workerApiKey`, which must match `WORKER_API_KEY` in `Config.php`, and its `transferPublicData` (2.14.1's template misspelled it as `transferPubicData`).
+   - `www/etc/datadashboard.yaml`: add your own tabs and panels. The new file already has 2.16's, such as the profile charts. Keep `lowering` in a tab's `jsArray` only on tabs that use the `lowering` view, and never together with `dataDashboardDefault`; 2.14's Position tab had both (#185).
+   - `www/app/Core/Config.php`: copy over only settings you'd changed yourself. The rest differ because of the 2.16 template and your installer answers.
+   - Keep the `.214` copies until the upgrade is working. Git doesn't ignore them, so `git status` lists them as untracked.
+2. Bring each plugin and parser you use up to its 2.16 `.dist` template, then make your changes in it again. Many plugins and parsers were fixed in 2.15 and 2.16, so don't keep or copy back the 2.14 versions.
    - A collection system transfer's plugin is named after the transfer: `<transfer name in lower case>_plugin.py`.
    - Bring its parsers up to date too.
    - `diff <your copy> <file>.dist` shows what changed.
-4. Start the workers and set OpenVDM back to On:
+3. Start the workers and set OpenVDM back to On:
 ```
 sudo supervisorctl restart openvdm:*
 ```
-5. In the web interface, on the **Configuration** page under **Maintenance Tasks**, run **Rebuild Cruise Directory**, **Re-export the OpenVDM Configuration**, **Rebuild Data Dashboard** and **Rebuild MD5 Summary**. If you use lowerings, also run **Rebuild Lowering Directory** and **Re-export the Lowering Configuration**. These tasks are named with your cruise and lowering names, for example "Rebuild Cruise Directory".
+4. In the web interface, on the **Configuration** page under **Maintenance Tasks**, run **Rebuild Cruise Directory**, **Re-export the OpenVDM Configuration**, **Rebuild Data Dashboard** and **Rebuild MD5 Summary**. If you use lowerings, also run **Rebuild Lowering Directory** and **Re-export the Lowering Configuration**. These tasks are named with your cruise and lowering names, for example "Rebuild Cruise Directory".
 
 Transfer logs are no longer kept in the cruise directory. 2.15 moved them to `/var/log/openvdm` (`TRANSFER_LOG_DIR` in `Config.php`), and `openvdm_214_to_215.sql` removes the old Transfer_Logs extra directory and ship-to-shore transfer. Existing cruises' `OpenVDM/TransferLogs` folders are left as they are.
 
