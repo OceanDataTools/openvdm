@@ -1835,6 +1835,14 @@ EOF
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
     chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
+    # composer.lock isn't tracked: each install writes its own, and it goes
+    # out of date when composer.json changes (e.g. after an upgrade), so
+    # Composer warns and installs from the old lock. The web app has no
+    # runtime dependencies to pin, so let Composer write a current one (#346)
+    if [ -e composer.lock ] && ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer validate -q --no-check-publish --no-check-all > /dev/null 2>&1; then
+        echo "Replacing the out-of-date www/composer.lock"
+        rm -f composer.lock
+    fi
     sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer -q install --no-dev
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
