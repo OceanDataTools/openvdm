@@ -728,6 +728,29 @@ function _install_packages_rhel {
 
 ###########################################################################
 ###########################################################################
+# Create a Python virtual environment with ${PYTHON_CMD}, or reuse an existing
+# one. An existing one made with another Python version (or whose python no
+# longer runs) is rebuilt with --clear: running venv over it would leave
+# bin/python on the old Python while pip installs for the new one, so the
+# workers would run the old interpreter with the old packages (#328).
+function make_venv {
+    local VENV_DIR=$1
+    local NEW_VER OLD_VER
+    NEW_VER=$(${PYTHON_CMD} -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+    if [ -d "${VENV_DIR}" ]; then
+        OLD_VER=$("${VENV_DIR}/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)
+        if [ "${OLD_VER}" != "${NEW_VER}" ]; then
+            echo "Rebuilding ${VENV_DIR} for Python ${NEW_VER} (it was made with ${OLD_VER:-a Python that no longer runs})"
+            ${PYTHON_CMD} -m venv --clear "${VENV_DIR}"
+            return
+        fi
+    fi
+    ${PYTHON_CMD} -m venv "${VENV_DIR}"
+}
+
+
+###########################################################################
+###########################################################################
 # Set up Python packages
 function install_python_packages {
     # Expect the following shell variables to be appropriately set:
@@ -737,7 +760,7 @@ function install_python_packages {
 
     cd $INSTALL_ROOT/openvdm
 
-    ${PYTHON_CMD} -m venv ./venv
+    make_venv ./venv
     source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
@@ -1451,7 +1474,7 @@ function configure_titiler {
 
     echo "Installing/Configuring TiTiler"
 
-    ${PYTHON_CMD} -m venv /opt/titiler
+    make_venv /opt/titiler
     source /opt/titiler/bin/activate
     pip install --upgrade pip --quiet
     pip install "titiler.application" "uvicorn[standard]" --quiet
