@@ -2324,8 +2324,11 @@ read -p "New/updated root user password for MySQL? ($CURRENT_ROOT_DATABASE_PASSW
 NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_PASSWORD}
 echo
 
-read -p "New password for MySQL user: $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
-OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$OPENVDM_USER}
+# The OpenVDM user's password (also its web login and Samba password)
+# defaults to the root database password, or else the user's name (#344)
+DEFAULT_OPENVDM_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$OPENVDM_USER}
+read -p "New password for MySQL user: $OPENVDM_USER? ($DEFAULT_OPENVDM_DATABASE_PASSWORD) " OPENVDM_DATABASE_PASSWORD
+OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$DEFAULT_OPENVDM_DATABASE_PASSWORD}
 echo
 
 echo "#####################################################################"
@@ -2371,8 +2374,10 @@ if [ "$SUPERVISORD_WEBINTERFACE" = "yes" ]; then
         read -p "Username? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_USER
         SUPERVISORD_WEBINTERFACE_USER=${SUPERVISORD_WEBINTERFACE_USER:-$OPENVDM_USER}
 
-        read -p "Password? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_PASS
-        SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_USER}
+        # Defaults to the OpenVDM user's password (which defaults to the root
+        # database password), as the username defaults to that user (#344)
+        read -p "Password? ($OPENVDM_DATABASE_PASSWORD) " SUPERVISORD_WEBINTERFACE_PASS
+        SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_DATABASE_PASSWORD}
     fi
 else
   SUPERVISORD_WEBINTERFACE_AUTH=no

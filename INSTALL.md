@@ -92,18 +92,19 @@ passwd: password updated successfully
 
 ```
 #####################################################################
-Gathing information for MySQL installation/configuration
+Gathering information for MySQL installation/configuration
 Root database password will be empty on initial installation. If this
-is the initial installation, hit return when prompted for root
+is the initial installation, hit "return" when prompted for root
 database password, otherwise enter the password you used during the
 initial installation.
 
-Current root database password (hit return if this is the initial
-installation)? 
-New database password for root? () weak_password
+Current root user password for MySQL (hit return if this is the
+initial installation)? 
+New/updated root user password for MySQL? () weak_password
 
-New database password for user survey? (survey) weak_password
+New password for MySQL user: survey? (weak_password) 
 ```
+The OpenVDM user's password defaults to the root password; hit return to use it, or enter another. It's also that user's password for the web interface and Samba.
 
 ```
 #####################################################################
@@ -120,8 +121,9 @@ browser.
 Enable Supervisor Web-interface?  (no) yes
 Enable user/pass on Supervisor Web-interface?  (no) yes
 Username? (survey) 
-Password? (survey) weak_password
+Password? (weak_password) 
 ```
+The password defaults to the OpenVDM user's password.
 
 ```
 #####################################################################
