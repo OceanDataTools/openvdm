@@ -33,6 +33,11 @@
 
 PREFERENCES_FILE='.install_openvdm_preferences'
 
+# Python versions the installer uses, newest first: those the pinned
+# requirements (numpy, pandas) have wheels for. A newer or pre-release Python
+# (e.g. deadsnakes' 3.15 release candidate) would have to build them (#352).
+SUPPORTED_PYTHON_VERSIONS="3.14 3.13 3.12 3.11"
+
 # xbt-edf-qc commit installed with the sample data, for the XBT plugin (#300)
 XBT_EDF_QC_COMMIT='a784145a2dc9462d8071747b5dfcfcfd2c3fee70'
 
@@ -368,6 +373,15 @@ function _install_node_nvm {
 ###########################################################################
 ###########################################################################
 # Debian/Ubuntu package installation
+# True if apt has an installable package of exactly this name. ("apt-cache
+# show <name>" treats the name as a pattern: "python3.15" matched
+# postgresql-plpython3-15, #352.)
+function _apt_has {
+    apt-cache policy "$1" 2>/dev/null \
+        | awk -v want="$1:" '$0 == want {found = 1; next} found && /^ *Candidate:/ {print $2; exit}' \
+        | grep -qv '^(none)$'
+}
+
 function _install_packages_debian {
 
     export NEEDRESTART_MODE=a
@@ -449,11 +463,13 @@ function _install_packages_debian {
     # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
     apt-get update
 
-    # Determine the best available PHP version (8.2 or newer).
+    # PHP version: 8.3, which OpenVDM 2.x runs on in production, where it's
+    # packaged (Ondrej's PPA, Sury); otherwise the next newer one (e.g. Ubuntu
+    # 26.04 ships only 8.5), then 8.2 (#352).
     # Must run after apt-get update so the package cache reflects any PPAs added above.
     PHP_VER=""
-    for _phpver in 8.5 8.4 8.3 8.2; do
-        if apt-cache show "php${_phpver}" > /dev/null 2>&1; then
+    for _phpver in 8.3 8.4 8.5 8.2; do
+        if _apt_has "php${_phpver}"; then
             PHP_VER="${_phpver}"
             break
         fi
@@ -467,7 +483,7 @@ function _install_packages_debian {
     # Ubuntu ships mysql-server/mysql-client; Debian ships mariadb-server/mariadb-client.
     # On newer Ubuntu releases mysql-server may not be available — fall back to MariaDB.
     if [ "$OS_ID" = "ubuntu" ]; then
-        if apt-cache show mysql-server > /dev/null 2>&1; then
+        if _apt_has mysql-server; then
             MYSQL_PKGS="mysql-client mysql-server"
         else
             echo "mysql-server not available for '${CODENAME}'; using MariaDB instead"
@@ -490,7 +506,7 @@ function _install_packages_debian {
 
     # Install php-gearman: use the native versioned package when available
     # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
-    if apt-cache show "php${PHP_VER}-gearman" > /dev/null 2>&1; then
+    if _apt_has "php${PHP_VER}-gearman"; then
         NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman"
     else
         echo "php${PHP_VER}-gearman not packaged; building via PECL (requires libgearman-dev)..."
@@ -503,12 +519,12 @@ function _install_packages_debian {
         fi
     fi
 
-    # Install newest available Python >= 3.12.
+    # Install the newest supported Python (SUPPORTED_PYTHON_VERSIONS).
     # Try versioned packages from newest to oldest; fall back to system python3
     # if it is already >= 3.11 (e.g. trixie ships python3.13 as python3).
     _PYTHON_INSTALLED=false
-    for _VER in 3.15 3.14 3.13 3.12 3.11; do
-        if apt-cache show "python${_VER}" > /dev/null 2>&1; then
+    for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
+        if _apt_has "python${_VER}" && _apt_has "python${_VER}-venv" && _apt_has "python${_VER}-dev"; then
             _PKGS="python${_VER} python${_VER}-dev python${_VER}-venv"
             NEEDRESTART_MODE=a apt-get install -y $_PKGS
             if command -v "python${_VER}" > /dev/null 2>&1; then
@@ -681,7 +697,7 @@ function _install_packages_rhel {
     # Install newest available Python >= 3.11.
     # Try versioned packages from newest to oldest.
     _PYTHON_INSTALLED=false
-    for _VER in 3.15 3.14 3.13 3.12 3.11; do
+    for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
         if dnf info "python${_VER}" > /dev/null 2>&1; then
             dnf install -y "python${_VER}" "python${_VER}-devel"
             _PYTHON_INSTALLED=true
@@ -800,7 +816,7 @@ function install_python_packages {
 # Must be called after install_packages so the packages are already present.
 function detect_python {
 
-    for _ver in 3.15 3.14 3.13 3.12 3.11; do
+    for _ver in ${SUPPORTED_PYTHON_VERSIONS}; do
         if command -v "python${_ver}" > /dev/null 2>&1; then
             PYTHON_CMD="python${_ver}"
             PYTHON_VERSION="${_ver}"
