@@ -122,3 +122,9 @@ thead {
   display: inline-block;
   margin-right: 2em;
 }
+/* Map popups: Leaflet sizes their text in rem, which Bootstrap 3's 10px root
+   font makes about 8px. Use the page's 14px. The extra class outranks
+   leaflet.css, which loads after this file (#362) */
+.leaflet-container .leaflet-popup-content {
+  font-size: 14px;
+}
