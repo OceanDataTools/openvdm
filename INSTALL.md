@@ -317,20 +317,20 @@ Whichever you choose, if the server is a virtual machine, take a snapshot first.
 cd <openvdm_root>
 sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_2.14_backup.sql
 ```
-3. Set your configuration files aside as `.214` copies. The installer builds `openvdm.yaml` and `datadashboard.yaml` from their 2.16 `.dist` templates only when they don't exist, and it always rewrites `Config.php`, so this gets you clean 2.16 files. You'll merge your changes back in from the copies afterwards.
+3. Set your configuration files aside as `.214` copies. The installer builds `openvdm.yaml` and `datadashboard.yaml` from their 2.16 `.dist` templates only when they don't exist, and it always rewrites `Config.php`, so this gets you clean 2.16 files. You'll merge your changes back in from the copies afterwards. The 2.14 installer left `www/` owned by root, and the OpenVDM user does the copying and, in step 4, the updating, so give it the whole checkout first:
 ```
 cd <openvdm_root>
-sudo cp www/app/Core/Config.php www/app/Core/Config.php.214
-sudo mv server/etc/openvdm.yaml server/etc/openvdm.yaml.214
-sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.214
+sudo chown -R <openvdm_user>:<openvdm_user> <openvdm_root>
+sudo -u <openvdm_user> cp www/app/Core/Config.php www/app/Core/Config.php.214
+sudo -u <openvdm_user> mv server/etc/openvdm.yaml server/etc/openvdm.yaml.214
+sudo -u <openvdm_user> mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.214
 ```
    `Config.php` is copied, not moved: the installer rewrites it anyway, and it reads the worker API key from it. If the installer stops before it gets that far, the web app keeps its working `Config.php`. The two YAML files have to be moved, because the installer only builds them when they're missing.
 
    Don't skip the two renames. If you keep 2.14's `openvdm.yaml`, the installer only appends `workerApiKey` and `transferPublicData` to it. If you keep 2.14's `datadashboard.yaml`, it misses 2.16's panels and keeps a Position tab setting that breaks its map (#185).
-4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data. The 2.14 installer left `www/` owned by root, and the OpenVDM user does the updating, so give it the whole checkout first. If you installed 2.14 from a tag (e.g. `2.14.1`), answer `master` at the installer's branch question.
+4. Update the code and re-run the installer. Give the same answers as for the 2.14 install, especially the OpenVDM user and the data root directory. Don't install the sample data. If you installed 2.14 from a tag (e.g. `2.14.1`), answer `master` at the installer's branch question.
 ```
 cd <openvdm_root>
-sudo chown -R <openvdm_user>:<openvdm_user> <openvdm_root>
 sudo -u <openvdm_user> git fetch origin
 sudo -u <openvdm_user> git checkout master
 sudo -u <openvdm_user> git pull --ff-only
@@ -423,18 +423,20 @@ OpenVDM v2.16 adds FTP Server as a collection system transfer type (#17), which 
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Update the code and dependencies by re-running the installer. It's safe to run over an existing install. It pulls the latest code, runs `composer install --no-dev` (which also removes any Composer development packages, such as PHPStan) and reinstalls the JavaScript libraries (`npm install`). Both now run as the OpenVDM user instead of root. On Debian and Ubuntu the installer also moves Node.js (nvm) from root's home directory to the OpenVDM user's, so that user can run npm, and removes the old `/root/.nvm` and its lines in root's `.bashrc`. If root installed other global npm packages in `/root/.nvm`, it's kept and the installer says so. It asks the same questions as the original install, with your previous answers as the defaults:
-   First set two settings files aside as `.215` copies.
+   First set three settings files aside as `.215` copies, as the OpenVDM user, which owns them:
    - **`Config.php`:** the installer rewrites it from the 2.16 template on every run, so any changes you've made to it are lost. Copy it rather than moving it: the installer reads the worker API key from it, and if the installer stops before rewriting it, the web app keeps working.
-   - **`datadashboard.yaml`:** the installer builds a new one from its 2.16 template only when there isn't one, so move it.
-   - **`server/etc/openvdm.yaml`:** keep it as it is. 2.16 didn't change its settings.
+   - **`openvdm.yaml`** and **`datadashboard.yaml`:** the installer builds new ones from their 2.16 templates only when they don't exist, so move them.
 ```
 cd <openvdm_root>
-sudo cp www/app/Core/Config.php www/app/Core/Config.php.215
-sudo mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.215
-git pull
+sudo -u <openvdm_user> cp www/app/Core/Config.php www/app/Core/Config.php.215
+sudo -u <openvdm_user> mv server/etc/openvdm.yaml server/etc/openvdm.yaml.215
+sudo -u <openvdm_user> mv www/etc/datadashboard.yaml www/etc/datadashboard.yaml.215
+sudo -u <openvdm_user> git pull --ff-only
 sudo bash ./utils/install-openvdm.sh
 ```
-If your `server/etc/openvdm.yaml` is older than 2.15.5, the installer also adds the two settings added in that release: `workerApiKey`, set to the same key as `WORKER_API_KEY` in `www/app/Core/Config.php`, and `transferPublicData`, set from your PublicData answer. Without `workerApiKey` the workers don't receive transfer passwords from the web app, so transfers that use a password fail. Without `transferPublicData`, older releases' Rebuild Cruise Directory and cruise setup/finalize crashed with `KeyError: 'transferPublicData'`; 2.16.0 defaults it to `True` (#187). To check:
+   Run `git pull` as the OpenVDM user too: git refuses to work in a checkout owned by another user ("detected dubious ownership in repository").
+
+   The new `server/etc/openvdm.yaml` has `workerApiKey`, the same key as `WORKER_API_KEY` in `Config.php` (your existing key, from 2.15.5 on), and `transferPublicData`, set from your PublicData answer. Without `workerApiKey` the workers don't receive transfer passwords from the web app, so transfers that use a password fail. Without `transferPublicData`, older releases' Rebuild Cruise Directory and cruise setup/finalize crashed with `KeyError: 'transferPublicData'` (#187). To check:
 ```
 grep -E 'workerApiKey|transferPublicData' <openvdm_root>/server/etc/openvdm.yaml
 ```
@@ -464,13 +466,15 @@ cp geotiff_titiler_parser.py.dist geotiff_titiler_parser.py
 ```
 The other `.dist` files changed in this release have documentation-only changes and don't need copying.
 
-5. Merge your settings into the two files the installer rebuilt. `diff` shows the differences:
+5. Merge your settings into the three files the installer rebuilt. `diff` shows the differences:
 ```
 cd <openvdm_root>
+diff server/etc/openvdm.yaml.215 server/etc/openvdm.yaml
 diff www/etc/datadashboard.yaml.215 www/etc/datadashboard.yaml
 diff www/app/Core/Config.php.215 www/app/Core/Config.php
 ```
    Make your changes in the 2.16 files; don't copy the `.215` files back.
+   - **`server/etc/openvdm.yaml`:** add your hooks and `postHookCommands`, and any other settings you'd changed. Keep the new file's `workerApiKey` and `transferPublicData`.
    - **`www/etc/datadashboard.yaml`:** add your own tabs and panels. The new file has 2.16's:
      - CTD and XBT cast positions on the Position map;
      - CTD Casts and XBT Casts depth profiles on the Seawater tab;
