@@ -1,50 +1,60 @@
 #!/usr/bin/env python3
-"""
-FILE:  geotiff_titiler_parser.py
+"""Parser for GeoTIFF files served through TiTiler.
 
-USAGE:  geotiff_titiler_parser.py [-h] [-v+] <dataFile>
-
-DESCRIPTION:  Process the supplied geotiff file using TiTiler and return the
-              json-formatted string used by OpenVDM as part of it's Data
-              dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   requests==2.32.3
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-04-12
+Queries a TiTiler server for the GeoTIFF's geographic bounds and band
+statistics and returns the JSON-formatted plugin data used by OpenVDM's Data
+Dashboard.
 """
 
-import os
 import logging
+import os
 import sys
 from os.path import dirname, realpath
+
 import requests
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMParser
 
-TIMEOUT = 2
+INFO_TIMEOUT = 5
+STATS_TIMEOUT = 60
 DEFAULT_TITILER_URL = 'http://localhost/titiler'
 DEFAULT_CRUISEDATA_URL = 'http://localhost/CruiseData'
 DEFAULT_CRUISEPATH = '/data/CruiseData'
 
+GEO_ROUNDING = 6
+VALUE_ROUNDING = 3
+
+# Bands with these color interpretations hold display imagery (e.g. 0-255
+# RGB), so their value ranges aren't meaningful stats.
+IMAGERY_COLORINTERP = {'red', 'green', 'blue', 'alpha', 'palette'}
+
+
 class GeoTIFFParser(OpenVDMParser):
-    """
-    Custom OpenVDM file parser
+    """OpenVDM parser for GeoTIFF files, using TiTiler for metadata and tiles.
+
+    The file is passed to TiTiler as a URL under the CruiseData web share, so
+    TiTiler must be able to reach that URL.
+
+    Attributes:
+        titiler_url: Base URL of the TiTiler server.
+        cruisedata_url: URL of the CruiseData web share.
+        cruisedata_path: Local path of the CruiseData directory; replaced by
+            ``cruisedata_url`` to build the URL TiTiler reads the file from.
     """
 
-    def __init__(self, use_openvdm_api=False, cruisedata_path=None, cruisedata_url=None, titiler_url=None):
+    def __init__(self, use_openvdm_api: bool = False, cruisedata_path: str | None = None,
+                 cruisedata_url: str | None = None, titiler_url: str | None = None) -> None:
+        """Initialise the parser.
+
+        Args:
+            use_openvdm_api: Look up the CruiseData URL and path from the
+                OpenVDM API when they aren't given.
+            cruisedata_path: Local CruiseData directory.
+            cruisedata_url: URL of the CruiseData web share.
+            titiler_url: Base URL of the TiTiler server.
+        """
         super().__init__(use_openvdm_api=use_openvdm_api)
 
         self.titiler_url = titiler_url or DEFAULT_TITILER_URL
@@ -56,41 +66,107 @@ class GeoTIFFParser(OpenVDMParser):
             self.cruisedata_url = cruisedata_url or DEFAULT_CRUISEDATA_URL
             self.cruisedata_path = cruisedata_path or DEFAULT_CRUISEPATH
 
-    def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    def _get_info(self, file_url: str) -> tuple[list[float], dict]:
+        """Return the file's WGS84 bounds and its TiTiler info.
+
+        Args:
+            file_url: URL TiTiler reads the GeoTIFF from.
+
+        Returns:
+            The ``[minx, miny, maxx, maxy]`` bounds in decimal degrees, and the
+            dataset info (TiTiler's ``/cog/info`` fields).
+
+        Raises:
+            Exception: If TiTiler can't be reached or can't read the file.
         """
-        Process the provided file
+        # /cog/info returns bounds in the dataset's own CRS; /cog/info.geojson
+        # returns them in WGS84 (plus the same info as its properties).
+        req = requests.get(f'{self.titiler_url}/cog/info.geojson',
+                           params={'url': file_url}, timeout=INFO_TIMEOUT)
+        req.raise_for_status()
+        res = req.json()
+        bounds = [round(bound, GEO_ROUNDING) for bound in res['bbox']]
+        return bounds, res.get('properties', {})
+
+    def _add_band_stats(self, file_url: str, info: dict) -> None:
+        """Add value-range and valid-pixel stats for each data band.
+
+        Statistics come from TiTiler's ``/cog/statistics``, which computes
+        them on a downsampled preview, so they are approximate for large
+        rasters. Bands holding display imagery (RGB, alpha, palette) are
+        skipped. Failures are logged and otherwise ignored, since these stats
+        are optional.
+
+        Args:
+            file_url: URL TiTiler reads the GeoTIFF from.
+            info: Dataset info from :meth:`_get_info`.
         """
-
-        logging.debug("Parsing data file...")
-        directoryname, filename = os.path.split(filepath)
-        label = os.path.splitext(filename)[0]
-
-        params = {
-            'url': f"{self.cruisedata_url}{filepath.replace(self.cruisedata_path, '')}"
-        }
-
-        url = f'{self.titiler_url}/cog/info'
+        colorinterp = [ci.lower() for ci in info.get('colorinterp') or []]
+        if colorinterp and all(ci in IMAGERY_COLORINTERP for ci in colorinterp):
+            logging.debug("Imagery GeoTIFF (%s), skipping band stats", ', '.join(colorinterp))
+            return
 
         try:
-            req = requests.get(url, params=params, timeout=TIMEOUT)
-            res = req.json()
-            bounds = res.get('bounds')
-            bounds = [round(bound, 6) for bound in bounds]
+            req = requests.get(f'{self.titiler_url}/cog/statistics',
+                               params={'url': file_url}, timeout=STATS_TIMEOUT)
+            req.raise_for_status()
+            stats = req.json()
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logging.warning("Unable to retrieve band statistics from TiTiler: %s", err)
+            return
+
+        has_nodata = info.get('nodata_type', 'None') != 'None'
+
+        for idx, (band, band_stats) in enumerate(stats.items()):
+            if idx < len(colorinterp) and colorinterp[idx] in IMAGERY_COLORINTERP:
+                continue
+
+            name = band_stats.get('description') or band
+            # Unnamed bands come back as "b1", "b2", ...
+            if name == band and band.startswith('b') and band[1:].isdigit():
+                name = f'Band {band[1:]}'
+
+            self.add_bounds_stat([round(band_stats['min'], VALUE_ROUNDING),
+                                  round(band_stats['max'], VALUE_ROUNDING)], f'{name} Bounds')
+
+            if has_nodata:
+                self.add_value_validity_stat([int(band_stats['valid_pixels']),
+                                              int(band_stats['masked_pixels'])], f'{name} Validity')
+
+    def process_file(self, filepath: str) -> None:
+        """Parse the GeoTIFF and populate the plugin data.
+
+        Args:
+            filepath: Path to the GeoTIFF under ``cruisedata_path``.
+
+        Raises:
+            Exception: If TiTiler can't return the file's bounds.
+        """
+        logging.debug("Parsing data file...")
+        label = os.path.splitext(os.path.basename(filepath))[0]
+        file_url = f"{self.cruisedata_url}{filepath.replace(self.cruisedata_path, '')}"
+
+        try:
+            bounds, info = self._get_info(file_url)
         except Exception as err:
             logging.error("Unable to retrieve metadata on file from TiTiler API")
             raise err
 
         logging.debug("Finished parsing data file")
 
+        logging.debug("Tabulating statistics...")
+        # TiTiler's bbox is [west, south, east, north]; geoBounds is
+        # [north, east, south, west]. mapBounds below keeps TiTiler's order.
+        west, south, east, north = bounds
+        self.add_geobounds_stat([north, east, south, west])
+        self._add_band_stats(file_url, info)
+
         logging.debug("Building visualization data...")
-
-        visualizer_data_obj = {
+        self.add_visualization_data({
             "label": label,
-            "tileURL": params['url'],
-            "mapBounds": ','.join([str(bound) for bound in bounds])
-        }
-
-        self.add_visualization_data(visualizer_data_obj)
+            "tileURL": file_url,
+            "mapBounds": ','.join(str(bound) for bound in bounds)
+        })
 
 
 # -------------------------------------------------------------------------------------
@@ -107,6 +183,8 @@ if __name__ == "__main__":
                         help='Path to CruiseData')
     parser.add_argument('--cruisedataURL', metavar='cruisedataURL', default=None,
                         help='URL to CruiseData')
+    parser.add_argument('--titilerURL', metavar='titilerURL', default=None,
+                        help=f'URL to TiTiler (default: {DEFAULT_TITILER_URL})')
     parser.add_argument('dataFile', metavar='dataFile',
                         help='the raw data file to process')
 
@@ -123,7 +201,9 @@ if __name__ == "__main__":
     parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
     logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
 
-    ovdm_parser = GeoTIFFParser(cruisedata_path=parsed_args.cruisedataPath, cruisedata_url=parsed_args.cruisedataURL)
+    ovdm_parser = GeoTIFFParser(cruisedata_path=parsed_args.cruisedataPath,
+                                cruisedata_url=parsed_args.cruisedataURL,
+                                titiler_url=parsed_args.titilerURL)
 
     try:
         logging.info("Processing file: %s", parsed_args.dataFile)

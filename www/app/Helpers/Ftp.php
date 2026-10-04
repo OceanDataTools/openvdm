@@ -85,13 +85,15 @@ class Ftp
      * @param string $folderChmod folder name
      * @param int    $permission  permission value
      *
-     * @return string success message
+     * @return string|null success message, or null if chmod failed
      */
     public function folderPermission($folderChmod, $permission)
     {
         if (ftp_chmod($this->conn, $permission, $folderChmod) !== false) {
             return "<p>$folderChmod chmoded successfully to ".$permission."</p>\n";
         }
+
+        return null;
     }
 
     /**

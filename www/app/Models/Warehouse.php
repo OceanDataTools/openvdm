@@ -1,6 +1,6 @@
 <?php
 
-namespace models;
+namespace Models;
 use Core\Model;
 
 class Warehouse extends Model {
@@ -8,6 +8,8 @@ class Warehouse extends Model {
     // const CONFIG_FN = 'ovdmConfig.json';
     // const LOWERING_CONFIG_FN = 'loweringConfig.json';
     // const MANIFEST_FN = 'manifest.json';
+
+    private $_lowerings;
 
     public function getFreeSpace() {
         $baseDir = $this->getShipboardDataWarehouseBaseDir();
@@ -498,7 +500,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruiseName'];
+                        return $ovdmConfigJSON['cruiseName'] ?? '';
                     }
                 }
             }
@@ -525,7 +527,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruisePI'];
+                        return $ovdmConfigJSON['cruisePI'] ?? '';
                     }
                 }
             }
@@ -552,7 +554,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return $ovdmConfigJSON['cruiseLocation'];
+                        return $ovdmConfigJSON['cruiseLocation'] ?? '';
                     }
                 }
             }
@@ -578,7 +580,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'],'cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate']);
+                        return array('cruiseStartDate' => $ovdmConfigJSON['cruiseStartDate'] ?? '','cruiseEndDate' => $ovdmConfigJSON['cruiseEndDate'] ?? '');
                     }
                 }
             }
@@ -604,7 +606,7 @@ class Warehouse extends Model {
                     $ovdmConfigContents = file_get_contents($cruiseDir . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn());
                     $ovdmConfigJSON = json_decode($ovdmConfigContents,true);
                     if ($ovdmConfigJSON !== null) {
-                        return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'],'cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort']);
+                        return array('cruiseStartPort' => $ovdmConfigJSON['cruiseStartPort'] ?? '','cruiseEndPort' => $ovdmConfigJSON['cruiseEndPort'] ?? '');
                     }
                 }
             }

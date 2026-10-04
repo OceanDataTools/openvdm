@@ -1,0 +1,58 @@
+# PHPStan static analysis for the OpenVDM web app (issue #130).
+#
+# Run from www/:  vendor/bin/phpstan analyse
+# Needs dev dependencies: composer install (production installs use --no-dev).
+
+parameters:
+    level: 1
+    phpVersion: 80300
+    paths:
+        - app
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    # Values come from each site's Config.php, not the .dist template, so
+    # analyse them by type only.
+    dynamicConstantNames:
+        - DIR
+        - CRUISEDATA_BASEDIR
+        - CRUISEDATA_APACHEDIR
+        - PUBLICDATA_DIR
+        - SHOW_PUBLICDATA
+        - TRANSFER_LOG_DIR
+        - DASHBOARD_CONF
+        - LOWERINGDATA_BASEDIR
+        - CRUISE_NAME
+        - LOWERING_NAME
+        - CRUISE_CONFIG_FN
+        - LOWERING_CONFIG_FN
+        - MD5_SUMMARY_FN
+        - MD5_SUMMARY_MD5_FN
+        - DATA_DASHBOARD_MANIFEST_FN
+        - SHOW_CRUISE_META_IN_UI
+        - DEFAULT_CONTROLLER
+        - DEFAULT_METHOD
+        - TEMPLATE
+        - LANGUAGE_CODE
+        - DB_TYPE
+        - DB_HOST
+        - DB_NAME
+        - DB_USER
+        - DB_PASS
+        - PREFIX
+        - SESSION_PREFIX
+        - SITETITLE
+        - WORKER_API_KEY
+    ignoreErrors:
+        # Views and templates are included from Core\View::render(), which
+        # passes $data and $error into their scope.
+        -
+            message: '#^Variable \$(data|error) might not be defined\.$#'
+            identifier: variable.undefined
+            paths:
+                - app/views/*
+                - app/templates/*
+
+includes:
+    # Findings that existed when PHPStan was added (#130). Fix them over time
+    # and regenerate with: vendor/bin/phpstan analyse --generate-baseline phpstan-baseline.neon
+    - phpstan-baseline.neon

@@ -22,34 +22,79 @@ import glob as glob_module
 import json
 import logging
 import os
-import re
 import sys
+import re
 import signal
 import subprocess
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from random import randint
+from typing import Optional
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import build_include_file, is_ascii, is_default_ignore, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, has_wildcard, mount_smb_share, test_cst_source
+from server.lib import transfer_utils
+from server.lib.transfer_utils import TransferCommandError
+from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
 from server.lib.openvdm import OpenVDM
 
-TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
-
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
+def classify_file(filepath: str, size: int, mod_time: float, filters: dict,
+                  data_start_time: float, data_end_time: float):
+    """Decide whether a listed file is transferred, reported as excluded or ignored.
+
+    Applies the default-ignore patterns, the date-range bounds (modification
+    time), the ASCII filename requirement and the transfer's ignore, include
+    and exclude filters.
+
+    Args:
+        filepath: Path of the file (matched against the filters).
+        size: File size in bytes.
+        mod_time: Modification time as a Unix epoch float.
+        filters: Dict with ``ignore_filters``, ``include_filters`` and
+            ``exclude_filters`` keys, each a list of glob patterns.
+        data_start_time: Earliest allowed modification time (inclusive).
+        data_end_time: Latest allowed modification time (inclusive).
+
+    Returns:
+        tuple | None: ``("include", filepath, size_str)``, ``("exclude",
+        filepath, None)``, or ``None`` for a file that is skipped entirely.
+    """
+
+    if is_default_ignore(filepath):
+        return None
+
+    if not data_start_time <= mod_time <= data_end_time:
+        return None
+
+    if not is_ascii(filepath):
+        return ("exclude", filepath, None)
+
+    if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
+        return None
+
+    if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
+        if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
+            return ("exclude", filepath, None)
+
+        return ("include", filepath, str(size))
+
+    return ("exclude", filepath, None)
+
+
 def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
     """Filter a batch of local file paths against transfer criteria.
 
-    Each file is evaluated against date-range bounds (modification time),
-    default-ignore patterns, ASCII filename requirement, and the configured
-    include/exclude filter lists.
+    Each file is ``stat``ed and evaluated with :func:`classify_file`.
+    Symlinks and files that disappear are skipped.
 
     Args:
         batch: List of absolute file paths to evaluate.
@@ -66,56 +111,63 @@ def process_batch(batch: list, filters: dict, data_start_time: float, data_end_t
         (symlinks, default-ignored, out-of-range) are omitted from the result.
     """
 
-    def _process_filepath(filepath, filters, data_start_time, data_end_time):
-        """
-        Process a file path to determine if it should be included or excluded from
-        the data transfer
-        """
-
-        try:
-            if os.path.islink(filepath):
-                return None
-
-            if is_default_ignore(filepath):
-                return None
-
-            stat = os.stat(filepath)
-            mod_time = stat.st_mtime
-            size = stat.st_size
-
-            if not (data_start_time <= mod_time <= data_end_time):
-                return None
-
-            if not is_ascii(filepath):
-                return ("exclude", filepath, None)
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['ignore_filters']):
-                return None
-
-            if any(fnmatch.fnmatch(filepath, p) for p in filters['include_filters']):
-                if any(fnmatch.fnmatch(filepath, p) for p in filters['exclude_filters']):
-                    return ("exclude", filepath, None)
-
-                return ("include", filepath, str(size))
-
-            return ("exclude", filepath, None)
-
-        except FileNotFoundError:
-            return None
-
-
     results = []
 
     for filepath in batch:
-        result = _process_filepath(filepath, filters, data_start_time, data_end_time)
+        try:
+            if os.path.islink(filepath):
+                continue
+            stat = os.stat(filepath)
+        except FileNotFoundError:
+            continue
+
+        result = classify_file(filepath, stat.st_size, stat.st_mtime, filters, data_start_time, data_end_time)
+        if result:
+            results.append(result)
+    return results
+
+
+def process_listed_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
+    """Filter a batch of already-listed files (e.g. from ``rclone lsjson``) against transfer criteria.
+
+    Like :func:`process_batch`, but the size and modification time come from
+    the listing, so nothing is ``stat``ed.
+
+    Args:
+        batch: ``(filepath, size, mod_time)`` tuples.
+        filters: Dict with ``ignore_filters``, ``include_filters``, and
+            ``exclude_filters`` keys, each containing a list of glob patterns.
+        data_start_time: Earliest allowed modification time (inclusive).
+        data_end_time: Latest allowed modification time (inclusive).
+
+    Returns:
+        List of ``(action, filepath, size_str)`` tuples, as for :func:`process_batch`.
+    """
+
+    results = []
+    for filepath, size, mod_time in batch:
+        result = classify_file(filepath, size, mod_time, filters, data_start_time, data_end_time)
         if result:
             results.append(result)
     return results
 
 
 def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
-    """
-    Process a batch of rsync output lines.
+    """Classify a batch of files from an rsync listing against the transfer's filters.
+
+    Args:
+        batch: rsync output lines (one file each).
+        filters: Dict of ``include_filters``, ``exclude_filters`` and
+            ``ignore_filters`` glob patterns.
+        data_start_time: Start of the transfer's data window, in seconds since
+            *epoch*.
+        data_end_time: End of the data window, in seconds since *epoch*.
+        epoch: The ``datetime`` that file modification times are measured from.
+
+    Returns:
+        list[tuple]: ``('include', path, size)`` or ``('exclude', path, None)``
+        for each file; ignored files and files outside the data window are left
+        out.
     """
 
     def _process_rsync_line(line, filters, data_start_time, data_end_time, epoch):
@@ -169,13 +221,105 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
     return results
 
 
-def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int) -> tuple:
-    """Execute an rsync transfer command and collect new/updated file lists.
+def _add_files(all_files: dict, dest_name: Optional[str], files: dict) -> None:
+    """Add one source directory's new, updated and excluded files to the transfer's totals.
 
-    Streams rsync item-change output (``>f+++++++++`` / ``>f.``) to classify
-    files as new or updated, and reports percentage progress to the Gearman
-    job via ``to-chk=`` lines.  Honours ``worker.stop`` to allow graceful
-    early termination.
+    Args:
+        all_files: The transfer's file lists, updated in place.
+        dest_name: The directory the source is copied into for a wildcard
+            match (its paths are prefixed with it), or ``None``.
+        files: The source directory's ``new``, ``updated`` and ``exclude``
+            lists.
+    """
+    for key in ('new', 'updated', 'exclude'):
+        all_files[key].extend([os.path.join(dest_name, f) for f in files[key]] if dest_name
+                              else files[key])
+
+
+def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str:
+    """Return the failure reason for an rsync source listing that failed.
+
+    Args:
+        message: What failed, e.g. ``"Error listing source directory /data"``.
+        proc: The finished rsync listing.
+
+    Returns:
+        *message* with rsync's exit code and its most specific error line.
+    """
+    reason = f"{message}: rsync exited with code {proc.returncode}"
+    lines = (proc.stdout + proc.stderr).splitlines()
+    # The sending side's error is the cause; a receiver's "read error" or
+    # "Broken pipe" that follows it is only the connection closing (#284)
+    sender_errors = [line for line in lines if line.startswith('rsync: [sender]')]
+    detail = sender_errors[0] if sender_errors else transfer_utils.error_detail('rsync', lines)
+    return f"{reason}: {detail}" if detail else reason
+
+
+def _copied_files(dest_dir: str, paths: list) -> list:
+    """Return the paths that exist in the destination directory.
+
+    rsync lists a file when it starts sending it, so after a failed or
+    stopped transfer the last file listed may never have been copied (#262).
+
+    Args:
+        dest_dir: The local destination directory.
+        paths: File paths relative to *dest_dir*.
+
+    Returns:
+        The paths in *paths* that are files in *dest_dir*.
+    """
+    return [path for path in paths if os.path.isfile(os.path.join(dest_dir, path))]
+
+
+# An rsync listing error about a directory inside the source, e.g.
+# 'rsync: [sender] opendir "/data/sub" failed: Permission denied (13)', or
+# '... opendir "/data/sub" (in module) failed: ...' from an rsync daemon
+RSYNC_SUBDIR_ERROR_RE = re.compile(r'^rsync: (?:\[sender\] )?opendir "(?P<path>[^"]*)"(?: \(in [^)]*\))? failed')
+
+
+def _rsync_listing_failure(message: str, proc: subprocess.CompletedProcess,
+                           sync_from_source: bool) -> Optional[str]:
+    """Return the failure reason for an rsync source listing, or ``None`` if it can be used.
+
+    Code 23 (a partial listing) fails with **Sync from source**, which would
+    delete the unlisted files from the destination (#238). Without it, a
+    listing whose only errors are directories inside the source that can't be
+    read is used, and the errors are logged as warnings (#264). Any other
+    code-23 error fails the transfer, e.g. the source directory itself can't
+    be entered (``change_dir``) or listed (``opendir "<source>/."``), which
+    gives an empty listing (#284).
+
+    Args:
+        message: What failed, e.g. ``"Error listing source directory /data"``.
+        proc: The finished rsync listing.
+        sync_from_source: Whether the transfer deletes destination files
+            that aren't in the source.
+
+    Returns:
+        The reason the transfer fails, or ``None``.
+    """
+    if proc.returncode in transfer_utils.RSYNC_OK_CODES:
+        return None
+    if proc.returncode == 23 and not sync_from_source:
+        errors = [line for line in proc.stderr.splitlines() if line.startswith('rsync:')]
+        matches = [RSYNC_SUBDIR_ERROR_RE.match(line) for line in errors]
+        if errors and all(match and not match.group('path').endswith('/.') for match in matches):
+            for line in errors[:10]:
+                logging.warning("Skipping unreadable source path: %s", line)
+            if len(errors) > 10:
+                logging.warning("... and %d more unreadable source paths", len(errors) - 10)
+            return None
+    return _rsync_listing_error(message, proc)
+
+
+def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, file_count: int,
+                         dest_dir: str) -> tuple:
+    """Run an rsync transfer command and collect the new and updated files.
+
+    Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
+    progress to the Gearman job and honouring ``worker.stop``. When the
+    transfer fails or is stopped, only the files that are in *dest_dir* are
+    returned, since the one rsync was sending may not have been copied (#262).
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -184,59 +328,31 @@ def run_transfer_command(worker: "OVDMGearmanWorker", current_job, cmd: list, fi
         cmd: The rsync command as a list of strings.
         file_count: Expected number of files to transfer; when 0 the command
             is skipped entirely.
+        dest_dir: The local directory rsync copies into.
 
     Returns:
         A two-tuple ``(new_files, updated_files)`` where each element is a
-        list of relative file paths.
+        list of file paths relative to *dest_dir*.
+
+    Raises:
+        TransferCommandError: If rsync exits with an error (#230). Its
+            ``files`` holds what rsync copied before failing (#239).
     """
 
-    if file_count == 0:
-        logging.info("Skipping Transfer Command: nothing to transfer")
-        return [], []
+    def _progress(percent):
+        if current_job:
+            worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
 
-    logging.debug('Transfer Command: %s', ' '.join(cmd))
-
-    new_files = []
-    updated_files = []
-    last_percent_reported = -1
-
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    while proc.poll() is None:
-
-        for line in proc.stdout:
-
-            if worker.stop:
-                logging.info("Stopping")
-                proc.terminate()
-                break
-
-            line = line.strip()
-
-            if not line:
-                continue
-
-            if line.startswith( '>f+++++++++' ):
-                filename = line.split(' ',1)[1]
-                new_files.append(filename.rstrip('\n'))
-            elif line.startswith( '>f.' ):
-                filename = line.split(' ',1)[1]
-                updated_files.append(filename.rstrip('\n'))
-
-            # Extract progress from `to-chk=` lines
-            match = TO_CHK_RE.search(line)
-            if match:
-                remaining = int(match.group(1))
-                total = int(match.group(2))
-                if total > 0:
-                    percent = int(100 * (total - remaining) / total)
-
-                    if percent != last_percent_reported:
-                        logging.info("Progress Update: %d%%", percent)
-                        if current_job:
-                            worker.send_job_status(current_job, int(90 * percent / 100) + 5, 100) # 95 - 5
-                        last_percent_reported = percent
-
-    return new_files, updated_files
+    try:
+        result = transfer_utils.run_transfer_command(cmd, file_count, _progress,
+                                                     lambda: worker.stop)
+    except TransferCommandError as exc:
+        for key in ('new', 'updated'):
+            exc.files[key] = _copied_files(dest_dir, exc.files[key])
+        raise
+    if result['stopped']:
+        return _copied_files(dest_dir, result['new']), _copied_files(dest_dir, result['updated'])
+    return result['new'], result['updated']
 
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-many-instance-attributes
@@ -275,8 +391,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def keyword_replace(self, s):
-        """
-        Simple keyword replace function
+        """Replace the ``{cruiseID}``-style placeholders in a path.
+
+        The placeholders are ``{cruiseID}``, ``{loweringID}`` and
+        ``{loweringDataBaseDir}``.
+
+        Args:
+            s: Path or filter string that may contain placeholders.
+
+        Returns:
+            str | None: *s* with the placeholders replaced, or ``None`` if *s*
+            is ``None``.
         """
 
         if not isinstance(s, str):
@@ -290,8 +415,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def build_rel_dir(self):
-        """
-        Replace wildcard string in destDir
+        """Return the transfer's destination directory, relative to the cruise directory.
+
+        Lowering-level transfers are placed under
+        ``<loweringDataBaseDir>/<loweringID>/``.
+
+        Returns:
+            str | None: The relative destination directory with placeholders
+            replaced, or ``None`` if the transfer has no ``destDir``.
         """
 
         if not self.collection_system_transfer:
@@ -309,24 +440,31 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def build_source_dir(self):
-        """
-        Replace wildcard string in sourceDir
+        """Return the transfer's source directory with its placeholders replaced.
+
+        Returns:
+            str | None: The ``sourceDir`` with ``{cruiseID}``-style
+            placeholders replaced, or ``None`` if it isn't set.
         """
 
         return self.keyword_replace(self.collection_system_transfer['sourceDir']) if self.collection_system_transfer else None
 
 
     def build_dest_dir(self):
-        """
-        Replace wildcard string in destDir AND add full cruise path
+        """Return the transfer's absolute destination directory.
+
+        Returns:
+            str: The cruise directory joined with :meth:`build_rel_dir`.
         """
 
         return os.path.join(self.cruise_dir, self.build_rel_dir())
 
 
     def build_logfile_dirpath(self):
-        """
-        Build the path to save transfer logfiles
+        """Return the transfer log directory, creating it if needed.
+
+        Returns:
+            str: The directory from ``OpenVDM.get_transfer_log_dir()``.
         """
 
         log_dir = self.ovdm.get_transfer_log_dir()
@@ -334,7 +472,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return log_dir
 
 
-    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False):
+    def _enumerate_sources(self, transfer_type, source_dir, prefix=None, password_file=None, is_darwin=False, mount_base=None):
         """
         Enumerate concrete source directories when source_dir contains glob wildcard characters.
         Returns a list of (concrete_source_dir, dest_basename) tuples.
@@ -354,8 +492,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         cst_cfg = self.collection_system_transfer
 
-        if transfer_type in ['local', 'smb']:
-            local_parent = os.path.join(prefix, parent.lstrip('/')) if prefix else parent
+        if transfer_type in ['local', 'smb', 'ftp']:
+            local_parent = mount_path(prefix, parent, mount_base) if prefix else parent
             matched = sorted([
                 d for d in glob_module.glob(os.path.join(local_parent, pattern))
                 if os.path.isdir(d)
@@ -417,10 +555,29 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         return [(source_dir, None)]
 
 
-    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None):
-        """
-        Build the list of files to include, exclude, ignore for the given transfer.
-        override_source_dir, when provided, is used instead of self.source_dir.
+    def build_cst_filelist(self, prefix=None, rsync_password_filepath=None, is_darwin=False, batch_size=500, max_workers=16, override_source_dir=None, rclone_config=None):
+        """Build the lists of files to transfer and exclude for the collection system transfer.
+
+        Lists the source with rsync, then classifies the files in parallel
+        batches (see :func:`process_rsync_batch`).
+
+        Args:
+            prefix: Path prefix to strip from the listed files, or ``None``.
+            rsync_password_filepath: rsync password file, for rsync-server
+                sources.
+            is_darwin: The source is a macOS host (affects rsync options).
+            batch_size: Number of files per classification batch.
+            max_workers: Number of parallel classification workers.
+            override_source_dir: Source directory to use instead of
+                ``self.source_dir`` (e.g. for one match of a wildcard source).
+            rclone_config: rclone config file with the FTP remote, for FTP
+                sources, which are listed with ``rclone lsjson`` rather than
+                through the mount (#208).
+
+        Returns:
+            dict: ``{'verdict': True, 'files': {'include', 'exclude', 'new',
+            'updated', 'filesize'}}``, or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         def _build_filters(cst_cfg, cruise_id, lowering_id):
@@ -482,12 +639,43 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
 
+        # Ignored folders aren't listed: they may be unreadable, which fails
+        # the listing (#264), or large, such as snapshots (#265)
+        exclude_patterns = transfer_exclude_patterns()
+
         # Get file list based on transfer_type
-        if transfer_type in ['local', 'smb']:
+        if transfer_type == 'ftp':
+            # One rclone listing, not a walk and a stat per file through the
+            # mount, which is slow over FTP and shows a directory the server
+            # refuses to list as empty (#208)
+            success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir,
+                                               exclude_patterns)
+            if not success:
+                return {'verdict': False,
+                        'reason': f"Error listing source directory {raw_source_dir}: {listing}"}
+            filepaths = [(os.path.join(source_dir, path), size, mod_time)
+                         for path, size, mod_time in listing]
+        elif transfer_type in ['local', 'smb']:
+            # A missing source or a listing error must not look like an empty
+            # source: with syncFromSource that would delete the destination (#206)
+            if not os.path.isdir(source_dir):
+                return {'verdict': False, 'reason': f"Source directory {raw_source_dir} not found"}
+
+            walk_errors = []
             filepaths = []
-            for root, _, filenames in os.walk(source_dir):
+            for root, dirnames, filenames in os.walk(source_dir, onerror=walk_errors.append):
+                dirnames[:] = [d for d in dirnames if not is_default_ignore_dir(os.path.join(root, d))]
                 for filename in filenames:
                     filepaths.append(os.path.join(root, filename))
+
+            if walk_errors:
+                if transfer_type == 'smb':
+                    # On a mounted share or FTP server this is usually a
+                    # network error, so the listing can't be trusted
+                    return {'verdict': False,
+                            'reason': f"Error listing source directory {raw_source_dir}: {walk_errors[0]}"}
+                for exc in walk_errors:
+                    logging.warning("Skipping unreadable source path: %s", exc)
         else:
             command = ['rsync', '-r']
             if cst_cfg.get('skipEmptyFiles') == 1:
@@ -495,6 +683,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             if cst_cfg.get('skipEmptyDirs') == 1:
                 command.append('-m')
+
+            command += [f'--exclude={pattern}' for pattern in exclude_patterns]
 
             if transfer_type == 'rsync':
                 command += [f'--password-file={rsync_password_filepath}', '--no-motd',
@@ -510,8 +700,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if cst_cfg.get('sshUseKey') == 0:
                     command = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + command
 
-            logging.debug("File list Command: %s", ' '.join(command).replace(f'-p {cst_cfg.get("sshPass", "")}', '-p ****'))
+            logging.debug("File list Command: %s", transfer_utils.redact_command(command))
             proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            # A failed or partial listing looks like missing files, and
+            # with syncFromSource those are deleted from the destination (#238)
+            reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
+                                            proc, cst_cfg['syncFromSource'] == 1)
+            if reason:
+                return {'verdict': False, 'reason': reason}
             filepaths = proc.stdout.splitlines()
             filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
 
@@ -522,7 +718,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         batches = [filepaths[i:i + batch_size] for i in range(0, total_files, batch_size)]
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            if transfer_type in ['local', 'smb']:
+            if transfer_type == 'ftp':
+                futures = [executor.submit(process_listed_batch, batch, filters, data_start_time, data_end_time)
+                           for batch in batches]
+            elif transfer_type in ['local', 'smb']:
                 futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
                            for batch in batches]
             else:
@@ -545,7 +744,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             logging.debug("Checking staleness (wait %ss)...", staleness)
             time.sleep(int(staleness))
 
-            if transfer_type in ['local', 'smb']:
+            if transfer_type == 'ftp':
+                success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir,
+                                                   exclude_patterns)
+                if not success:
+                    return {'verdict': False,
+                            'reason': f"Error re-listing source directory {raw_source_dir}: {listing}"}
+                current_sizes = {os.path.join(source_dir, path): str(size) for path, size, _ in listing}
+                kept = [(path, size) for path, size in zip(return_files['include'], return_files['filesize'])
+                        if current_sizes.get(path) == size]
+                return_files['include'] = [path for path, _ in kept]
+                return_files['filesize'] = [size for _, size in kept]
+            elif transfer_type in ['local', 'smb']:
                 paths_sizes = list(zip(return_files['include'], return_files['filesize']))
                 stale_batches = [paths_sizes[i:i + batch_size] for i in range(0, len(paths_sizes), batch_size)]
                 verified_paths = []
@@ -560,21 +770,27 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return_files['filesize'] = verified_sizes
             else:
                 proc = subprocess.run(command, capture_output=True, text=True, check=False)
+                # Otherwise the staleness check is silently skipped (#238)
+                reason = _rsync_listing_failure(f"Error re-listing source directory {raw_source_dir}",
+                                                proc, cst_cfg['syncFromSource'] == 1)
+                if reason:
+                    return {'verdict': False, 'reason': reason}
+                current_sizes = {}
                 for line in proc.stdout.splitlines():
-                    try:
-                        file_or_dir, size, *_ , filepath = line.split(None, 4)
-                        if not file_or_dir.startswith('-'):
-                            continue
-                        idx = return_files['include'].index(filepath)
-                        if return_files['filesize'][idx] != size:
-                            del return_files['filesize'][idx]
-                            del return_files['include'][idx]
-                    except Exception as exc:
-                        logging.warning("Staleness check error: %s", str(exc))
+                    parts = line.split(None, 4)
+                    if len(parts) == 5 and parts[0].startswith('-'):
+                        current_sizes[parts[4]] = parts[1]
+                # Keep only the files listed again with the same size: a file
+                # missing from the re-listing (vanished, or in a directory that
+                # became unreadable) hasn't been checked (#284)
+                kept = [(path, size) for path, size in zip(return_files['include'], return_files['filesize'])
+                        if current_sizes.get(path) == size]
+                return_files['include'] = [path for path, _ in kept]
+                return_files['filesize'] = [size for _, size in kept]
 
         # Format final output
         del return_files['filesize']
-        if transfer_type in ['local', 'smb']:
+        if transfer_type in ['local', 'smb', 'ftp']:
             base_len = len(source_dir.rstrip(os.sep)) + 1
             return_files['include'] = [f[base_len:] for f in return_files['include']]
             return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
@@ -583,8 +799,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def test_destination_dir(self):
-        """
-        Verify the destination directory exists
+        """Check that the transfer's destination directory exists.
+
+        The directory is in the cruise directory (or the lowering's, for
+        lowering-level transfers).
+
+        Returns:
+            list[dict]: Test parts with ``partName``/``result``/``reason``
+            keys.
         """
 
         results = []
@@ -602,8 +824,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def transfer_from_source(self, current_job):
-        """
-        Perform the collection system transfer.
+        """Copy new and updated files from the source into the cruise (or lowering) directory.
+
+        Mounts SMB shares and FTP servers first. Expands wildcard source
+        directories, builds the file list for each, and runs rsync with the
+        transfer's options.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+
+        Returns:
+            dict: ``{'verdict': True, 'files': ...}`` with the ``new``,
+            ``updated`` and ``exclude`` files (and ``deleted``, when the
+            transfer syncs deletions), or ``{'verdict': False, 'reason':
+            ...}``.
         """
 
         cst_cfg = self.collection_system_transfer
@@ -619,6 +853,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         prefix = None
         mntpoint = None
+        mount_base = None
+        rclone_config = None
         is_darwin = False
 
         with temporary_directory() as tmpdir:
@@ -638,6 +874,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                         reason += f' — {mount_detail}'
                     return {'verdict': False, 'reason': reason}
                 prefix = mntpoint
+
+            # Adjustments for FTP
+            if transfer_type == 'ftp':
+                success, rclone_config = prepare_ftp_config(cst_cfg, tmpdir)
+                if not success:
+                    return {'verdict': False, 'reason': rclone_config, 'files': []}
+                # Mount the source directory (or wildcard parent), not the
+                # server root, which the account may not be able to list (#209)
+                mount_base = ftp_mount_base(source_dir)
+                success, mount_result = prepare_ftp_mount(cst_cfg, tmpdir, rclone_config, mount_base)
+                if not success:
+                    reason = 'Failed to mount FTP server'
+                    if mount_result:
+                        reason += f' — {mount_result}'
+                    return {'verdict': False, 'reason': reason}
+                mntpoint = prefix = mount_result
 
             # Adjustments for RSYNC
             if transfer_type == 'rsync':
@@ -662,7 +914,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 is_darwin = check_darwin(cst_cfg)
 
             # Enumerate source directories (expands wildcards if present)
-            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin)
+            source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin, mount_base)
 
             if not source_pairs:
                 return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
@@ -673,29 +925,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
 
+            # List every source directory before copying anything. A listing
+            # that fails fails the transfer: skipping it would report success,
+            # and an empty list with syncFromSource deletes the destination (#206).
+            file_lists = []
             for src_dir, dest_name in source_pairs:
-                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
-                if dest_name:
-                    os.makedirs(effective_dest, exist_ok=True)
-
-                # Build filelist for this source directory
                 filelist_result = self.build_cst_filelist(
                     prefix=prefix,
                     rsync_password_filepath=password_file,
                     is_darwin=is_darwin,
-                    override_source_dir=src_dir
+                    override_source_dir=src_dir,
+                    rclone_config=rclone_config
                 )
 
                 if not filelist_result['verdict']:
-                    logging.warning("Filelist build failed for %s: %s", src_dir, filelist_result.get('reason', 'Unknown'))
-                    continue
+                    reason = filelist_result.get('reason', 'Unknown error')
+                    logging.error("Filelist build failed for %s: %s", src_dir, reason)
+                    return {'verdict': False, 'reason': f"Unable to list source files: {reason}", 'files': []}
 
-                files = filelist_result['files']
+                file_lists.append((src_dir, dest_name, filelist_result['files']))
+
+            for src_dir, dest_name, files in file_lists:
+                effective_dest = os.path.join(dest_dir, dest_name) if dest_name else dest_dir
+                if dest_name:
+                    os.makedirs(effective_dest, exist_ok=True)
 
                 # Write file list
-                if not build_include_file(files['include'], include_file):
-                    logging.warning("Error writing file list for %s, skipping", src_dir)
-                    continue
+                if not write_list_file(files['include'], include_file):
+                    # Skipping the source would report success (#238)
+                    logging.error("Error writing file list for %s", src_dir)
+                    return {'verdict': False, 'reason': f"Unable to write the file list for {src_dir}",
+                            'files': []}
 
                 # Build rsync source path
                 if transfer_type == 'local':
@@ -704,8 +964,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     source_path = f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{src_dir}"
                 elif transfer_type == 'ssh':
                     source_path = f"{cst_cfg['sshUser']}@{cst_cfg['sshServer']}:{src_dir}"
-                elif transfer_type == 'smb':
-                    source_path = os.path.join(mntpoint, src_dir.lstrip('/').rstrip('/'))
+                elif transfer_type in ['smb', 'ftp']:
+                    source_path = mount_path(mntpoint, src_dir, mount_base).rstrip('/')
 
                 source_path += '/'
 
@@ -719,9 +979,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
                     cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
 
-                new_files, updated_files = run_transfer_command(
-                    self, current_job, cmd, len(files['include'])
-                )
+                try:
+                    new_files, updated_files = run_transfer_command(
+                        self, current_job, cmd, len(files['include']), effective_dest
+                    )
+                except TransferCommandError as exc:
+                    # Don't report a failed transfer as successful (#230), but
+                    # return what was copied (here and from any earlier
+                    # wildcard matches), so the hooks still process it (#239)
+                    _add_files(all_files, dest_name, {'new': exc.files['new'],
+                                                      'updated': exc.files['updated'],
+                                                      'exclude': files['exclude']})
+                    return {'verdict': False, 'reason': f"Transfer failed: {exc}", 'files': all_files}
                 files['new'] = new_files
                 files['updated'] = updated_files
 
@@ -733,22 +1002,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     else:
                         all_files['deleted'].extend(deleted)
 
-                # Accumulate results, prefixing paths with dest_name for wildcard expansions
-                if dest_name:
-                    all_files['new'].extend([os.path.join(dest_name, f) for f in files['new']])
-                    all_files['updated'].extend([os.path.join(dest_name, f) for f in files['updated']])
-                    all_files['exclude'].extend([os.path.join(dest_name, f) for f in files['exclude']])
-                else:
-                    all_files['new'].extend(files['new'])
-                    all_files['updated'].extend(files['updated'])
-                    all_files['exclude'].extend(files['exclude'])
+                _add_files(all_files, dest_name, files)
 
         return {'verdict': True, 'files': all_files}
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Reads the job's JSON payload (``collectionSystemTransfer``,
+        ``cruiseID``, ``loweringID``, ``systemStatus``; any it omits default to
+        the current cruise/lowering settings), loads what the task needs from
+        the OpenVDM API, then runs the task handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
 
@@ -845,15 +1117,26 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the collection system transfer's status to error and sends it back
+        to Gearman as a failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
@@ -874,8 +1157,24 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the collection system transfer's status to error, with that part's
+        reason; ``Ignore`` leaves the status unchanged; anything else sets it
+        to idle.
+
+        If the transfer produced new, updated or deleted files, submits the
+        hook tasks configured for ``runCollectionSystemTransfer`` in
+        ``openvdm.yaml`` with those file lists. That includes a failed
+        transfer's files that were copied before it failed (#239).
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -893,9 +1192,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if final_verdict == "Fail":
             reason = final_part.get('reason', "undefined")
             self.ovdm.set_error_collection_system_transfer(cst_id, reason)
-            return super().send_job_complete(current_job, job_result)
 
-        # If not a failure, prepare potential follow-up jobs
+        # Prepare follow-up jobs for the files transferred, also by a failed
+        # transfer before it failed (#239)
         new_files = results.get('files', {}).get('new', [])
         updated_files = results.get('files', {}).get('updated', [])
         deleted_files = results.get('files', {}).get('deleted', [])
@@ -920,7 +1219,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 gm_client.submit_job(task, json.dumps(job_data), background=True)
 
         # Always set idle at the end if not failed
-        self.ovdm.set_idle_collection_system_transfer(cst_id)
+        if final_verdict != "Fail":
+            self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -968,8 +1268,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
 
 def task_run_collection_system_transfer(worker, current_job): # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
-    """
-    Run the collection system transfer
+    """Gearman task: run a collection system transfer.
+
+    Checks the transfer isn't already running and is enabled, tests the source
+    and destination, copies new and updated files into the cruise (or lowering)
+    directory, sets ownership and permissions, and writes the transfer and
+    exclude logs.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``) and ``files`` (new, updated and excluded
+        files).
     """
 
     time.sleep(randint(0,2))
@@ -1022,6 +1335,17 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     if not results['verdict']:
         logging.error("Transfer of remote files failed: %s", results['reason'])
+        # Files copied before the failure still get their ownership set and
+        # are passed to the hooks by on_job_complete() (#239)
+        copied = results.get('files') or {}
+        if copied.get('new') or copied.get('updated') or copied.get('deleted'):
+            job_results['files'] = copied
+            if copied.get('new') or copied.get('updated'):
+                perms = set_owner_group_permissions(
+                    worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.dest_dir)
+                if not perms['verdict']:
+                    logging.error("Error setting destination directory file/directory ownership/permissions: %s",
+                                  worker.dest_dir)
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
         return json.dumps(job_results)
 
@@ -1131,8 +1455,11 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -1141,8 +1468,11 @@ if __name__ == "__main__":
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))

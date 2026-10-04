@@ -45,7 +45,7 @@ class HPRParser(OpenVDMCSVParser):
                 try:
                     heading = float(field_data['heading'])
                     pitch = float(field_data['pitch'])
-                    roll = int(field_data['roll'])
+                    roll = float(field_data['roll'])
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['heading'].append(heading)
                     raw_data['pitch'].append(pitch)

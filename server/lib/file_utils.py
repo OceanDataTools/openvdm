@@ -21,13 +21,41 @@ from pwd import getpwnam
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+# Files and folders that are never instrument data, as fnmatch patterns (where
+# ``*`` also matches ``/``). A folder is written ``**/<name>/*``. ``#`` is
+# written ``[#]``, since rsync and rclone read an exclude-file line starting
+# with ``#`` as a comment.
 default_ignore_patterns = [
+    # OS clutter
     "**/@eaDir*",
     "**/.DS_Store",
     "**/._*",
     "**/Thumbs.db",
+    "**/ehthumbs.db",
     "**/desktop.ini",
-    "**/.*.??????"
+    # rsync temporary files
+    "**/.*.??????",
+    # Linux and NFS (files still in use after deletion)
+    "**/lost+found/*",
+    "**/.Trash-*/*",
+    "**/.nfs*",
+    # Windows drives, USB and SMB
+    "**/$RECYCLE.BIN/*",
+    "**/System Volume Information/*",
+    # macOS volumes
+    "**/.Trashes/*",
+    "**/.Spotlight-V100/*",
+    "**/.fseventsd/*",
+    "**/.TemporaryItems/*",
+    "**/.DocumentRevisions-V100/*",
+    # NAS recycle bins and snapshots (Synology, NetApp, ZFS)
+    "**/[#]recycle/*",
+    "**/.snapshot/*",
+    "**/~snapshot/*",
+    "**/.zfs/*",
+    # Office lock files (Word/Excel, LibreOffice)
+    "**/~$*",
+    "**/.~lock.*#",
 ]
 
 def is_ascii(s: str) -> bool:
@@ -64,6 +92,36 @@ def expand_patterns(patterns: List[str]) -> List[str]:
             expanded.add(p[3:])  # Add version without **/
     return sorted(expanded)
 
+def transfer_exclude_patterns(patterns: Optional[List[str]] = None) -> List[str]:
+    """Return glob patterns as rsync and rclone ``--exclude-from`` patterns.
+
+    rsync and rclone read these patterns differently (#259): rclone's
+    ``**/`` needs at least one directory, so ``**/.DS_Store`` misses a
+    ``.DS_Store`` at the top of the transfer, and rclone matches patterns
+    against file paths only, so ``@eaDir*`` doesn't exclude the files in an
+    ``@eaDir`` directory. For each pattern this returns the pattern without a
+    leading ``**/`` (a pattern without ``/`` matches at any depth in both) and
+    ``<pattern>/**``, which excludes the contents of a matching directory.
+    A folder pattern (``<name>/*``) becomes ``<name>/`` and ``<name>/**``,
+    which exclude the folder itself, so a source listing doesn't open it
+    (#265).
+
+    Args:
+        patterns: Glob patterns. Defaults to :data:`default_ignore_patterns`.
+
+    Returns:
+        The exclude patterns, without duplicates.
+    """
+
+    exclude_patterns = []
+    for p in patterns or default_ignore_patterns:
+        p = p[3:] if p.startswith("**/") else p
+        candidates = (p[:-1], f"{p[:-2]}/**") if p.endswith("/*") else (p, f"{p}/**")
+        for exclude_pattern in candidates:
+            if exclude_pattern not in exclude_patterns:
+                exclude_patterns.append(exclude_pattern)
+    return exclude_patterns
+
 def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bool:
     """Return ``True`` if *filepath* matches any of the provided glob-style patterns.
 
@@ -86,6 +144,29 @@ def is_default_ignore(filepath: str, patterns: Optional[List[str]] = None) -> bo
     return any(fnmatch.fnmatch(filepath, pattern) for pattern in patterns)
 
 
+def is_default_ignore_dir(dirpath: str, patterns: Optional[List[str]] = None) -> bool:
+    """Return ``True`` if every file under *dirpath* matches the glob-style patterns.
+
+    A listing can then skip the directory without opening it, which matters
+    for folders the transfer account can't read, and for large ones such as
+    snapshots (#265). A pattern ending in ``*`` that matches ``<dirpath>/``
+    matches every path under it, so only those patterns are checked.
+
+    Args:
+        dirpath: Absolute or relative path of the directory.
+        patterns: Optional list of glob patterns.  Defaults to
+            :data:`default_ignore_patterns`.
+
+    Returns:
+        ``True`` if the directory can be skipped.
+    """
+
+    dirpath = os.path.normpath(dirpath) + "/"
+    patterns = expand_patterns(patterns or default_ignore_patterns)
+
+    return any(fnmatch.fnmatch(dirpath, pattern) for pattern in patterns if pattern.endswith("*"))
+
+
 def build_filelist(source_dir: str) -> dict:
     """Walk *source_dir* and categorise every file as included or excluded.
 
@@ -105,7 +186,9 @@ def build_filelist(source_dir: str) -> dict:
 
     return_files = { 'include':[], 'exclude':[], 'new':[], 'updated':[]}
 
-    for root, _, files in os.walk(source_dir):
+    for root, dirs, files in os.walk(source_dir):
+        # Don't walk ignored folders (#265)
+        dirs[:] = [d for d in dirs if not is_default_ignore_dir(os.path.join(root, d))]
 
         for filename in files:
             fullpath = os.path.join(root, filename)
@@ -126,15 +209,16 @@ def build_filelist(source_dir: str) -> dict:
     return return_files
 
 
-def build_include_file(include_list: List[str], filepath: str) -> bool:
-    """Write *include_list* to *filepath* for use as an rsync ``--files-from`` argument.
+def write_list_file(entries: List[str], filepath: str) -> bool:
+    """Write *entries* to *filepath* for an rsync or rclone ``--files-from`` or ``--exclude-from``.
 
-    Each entry is written on its own line, followed by a NUL byte to satisfy
-    rsync's ``--from0`` option if used.
+    Each entry is written on its own line, ending in a newline. rclone reads
+    anything else after the last newline as part of the last entry, so
+    nothing else may follow it (#255).
 
     Args:
-        include_list: Relative file paths to include in the transfer.
-        filepath: Destination path for the generated include file.
+        entries: Relative file paths, or exclude patterns.
+        filepath: Path of the file to write.
 
     Returns:
         ``True`` on success, ``False`` if the file could not be written.
@@ -142,10 +226,9 @@ def build_include_file(include_list: List[str], filepath: str) -> bool:
 
     try:
         with open(filepath, mode='w', encoding="utf-8") as f:
-            f.write('\n'.join(include_list))
-            f.write('\0')
+            f.writelines(f'{entry}\n' for entry in entries)
     except IOError as exc:
-        logging.error("Error writing include file: %s", str(exc))
+        logging.error("Error writing list file %s: %s", filepath, str(exc))
         return False
 
     return True
@@ -476,7 +559,10 @@ def temporary_directory(preserve_on_error: bool = False):
     """Context manager that creates a temporary directory and cleans it up on exit.
 
     If a ``mntpoint`` subdirectory exists and is mounted at cleanup time, it is
-    unmounted before the tree is removed.
+    unmounted before the tree is removed. If ``umount`` fails, a lazy unmount
+    (``umount -l``) is tried. If it is still mounted after that, the temporary
+    directory is left in place: deleting it would delete the files of the
+    mounted share or FTP server (#207).
 
     Args:
         preserve_on_error: If ``True``, skip cleanup when an exception is raised
@@ -495,11 +581,19 @@ def temporary_directory(preserve_on_error: bool = False):
     def _cleanup_temp_dir(tmpdir, mntpoint_path):
         """Helper to unmount and delete a temporary directory safely."""
         if os.path.ismount(mntpoint_path):
-            try:
-                subprocess.run(['umount', mntpoint_path], check=True)
-                logging.info("Unmounted %s before cleanup.", mntpoint_path)
-            except subprocess.CalledProcessError as exc:
-                logging.warning("Failed to unmount %s: %s", mntpoint_path, str(exc))
+            for cmd in (['umount', mntpoint_path], ['umount', '-l', mntpoint_path]):
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                if proc.returncode == 0 and not os.path.ismount(mntpoint_path):
+                    logging.info("Unmounted %s before cleanup (%s).", mntpoint_path, ' '.join(cmd[:-1]))
+                    break
+                logging.warning("Failed to unmount %s with %s: %s", mntpoint_path,
+                                ' '.join(cmd[:-1]), proc.stderr.strip())
+
+            # Never rmtree through a mount: it would delete the mounted files
+            if os.path.ismount(mntpoint_path):
+                logging.error("%s is still mounted; leaving temporary directory %s in place",
+                              mntpoint_path, tmpdir)
+                return
 
         try:
             shutil.rmtree(tmpdir)

@@ -45,13 +45,16 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.lib.geojson_utils import convert_to_kml, combine_geojson_files
 from server.lib.openvdm import OpenVDM
 
+# Name of the extra directory the trackline files are written to.
 TRACKLINE_EXTRA_DIR_NAME = 'Tracklines'
+# Name of the extra directory holding the data dashboard files and manifest.
 DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
 
 # ----------------------------------------------------------------------
 # Default GPS source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
+# GPS sources used when no --config_file is given; edit to match this ship.
 DEFAULT_GPS_SOURCES_YAML = """
 CollectionSystem: ROV_OpenRVDAS
 GPSSources:

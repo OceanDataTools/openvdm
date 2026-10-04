@@ -1,14 +1,9 @@
 $(function () {
     'use strict';
 
-    var MAPPROXY_DIR = '/mapproxy';
-    var TITILER_URL = '/titiler'
-
-    var max_values = 5;
-
     function displayLatestJSON(dataType, reversedY, inverted) {
-        var reversedY = reversedY || false;
-        var inverted = inverted || false;
+        reversedY = reversedY || false;
+        inverted = inverted || false;
         var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
         $.getJSON(getVisualizerDataURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -19,7 +14,7 @@ $(function () {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
 
-                    var scales = { x: (inverted === true) ? { type: null } : {
+                    var scales = { x: {
                         type: 'time',
                         adapters: { date: { zone: 0 } },
                         time: {
@@ -90,8 +85,33 @@ $(function () {
                         }
                     };
 
+                    if (inverted) {
+                        openvdmInvertTimeChart(chartOptions);
+                    }
+
                     const ctx = document.getElementById(placeholderID).getContext('2d');
-                    var chart = new Chart(ctx, chartOptions);
+                    new Chart(ctx, chartOptions);
+                }
+            }
+        });
+    }
+
+    //Draw the latest depth profile (json-profile, #274) as a thumbnail
+    function displayLatestProfile(dataType, profileOptions) {
+        var getVisualizerDataURL = siteRoot + 'api/dashboardData/getLatestVisualizerDataByType/' + cruiseID + '/' + dataType;
+        $.getJSON(getVisualizerDataURL, function (data, status) {
+            if (status === 'success' && data !== null) {
+
+                var placeholderID = dataType + '-placeholder';
+                var profile = openvdmProfileChartConfig(data, $.extend({}, profileOptions, {showAxes: false}));
+                if ('error' in profile) {
+                    $('#' + placeholderID).html('<strong>Error: ' + profile.error + '</strong>');
+                } else {
+                    profile.config.options.onClick = function () {
+                        window.location.href = siteRoot + 'dataDashboard/customTab/' + subPages[dataType] + '#' + dataType;
+                    };
+                    const ctx = document.getElementById(placeholderID).getContext('2d');
+                    new Chart(ctx, profile.config);
                 }
             }
         });
@@ -106,8 +126,12 @@ $(function () {
                 if ('error' in data) {
                     $(placeholder).html('<strong>Error: ' + data.error + '</strong>');
                 } else {
-                    //Get the last coordinate from the latest trackline
-                    var lastCoordinate = data[0].features[0].geometry.coordinates[data[0].features[0].geometry.coordinates.length - 1],
+                    //Get the last position of the latest feature (a track or a point, #292)
+                    var positions = openvdmFeaturePositions(data[0].features[0]);
+                    if (positions.length === 0) {
+                        return;
+                    }
+                    var lastCoordinate = positions[positions.length - 1],
                         latLng = L.latLng(lastCoordinate[1], lastCoordinate[0]);
 
                     if (lastCoordinate[0] < 0) {
@@ -119,6 +143,7 @@ $(function () {
                     // Add latest trackline (GeoJSON)
                     var ggaData = L.geoJson(data[0], {
                         style: { weight: 3 },
+                        pointToLayer: openvdmPointMarker(),
                         coordsToLatLng: function (coords) {
                             var longitude = coords[0],
                                 latitude = coords[1];
@@ -151,16 +176,13 @@ $(function () {
                     });
 
                     //Add basemap layer
-                    L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-                        // attribution: '&copy <a href="http://www.openstreetmap.org/copyright", target="_blank", rel="noopener">OpenStreetMap</a>, contributors &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
-                        maxZoom: 20
-                    }).addTo(mapdb);
+                    openvdmDefaultBaseLayer().addTo(mapdb);
 
                     // Add latest trackline (GeoJSON)
                     ggaData.addTo(mapdb);
 
                     // Add marker at the last coordinate
-                    var marker = L.marker(latLng).addTo(mapdb);
+                    L.marker(latLng).addTo(mapdb);
 
                 }
             }
@@ -183,7 +205,6 @@ $(function () {
 
                     //Build Leaflet latLng object
                     var mapBounds = L.latLngBounds(southwest, northeast);
-                    var latLng = mapBounds.getCenter();
 
                     //Build the map
                     var mapdb = L.map(placeholder.split('#')[1], {
@@ -200,21 +221,12 @@ $(function () {
                     });
 
                     //Add basemap layer
-                    L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-                        maxZoom: 20
-                    }).addTo(mapdb);
+                    openvdmDefaultBaseLayer().addTo(mapdb);
 
-                    // Add latest geotiff
-                    if ('tileDirectory' in data[0]) {
-                        L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                            tms:true,
-                            bounds:mapBounds
-                        }).addTo(mapdb);
-                    } else if ('tileURL' in data[0]) {
-                        const url = TITILER_URL + '/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=' + encodeURIComponent(data[0]['tileURL'])
-                        L.tileLayer(url, {
-                            bounds:mapBounds
-                        }).addTo(mapdb);
+                    // Add latest geotiff: pre-rendered tiles or a TiTiler GeoTIFF (#298)
+                    var tileLayer = openvdmTileLayer(data[0], cruiseDataDir);
+                    if (tileLayer) {
+                        tileLayer.addTo(mapdb);
                     }
                     mapdb.fitBounds(mapBounds);
                 }
@@ -256,6 +268,11 @@ $(function () {
                 displayLatestJSON(jsonInvertedTypes[i], false, true);
             }
         }
+        $.each(jsonProfileTypes, function (dataType, profileOptions) {
+            if ($('#' + dataType + '-placeholder').length) {
+                displayLatestProfile(dataType, profileOptions);
+            }
+        });
     }
 
     displayLatestData();

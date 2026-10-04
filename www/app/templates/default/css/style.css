@@ -116,3 +116,15 @@ thead {
 .pl-5 { padding-left:3rem!important; }
 .px-5 { padding-right:3rem!important;padding-left:3rem!important; }
 .py-5 { padding-top:3rem!important;padding-bottom:3rem!important; }
+/* Data dashboard tabs: a data type's files sit side by side and wrap
+   between files, not inside a narrow grid cell (#280, #282) */
+.objectList .file-entry {
+  display: inline-block;
+  margin-right: 2em;
+}
+/* Map popups: Leaflet sizes their text in rem, which Bootstrap 3's 10px root
+   font makes about 8px. Use the page's 14px. The extra class outranks
+   leaflet.css, which loads after this file (#362) */
+.leaflet-container .leaflet-popup-content {
+  font-size: 14px;
+}

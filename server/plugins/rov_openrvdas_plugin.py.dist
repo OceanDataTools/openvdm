@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
-"""
-FILE:  rov_openrvdas_plugin.py
+"""Plugin for ROV data logged by OpenRVDAS.
 
-USAGE:  rov_openrvdas_plugin.py [-h] [--dataType] <dataFile>
-
-DESCRIPTION:  This python script interprets raw files created by the OpenRVDAS
-    Data Acquision System.  Depending on the command-line arguments, the script
-    returns the data type of the file or a sub-sampled and json-formatted
-    version of the original file to stdout.  The json-formatted file is
-    used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [--dataType] Return the datatype of the file as defined in the
-                fileTypeFilter array.
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.11
-               Python Modules:
-                   requests==2.32.3
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-10-23
- REVISION:  2025-04-12
+Matches raw OpenRVDAS log files from an ROV to their parsers, crops the data to
+the file's lowering (from Sealog or OpenVDM), and returns the JSON-formatted
+plugin data used by OpenVDM's Data Dashboard.
 """
 
 import sys
@@ -32,7 +12,7 @@ import json
 import fnmatch
 import argparse
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from os.path import dirname, realpath
 import requests
 
@@ -50,9 +30,12 @@ from server.plugins.parsers.sprint_parser import SprintParser
 SEALOG_SERVER_URL = 'http://localhost:8000/sealog-server'
 SEALOG_JWT = '<TOKEN>'
 
+# Timestamp formats for lowering start/stop times: Sealog, then OpenVDM.
+TIME_FORMATS = ('%Y-%m-%dT%H:%M:%S.%fZ', '%Y/%m/%d %H:%M:%S', '%Y/%m/%d %H:%M')
+
 # -------------------------------------------------------------------------------------
-# This array defines the various dataTypes collected by SCS and the cooresponding file
-# regex expression.
+# This array defines the dataTypes collected by the ROV's OpenRVDAS logger and the
+# corresponding file regex expression.
 # -------------------------------------------------------------------------------------
 FILE_TYPE_FILTERS = [
     {"data_type":"rov-comp-pres", "regex": "*/raw/Mech_Comps_Raw-*.txt",   "parser": "CompPres", 'parser_options':{}},
@@ -64,85 +47,183 @@ FILE_TYPE_FILTERS = [
     {"data_type":"rov-usbl-sec",  "regex": "*/raw/USBL_Sec_GGA_Raw-*.txt", "parser": "GGA",      'parser_options':{}},
 ]
 
-# -------------------------------------------------------------------------------------
-# Function to determine the datatype of the raw datafile.  If the datatype can not be
-# determined, the function returns false
-# -------------------------------------------------------------------------------------
-
 
 class ROVOpenRVDASPlugin(OpenVDMPlugin):
-    """
-    OpenVDM plugin for the SCS Underway data acquisition system
-    """
+    """OpenVDM plugin for ROV data logged by OpenRVDAS."""
+
+    PARSER_MAP = {
+        "CompPres": CompPresParser,
+        "CTD": CTDParser,
+        "GGA": GGAParser,
+        "O2": O2Parser,
+        "Paro": ParoParser,
+        "Sprint": SprintParser,
+    }
 
     def __init__(self, lowering=None, use_sealog_api=True):
+        """Initialise the plugin.
 
+        Args:
+            lowering: Lowering ID to crop every file to. By default each file's
+                lowering is taken from its path (``<loweringDataBaseDir>/<loweringID>/``),
+                falling back to the current lowering in OpenVDM.
+            use_sealog_api: Take each lowering's start/stop times from its
+                Sealog milestones instead of its OpenVDM lowering config.
+        """
+
+        super().__init__(FILE_TYPE_FILTERS)
         self.sealog_server_url = SEALOG_SERVER_URL
         self.sealog_jwt = SEALOG_JWT
         self.ovdm = OpenVDM()
-        self.lowering = lowering if lowering is not None else self.ovdm.get_lowering_id()
+        self.lowering = lowering
         self.use_sealog_api = use_sealog_api
+        self._warehouse_config = None
+        self._windows = {}
 
-        if self.use_sealog_api:
-            lowering = self._get_sealog_lowering_by_id(self.lowering)
-            try:
-                self.start_dt = datetime.strptime(lowering['lowering_additional_meta']['milestones']['lowering_descending'], "%Y-%m-%dT%H:%M:%S.%fZ")  if lowering['lowering_additional_meta']['milestones']['lowering_descending'] else datetime.strptime(lowering.start_ts, "%Y-%m-%dT%H:%M:%S.%fZ")
-                self.stop_dt = datetime.strptime(lowering['lowering_additional_meta']['milestones']['lowering_floats_on_surface'], "%Y-%m-%dT%H:%M:%S.%fZ")  if lowering['lowering_additional_meta']['milestones']['lowering_floats_on_surface'] else datetime.strptime(lowering.stop_ts, "%Y-%m-%dT%H:%M:%S.%fZ")
-            except Exception as err:
-                logging.warning("Could not determine lowering start/stop datetime")
-                logging.debug(str(err))
-                self.start_dt = None
-                self.stop_dt = None
+    def get_lowering_window(self, lowering_id):
+        """Return the ``(start_dt, stop_dt)`` window for a lowering.
 
-        else:
-            try:
-                self.start_dt = datetime.strptime(self.ovdm.get_lowering_start_date(), "%Y-%m-%dT%H:%M:%S.%fZ")
-            except Exception as err:
-                self.start_dt = None
-                logging.debug(str(err))
+        Times are UTC-aware datetimes, or ``None`` where no time is available,
+        in which case the parsers don't crop on that side. Results are cached
+        per lowering.
 
-            try:
-                self.stop_dt = datetime.strptime(self.ovdm.get_lowering_end_date(), "%Y-%m-%dT%H:%M:%S.%fZ")
-            except Exception as err:
-                self.stop_dt = None
-                logging.debug(str(err))
+        Args:
+            lowering_id: The lowering ID.
 
-        super().__init__(FILE_TYPE_FILTERS)
-
-
-    def get_parser(self, filepath): # pylint: disable=too-many-return-statements
-        """
-        Function to determine the parser to use with the raw datafile.  If the
-        datatype can not be determined, the function returns false
+        Returns:
+            A ``(start_dt, stop_dt)`` tuple.
         """
 
-        file_type_filter = list(filter(lambda file_type_filter: fnmatch.fnmatch(filepath, file_type_filter['regex']), self.file_type_filters))
+        if lowering_id not in self._windows:
+            if not lowering_id:
+                window = (None, None)
+            elif self.use_sealog_api:
+                window = self._get_sealog_window(lowering_id)
+            else:
+                window = self._get_openvdm_window(lowering_id)
 
-        if len(file_type_filter) == 0:
+            if window == (None, None):
+                logging.warning("Could not determine start/stop times for lowering %s; data won't be cropped",
+                                lowering_id)
+            self._windows[lowering_id] = window
+
+        return self._windows[lowering_id]
+
+    def _get_parsers(self, filepath):
+        """Return ``(data_type, parser)`` pairs for the file, set to crop to its lowering."""
+
+        matches = [f for f in self.file_type_filters if fnmatch.fnmatch(filepath, f["regex"])]
+        if not matches:
+            logging.debug("No file type filters matched %s", filepath)
+            return []
+
+        start_dt, stop_dt = self.get_lowering_window(self._lowering_for(filepath))
+
+        parsers = []
+        for f in matches:
+            parser_name = f.get("parser")
+            parser_cls = self.PARSER_MAP.get(parser_name)
+            if not parser_cls:
+                logging.warning("Unknown parser '%s' for %s", parser_name, filepath)
+                continue
+            try:
+                options = {'start_dt': start_dt, 'stop_dt': stop_dt, **f.get("parser_options", {})}
+                parsers.append((f["data_type"], parser_cls(**options)))
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logging.exception("Failed to instantiate parser %s for %s: %s", parser_name, filepath, exc)
+        return parsers
+
+    def parse_file(self, filepath):
+        """Run every matching parser on the file and return their plugin data by data type."""
+
+        parsers = self._get_parsers(filepath)
+        if not parsers:
+            logging.debug("No parsers matched file %s", filepath)
+            return {}
+
+        results = {}
+        for data_type, data_parser in parsers:
+            try:
+                data_parser.parse(filepath)
+                if data_parser.plugin_data:
+                    results[data_type] = data_parser.plugin_data
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logging.exception("Parser '%s' failed for file '%s': %s", data_type, filepath, exc)
+        return results
+
+    def _get_warehouse_config(self):
+        """Return (and cache) OpenVDM's shipboard data warehouse config."""
+
+        if self._warehouse_config is None:
+            self._warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
+        return self._warehouse_config
+
+    def _lowering_for(self, filepath):
+        """Return the lowering ID to crop *filepath* to.
+
+        An explicit ``lowering`` wins; otherwise the path component after the
+        lowering base directory (e.g. ``Vehicle/<loweringID>/...``); otherwise
+        the current lowering.
+        """
+
+        if self.lowering:
+            return self.lowering
+
+        try:
+            base_dir = self._get_warehouse_config().get('loweringDataBaseDir')
+            parts = os.path.normpath(filepath).split(os.sep)
+            if base_dir in parts and parts.index(base_dir) + 1 < len(parts) - 1:
+                return parts[parts.index(base_dir) + 1]
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logging.debug("Could not determine lowering from path %s: %s", filepath, err)
+
+        return self.ovdm.get_lowering_id()
+
+    def _get_sealog_window(self, lowering_id):
+        """Return the lowering's window from Sealog.
+
+        Uses the ``lowering_descending`` / ``lowering_floats_on_surface``
+        milestones, falling back to the lowering's ``start_ts`` / ``stop_ts``.
+        """
+
+        lowering = self._get_sealog_lowering_by_id(lowering_id)
+        if not lowering:
+            return None, None
+
+        milestones = (lowering.get('lowering_additional_meta') or {}).get('milestones') or {}
+        return (self._parse_time(milestones.get('lowering_descending') or lowering.get('start_ts')),
+                self._parse_time(milestones.get('lowering_floats_on_surface') or lowering.get('stop_ts')))
+
+    def _get_openvdm_window(self, lowering_id):
+        """Return the lowering's window from its OpenVDM lowering config file."""
+
+        try:
+            config = self._get_warehouse_config()
+            config_path = os.path.join(config['shipboardDataWarehouseBaseDir'], self.ovdm.get_cruise_id(),
+                                       config['loweringDataBaseDir'], lowering_id,
+                                       self.ovdm.get_lowering_config_fn())
+            with open(config_path, 'r', encoding='utf-8') as config_file:
+                lowering_config = json.load(config_file)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logging.debug("Could not read lowering config for %s: %s", lowering_id, err)
+            return None, None
+
+        return (self._parse_time(lowering_config.get('loweringStartDate')),
+                self._parse_time(lowering_config.get('loweringEndDate')))
+
+    @staticmethod
+    def _parse_time(value):
+        """Parse a Sealog or OpenVDM timestamp string as a UTC datetime, or return ``None``."""
+
+        if not value:
             return None
-
-        file_type_filter = file_type_filter[0]
-
-        if file_type_filter['parser'] == "CompPres":
-            return CompPresParser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "CTD":
-            return CTDParser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "GGA":
-            return GGAParser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "O2":
-            return O2Parser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "Paro":
-            return ParoParser(**file_type_filter['parser_options'])
-
-        if file_type_filter['parser'] == "Sprint":
-            return SprintParser(**file_type_filter['parser_options'])
-
+        for time_format in TIME_FORMATS:
+            try:
+                return datetime.strptime(value, time_format).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+        logging.warning("Unrecognised lowering time: %s", value)
         return None
-
 
     def _get_sealog_lowering_by_id(self, lowering_id):
         """
@@ -154,11 +235,23 @@ class ROVOpenRVDASPlugin(OpenVDMPlugin):
             req = requests.get(url, headers={"authorization": self.sealog_jwt}, timeout=5)
             lowering = json.loads(req.text)[0]
             return lowering
-        except Exception as err:
+        except Exception as err:  # pylint: disable=broad-exception-caught
             logging.warning("Lowering %s not found in Sealog", lowering_id)
             logging.debug(str(err))
 
         return None
+
+
+# -------------------------------
+# Module-level function for worker
+# -------------------------------
+def process_file(filepath):
+    """
+    Module-level wrapper for Gearman worker compatibility.
+    """
+    rov_plugin = ROVOpenRVDASPlugin()
+    return rov_plugin.parse_file(filepath)
+
 
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
@@ -198,11 +291,11 @@ if __name__ == "__main__":
     plugin = ROVOpenRVDASPlugin(lowering=parsed_args.lowering)
 
     if parsed_args.dataType:
-        dataType = plugin.get_data_type(parsed_args.dataFile)
-        if dataType is None:
+        data_types = plugin.get_data_types(parsed_args.dataFile)
+        if not data_types:
             logging.warning("File is of unknown type")
             sys.exit(1)
-        print(dataType)
+        print(",".join(sorted(data_types)))
     else:
         jsonSTR = plugin.get_json_str(parsed_args.dataFile)
         if jsonSTR is None:

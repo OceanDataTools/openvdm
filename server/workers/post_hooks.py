@@ -22,6 +22,7 @@ import signal
 import sys
 import copy
 import subprocess
+import traceback
 from os.path import dirname, realpath
 import python3_gearman
 
@@ -29,6 +30,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'POST_RUN_COLLECTION_SYSTEM_TRANSFER_HOOK': 'postCollectionSystemTransfer',
     'POST_UPDATE_DATA_DASHBOARD_HOOK': 'postDataDashboard',
@@ -40,6 +42,7 @@ TASK_NAMES = {
     'POST_FINALIZE_LOWERING_HOOK': 'postFinalizeCurrentLowering'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,
@@ -207,8 +210,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def get_command_list(self):
-        """
-        Retrieve list of commands for the specified hook_name
+        """Return the commands to run for the job's post hook.
+
+        The hook's commands come from ``postHookCommands`` in ``openvdm.yaml``;
+        placeholders in them are filled in, using the collection system
+        transfer for transfer hooks.
+
+        Returns:
+            dict: ``{'verdict': True, 'commandList': [...]}`` (``None`` if the
+            hook has no commands), or ``{'verdict': False, 'reason': ...}`` if
+            the collection system transfer can't be found.
         """
 
         if not self.hook_commands:
@@ -236,8 +247,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_execute(self, current_job):
-        """
-        Function run when a new job arrives
+        """Set up and run a job for this worker's task.
+
+        Loads what the task needs from the OpenVDM API, then runs the task
+        handler.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result: the task handler's JSON result, or an early
+            failure result (e.g. if the payload can't be parsed).
         """
         self.stop = False
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
@@ -281,15 +301,26 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
 
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
@@ -310,8 +341,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; ``Ignore`` leaves
+        the status unchanged; anything else sets it to idle. Tasks with an ID
+        of 0 (this worker's ``CUSTOM_TASKS``) have no status in OpenVDM.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
 
         results = json.loads(job_result)
@@ -465,16 +507,22 @@ if __name__ == "__main__":
     new_worker.set_client_id(__file__)
 
     def sigquit_handler(_signo, _stack_frame):
-        """
-        Signal Handler for QUIT
+        """Handle SIGQUIT: stop the current task; the worker keeps running.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.warning("QUIT Signal Received")
         new_worker.stop_task()
 
     def sigint_handler(_signo, _stack_frame):
-        """
-        Signal Handler for INT
+        """Handle SIGINT: stop the current task and shut down the worker.
+
+        Args:
+            _signo: Signal number (unused).
+            _stack_frame: Current stack frame (unused).
         """
 
         logging.warning("INT Signal Received")

@@ -42,7 +42,10 @@
 #  page: position
 
 # The MVC view used to format the tab.  OpenVDM includes a "default" view that can be
-# used for displaying maps, and time-series data but additional custom view can be
+# used for displaying maps, and time-series data, and a "lowering" view that shows the
+# same for one lowering at a time, chosen from a drop-down (use it with the "lowering"
+# js file instead of "dataDashboardDefault"; see the example Lowering tab at the end
+# of this file).  Additional custom views can be
 # developed and used.  For custom views, specify the filename of the view (which must
 # be located in the ./app/views/DataDashboard directory of the OpenVDM web-application)
 # minus the php suffix (i.e use "customView" for "customView.php")
@@ -96,6 +99,27 @@
 #      visType: geoJSON
 #    - dataType: geotiff
 #      visType: tms
+
+# For "chart" placeholders, the 'visType' is one of:
+#   json            - each series against time
+#   json-reversedY  - the same, with the y axes reversed (values increase downward)
+#   json-inverted   - each series against time, on its side: time runs down the
+#                     left (earliest at the top) and the values across
+#   json-reversedY-inverted - the same, with the value axes reversed
+#   json-profile    - a depth profile: depth down the vertical axis and the other
+#                     series across, each on its own x axis, joined in time order.
+#                     Optional keys: "depthSeries", the series label to use for
+#                     depth (default: Depth), and "profileSeries", the series to
+#                     plot across (default: all the others). Give a profile its own
+#                     "id" when the same dataType is also charted against time.
+#  - plotType: chart
+#    id: ctd-profile
+#    heading: CTD Profile
+#    dataArray:
+#    - dataType: ctd
+#      visType: json-profile
+#      depthSeries: Depth
+#      profileSeries: [Temperature, Salinity]
 #
 
 - title: Position
@@ -108,13 +132,16 @@
   - charts
   - charts-zoom
   - leaflet
-  - lowering
   placeholderArray:
   - plotType: map
     id: map
     heading: Position
     dataArray:
     - dataType: gga
+      visType: geoJSON
+    - dataType: ctd-position
+      visType: geoJSON
+    - dataType: xbt-position
       visType: geoJSON
     - dataType: geotiff
       visType: tms
@@ -160,3 +187,76 @@
     dataArray:
     - dataType: ssv
       visType: json
+  - plotType: chart
+    id: ctd-profile
+    heading: CTD Casts
+    dataArray:
+    - dataType: ctd
+      visType: json-profile
+      depthSeries: Depth
+      profileSeries: [Temperature, Salinity, Conductivity]
+  - plotType: chart
+    id: xbt-profile
+    heading: XBT Casts
+    dataArray:
+    - dataType: xbt
+      visType: json-profile
+      depthSeries: Depth
+      profileSeries: [Temperature, Sound Velocity]
+
+# Example tab for lowering data (e.g. from the ROV OpenRVDAS plugin). The "lowering"
+# view adds a drop-down to choose the lowering and shows only that lowering's files.
+# Load the "lowering" js file on this tab instead of "dataDashboardDefault", never both:
+# each builds every map and chart on the page.
+#- title: Lowering
+#  page: lowering
+#  view: lowering
+#  cssArray:
+#  - leaflet
+#  jsArray:
+#  - lowering
+#  - charts
+#  - charts-zoom
+#  - leaflet
+#  placeholderArray:
+#  - plotType: map
+#    id: map
+#    heading: ROV Position
+#    dataArray:
+#    - dataType: rov-sprint
+#      visType: geoJSON
+#    - dataType: rov-usbl-pri
+#      visType: geoJSON
+#    - dataType: rov-usbl-sec
+#      visType: geoJSON
+#  - plotType: chart
+#    id: rov-comp-pres
+#    heading: ROV Comp Pressure
+#    dataArray:
+#    - dataType: rov-comp-pres
+#      visType: json
+#  - plotType: chart
+#    id: rov-ctd
+#    heading: ROV CTD
+#    dataArray:
+#    - dataType: rov-ctd
+#      visType: json
+#  - plotType: chart
+#    id: rov-ctd-profile
+#    heading: ROV CTD Profile
+#    dataArray:
+#    - dataType: rov-ctd
+#      visType: json-profile
+#      profileSeries: [Temperature, Salinity, Sound Velocity]
+#  - plotType: chart
+#    id: rov-o2
+#    heading: ROV O2
+#    dataArray:
+#    - dataType: rov-o2
+#      visType: json
+#  - plotType: chart
+#    id: rov-paro
+#    heading: ROV Paro Depth
+#    dataArray:
+#    - dataType: rov-paro
+#      visType: json

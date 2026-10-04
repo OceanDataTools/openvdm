@@ -14,7 +14,8 @@
 #
 # It should be re-run whenever the code has been refreshed. Preferably
 # by first running 'git pull' to get the latest copy of the script,
-# and then running 'utils/install-openvdm.sh' to run that script.
+# and then running 'sudo bash ./utils/install-openvdm.sh' to run that
+# script (it isn't executable, so run it with bash).
 #
 # The script has been designed to be idempotent, that is, it can be
 # run over again with no ill effects.
@@ -32,6 +33,14 @@
 
 PREFERENCES_FILE='.install_openvdm_preferences'
 
+# Python versions the installer uses, newest first: those the pinned
+# requirements (numpy, pandas) have wheels for. A newer or pre-release Python
+# (e.g. deadsnakes' 3.15 release candidate) would have to build them (#352).
+SUPPORTED_PYTHON_VERSIONS="3.14 3.13 3.12 3.11"
+
+# xbt-edf-qc commit installed with the sample data, for the XBT plugin (#300)
+XBT_EDF_QC_COMMIT='a784145a2dc9462d8071747b5dfcfcfd2c3fee70'
+
 
 ###########################################################################
 ###########################################################################
@@ -42,7 +51,9 @@ function exit_gracefully {
     if [ -n "$INSTALL_ROOT" ]; then
         deactivate 2>/dev/null || true
     fi
-    return -1 2> /dev/null || exit -1  # exit correctly if sourced/bashed
+    # Stop the installer. ("return" here only left this function when it was
+    # called from another function, so the install carried on, #334.)
+    exit 1
 }
 
 #########################################################################
@@ -308,7 +319,69 @@ function install_packages {
 
 ###########################################################################
 ###########################################################################
+# Debian/Ubuntu: install Node.js LTS with nvm in the OpenVDM user's home and
+# link npm/node into /usr/local/bin. install_openvdm builds the web app as
+# that user. Earlier installers put nvm in root's home, where the OpenVDM
+# user can't run it; that install is removed (unless root installed other
+# global npm packages in it) and its lines in root's shell startup files are
+# deleted. An npm in /usr/local/bin that isn't from nvm is left alone.
+function _install_node_nvm {
+
+    local user_home nvm_dir npm_target old_nvm_dir extra node_version rcfile
+    user_home=$(getent passwd "${OPENVDM_USER}" | cut -d: -f6)
+    nvm_dir="${user_home}/.nvm"
+    npm_target=$(readlink /usr/local/bin/npm || true)
+
+    if [ -e /usr/local/bin/npm ] && [[ "${npm_target}" != */.nvm/* ]]; then
+        echo "Using the existing /usr/local/bin/npm"
+        return
+    fi
+    if [ -e /usr/local/bin/npm ] && [[ "${npm_target}" == "${nvm_dir}/"* ]] && \
+            [ "$(stat -c %U "${nvm_dir}")" = "${OPENVDM_USER}" ]; then
+        echo "Node.js is already installed for ${OPENVDM_USER}"
+        return
+    fi
+
+    if [[ "${npm_target}" == */.nvm/* ]]; then
+        old_nvm_dir="${npm_target%%/.nvm/*}/.nvm"
+        if [ -d "${old_nvm_dir}" ] && [ "$(stat -c %U "${old_nvm_dir}")" = "root" ]; then
+            extra=$(find "${old_nvm_dir}"/versions/node/*/lib/node_modules -mindepth 1 -maxdepth 1 \
+                ! -name npm ! -name corepack -printf '%f ' 2>/dev/null || true)
+            if [ -n "${extra}" ]; then
+                echo "Keeping ${old_nvm_dir}: it has other global npm packages (${extra})"
+            else
+                echo "Removing the root-owned nvm install in ${old_nvm_dir}"
+                rm -rf "${old_nvm_dir}"
+                for rcfile in .bashrc .bash_profile .profile .zshrc; do
+                    rcfile="${old_nvm_dir%/.nvm}/${rcfile}"
+                    [ -f "${rcfile}" ] && sed -i -e '/^export NVM_DIR=/d' \
+                        -e '/\$NVM_DIR\/nvm\.sh/d' -e '/\$NVM_DIR\/bash_completion/d' "${rcfile}"
+                done
+            fi
+        fi
+    fi
+
+    echo "Installing Node.js (nvm) for ${OPENVDM_USER}"
+    sudo -H -u "${OPENVDM_USER}" bash -c '
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash &&
+        . "$HOME/.nvm/nvm.sh" && nvm install --lts'
+    node_version=$(sudo -H -u "${OPENVDM_USER}" bash -c '. "$HOME/.nvm/nvm.sh" && nvm version "lts/*"')
+    ln -sf "${nvm_dir}/versions/node/${node_version}/bin/npm" /usr/local/bin/npm
+    ln -sf "${nvm_dir}/versions/node/${node_version}/bin/node" /usr/local/bin/node
+}
+
+###########################################################################
+###########################################################################
 # Debian/Ubuntu package installation
+# True if apt has an installable package of exactly this name. ("apt-cache
+# show <name>" treats the name as a pattern: "python3.15" matched
+# postgresql-plpython3-15, #352.)
+function _apt_has {
+    apt-cache policy "$1" 2>/dev/null \
+        | awk -v want="$1:" '$0 == want {found = 1; next} found && /^ *Candidate:/ {print $2; exit}' \
+        | grep -qv '^(none)$'
+}
+
 function _install_packages_debian {
 
     export NEEDRESTART_MODE=a
@@ -385,27 +458,18 @@ function _install_packages_debian {
         fi
     fi
 
-    # Install Node.js via nvm
-    if [ ! -e "/usr/local/bin/npm" ]; then
-        cd ~
-        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-        nvm install --lts
-        NODE_VERSION=$(node -v)
-        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/
-        ln -sf "$HOME/.nvm/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/
-    fi
+    _install_node_nvm
 
     # Run update without -qq so any repo errors (GPG, 404, etc.) are visible
     apt-get update
 
-    # Determine the best available PHP version (8.2 or newer).
+    # PHP version: 8.3, which OpenVDM 2.x runs on in production, where it's
+    # packaged (Ondrej's PPA, Sury); otherwise the next newer one (e.g. Ubuntu
+    # 26.04 ships only 8.5), then 8.2 (#352).
     # Must run after apt-get update so the package cache reflects any PPAs added above.
     PHP_VER=""
-    for _phpver in 8.5 8.4 8.3 8.2; do
-        if apt-cache show "php${_phpver}" > /dev/null 2>&1; then
+    for _phpver in 8.3 8.4 8.5 8.2; do
+        if _apt_has "php${_phpver}"; then
             PHP_VER="${_phpver}"
             break
         fi
@@ -419,7 +483,7 @@ function _install_packages_debian {
     # Ubuntu ships mysql-server/mysql-client; Debian ships mariadb-server/mariadb-client.
     # On newer Ubuntu releases mysql-server may not be available — fall back to MariaDB.
     if [ "$OS_ID" = "ubuntu" ]; then
-        if apt-cache show mysql-server > /dev/null 2>&1; then
+        if _apt_has mysql-server; then
             MYSQL_PKGS="mysql-client mysql-server"
         else
             echo "mysql-server not available for '${CODENAME}'; using MariaDB instead"
@@ -432,7 +496,7 @@ function _install_packages_debian {
 
     NEEDRESTART_MODE=a apt-get install -q -y \
         openssh-server apache2 \
-        cifs-utils gdal-bin gearman-job-server git \
+        cifs-utils fuse3 gdal-bin gearman-job-server git \
         libapache2-mod-php${PHP_VER} libapache2-mod-wsgi-py3 libgearman-dev \
         $MYSQL_PKGS \
         php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl \
@@ -442,7 +506,7 @@ function _install_packages_debian {
 
     # Install php-gearman: use the native versioned package when available
     # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
-    if apt-cache show "php${PHP_VER}-gearman" > /dev/null 2>&1; then
+    if _apt_has "php${PHP_VER}-gearman"; then
         NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman"
     else
         echo "php${PHP_VER}-gearman not packaged; building via PECL (requires libgearman-dev)..."
@@ -455,12 +519,12 @@ function _install_packages_debian {
         fi
     fi
 
-    # Install newest available Python >= 3.12.
+    # Install the newest supported Python (SUPPORTED_PYTHON_VERSIONS).
     # Try versioned packages from newest to oldest; fall back to system python3
     # if it is already >= 3.11 (e.g. trixie ships python3.13 as python3).
     _PYTHON_INSTALLED=false
-    for _VER in 3.15 3.14 3.13 3.12 3.11; do
-        if apt-cache show "python${_VER}" > /dev/null 2>&1; then
+    for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
+        if _apt_has "python${_VER}" && _apt_has "python${_VER}-venv" && _apt_has "python${_VER}-dev"; then
             _PKGS="python${_VER} python${_VER}-dev python${_VER}-venv"
             NEEDRESTART_MODE=a apt-get install -y $_PKGS
             if command -v "python${_VER}" > /dev/null 2>&1; then
@@ -623,9 +687,12 @@ function _install_packages_rhel {
         dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
     fi
 
-    # On RHEL 9, MySQL is delivered as an AppStream module; enable it before install.
+    # On RHEL 9, enable the mysql:8.0 module stream if the system has one.
+    # Current RHEL 9 releases ship MySQL 8.0 as a normal AppStream package and
+    # only an 8.4 stream, so there's nothing to enable (#350).
     # On RHEL 10+, MySQL AppStream is removed — MariaDB is the default instead.
-    if [ "$OS_VERSION_MAJOR" -ge 9 ] && [ "$OS_VERSION_MAJOR" -lt 10 ]; then
+    if [ "$OS_VERSION_MAJOR" -ge 9 ] && [ "$OS_VERSION_MAJOR" -lt 10 ] \
+        && dnf -q module list mysql 2>/dev/null | grep -qE '^mysql +8\.0( |$)'; then
         dnf module reset mysql -y
         dnf module enable mysql:8.0 -y
     fi
@@ -633,7 +700,7 @@ function _install_packages_rhel {
     # Install newest available Python >= 3.11.
     # Try versioned packages from newest to oldest.
     _PYTHON_INSTALLED=false
-    for _VER in 3.15 3.14 3.13 3.12 3.11; do
+    for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
         if dnf info "python${_VER}" > /dev/null 2>&1; then
             dnf install -y "python${_VER}" "python${_VER}-devel"
             _PYTHON_INSTALLED=true
@@ -656,7 +723,7 @@ function _install_packages_rhel {
         # v10+: mariadb-server replaces mysql-server; gearmand/libgearman-devel/
         # python3-pyproj not available in base/EPEL 10 repos — handled separately.
         dnf -y install \
-            cifs-utils curl gcc gcc-c++ gdal git httpd httpd-devel \
+            cifs-utils curl fuse3 gcc gcc-c++ gdal git httpd httpd-devel \
             gdal-devel geos-devel libjpeg-devel make redhat-rpm-config \
             mariadb-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \
@@ -665,7 +732,7 @@ function _install_packages_rhel {
         # gearmand was already built from source in the PHP section above
     else
         dnf -y install \
-            cifs-utils curl gcc gcc-c++ gdal gearmand git httpd httpd-devel \
+            cifs-utils curl fuse3 gcc gcc-c++ gdal gearmand git httpd httpd-devel \
             gdal-devel libgearman-devel geos-devel libjpeg-devel make redhat-rpm-config \
             mysql-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \
@@ -683,6 +750,29 @@ function _install_packages_rhel {
 
 ###########################################################################
 ###########################################################################
+# Create a Python virtual environment with ${PYTHON_CMD}, or reuse an existing
+# one. An existing one made with another Python version (or whose python no
+# longer runs) is rebuilt with --clear: running venv over it would leave
+# bin/python on the old Python while pip installs for the new one, so the
+# workers would run the old interpreter with the old packages (#328).
+function make_venv {
+    local VENV_DIR=$1
+    local NEW_VER OLD_VER
+    NEW_VER=$(${PYTHON_CMD} -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+    if [ -d "${VENV_DIR}" ]; then
+        OLD_VER=$("${VENV_DIR}/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)
+        if [ "${OLD_VER}" != "${NEW_VER}" ]; then
+            echo "Rebuilding ${VENV_DIR} for Python ${NEW_VER} (it was made with ${OLD_VER:-a Python that no longer runs})"
+            ${PYTHON_CMD} -m venv --clear "${VENV_DIR}"
+            return
+        fi
+    fi
+    ${PYTHON_CMD} -m venv "${VENV_DIR}"
+}
+
+
+###########################################################################
+###########################################################################
 # Set up Python packages
 function install_python_packages {
     # Expect the following shell variables to be appropriately set:
@@ -692,7 +782,7 @@ function install_python_packages {
 
     cd $INSTALL_ROOT/openvdm
 
-    ${PYTHON_CMD} -m venv ./venv
+    make_venv ./venv
     source ./venv/bin/activate  # activate virtual environment
 
     pip install --trusted-host pypi.org \
@@ -729,7 +819,7 @@ function install_python_packages {
 # Must be called after install_packages so the packages are already present.
 function detect_python {
 
-    for _ver in 3.15 3.14 3.13 3.12 3.11; do
+    for _ver in ${SUPPORTED_PYTHON_VERSIONS}; do
         if command -v "python${_ver}" > /dev/null 2>&1; then
             PYTHON_CMD="python${_ver}"
             PYTHON_VERSION="${_ver}"
@@ -1406,7 +1496,7 @@ function configure_titiler {
 
     echo "Installing/Configuring TiTiler"
 
-    ${PYTHON_CMD} -m venv /opt/titiler
+    make_venv /opt/titiler
     source /opt/titiler/bin/activate
     pip install --upgrade pip --quiet
     pip install "titiler.application" "uvicorn[standard]" --quiet
@@ -1590,30 +1680,117 @@ function setup_timezone {
 
 ###########################################################################
 ###########################################################################
+# Generate an SSH key for root, of ssh-keygen's default type on this system
+# (RSA before OpenSSH 9.5, Ed25519 since), falling back to RSA if that fails
+# (e.g. Ed25519 in FIPS mode). The key is named after its type, as ssh-keygen
+# would name it: ~/.ssh/id_rsa, id_ecdsa or id_ed25519 (#340).
+function _generate_root_ssh_key {
+    local _TMP _TYPE _NAME
+    _TMP=$(mktemp -u ~/.ssh/openvdm_key.XXXXXX)
+    if ! ssh-keygen -q -N "" -f "${_TMP}" < /dev/null; then
+        echo "Couldn't generate an SSH key of the default type; generating RSA"
+        ssh-keygen -q -N "" -t rsa -f "${_TMP}" < /dev/null || return 1
+    fi
+    # "3072 SHA256:... root@host (RSA)" -> rsa
+    _TYPE=$(ssh-keygen -l -f "${_TMP}.pub" | sed -n 's/.*(\([A-Za-z0-9-]*\))$/\1/p' | tr '[:upper:]-' '[:lower:]_')
+    _NAME="id_${_TYPE:-rsa}"
+    mv "${_TMP}" ~/.ssh/${_NAME}
+    mv "${_TMP}.pub" ~/.ssh/${_NAME}.pub
+    chmod 600 ~/.ssh/${_NAME} ~/.ssh/${_NAME}.pub
+    echo "Generated SSH key ~/.ssh/${_NAME}"
+}
+
+###########################################################################
+###########################################################################
+# Make sure the kernel can load the filesystem drivers OpenVDM mounts with:
+# cifs (SMB transfers) and fuse (FTP sources, through rclone mount). Minimal
+# and cloud installs can lack the package that ships them: Rocky/Alma/RHEL keep
+# cifs.ko in kernel-modules, not kernel-modules-core (#356). Installs the
+# package for the running kernel; if that version isn't available, installs
+# the latest one and says a reboot is needed.
+function _install_kernel_module_pkg {
+    if [ "$OS_FAMILY" = "rhel" ]; then
+        dnf install -y "$1" > /dev/null 2>&1
+    else
+        NEEDRESTART_MODE=a apt-get install -q -y "$1" > /dev/null 2>&1
+    fi
+}
+
+function ensure_kernel_modules {
+    local _MOD _PKG _KVER
+    _KVER=$(uname -r)
+    for _MOD in cifs fuse; do
+        modinfo "${_MOD}" > /dev/null 2>&1 && continue
+        echo "The running kernel (${_KVER}) has no ${_MOD} module; installing it"
+        if [ "$OS_FAMILY" = "rhel" ]; then
+            _install_kernel_module_pkg "kernel-modules-${_KVER}"
+        else
+            # Ubuntu splits modules between these; Debian ships them in linux-image
+            for _PKG in "linux-modules-${_KVER}" "linux-modules-extra-${_KVER}"; do
+                modinfo "${_MOD}" > /dev/null 2>&1 && break
+                _install_kernel_module_pkg "${_PKG}"
+            done
+        fi
+        if modinfo "${_MOD}" > /dev/null 2>&1; then
+            modprobe "${_MOD}" && echo "Loaded the ${_MOD} module"
+        else
+            # The running kernel's package isn't available (an older kernel):
+            # install the latest one, which needs a reboot into the new kernel
+            if [ "$OS_FAMILY" = "rhel" ]; then
+                _install_kernel_module_pkg kernel-modules
+            fi
+            echo "WARNING: The ${_MOD} module isn't available for the running kernel (${_KVER})."
+            echo "         Reboot into the latest kernel; until then ${_MOD} mounts fail"
+            echo "         (\"mount error(19): No such device\")."
+        fi
+    done
+}
+
+###########################################################################
+###########################################################################
 # Set system ssh
 function setup_ssh {
 
-    # Generate SSH keypair for root if missing
-    if [ ! -d ~/.ssh ] || [ ! -e ~/.ssh/id_rsa.pub ]; then
-        mkdir -p ~/.ssh
-        chmod 700 ~/.ssh
-        ssh-keygen -q -N "" -t rsa -f ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
+    # Root's SSH keys (the workers run as root and use them for SSH transfers):
+    # the ones it already has under OpenSSH's default names, whatever their
+    # type, or a new one of this system's default type if it has none (#340)
+    local _NAME _PUB
+    local _PUBS=()
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    for _NAME in id_rsa id_ecdsa id_ecdsa_sk id_ed25519 id_ed25519_sk id_xmss id_dsa; do
+        if [ -e ~/.ssh/${_NAME} ] && [ ! -e ~/.ssh/${_NAME}.pub ]; then
+            # A key without its .pub: recreate the .pub rather than replace the key
+            ssh-keygen -y -f ~/.ssh/${_NAME} > ~/.ssh/${_NAME}.pub 2>/dev/null || rm -f ~/.ssh/${_NAME}.pub
+        fi
+        if [ -e ~/.ssh/${_NAME} ] && [ -s ~/.ssh/${_NAME}.pub ]; then
+            _PUBS+=("${HOME}/.ssh/${_NAME}.pub")
+        fi
+    done
+    if [ ${#_PUBS[@]} -eq 0 ]; then
+        _generate_root_ssh_key || { echo "ERROR: Couldn't generate an SSH key for root"; exit_gracefully; }
+        for _NAME in id_rsa id_ecdsa id_ed25519; do
+            [ -s ~/.ssh/${_NAME}.pub ] && _PUBS+=("${HOME}/.ssh/${_NAME}.pub")
+        done
     fi
 
-    # Authorize root's key for passwordless login as root
-    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" ~/.ssh/authorized_keys 2>/dev/null; then
-        cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-        chmod 600 ~/.ssh/authorized_keys
-    fi
-
-    # Authorize root's key for passwordless login as OPENVDM_USER
-    if ! grep -qF "$(cat ~/.ssh/id_rsa.pub)" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
-        mkdir -p "/home/${OPENVDM_USER}/.ssh"
-        chmod 700 "/home/${OPENVDM_USER}/.ssh"
-        cat ~/.ssh/id_rsa.pub >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-        chmod 600 "/home/${OPENVDM_USER}/.ssh/authorized_keys"
-        chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
+    # Authorize root's keys for passwordless login as root and as OPENVDM_USER
+    mkdir -p "/home/${OPENVDM_USER}/.ssh"
+    chmod 700 "/home/${OPENVDM_USER}/.ssh"
+    for _PUB in "${_PUBS[@]}"; do
+        if ! grep -qF "$(cat "${_PUB}")" ~/.ssh/authorized_keys 2>/dev/null; then
+            cat "${_PUB}" >> ~/.ssh/authorized_keys
+        fi
+        if ! grep -qF "$(cat "${_PUB}")" "/home/${OPENVDM_USER}/.ssh/authorized_keys" 2>/dev/null; then
+            cat "${_PUB}" >> "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+        fi
+    done
+    chmod 600 ~/.ssh/authorized_keys "/home/${OPENVDM_USER}/.ssh/authorized_keys"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "/home/${OPENVDM_USER}/.ssh"
+    # SELinux: sshd only reads authorized_keys labelled ssh_home_t; make sure
+    # both .ssh directories are, as ssh-copy-id does
+    if command -v restorecon > /dev/null && command -v selinuxenabled > /dev/null && selinuxenabled; then
+        restorecon -R ~/.ssh "/home/${OPENVDM_USER}/.ssh"
     fi
 
     # Pre-accept host key to allow passwordless SSH to OPENVDM_USER@HOSTNAME
@@ -1643,9 +1820,24 @@ function install_openvdm {
 
         if [ -e .git ] ; then   # If we've already got an installation
             echo "Updating existing OpenVDM repository"
-            sudo -u ${OPENVDM_USER} git pull
-            sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH
-            sudo -u ${OPENVDM_USER} git pull
+            # The OpenVDM user updates the checkout, so it must own all of it:
+            # earlier installers left parts of it owned by root (2.14 set www/
+            # to root:root), and a git pull that can't replace those files
+            # fails partway, leaving the old code in place (#334)
+            chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm
+            # npm rewrites www/package-lock.json during the build; that isn't a
+            # site change, and it would block the update
+            sudo -u ${OPENVDM_USER} git checkout -- www/package-lock.json 2>/dev/null
+            # Update to the branch (or tag) asked for, and stop if that fails.
+            # A tag is checked out as is; a branch is then fast-forwarded.
+            if ! sudo -u ${OPENVDM_USER} git fetch --tags origin \
+                || ! sudo -u ${OPENVDM_USER} git checkout $OPENVDM_BRANCH \
+                || { sudo -u ${OPENVDM_USER} git symbolic-ref -q HEAD > /dev/null \
+                     && ! sudo -u ${OPENVDM_USER} git pull --ff-only; }; then
+                echo "ERROR: Couldn't update ${INSTALL_ROOT}/openvdm to '${OPENVDM_BRANCH}' (see git's message above)."
+                echo "       If local changes to tracked files are blocking it, 'git -C ${INSTALL_ROOT}/openvdm status' lists them."
+                exit_gracefully
+            fi
 
         else
             echo "Reinstalling OpenVDM from repository"  # Bad install, re-doing
@@ -1701,9 +1893,22 @@ flush privileges;
 EOF
     fi
 
+    # Build as the OpenVDM user so Composer and npm (run by post_composer.sh)
+    # and any package install scripts don't run as root. Earlier installs
+    # built as root; the chown gives their vendor/ and node_modules/ to the
+    # OpenVDM user first.
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
-    /usr/local/bin/composer -q install
+    chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
+    # composer.lock isn't tracked: each install writes its own, and it goes
+    # out of date when composer.json changes (e.g. after an upgrade), so
+    # Composer warns and installs from the old lock. The web app has no
+    # runtime dependencies to pin, so let Composer write a current one (#346)
+    if [ -e composer.lock ] && ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer validate -q --no-check-publish --no-check-all > /dev/null 2>&1; then
+        echo "Replacing the out-of-date www/composer.lock"
+        rm -f composer.lock
+    fi
+    sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer -q install --no-dev
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
@@ -1780,6 +1985,22 @@ EOF
         # On re-runs, update the key in-place if it is still the placeholder
         sed -i -e "s/workerApiKey: \"${_PLACEHOLDER}\"/workerApiKey: \"${WORKER_API_KEY}\"/" \
             ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+
+        # openvdm.yaml files from before 2.15.5 lack these keys. Without
+        # workerApiKey the workers get no transfer passwords from the API.
+        if [ -n "$(tail -c1 "${_YAML}")" ]; then
+            echo >> "${_YAML}"
+        fi
+        if ! grep -q '^workerApiKey:' "${_YAML}"; then
+            echo "Adding workerApiKey to ${_YAML}"
+            echo "workerApiKey: \"${WORKER_API_KEY}\"" >> "${_YAML}"
+        fi
+        if ! grep -q '^transferPublicData:' "${_YAML}"; then
+            echo "Adding transferPublicData to ${_YAML}"
+            _TRANSFER_PUBLICDATA='True'
+            [ "$INSTALL_PUBLICDATA" = "no" ] && _TRANSFER_PUBLICDATA='False'
+            echo "transferPublicData: ${_TRANSFER_PUBLICDATA}" >> "${_YAML}"
+        fi
     fi
 
     cd ${startingDir}
@@ -1793,7 +2014,7 @@ function install_sample_data {
     # Expect the following shell variables to be appropriately set:
     # INSTALL_ROOT          - root directory where openvdm is installed
     # OPENVDM_USER          - valid userid
-    # OPENVDM_DATABASE_PASSWORD - OpenVDM DB/SMB password (reused for sample SMB shares)
+    # OPENVDM_DATABASE_PASSWORD - OpenVDM DB/SMB password (reused for sample SMB shares and FTP)
     # NEW_ROOT_DATABASE_PASSWORD - MySQL root password
     # SAMPLEDATA_ROOT       - where sample data files will be extracted
     # SAMPLEDATA_REPO       - git repository URL for openvdm_sample_data
@@ -1842,6 +2063,10 @@ function install_sample_data {
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssdw"
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_destination"
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
+    # Older sample_data.tgz archives don't include the FTP directories
+    mkdir -p "${SAMPLEDATA_ROOT}/ftp_source" "${SAMPLEDATA_ROOT}/ftp_destination"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_source"
+    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_destination"
 
     if [ "$HAS_SELINUX" = true ]; then
         # Samba shares need samba_share_t; rsync daemon (rsync_t) needs
@@ -1882,29 +2107,64 @@ flush privileges;
 EOF
     rm -f /tmp/openvdm_sample_data_custom.sql
 
-    # Enable sample data plugins (copy .dist files only if active copy does not exist)
+    # The sample data includes lowering-level transfers (e.g. ROV_OpenRVDAS),
+    # which only run with lowering components on. The post-install step sets
+    # up the sample lowering.
+    echo "Turning on lowering components for the sample data"
+    mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
+EOF
+
+    # Enable sample data plugins and the parsers they import (copy .dist files
+    # only if active copy does not exist). The parsers are read from each
+    # plugin's "from server.plugins.parsers.<name> import" lines, so the list
+    # can't fall behind the plugins (#270).
     echo "Enabling sample data plugins"
     local PLUGIN_DIR="${INSTALL_ROOT}/openvdm/server/plugins"
-    for dist_file in \
+    local plugin parser
+    for plugin in \
+        ctd_plugin.py \
         em302_plugin.py \
         openrvdas_plugin.py \
-        rov_openrvdas_plugin.py; do
-        if [ -e "${PLUGIN_DIR}/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/${dist_file}" ]; then
-            cp "${PLUGIN_DIR}/${dist_file}.dist" "${PLUGIN_DIR}/${dist_file}"
+        rov_openrvdas_plugin.py \
+        xbt_plugin.py; do
+        if [ ! -e "${PLUGIN_DIR}/${plugin}.dist" ]; then
+            echo "WARNING: ${plugin}.dist not found; plugin not enabled"
+            continue
         fi
-    done
-    for dist_file in \
-        geotiff_titiler_parser.py \
-        gga_parser.py \
-        met_parser.py \
-        ssv_parser.py \
-        tsg45_parser.py \
-        twind_parser.py; do
-        if [ -e "${PLUGIN_DIR}/parsers/${dist_file}.dist" ] && [ ! -e "${PLUGIN_DIR}/parsers/${dist_file}" ]; then
-            cp "${PLUGIN_DIR}/parsers/${dist_file}.dist" "${PLUGIN_DIR}/parsers/${dist_file}"
+        if [ ! -e "${PLUGIN_DIR}/${plugin}" ]; then
+            cp "${PLUGIN_DIR}/${plugin}.dist" "${PLUGIN_DIR}/${plugin}"
         fi
+        for parser in $(grep -oE '^from server\.plugins\.parsers\.[A-Za-z0-9_]+' "${PLUGIN_DIR}/${plugin}" | sed 's/.*\.//' | sort -u); do
+            if [ -e "${PLUGIN_DIR}/parsers/${parser}.py" ]; then
+                continue
+            elif [ -e "${PLUGIN_DIR}/parsers/${parser}.py.dist" ]; then
+                cp "${PLUGIN_DIR}/parsers/${parser}.py.dist" "${PLUGIN_DIR}/parsers/${parser}.py"
+            else
+                echo "WARNING: ${plugin} imports ${parser}, but parsers/${parser}.py.dist was not found"
+            fi
+        done
     done
     chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${PLUGIN_DIR}"
+
+    # The XBT plugin's parser uses xbt-edf-qc, which requirements.txt doesn't
+    # install. Pinned to a tested commit; --no-deps because requirements.txt
+    # already has its numpy and pandas, and it doesn't use xarray or netCDF4
+    # for parsing and QC (#300)
+    echo "Installing xbt-edf-qc for the XBT plugin"
+    "${INSTALL_ROOT}/openvdm/venv/bin/pip" install --no-deps --quiet \
+        "xbt-edf-qc @ git+https://github.com/botheredbybees/xbt-edf-qc.git@${XBT_EDF_QC_COMMIT}" \
+        global-land-mask \
+        || echo "WARNING: xbt-edf-qc not installed; the XBT plugin won't parse casts"
+
+    # Show the sample lowering's data: uncomment the example Lowering tab at
+    # the end of the data dashboard config, unless it already has one (#272)
+    local DASHBOARD_YAML="${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml"
+    if [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
+        && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
+        echo "Enabling the data dashboard's Lowering tab"
+        sed -i -e '/^#- title: Lowering$/,/^$/s/^#//' "${DASHBOARD_YAML}"
+    fi
 
     # Add Samba shares for sample data
     echo "Configuring Samba shares for sample data"
@@ -2034,6 +2294,32 @@ RSYNCUNIT
     systemctl enable "${RSYNC_SERVICE}"
     systemctl restart "${RSYNC_SERVICE}"
 
+    # Local FTP server for testing FTP transfers (pyftpdlib, run by Supervisor).
+    # Listens on localhost only: port 2121 supports MLSD, port 2122 doesn't.
+    echo "Configuring FTP server for sample data"
+    "${INSTALL_ROOT}/openvdm/venv/bin/pip" install pyftpdlib --quiet
+
+    printf '%s\n' "${OPENVDM_DATABASE_PASSWORD}" > /etc/openvdm_sample_ftp.passwd
+    chown "${OPENVDM_USER}:${OPENVDM_USER}" /etc/openvdm_sample_ftp.passwd
+    chmod 600 /etc/openvdm_sample_ftp.passwd
+
+    cat > "${SUPERVISOR_CONF_D}/openvdm_sample_ftp.${SUPERVISOR_PROG_EXT}" << EOF
+[program:openvdm_sample_ftp]
+command=${INSTALL_ROOT}/openvdm/venv/bin/python utils/sample_ftp_server.py --root ${SAMPLEDATA_ROOT} --user ${OPENVDM_USER} --password-file /etc/openvdm_sample_ftp.passwd --port 2121
+directory=${INSTALL_ROOT}/openvdm
+redirect_stderr=true
+stdout_logfile=/var/log/openvdm/sample_ftp.log
+user=${OPENVDM_USER}
+autostart=true
+autorestart=true
+stopsignal=INT
+EOF
+
+    supervisorctl reread
+    supervisorctl update
+    # Pick up a changed password or script on re-install
+    supervisorctl restart openvdm_sample_ftp
+
     echo "Sample data installation complete"
 
     cd "${startingDir}"
@@ -2111,8 +2397,11 @@ read -p "New/updated root user password for MySQL? ($CURRENT_ROOT_DATABASE_PASSW
 NEW_ROOT_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$CURRENT_ROOT_DATABASE_PASSWORD}
 echo
 
-read -p "New password for MySQL user: $OPENVDM_USER? ($OPENVDM_USER) " OPENVDM_DATABASE_PASSWORD
-OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$OPENVDM_USER}
+# The OpenVDM user's password (also its web login and Samba password)
+# defaults to the root database password, or else the user's name (#344)
+DEFAULT_OPENVDM_DATABASE_PASSWORD=${NEW_ROOT_DATABASE_PASSWORD:-$OPENVDM_USER}
+read -p "New password for MySQL user: $OPENVDM_USER? ($DEFAULT_OPENVDM_DATABASE_PASSWORD) " OPENVDM_DATABASE_PASSWORD
+OPENVDM_DATABASE_PASSWORD=${OPENVDM_DATABASE_PASSWORD:-$DEFAULT_OPENVDM_DATABASE_PASSWORD}
 echo
 
 echo "#####################################################################"
@@ -2158,8 +2447,10 @@ if [ "$SUPERVISORD_WEBINTERFACE" = "yes" ]; then
         read -p "Username? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_USER
         SUPERVISORD_WEBINTERFACE_USER=${SUPERVISORD_WEBINTERFACE_USER:-$OPENVDM_USER}
 
-        read -p "Password? ($OPENVDM_USER) " SUPERVISORD_WEBINTERFACE_PASS
-        SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_USER}
+        # Defaults to the OpenVDM user's password (which defaults to the root
+        # database password), as the username defaults to that user (#344)
+        read -p "Password? ($OPENVDM_DATABASE_PASSWORD) " SUPERVISORD_WEBINTERFACE_PASS
+        SUPERVISORD_WEBINTERFACE_PASS=${SUPERVISORD_WEBINTERFACE_PASS:-$OPENVDM_DATABASE_PASSWORD}
     fi
 else
   SUPERVISORD_WEBINTERFACE_AUTH=no
@@ -2280,6 +2571,7 @@ save_default_variables
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
 install_packages
+ensure_kernel_modules
 
 echo "#####################################################################"
 echo "Detecting Python version"
@@ -2362,9 +2654,18 @@ OVDM_CRUISE_START_DATE=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm
 OVDM_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
     "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=0;" \
     2>/dev/null | tr '\n' ',')
+OVDM_LOWERING_CST_IDS=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT collectionSystemTransferID FROM OVDM_CollectionSystemTransfers WHERE enable=1 AND cruiseOrLowering=1;" \
+    2>/dev/null | tr '\n' ',')
+OVDM_LOWERING_ID=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='loweringID';" 2>/dev/null)
+OVDM_SHOW_LOWERING=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
+    "SELECT value FROM OVDM_CoreVars WHERE name='showLoweringComponents';" 2>/dev/null)
 OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+OVDM_ROOT="${INSTALL_ROOT}/openvdm"
 
 export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
+export OVDM_LOWERING_CST_IDS OVDM_LOWERING_ID OVDM_SHOW_LOWERING OVDM_ROOT
 "${INSTALL_ROOT}/openvdm/venv/bin/python3" - <<'PYEOF'
 import os, sys, json
 
@@ -2379,48 +2680,105 @@ cruise_start_date = os.environ.get('OVDM_CRUISE_START_DATE', '')
 cst_ids = [x for x in os.environ.get('OVDM_CST_IDS', '').split(',') if x]
 cruise_dir = os.environ.get('OVDM_CRUISE_DIR', '')
 install_sampledata = os.environ.get('INSTALL_SAMPLEDATA', 'no') == 'yes'
+lowering_cst_ids = [x for x in os.environ.get('OVDM_LOWERING_CST_IDS', '').split(',') if x]
+lowering_id = os.environ.get('OVDM_LOWERING_ID', '')
+show_lowering = os.environ.get('OVDM_SHOW_LOWERING', 'No') == 'Yes'
 
 gm = python3_gearman.GearmanClient(['localhost:4730'])
+
+def job_failed(request, timeout):
+    """Return why a job didn't succeed, or None if it completed and passed.
+
+    A job that timed out, didn't complete, or returned no readable result
+    counts as failed (#212), as well as one with a failed part.
+    """
+    if getattr(request, 'timed_out', False):
+        return f'timed out after {timeout} s'
+    state = getattr(request, 'state', None)
+    if state != python3_gearman.constants.JOB_COMPLETE:
+        return f'job ended in state {state}'
+    try:
+        parts = json.loads(request.result).get('parts', [])
+    except (TypeError, ValueError, AttributeError):
+        return 'job returned no readable result'
+    failed = [p for p in parts if p.get('result') == 'Fail']
+    return f"{failed[0]['partName']}: {failed[0].get('reason', '')}" if failed else None
 
 if not os.path.exists(cruise_dir):
     # Fresh install: setupNewCruise creates the directory, MD5 files,
     # cruise_config.json, and data dashboard manifest in one shot.
-    print('  Setting up new cruise...')
-    try:
-        gm.submit_job('setupNewCruise', '{}', wait_until_complete=True, poll_timeout=120)
-        print('  Setup new cruise: done')
-    except Exception as e:
-        print(f'  Warning: setupNewCruise failed: {e}', file=sys.stderr)
+    cruise_steps = [('Setup new cruise', 'setupNewCruise', 120)]
 else:
     # Re-install: cruise directory already exists; just re-export config
     # and rebuild the directory structure.
-    for label, task, timeout in [
+    cruise_steps = [
         ('Re-export cruise configuration', 'exportOVDMConfig',      30),
         ('Rebuild cruise directory',        'rebuildCruiseDirectory', 120),
-    ]:
-        print(f'  {label}...')
-        try:
-            gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
-            print(f'  {label}: done')
-        except Exception as e:
-            print(f'  Warning: {label} failed: {e}', file=sys.stderr)
-
-if install_sampledata and cst_ids:
-    print(f'  Running {len(cst_ids)} collection system transfer(s)...')
+    ]
+for label, task, timeout in cruise_steps:
+    print(f'  {label}...')
     try:
-        jobs = []
-        for cst_id in cst_ids:
-            payload = json.dumps({
-                'cruiseID': cruise_id,
-                'cruiseStartDate': cruise_start_date,
-                'systemStatus': 'On',
-                'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}
-            })
-            jobs.append({'task': 'runCollectionSystemTransfer', 'data': payload})
-        gm.submit_multiple_jobs(jobs, background=False, wait_until_complete=True, poll_timeout=600)
-        print('  Collection system transfers: done')
+        request = gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
+        reason = job_failed(request, timeout)
+        if reason:
+            print(f'  Warning: {label} failed: {reason}', file=sys.stderr)
+        else:
+            print(f'  {label}: done')
     except Exception as e:
-        print(f'  Warning: collection system transfers failed: {e}', file=sys.stderr)
+        print(f'  Warning: {label} failed: {e}', file=sys.stderr)
+
+
+# The sample data turns on lowering components (#201); set up its lowering
+# the same way as the cruise, so the lowering-level sample transfers can run.
+lowering_ready = False
+if install_sampledata and show_lowering and lowering_id:
+    try:
+        sys.path.insert(0, os.environ['OVDM_ROOT'])
+        from server.lib.openvdm import OpenVDM
+        warehouse = OpenVDM().get_shipboard_data_warehouse_config()
+        lowering_dir = os.path.join(warehouse['shipboardDataWarehouseBaseDir'], cruise_id,
+                                    warehouse['loweringDataBaseDir'], lowering_id)
+        if not os.path.exists(lowering_dir):
+            steps = [('Set up new lowering', 'setupNewLowering', 120)]
+        else:
+            steps = [('Re-export lowering configuration', 'exportLoweringConfig',     30),
+                     ('Rebuild lowering directory',       'rebuildLoweringDirectory', 120)]
+        lowering_ready = True
+        for label, task, timeout in steps:
+            print(f'  {label}...')
+            request = gm.submit_job(task, '{}', wait_until_complete=True, poll_timeout=timeout)
+            reason = job_failed(request, timeout)
+            if reason:
+                lowering_ready = False
+                print(f'  Warning: {label} failed: {reason}', file=sys.stderr)
+            else:
+                print(f'  {label}: done')
+    except Exception as e:
+        lowering_ready = False
+        print(f'  Warning: lowering setup failed: {e}', file=sys.stderr)
+
+if install_sampledata:
+    jobs = []
+    for cst_id in cst_ids:
+        jobs.append({'cruiseID': cruise_id, 'cruiseStartDate': cruise_start_date,
+                     'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}})
+    if lowering_ready:
+        for cst_id in lowering_cst_ids:
+            jobs.append({'cruiseID': cruise_id, 'loweringID': lowering_id,
+                         'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}})
+    elif lowering_cst_ids:
+        print(f'  Skipping {len(lowering_cst_ids)} lowering-level transfer(s): no lowering set up')
+
+    if jobs:
+        print(f'  Running {len(jobs)} collection system transfer(s)...')
+        try:
+            gm.submit_multiple_jobs(
+                [{'task': 'runCollectionSystemTransfer',
+                  'data': json.dumps(dict(job, systemStatus='On'))} for job in jobs],
+                background=False, wait_until_complete=True, poll_timeout=600)
+            print('  Collection system transfers: done')
+        except Exception as e:
+            print(f'  Warning: collection system transfers failed: {e}', file=sys.stderr)
 PYEOF
 echo
 

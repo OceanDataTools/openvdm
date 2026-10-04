@@ -37,6 +37,7 @@ class DataDashboard extends Controller {
         $data['jsonReversedYTypes'] = $this->_dataDashboardModel->getJSONReversedYTypes();
         $data['jsonReversedYInvertedTypes'] = $this->_dataDashboardModel->getJSONReversedYInvertedTypes();
         $data['jsonInvertedTypes'] = $this->_dataDashboardModel->getJSONInvertedTypes();
+        $data['jsonProfileTypes'] = $this->_dataDashboardModel->getJSONProfileTypes();
 
         $data['subPages'] = $this->_dataDashboardModel->getSubPages();
 
@@ -84,7 +85,10 @@ class DataDashboard extends Controller {
         if (!empty($tab['placeholderArray']) && is_array($tab['placeholderArray']) && sizeof($tab['placeholderArray'])>0) {
             foreach ($tab['placeholderArray'] as $placeholder) {
                 $placeholder['dataFiles'] = array();
-                foreach ($placeholder['dataArray'] as $dataObj) {
+                foreach ($placeholder['dataArray'] as $k => $dataObj) {
+                    if (($dataObj['visType'] ?? '') === 'json-profile') {
+                        $placeholder['dataArray'][$k]['profileOptions'] = \Models\DataDashboard::profileOptions($dataObj);
+                    }
                     $objects = $this->_dashboardDataModel->getDashboardObjectsByTypes($dataObj['dataType']);
                     array_push($placeholder['dataFiles'], $objects);
                 }
@@ -118,6 +122,48 @@ class DataDashboard extends Controller {
 
     }
 
+    /**
+     * Fill in the Data Quality tab's data types, their files, and each file's
+     * quality tests and stats.
+     *
+     * A file with neither quality tests nor stats is left out, and so is a
+     * data type with no files left (#310). Missing tests or stats are empty
+     * arrays.
+     *
+     * @param array $data The view data, updated in place.
+     */
+    private function loadDataQuality(&$data) {
+        $data['dataTypes'] = array();
+        $data['dataObjects'] = array();
+        $data['dataObjectsQualityTests'] = array();
+        $data['dataObjectsStats'] = array();
+
+        foreach ($this->_dashboardDataModel->getDashboardDataTypes() as $dataType) {
+            $objects = array();
+            $qualityTests = array();
+            $stats = array();
+            foreach ($this->_dashboardDataModel->getDashboardObjectsByTypes($dataType) as $object) {
+                $objectQualityTests = $this->_dashboardDataModel->getDashboardObjectQualityTestsByJsonName($object['dd_json'], $dataType);
+                $objectStats = $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($object['dd_json'], $dataType);
+                $objectQualityTests = is_array($objectQualityTests) ? $objectQualityTests : array();
+                $objectStats = is_array($objectStats) ? $objectStats : array();
+                if (empty($objectQualityTests) && empty($objectStats)) {
+                    continue;
+                }
+                $objects[] = $object;
+                $qualityTests[] = $objectQualityTests;
+                $stats[] = $objectStats;
+            }
+            if (empty($objects)) {
+                continue;
+            }
+            $data['dataTypes'][] = $dataType;
+            $data['dataObjects'][] = $objects;
+            $data['dataObjectsQualityTests'][] = $qualityTests;
+            $data['dataObjectsStats'][] = $stats;
+        }
+    }
+
     public function dataQuality(){
 
         $data['title'] = 'Data Quality';
@@ -127,22 +173,8 @@ class DataDashboard extends Controller {
         $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
         $data['dataWarehouseApacheDir'] = $this->_warehouseModel->getShipboardDataWarehouseApacheDir();
         $data['javascript'] = array('dataDashboardQuality');
-        $data['dataTypes'] = $this->_dashboardDataModel->getDashboardDataTypes();
-        $data['dataObjects'] = array();
-        $data['dataObjectsQualityTests'] = array();
-        $data['dataObjectsStats'] = array();
+        $this->loadDataQuality($data);
         $data['stats'] = null;
-
-        for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
-            array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
-            array_push($data['dataObjectsQualityTests'], array());
-            array_push($data['dataObjectsStats'], array());
-            for($j = 0; $j < sizeof($data['dataObjects'][$i]); $j++) {
-                //var_dump($dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
-                array_push($data['dataObjectsQualityTests'][$i], $this->_dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-                array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-            }
-        }
 
         View::renderTemplate('header', $data);
         View::renderTemplate('dataDashboardHeader', $data);
@@ -164,21 +196,7 @@ class DataDashboard extends Controller {
         $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
         $data['javascript'] = array('dataDashboardQuality');
         $data['dataWarehouseApacheDir'] = $this->_warehouseModel->getShipboardDataWarehouseApacheDir();
-        $data['dataTypes'] = $this->_dashboardDataModel->getDashboardDataTypes();
-        $data['dataObjects'] = array();
-        $data['dataObjectsQualityTests'] = array();
-        $data['dataObjectsStats'] = array();
-
-        for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
-            array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
-            array_push($data['dataObjectsQualityTests'], array());
-            array_push($data['dataObjectsStats'], array());
-            for($j = 0; $j < sizeof($data['dataObjects'][$i]); $j++) {
-                //var_dump($dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
-                array_push($data['dataObjectsQualityTests'][$i], $this->_dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-                array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-            }
-        }
+        $this->loadDataQuality($data);
 
         $data['statsTitle'] = array_pop(explode("/", $rawData));
         $data['statsDataType'] = $this->_dashboardDataModel->getDashboardObjectDataTypeByRawName($rawData, $dataType);
@@ -200,21 +218,7 @@ class DataDashboard extends Controller {
         $data['systemStatus'] = $this->_warehouseModel->getSystemStatus();
         $data['javascript'] = array('dataDashboardQuality');
         $data['dataWarehouseApacheDir'] = $this->_warehouseModel->getShipboardDataWarehouseApacheDir();
-        $data['dataTypes'] = $this->_dashboardDataModel->getDashboardDataTypes();
-        $data['dataObjects'] = array();
-        $data['dataObjectsQualityTests'] = array();
-        $data['dataObjectsStats'] = array();
-
-        for($i = 0; $i < sizeof($data['dataTypes']); $i++) {
-            array_push($data['dataObjects'], $this->_dashboardDataModel->getDashboardObjectsByTypes($data['dataTypes'][$i]));
-            array_push($data['dataObjectsQualityTests'], array());
-            array_push($data['dataObjectsStats'], array());
-            for($j = 0; $j < sizeof($data['dataObjects'][$i]); $j++) {
-                //var_dump($dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json']));
-                array_push($data['dataObjectsQualityTests'][$i], $this->_dashboardDataModel->getDashboardObjectQualityTestsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-                array_push($data['dataObjectsStats'][$i], $this->_dashboardDataModel->getDashboardObjectStatsByJsonName($data['dataObjects'][$i][$j]['dd_json'], $data['dataTypes'][$i]));
-            }
-        }
+        $this->loadDataQuality($data);
 
         $data['statsTitle'] = $dataType;
         $data['statsDataType'] = $dataType;

@@ -4,6 +4,128 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.16.0] – 2026-09-28
+
+**Highlights**
+- **FTP Server transfers**, for collection system sources and cruise data destinations.
+- **Depth profile charts**, and parsers for **Sea-Bird SBE 9plus CTD** and **MK21 XBT** casts, with each cast's position on the map.
+- **Transfers report failures**: a failed rsync or rclone transfer, or a source that can't be listed, no longer passes. With Sync from source on, an unlistable source had emptied the destination.
+- **Keyless basemaps** (CARTO now needs an API key), tracks colored by data type, and point markers.
+- **Installer**: tested with fresh installs and 2.15.8 upgrades on Rocky Linux and AlmaLinux 9 and 10, and Ubuntu 22.04 and 24.04. Safer re-runs, and step-by-step upgrades from 2.14 and 2.15.
+
+**Upgrading:** follow "Upgrading from 2.15" (or "from 2.14") in [INSTALL.md](INSTALL.md):
+- set aside `Config.php`, `openvdm.yaml` and `datadashboard.yaml`, re-run the installer, and merge your settings back into the 2.16 files;
+- update the database with `database/openvdm_215_to_216.sql`;
+- copy the updated `.dist` files you use over your copies:
+  - the GeoTIFF, TSG45, HPR and GNSS parsers;
+  - the ROV OpenRVDAS plugin (keep `SEALOG_SERVER_URL` and `SEALOG_JWT`);
+  - `bin/build_remote_directory.py`;
+  - `custom1.js`;
+- in your own `datadashboard.yaml`, remove `- lowering` from the Position tab's `jsArray`, and add `charts-zoom` to any Lowering tab;
+- rebuild the data dashboard.
+
+The detailed notes for each change are in the [full 2.16.0 changelog](https://github.com/OceanDataTools/openvdm/blob/f1d28e7d83cbc2e1b95d6d7e4b51f454796cdd55/CHANGELOG.md#2160--2026-09-28) and the linked issues.
+
+### Added
+- **FTP Server transfers**:
+  - collection system sources are mounted with `rclone mount` and copied with rsync, as for SMB;
+  - cruise data destinations are copied with rclone, as for SSH;
+  - the server field takes `host[:port]`;
+  - plain FTP only, not FTPS;
+  - needs the database update. The installer adds `fuse3` (#17, #199).
+- **Depth profile charts** (`visType: json-profile`, with optional `depthSeries` and `profileSeries`) on default and lowering tabs and the main page (#274). The inverted charts (`json-inverted`, `json-reversedY-inverted`) work again (#275).
+- **Sea-Bird SBE 9plus CTD parser and plugin** (`ctd_profile_parser.py.dist`, `ctd_plugin.py.dist`), based on code by Oscar Garcia (CSIC):
+  - pressure, temperature, conductivity, salinity and depth, matching Sea-Bird's own data conversion;
+  - the cast's geographic bounds;
+  - its position on the map (`ctd-position`);
+  - optional PNG plots (#286, #290, #292, #304, #324).
+- **MK21 XBT parser and plugin** (`xbt_parser.py.dist`, `xbt_plugin.py.dist`), built on Peter Shanks' (AADC) xbt-edf-qc library:
+  - QC'd temperature and sound velocity profiles, and launch positions (`xbt-position`);
+  - the library isn't in `requirements.txt`, and the sample data install adds it (#300).
+  - The position data types have no stats, and show times as ISO 8601 UTC (#314, #320).
+- **Plugin API**: optional `get_source_files(filepath)` to re-parse a related file, e.g. a CTD cast when its `.xmlcon` arrives (#288); `format_iso8601()` in `openvdm_plugin.py` (#320).
+- **Maps show GeoJSON points** as circle markers with property popups. Point data types get no Latest Position or Start/End Positions checkbox (#292, #316, #322).
+- **New installs' default cruise** matches the sample data (Gulf of Mexico) (#293).
+
+### Changed
+- **Basemaps**:
+  - CARTO is replaced by keyless OpenStreetMap, Esri and GMRT layers, with label and seamark overlays;
+  - all maps share one tile-layer helper in `mapBaseLayers.js`;
+  - sites with their own `custom1.js` update it from `custom1.js.dist` (#121, #298).
+- **Map tracks** are drawn in the chart palette's colors, one per data type (#195).
+- **The data dashboard leaves out what has nothing to show**:
+  - on the Data Quality tab, files without stats or quality tests;
+  - on the other tabs, cards with no files (#310).
+  - Rebuild Data Dashboard deletes dashboard files that are no longer in the manifest (#318).
+- **Transfer forms**:
+  - a Transfer Type dropdown and example placeholders (#226, #227);
+  - a `:` in a cruise data Destination Directory (an rclone remote) is allowed only for Local Directory (#199).
+- **More system and NAS folders and files are ignored by default** (`lost+found`, recycle bins, snapshots, Office lock files, …), and they're skipped while listing the source (#265).
+- **SSH-key transfers** use the key ssh would use (`~/.ssh/config`, or root's default keys), not only `id_rsa` (#340).
+- **Installer**:
+  - builds the web app as the OpenVDM user, with nvm in that user's home on Debian/Ubuntu, and runs `composer install --no-dev` (#130, #183);
+  - on Debian/Ubuntu, installs PHP 8.3 (8.5 on Ubuntu 26.04, the only version there); uses Python 3.11–3.14 (#352);
+  - creates root's SSH key with the system's default type, and relabels it for SELinux (#340);
+  - installs the kernel modules for `cifs` and `fuse` when they're missing (#356);
+  - defaults the OpenVDM user's database password to root's, and the Supervisor password to that user's (#344).
+  - With sample data, it also sets up a local FTP server, turns on lowering components, and sets up a sample lowering and the example Lowering tab (#200, #201, #272).
+- **Dependencies**: pandas 2.3.3 (#330); js-cookie 3.0.8, moment-timezone 0.5.x, and moment as a direct dependency (#128, #181). Bootstrap 3's `npm audit` finding remains (#178).
+- **Removed**:
+  - the DBS parser's unused `no_mag` option; site plugins passing it get a `TypeError` (#147);
+  - the unused `OpenVDM.get_logfile_purge_timedelta_str()` (#169).
+- **Development**: ESLint, `php -l` and PHPStan run in the pre-commit hooks; pylint is fixed; docstrings across `server/` (pdoc). No effect on running installs (#128, #130, #131, #132, #135, #140, #141, #143, #144, #160, #161).
+- **INSTALL.md**: step-by-step upgrades from 2.14 (in place, or on a fresh OS) and from 2.15 (#326, #338, #354).
+
+### Fixed
+**Transfers**
+- Failed rsync and rclone transfers are no longer reported as successful. The reason includes the tool's error and the first failing file (#230, #237).
+- A source that can't be listed (rsync, SSH, SMB, FTP, local) fails the transfer instead of passing with no files. With Sync from source on, that had emptied the destination (#206, #238, #264, #284).
+- Cleanup no longer deletes files through an SMB or FTP share that's still mounted (#207).
+- A collection system transfer that fails partway still processes the files it copied (#239).
+- **rsync cruise data transfers**:
+  - copied nothing (#249);
+  - broke on subdirectory paths (#228);
+  - couldn't use `/` as the destination (#247);
+  - Test Setup left a `write_test.txt` behind (#233).
+- Cruise data Test Setup now tests every rclone remote type, and its messages are clearer (#165, #166, #179).
+- An SSH password was logged in plain text at debug level (#240).
+- A password typed before Test Setup was lost on Update (#119).
+
+**Data dashboard and parsers**
+- Pages returned HTTP 500 once the Messages table grew large (#123).
+- **GeoTIFF**:
+  - overlays were misplaced for files not in lat/lon, and Geographic Bounds were mislabelled (#138, #158);
+  - TiTiler layers didn't show on lowering tabs (#298).
+- Lowering tabs' maps and charts hadn't loaded since 2.14, and the Position tab logged `Map container is already initialized`. Lowering-tab charts now match the default tabs (#185, #278).
+- **Parsers**:
+  - HPR and GNSS gave no output (#152);
+  - TSG45 failed when files with and without an SBE 38 were parsed together (#146);
+  - time cropping failed (#149);
+  - the ROV OpenRVDAS plugin couldn't run (#150);
+  - `round_data()` failed without a precision (#168).
+- **Smaller dashboard fixes**:
+  - a data type's stats were merged by position, not name (#306);
+  - the page jumped when a chart was redrawn (#302);
+  - file names wrapped in narrow cells (#280, #282);
+  - the map marker shadow returned 404 (#193);
+  - one plugin's import failure crashed the whole rebuild (#191).
+- The Configuration page broke after Setup New Lowering (#336). Leftover debug output is removed (#308, #312).
+- PHP warnings and deprecation notices (#125, #132, #135).
+
+**Workers and installer**
+- Update MD5 Summary failed when the cruise had no summary yet (#348).
+- **Pre-2.15.5 `openvdm.yaml` files**: `KeyError: 'transferPublicData'`, and workers without `workerApiKey` got no transfer passwords (#187). Worker crash messages now name the real file and line (#187).
+- The lowering base directory is created from New Cruise. A failed step is no longer reported as both Fail and Pass (#189).
+- Error messages showed a tuple for an invalid transfer or task ID (#167). `bin/build_remote_directory.py` made directories with the wrong permissions (#164).
+- **Installer**:
+  - a venv made with another Python version is rebuilt (#328);
+  - a 2.14 upgrade could be left on 2.14's code, and error checks didn't stop the install (#334);
+  - a stale `composer.lock` warning (#346);
+  - a `mysql:8.0` module error on RHEL 9 (#350);
+  - failed setup steps are now reported (#212).
+
+---
+
 ## [2.15.8] – 2026-09-19
 
 ### Fixed

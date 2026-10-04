@@ -117,7 +117,7 @@ class TableBuilder
      * @param PDO|null $db - PDO instance (it can be a \helper\database instance)
      * @param bool     $id - A flag to add or not to add `id` field automatically
      */
-    public function __construct(PDO $db = null, $id = true)
+    public function __construct(?PDO $db = null, $id = true)
     {
         // If database is not given, create new database instance.
         // database is in the same namespace, we don't need to specify namespace

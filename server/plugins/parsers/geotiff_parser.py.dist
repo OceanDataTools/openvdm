@@ -1,26 +1,13 @@
 #!/usr/bin/env python3
-"""
-FILE:  geotiff_parser.py
+"""Parser for GeoTIFF files, using GDAL to build map tiles.
 
-USAGE:  geotiff_parser.py [-h] [-v+] <dataFile>
+Reprojects the supplied GeoTIFF to WGS84, builds a tile pyramid for the Data
+Dashboard map with gdal2tiles.py, and returns the JSON-formatted plugin data
+used by OpenVDM's Data Dashboard, including a Geographic Bounds stat.
 
-DESCRIPTION:  Parse the supplied geotiff file and return the json-
-    formatted string used by OpenVDM as part of it's Data dashboard.
-
-  OPTIONS:  [-h] Return the help message.
-            [-v+] Increase verbosity (default: warning)
-            <dataFile> Full or relative path of the data file to process.
-
-REQUIREMENTS:  Python3.10
-               Python Modules:
-                   GDAL==3.10.3
-
-     BUGS:
-    NOTES:
-   AUTHOR:  Webb Pinner
-  VERSION:  2.15
-  CREATED:  2016-08-29
- REVISION:  2025-04-12
+Requires GDAL's Python bindings (osgeo.gdal) and the gdalwarp, gdal_translate
+and gdal2tiles.py command-line tools, which aren't installed from
+requirements.txt.
 """
 
 import os
@@ -37,9 +24,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMParser
 
 class GeoTIFFParser(OpenVDMParser):
-    """
-    Custom OpenVDM file parser
-    """
+    """Parser for GeoTIFF files that writes a GDAL tile pyramid."""
 
     def __init__(self, use_openvdm_api=False, output_dir=None):
         super().__init__(use_openvdm_api=use_openvdm_api)
@@ -51,9 +36,7 @@ class GeoTIFFParser(OpenVDMParser):
         self.tile_dir = None
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """
-        Process the provided file
-        """
+        """Parse the GeoTIFF, write its tiles and populate the plugin data."""
 
         logging.debug("Parsing data file...")
 
@@ -120,7 +103,8 @@ class GeoTIFFParser(OpenVDMParser):
         logging.debug("Finished parsing data file")
 
         logging.debug("Tabulating statistics...")
-        self.add_geobounds_stat([minx,miny,maxx,maxy])
+        # geoBounds is [north, east, south, west]; mapBounds below stays west,south,east,north.
+        self.add_geobounds_stat([maxy, maxx, miny, minx])
 
         logging.debug("Building visualization data...")
 

@@ -5,6 +5,8 @@ use Core\Error;
 use Helpers\Session;
 use Helpers\Url;
 
+$loadingImage = '<img height="50" src="' . Url::templatePath() . 'images/loading.gif"/>';
+
 ?>
 
     <div class="row">
@@ -37,6 +39,7 @@ use Helpers\Url;
 ?>
                             <div class="panel panel-default">
 <?php
+        $filecount = 0;
         for($j=0; $j < sizeof($data['placeholders'][$i]->dataFiles); $j++){
 ?>
                             <a id="<?php echo $data['placeholders'][$i]->dataFiles[$j][0]['type']; ?>"></a>

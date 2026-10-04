@@ -1,6 +1,6 @@
 <?php
 
-namespace models\config;
+namespace Models\Config;
 use Core\Model;
 
 class Links extends Model {

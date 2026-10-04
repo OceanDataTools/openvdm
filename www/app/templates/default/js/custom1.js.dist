@@ -1,7 +1,6 @@
 $(function () {
     'use strict';
 
-    var MAPPROXY_DIR = '/mapproxy';
 
     var mapObjects = [];
 
@@ -37,26 +36,13 @@ $(function () {
             fullscreenControl: true,
         }).setView(L.latLng(0, 0), 2);
 
-        //Add basemap layer, use OpenStreetMap
-        var openStreetMap = L.tileLayer('http://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/about-carto/">rastertiles/voyager</a>',
-            maxZoom: 20
-        }),
-        gmrtBase = L.tileLayer.wms('http://www.gmrt.org/services/mapserver/wms_merc?', {
-            layers: 'topo',
-            format: 'image/png',
-            attribution: '<a href="https://www.marine-geo.org/portals/gmrt/" target="_blank">GMRT</a>'
-        });
+        //Add basemap layers, default to OpenStreetMap (see mapBaseLayers.js)
+        var baseLayers = openvdmBaseLayers();
 
-        openStreetMap.addTo(mapObject['map']);
-        openStreetMap.bringToBack();
+        baseLayers["OpenStreetMap"].addTo(mapObject['map']);
+        baseLayers["OpenStreetMap"].bringToBack();
 
-        var baseLayers = {
-            "OpenStreetMap" : openStreetMap,
-            "GMRT Base" : gmrtBase
-        };
-
-        L.control.layers(baseLayers).addTo(mapObject['map']);
+        L.control.layers(baseLayers, openvdmOverlayLayers()).addTo(mapObject['map']);
 
         L.easyPrint({
             title: 'Export current map view',
@@ -237,12 +223,12 @@ $(function () {
                         southwest = L.latLng(parseFloat(coords[1]), parseFloat(coords[0])),
                         northeast = L.latLng(parseFloat(coords[3]), parseFloat(coords[2]));
 
-                    // Build the layer
-                    mapObject['tmsLayers'][tmsObjectJsonName] = L.tileLayer(location.protocol + '//' + location.host + cruiseDataDir + '/' + data[0]['tileDirectory'] + '/{z}/{x}/{y}.png', {
-                        tms:true,
-                        bounds:L.latLngBounds(southwest, northeast),
-                        zIndex: 10
-                    });
+                    // Build the layer: pre-rendered tiles or a TiTiler GeoTIFF (#298)
+                    mapObject['tmsLayers'][tmsObjectJsonName] = openvdmTileLayer(data[0], cruiseDataDir, { zIndex: 10 });
+                    if (!mapObject['tmsLayers'][tmsObjectJsonName]) {
+                        delete mapObject['tmsLayers'][tmsObjectJsonName];
+                        return;
+                    }
 
                     if (parseFloat(coords[0]) < 0) {
                         southwest = southwest.wrap(360, 0);
@@ -290,7 +276,6 @@ $(function () {
     //build the maps
     for(var i = 0; i < mapObjects.length; i++) {
         mapChecked(mapObjects[i]);
-        setTimeout(updateBounds(mapObjects[i]), 5000);
         addLatestPositionLabelToMap(mapObjects[i], 'gga-cnav');
     }
 

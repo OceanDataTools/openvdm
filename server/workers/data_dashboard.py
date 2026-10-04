@@ -7,7 +7,8 @@ Registers two Gearman tasks:
   files reported by a collection system transfer and write the resulting
   dashboard JSON to the cruise directory.
 - ``rebuildDataDashboard`` — walk the entire cruise directory, run all matching
-  plugins against every file, and fully regenerate all dashboard objects.
+  plugins against every file, fully regenerate all dashboard objects, and
+  delete the dashboard files the new manifest no longer lists.
 
 Plugins are discovered at start-up from the ``pluginDir`` path in
 ``openvdm.yaml``.  Each plugin module is imported via ``importlib`` and must
@@ -22,6 +23,7 @@ import logging
 import os
 import signal
 import sys
+import traceback
 
 import python3_gearman
 
@@ -33,11 +35,13 @@ from server.lib.openvdm import OpenVDM
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
+# Gearman task names this worker registers.
 TASK_NAMES = {
     'UPDATE_DATA_DASHBOARD': 'updateDataDashboard',
     'REBUILD_DATA_DASHBOARD': 'rebuildDataDashboard'
 }
 
+# Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
         "taskID": 0,
@@ -45,6 +49,11 @@ CUSTOM_TASKS = [
         "longName": "Updating data dashboard",
     }
 ]
+
+
+class PluginLoadError(Exception):
+    """A collection system transfer's plugin file exists but couldn't be imported."""
+
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
     """Gearman worker for data-dashboard generation and updates.
@@ -78,12 +87,37 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
     @staticmethod
     def get_custom_task(current_job):
+        """Return the ``CUSTOM_TASKS`` entry for the job's task, or ``None``.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            dict | None: The matching task definition, or ``None`` if the job's
+            task isn't a custom task.
+        """
         task = list(filter(lambda task: task['name'] == current_job.task, CUSTOM_TASKS))
         return task[0] if len(task) > 0 else None
 
-    def _get_plugin_callable(self, cfg=None):
-        """
-        Retrieve the Python plugin callable for a collection system transfer.
+    def _get_plugin_functions(self, cfg=None):
+        """Return a collection system transfer's plugin's ``process_file`` and ``get_source_files``.
+
+        ``get_source_files(filepath)`` is optional: a plugin defines it when a
+        file's arrival means other raw files must be (re)processed, e.g. a CTD
+        cast's ``.xmlcon`` calibration means its ``.hex`` (#288).
+
+        Args:
+            cfg: The collection system transfer; defaults to the job's transfer.
+
+        Returns:
+            tuple: ``(process_file, get_source_files)``. ``process_file`` is
+            ``None`` if the transfer has no plugin file or the plugin has no
+            ``process_file``; ``get_source_files`` is ``None`` if the plugin
+            doesn't define it.
+
+        Raises:
+            PluginLoadError: If the plugin file exists but importing it fails,
+                e.g. because a parser it imports is missing.
         """
         cst_cfg = cfg or self.collection_system_transfer
         plugin_name = cst_cfg['name'].lower()
@@ -92,17 +126,54 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         plugin_path = os.path.join(plugin_dir, f"{plugin_name}{plugin_suffix}")
 
         if not os.path.isfile(plugin_path):
-            return None
+            return None, None
 
-        spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
-        plugin_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(plugin_module)
+        try:
+            spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
+            plugin_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(plugin_module)
+        except Exception as exc:
+            reason = f"Unable to load plugin {os.path.basename(plugin_path)}: {type(exc).__name__}: {exc}"
+            logging.exception(reason)
+            raise PluginLoadError(reason) from exc
 
         if not hasattr(plugin_module, 'process_file'):
             logging.warning("Plugin %s does not have a 'process_file(raw_path)' function", plugin_name)
-            return None
+            return None, None
 
-        return plugin_module.process_file
+        return plugin_module.process_file, getattr(plugin_module, 'get_source_files', None)
+
+    def _source_filelist(self, filelist, get_source_files):
+        """Map each file to the raw files the plugin should process for it (#288).
+
+        Args:
+            filelist: File paths relative to the cruise directory.
+            get_source_files: The plugin's ``get_source_files(filepath)``,
+                which takes and returns absolute paths.
+
+        Returns:
+            list: The files to process, relative to the cruise directory,
+            without duplicates, in order. A file the hook fails on is kept as
+            it is; a returned path outside the cruise directory is skipped.
+        """
+        sources = []
+        for filename in filelist:
+            raw_path = os.path.join(self.cruise_dir, filename)
+            try:
+                mapped = get_source_files(raw_path)
+            except Exception as exc:
+                logging.warning("Plugin get_source_files() failed for %s: %s", filename, exc)
+                mapped = [raw_path]
+            for path in mapped:
+                rel_path = os.path.relpath(path, self.cruise_dir)
+                if rel_path.startswith(os.pardir):
+                    logging.warning("Plugin get_source_files() returned %s, outside the cruise directory", path)
+                    continue
+                if rel_path != filename:
+                    logging.info("Processing %s for %s", rel_path, filename)
+                if rel_path not in sources:
+                    sources.append(rel_path)
+        return sources
 
     def _build_paths(self, filename):
         json_filename = f'{os.path.splitext(filename)[0]}.json'
@@ -120,10 +191,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         rel_raw = raw_path.replace(f'{base_dir}/', '')
         entries.append({"dd_json": rel_json, "raw_data": rel_raw})
 
-    def _process_filelist(self, current_job, filelist, plugin_callable, job_results, start=0, end=100):
+    def _process_filelist(self, current_job, filelist, plugin_callable, job_results, start=0, end=100,
+                          get_source_files=None):
+        """Process a list of files using a plugin callable.
+
+        Args:
+            current_job: The Gearman job, for progress updates.
+            filelist: File paths relative to the cruise directory.
+            plugin_callable: The plugin's ``process_file``.
+            job_results: The job's results, to add parts to.
+            start: Job progress (percent) at the start.
+            end: Job progress (percent) at the end.
+            get_source_files: The plugin's optional ``get_source_files``, to
+                map each file to the raw files to process (#288).
+
+        Returns:
+            tuple: The manifest entries to add and to remove.
         """
-        Process a list of files using a plugin callable.
-        """
+        if get_source_files:
+            filelist = self._source_filelist(filelist, get_source_files)
         base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
         new_manifest_entries = []
         remove_manifest_entries = []
@@ -175,7 +261,57 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         return new_manifest_entries, remove_manifest_entries
 
+    def prune_dashboard_files(self, manifest_entries):
+        """Delete the dashboard JSON files a rebuilt manifest no longer lists (#318).
+
+        Only ``.json`` files under the data dashboard directory are deleted,
+        never the manifest itself; directories left empty are removed too.
+
+        Args:
+            manifest_entries: The new manifest's entries; their ``dd_json``
+                paths are relative to the data warehouse base directory.
+
+        Returns:
+            dict: The job results part, a ``Fail`` naming the files that
+            couldn't be deleted.
+        """
+        base_dir = self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir']
+        keep = {os.path.join(base_dir, entry['dd_json']) for entry in manifest_entries}
+        keep.add(self.data_dashboard_manifest_file_path)
+        removed = 0
+        errors = []
+        for root, dirs, files in os.walk(self.data_dashboard_dir, topdown=False):
+            for name in files:
+                path = os.path.join(root, name)
+                if not name.endswith('.json') or path in keep:
+                    continue
+                try:
+                    os.remove(path)
+                    removed += 1
+                except OSError as exc:
+                    errors.append(f"{path}: {exc.strerror}")
+            for name in dirs:
+                path = os.path.join(root, name)
+                try:
+                    if not os.listdir(path):
+                        os.rmdir(path)
+                except OSError:
+                    pass        # not empty after all, or not ours to remove
+        if removed:
+            logging.info("Removed %d old dashboard file(s)", removed)
+        if errors:
+            return {"partName": "Remove old dashboard files", "result": "Fail", "reason": "; ".join(errors)}
+        return {"partName": "Remove old dashboard files", "result": "Pass"}
+
     def on_job_execute(self, current_job):
+        """Load the job's task and cruise/lowering settings, then run the job.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            The job's result, or a failed-job result if its payload can't be read.
+        """
         self.stop = False
         try:
             payload_obj = json.loads(current_job.data)
@@ -215,14 +351,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return super().on_job_execute(current_job)
 
     def on_job_exception(self, current_job, exc_info):
-        """
-        Function run when the current job has an exception
+        """Handle an exception raised while running the job.
+
+        Sets the task's status to error and sends it back to Gearman as a
+        failed job part.
+
+        Args:
+            current_job: The Gearman job.
+            exc_info: ``(type, value, traceback)`` of the exception.
+
+        Returns:
+            The base ``GearmanWorker`` exception result.
         """
         logging.error("Job Failed: %s", current_job.handle)
 
         exc_type, exc_value, exc_tb = exc_info
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else "unknown"
-        lineno = exc_tb.tb_lineno if exc_tb else "?"
+        # Report the frame that raised, not the outermost one (python3_gearman's worker.py)
+        frame = traceback.extract_tb(exc_tb)[-1] if exc_tb else None
+        fname = os.path.split(frame.filename)[1] if frame else "unknown"
+        lineno = frame.lineno if frame else "?"
         logging.error("%s in %s line %s", exc_type, fname, lineno)
 
         exc_name = exc_type.__name__ if exc_type else "UnknownError"
@@ -242,9 +389,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         return super().on_job_exception(current_job, exc_info)
 
     def on_job_complete(self, current_job, job_result):
-        """
-        Function run when the current job completes.
-        Handles updating task status, triggering post-tasks, and logging results.
+        """Record the job's outcome, then report completion to Gearman.
+
+        The outcome is the last entry in the result's ``parts``: ``Fail`` sets
+        the task's status to error, with that part's reason; anything else sets
+        it to idle. Tasks with an ID of 0 (this worker's ``CUSTOM_TASKS``) have
+        no status in OpenVDM.
+
+        After an update, submits the hook tasks configured for
+        ``updateDataDashboard`` in ``openvdm.yaml``; after a rebuild, submits
+        them once per active collection system transfer.
+
+        Args:
+            current_job: The Gearman job.
+            job_result: The task handler's JSON result.
+
+        Returns:
+            The base ``GearmanWorker`` completion result.
         """
         try:
             payload_obj = json.loads(current_job.data)
@@ -301,10 +462,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }))
 
     def stop_task(self):
+        """Ask the current task to stop."""
         self.stop = True
         logging.warning("Stopping current task...")
 
     def quit_worker(self):
+        """Stop the current task and shut down the worker."""
         self.stop = True
         logging.warning("Quitting worker...")
         self.shutdown()
@@ -314,11 +477,28 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 # Gearman task definitions
 # -------------------------
 def task_update_data_dashboard(worker, current_job):
+    """Update the data dashboard for a collection system transfer's new and updated files.
+
+    Runs the transfer's plugin on the files listed in the job payload, writes
+    their dashboard JSON files and updates the manifest.
+
+    Args:
+        worker: The data dashboard Gearman worker.
+        current_job: The Gearman job; its payload lists the new and updated files.
+
+    Returns:
+        str: JSON job results with ``parts`` and the new/updated/deleted files.
+    """
     job_results = {'parts':[], 'files':{'new':[], 'updated':[], 'deleted':[]}}
     logging.info("Start of task")
     worker.send_job_status(current_job, 1, 10)
 
-    plugin_callable = worker._get_plugin_callable()
+    try:
+        plugin_callable, get_source_files = worker._get_plugin_functions()
+    except PluginLoadError as exc:
+        job_results['parts'].append({"partName": "Load plugin", "result": "Fail", "reason": str(exc)})
+        return json.dumps(job_results)
+
     if plugin_callable is None:
         reason = f"Plugin not found for {worker.collection_system_transfer['name']}"
         logging.warning(reason)
@@ -335,7 +515,8 @@ def task_update_data_dashboard(worker, current_job):
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Retrieve file list", "result": "Pass"})
 
-    new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90)
+    new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90,
+                                                           get_source_files=get_source_files)
 
     # Load existing manifest
     try:
@@ -384,6 +565,19 @@ def task_update_data_dashboard(worker, current_job):
 
 
 def task_rebuild_data_dashboard(worker, current_job):
+    """Rebuild the whole data dashboard for the cruise.
+
+    Re-runs each collection system transfer's plugin on every file in its
+    destination directory (cruise-level, and for each lowering), rewrites the
+    manifest, then deletes the dashboard files the new manifest doesn't list.
+
+    Args:
+        worker: The data dashboard Gearman worker.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results with ``parts`` and the new/updated files.
+    """
     job_results = {'parts':[], 'files':{'new':[], 'updated':[]}}
     logging.info("Rebuilding data dashboard")
     worker.send_job_status(current_job, 1, 100)
@@ -395,9 +589,17 @@ def task_rebuild_data_dashboard(worker, current_job):
     job_results['parts'].append({"partName": "Verify Data dashboard directory exists", "result": "Pass"})
 
     manifest_entries = []
+    plugin_load_failures = []
     active_csts = worker.ovdm.get_active_collection_system_transfers()
     for idx, cst in enumerate(active_csts, 1):
-        plugin_callable = worker._get_plugin_callable(cfg=cst)
+        # A plugin that won't load fails its own transfer; the rest are still rebuilt
+        try:
+            plugin_callable, get_source_files = worker._get_plugin_functions(cfg=cst)
+        except PluginLoadError as exc:
+            job_results['parts'].append({"partName": f"Load plugin for {cst['name']}", "result": "Fail", "reason": str(exc)})
+            plugin_load_failures.append(str(exc))
+            continue
+
         if plugin_callable is None:
             logging.warning(f"No plugin for {cst['name']}, skipping")
             continue
@@ -416,7 +618,8 @@ def task_rebuild_data_dashboard(worker, current_job):
 
         start = int(80 * idx / len(active_csts) + 10)
         end = int(80 * (idx + 1) / len(active_csts) + 10)
-        new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end)
+        new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end,
+                                                  get_source_files=get_source_files)
         manifest_entries.extend(new_entries)
 
     # Write updated manifest
@@ -426,12 +629,24 @@ def task_rebuild_data_dashboard(worker, current_job):
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Updating manifest file", "result": "Pass"})
 
+    # Delete dashboard files the new manifest doesn't list (raw files removed
+    # from the cruise, files that no longer parse). Not after a stopped
+    # rebuild: its manifest is only partial (#318)
+    if not worker.stop:
+        job_results['parts'].append(worker.prune_dashboard_files(manifest_entries))
+
     # Set permissions
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.data_dashboard_dir)
     part_result = {"partName": "Set file/directory ownership", "result": "Pass" if output_results['verdict'] else "Fail"}
     if not output_results['verdict']:
         part_result['reason'] = output_results['reason']
     job_results['parts'].append(part_result)
+
+    # The last part sets the task's status (on_job_complete), so end with the
+    # plugin failures unless a later step already failed
+    if plugin_load_failures and output_results['verdict']:
+        job_results['parts'].append({"partName": "Load plugins", "result": "Fail",
+                                     "reason": "; ".join(plugin_load_failures)})
 
     worker.send_job_status(current_job, 100, 100)
     return json.dumps(job_results)
