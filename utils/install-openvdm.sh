@@ -1702,6 +1702,52 @@ function _generate_root_ssh_key {
 
 ###########################################################################
 ###########################################################################
+# Make sure the kernel can load the filesystem drivers OpenVDM mounts with:
+# cifs (SMB transfers) and fuse (FTP sources, through rclone mount). Minimal
+# and cloud installs can lack the package that ships them: Rocky/Alma/RHEL keep
+# cifs.ko in kernel-modules, not kernel-modules-core (#356). Installs the
+# package for the running kernel; if that version isn't available, installs
+# the latest one and says a reboot is needed.
+function _install_kernel_module_pkg {
+    if [ "$OS_FAMILY" = "rhel" ]; then
+        dnf install -y "$1" > /dev/null 2>&1
+    else
+        NEEDRESTART_MODE=a apt-get install -q -y "$1" > /dev/null 2>&1
+    fi
+}
+
+function ensure_kernel_modules {
+    local _MOD _PKG _KVER
+    _KVER=$(uname -r)
+    for _MOD in cifs fuse; do
+        modinfo "${_MOD}" > /dev/null 2>&1 && continue
+        echo "The running kernel (${_KVER}) has no ${_MOD} module; installing it"
+        if [ "$OS_FAMILY" = "rhel" ]; then
+            _install_kernel_module_pkg "kernel-modules-${_KVER}"
+        else
+            # Ubuntu splits modules between these; Debian ships them in linux-image
+            for _PKG in "linux-modules-${_KVER}" "linux-modules-extra-${_KVER}"; do
+                modinfo "${_MOD}" > /dev/null 2>&1 && break
+                _install_kernel_module_pkg "${_PKG}"
+            done
+        fi
+        if modinfo "${_MOD}" > /dev/null 2>&1; then
+            modprobe "${_MOD}" && echo "Loaded the ${_MOD} module"
+        else
+            # The running kernel's package isn't available (an older kernel):
+            # install the latest one, which needs a reboot into the new kernel
+            if [ "$OS_FAMILY" = "rhel" ]; then
+                _install_kernel_module_pkg kernel-modules
+            fi
+            echo "WARNING: The ${_MOD} module isn't available for the running kernel (${_KVER})."
+            echo "         Reboot into the latest kernel; until then ${_MOD} mounts fail"
+            echo "         (\"mount error(19): No such device\")."
+        fi
+    done
+}
+
+###########################################################################
+###########################################################################
 # Set system ssh
 function setup_ssh {
 
@@ -2525,6 +2571,7 @@ save_default_variables
 echo "#####################################################################"
 echo "Installing required software packages and libraries"
 install_packages
+ensure_kernel_modules
 
 echo "#####################################################################"
 echo "Detecting Python version"
