@@ -10,7 +10,9 @@ to the OpenVDM web API rather than direct database connections.
 from datetime import datetime, timezone
 import json
 import logging
+import os
 from os.path import dirname, realpath, join
+import python3_gearman
 import requests
 
 try:
@@ -23,6 +25,9 @@ DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'serve
 
 # Timeout, in seconds, for requests to the OpenVDM web API.
 TIMEOUT = 5
+
+# Gearman task that adds files to the cruise's MD5 summary (server/workers/md5_summary.py).
+UPDATE_MD5_SUMMARY_TASK = 'updateMD5Summary'
 
 class OpenVDM():
     """Python wrapper around the OpenVDM REST API and YAML configuration file.
@@ -1873,3 +1878,76 @@ class OpenVDM():
         except Exception as exc:
             logging.error("Unable to set lowering size with OpenVDM API")
             raise exc
+
+
+    def update_md5_summary(self, *, new=None, updated=None, deleted=None, cruise_id=None,  # pylint: disable=too-many-arguments
+                           background=True):
+        """Queue an ``updateMD5Summary`` job for files in a cruise directory.
+
+        For scripts and hooks that write files into the cruise directory,
+        which no transfer or data dashboard job lists for the MD5 summary.
+        Only one ``md5_summary`` worker runs, so Gearman runs MD5 jobs one at
+        a time: a job queued while another is running is applied after it,
+        with no race on the summary file. Running more than one MD5 worker
+        would break that.
+
+        Args:
+            new: Paths of files that are new to the summary.
+            updated: Paths of files whose checksums changed.
+            deleted: Paths of files to remove from the summary.
+            cruise_id: The cruise; defaults to the current cruise.
+            background: Return once the job is queued, instead of waiting
+                for it to finish.
+
+        Paths are relative to the cruise directory, or absolute paths inside
+        it.
+
+        Returns:
+            bool: Whether a job was queued (``False`` if no files were given).
+
+        Raises:
+            ValueError: If a path is outside the cruise directory, or there's
+                no cruise.
+            Exception: If the OpenVDM API or the Gearman server can't be
+                reached.
+        """
+
+        cruise_id = cruise_id or self.get_cruise_id()
+        if not cruise_id:
+            raise ValueError("No cruise to update the MD5 summary of")
+        warehouse_config = self.get_shipboard_data_warehouse_config()
+        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
+
+        files = {
+            'new': [self._cruise_relpath(path, cruise_dir) for path in new or []],
+            'updated': [self._cruise_relpath(path, cruise_dir) for path in updated or []],
+            'deleted': [self._cruise_relpath(path, cruise_dir) for path in deleted or []],
+        }
+        if not any(files.values()):
+            return False
+
+        gm_client = python3_gearman.GearmanClient([self.get_gearman_server()])
+        gm_client.submit_job(UPDATE_MD5_SUMMARY_TASK, json.dumps({'cruiseID': cruise_id, 'files': files}),
+                             background=background)
+        return True
+
+
+    @staticmethod
+    def _cruise_relpath(path, cruise_dir):
+        """Return *path* relative to *cruise_dir*.
+
+        Args:
+            path: A path relative to the cruise directory, or absolute.
+            cruise_dir: The cruise directory.
+
+        Returns:
+            str: The relative path.
+
+        Raises:
+            ValueError: If *path* is outside the cruise directory.
+        """
+
+        relpath = os.path.normpath(os.path.relpath(path, cruise_dir) if os.path.isabs(path) else path)
+        if relpath == '.' or relpath == '..' or relpath.startswith('..' + os.sep):
+            raise ValueError(f"{path} is not in the cruise directory {cruise_dir}")
+        return relpath
