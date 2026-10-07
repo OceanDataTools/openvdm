@@ -17,6 +17,9 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Queue an MD5 summary update for files a hook or script writes** into the cruise directory, which no transfer or data dashboard job lists: `OpenVDM.update_md5_summary()` in Python, or `utils/update_md5_summary.py` on the command line. Paths are relative to the cruise directory, or absolute inside it (#373).
 - **CTD profile plots in an extra directory:** `bin/plot_ctd_casts.py.dist`, run as a `postCollectionSystemTransfer` hook (example in `openvdm.yaml.dist`), saves a PNG plot of each new or updated cast, or of a cast whose `.xmlcon` arrives later, in an extra directory (`CTD_Plots` by default). The plots are part of the cruise, owned by the warehouse user and added to the MD5 summary. `--all --collectionSystem <name>` re-plots every cast. The script needs matplotlib (not in `requirements.txt`) and exits with a message if it's missing (#372).
 
+### Changed
+- **CTD profile plot header:** the Date is the cast's start date (`System UTC`), the Cast is the file's basename, and Depth is the cast's maximum depth calculated from pressure, left out when it can't be calculated. They had come from `** Date:`, `** Cast:` and `** Bottom Depth:` header lines, which most ships don't write that way (#376).
+
 ---
 
 ## [2.16.0] – 2026-09-28

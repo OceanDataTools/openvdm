@@ -60,8 +60,9 @@ ROUNDING = {
 # of thousands of points per series
 RESAMPLE_INTERVAL = '5s'
 
-# Header lines (marked "**") whose values label the plot
-METADATA_KEYS = ['Ship', 'Cruise', 'Date', 'Station', 'Cast', 'Depth']
+# Header lines (marked "**") read for the plot and the cast's position;
+# Depth is the bottom depth
+METADATA_KEYS = ['Ship', 'Cruise', 'Station', 'Depth']
 
 # Number of header lines searched for the metadata and the start time
 HEADER_LINES = 250
@@ -639,13 +640,12 @@ class CTDProfileParser(OpenVDMCSVParser):
             logging.warning("Dataframe empty after cropping: %s", filepath)
             return None
 
-        if self.plot_dir:
-            self.save_plot(df.reset_index(drop=True), filepath)
-
         # Before add_depth fills in the header's position
         scans_with_position = int(df['latitude'].notna().sum())
 
         df = self.add_depth(df, filepath)
+        if self.plot_dir:
+            self.save_plot(df.reset_index(drop=True), filepath)
         series = ([DEPTH_SERIES] if 'depth' in df else []) + SERIES
         in_range = self.in_range(df)
 
@@ -842,11 +842,15 @@ class CTDProfileParser(OpenVDMCSVParser):
         """Save a PNG profile plot of the cast to ``plot_dir`` (``<cast>.png``).
 
         Temperature, conductivity and salinity against pressure, with the
-        downcast drawn darker than the upcast. A failure is logged and
-        doesn't stop the parsing.
+        downcast drawn darker than the upcast. The header gives the ship,
+        cruise and station from the ``**`` header lines, the date of the
+        cast's start (``System UTC``), the file's basename as the cast, and
+        the cast's maximum depth if it could be calculated. A failure is
+        logged and doesn't stop the parsing.
 
         Args:
-            df: The cast's scans, in time order.
+            df: The cast's scans, in time order, with a ``depth`` column if
+                depth could be calculated.
             filepath: Path to the cast's ``.hex`` file.
         """
         try:
@@ -863,9 +867,11 @@ class CTDProfileParser(OpenVDMCSVParser):
         try:
             fig.subplots_adjust(top=0.72, right=0.75, left=0.10, bottom=0.08)
 
+            date = self.start_time.strftime('%Y-%m-%d') if self.start_time else 'N/A'
+            depth = f"  |  Depth: {df['depth'].max():.1f} m" if 'depth' in df else ''
             header_text = (
-                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {self.metadata['Date']}\n"
-                f"Station: {self.metadata['Station']}  |  Cast: {self.metadata['Cast']}  |  Depth: {self.metadata['Depth']} m\n"
+                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {date}\n"
+                f"Station: {self.metadata['Station']}  |  Cast: {splitext(basename(filepath))[0]}{depth}\n"
                 f"File: {basename(filepath)}  |  System Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
             fig.patches.append(patches.Rectangle((0.05, 0.88), 0.70, 0.08, linewidth=0.8, edgecolor='black',
