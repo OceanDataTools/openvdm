@@ -84,30 +84,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return log_dir
 
 
-    def update_md5_summary(self, files):
-        """Submit an ``updateMD5Summary`` Gearman job for the given files.
-
-        Args:
-            files: ``{'new': [...], 'updated': [...], 'deleted': [...]}`` with
-                paths relative to the cruise directory; missing keys are
-                treated as empty.
-        """
-
-        gm_data = {
-            'cruiseID': self.cruise_id,
-            'files': {
-                'new': files.get('new', []),
-                'updated': files.get('updated', []),
-                'deleted': files.get('deleted', [])
-            }
-        }
-
-        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-        gm_client.submit_job(MD5_TASK_NAMES['UPDATE_MD5_SUMMARY'], json.dumps(gm_data))
-
-        logging.debug("MD5 Summary Task Complete")
-
-
     def export_cruise_config(self, finalize=False):
         """Write the current cruise configuration to the cruise config file.
 
@@ -195,7 +171,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if not results['verdict']:
             return {'verdict': False, 'reason': results['reason']}
 
-        self.update_md5_summary({'new':[], 'updated':[cruise_config_fn]})
+        self.ovdm.update_md5_summary(updated=[cruise_config_fn], cruise_id=self.cruise_id, background=False)
 
         return {'verdict': True}
 
@@ -309,7 +285,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.error(reason)
                 return {'verdict': False, "reason": reason}
 
-            self.update_md5_summary(files)
+            self.ovdm.update_md5_summary(new=files['new'], updated=files['updated'], deleted=files['deleted'],
+                                          cruise_id=self.cruise_id, background=False)
             self.send_job_status(current_job, int((end_status - start_status) * 90/100) + start_status, 100)
 
             return {'verdict': True}

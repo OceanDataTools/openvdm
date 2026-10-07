@@ -14,6 +14,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - `HEX Header Position` and `HEX Scan Positions`: the `.hex` header and scans have positions;
   - `HEX Lost Scans`: gaps in the scans' modulo counter;
   - `Ranges`: temperature, conductivity, salinity and pressure within plausible limits, with a `<Variable> Validity` stat for each. The `ranges` parser option (`--<variable>Range` on the command line) changes the limits, e.g. for fresh water (#368).
+- **Queue an MD5 summary update for files a hook or script writes** into the cruise directory, which no transfer or data dashboard job lists: `OpenVDM.update_md5_summary()` in Python, or `utils/update_md5_summary.py` on the command line. Paths are relative to the cruise directory, or absolute inside it (#373).
 
 ---
 

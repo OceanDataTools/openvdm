@@ -21,7 +21,7 @@ OpenVDM is a 3-tier distributed system:
 
 **Tier 2 — Python Backend**
 - Location: `server/`
-- Core API wrapper: `server/lib/openvdm.py` — primary interface to the MySQL database via the web API
+- Core API wrapper: `server/lib/openvdm.py` — primary interface to the MySQL database via the web API. Code that writes files into the cruise directory outside a transfer or data dashboard job queues their MD5 summary update with `OpenVDM.update_md5_summary()` (`utils/update_md5_summary.py` from the shell, #373)
 - Connection utilities: `server/lib/connection_utils.py` — handles local, rsync, SMB, SSH, FTP, and rclone transfers
 - Plugin base classes: `server/lib/openvdm_plugin.py` — `OpenVDMPlugin` and `OpenVDMParserQualityTest`
 - File utilities: `server/lib/file_utils.py`, `server/lib/geojson_utils.py`

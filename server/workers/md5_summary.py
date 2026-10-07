@@ -27,14 +27,14 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, set_owner_group_permissions
-from server.lib.openvdm import OpenVDM
+from server.lib.openvdm import OpenVDM, UPDATE_MD5_SUMMARY_TASK
 
 BUF_SIZE = 65536  # read files in 64kb chunks
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
     'REBUILD_MD5_SUMMARY': 'rebuildMD5Summary',
-    'UPDATE_MD5_SUMMARY': 'updateMD5Summary'
+    'UPDATE_MD5_SUMMARY': UPDATE_MD5_SUMMARY_TASK
 }
 
 # Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
