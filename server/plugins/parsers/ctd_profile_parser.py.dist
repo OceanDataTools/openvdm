@@ -13,7 +13,12 @@ pressure with Sea-Bird's salt-water depth formula, which needs the latitude:
 it's taken from the NMEA position the deck unit appends to each scan, or the
 header's position, or the ``latitude`` option; without any of them there's no
 Depth series (use ``depthSeries: Pressure``). The stats include the depth
-range and the cast's geographic bounds.
+range and the cast's geographic bounds, and how many scans are inside each
+variable's plausible range. Quality tests check that the XMLCON has the deck
+unit append an NMEA position to each scan, that the header and the scans
+have positions, that no scans were lost (the scan counter), and that the
+values are in plausible ranges (the ``ranges`` option changes them, e.g. for
+fresh water).
 Optionally also saves a PNG profile plot, which needs matplotlib (not
 installed by ``requirements.txt``).
 
@@ -30,6 +35,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from os.path import basename, dirname, join, realpath, splitext
 
@@ -131,12 +137,36 @@ SERIES = [
     ('salinity', 'Salinity', 'PSU'),
 ]
 
+# Plausible ranges (min, max) for the Ranges test, as sbe-qa-processing's;
+# the ranges option overrides them, e.g. {'salinity': [0, 42]} for fresh water
+DEFAULT_RANGES = {
+    'pressure': (-5.0, 11000.0),
+    'temperature': (-2.5, 40.0),
+    'conductivity': (0.0, 7.0),
+    'salinity': (2.0, 42.0),
+}
+
+# Temperature, conductivity and salinity are range-checked only below this
+# pressure, since a cast can start on deck, where conductivity is zero
+RANGE_MIN_PRESSURE = 2.0
+
+# Share of scans that may lack a position for HEX Scan Positions to pass
+MAX_MISSING_POSITION_SHARE = 0.01
+
+# Share of lost scans above which HEX Lost Scans fails (any lost is a warning)
+MAX_LOST_SCAN_SHARE = 0.001
+
+# Share of range-checked values outside their range above which Ranges fails
+# (any outside is a warning)
+MAX_OUT_OF_RANGE_SHARE = 0.01
+
 
 class CTDProfileParser(OpenVDMCSVParser):
     """Parser for Sea-Bird CTD ``.hex`` casts."""
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, plot_dir=None, latitude=None):
+                 skip_header=False, use_openvdm_api=False, plot_dir=None, latitude=None,
+                 ranges=None):
         """Initialise the parser.
 
         Args:
@@ -150,12 +180,21 @@ class CTDProfileParser(OpenVDMCSVParser):
             latitude: Latitude in decimal degrees to compute depth with when
                 a cast has no position (neither in its scans nor its header),
                 or ``None`` for no depth then.
+            ranges: Plausible ``[min, max]`` ranges for the Ranges test, by
+                variable (``pressure``, ``temperature``, ``conductivity``,
+                ``salinity``), replacing the defaults for the variables
+                given, e.g. ``{'salinity': [0, 42]}`` for fresh water.
+
+        Raises:
+            ValueError: If *ranges* names an unknown variable or a range
+                isn't two numbers, min before max.
         """
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
         self.plot_dir = plot_dir
         self.default_latitude = latitude
+        self.ranges = self.check_ranges(ranges)
         self.coeffs = {}
         self.bytes_per_scan = None
         self.scans_averaged = None
@@ -163,7 +202,35 @@ class CTDProfileParser(OpenVDMCSVParser):
         self.latitude = None
         self.longitude = None
         self.nmea_offset = None
+        self.nmea_position_added = False
         self.metadata = {key: 'N/A' for key in METADATA_KEYS}
+
+    @staticmethod
+    def check_ranges(ranges):
+        """Return the default ranges with *ranges* applied.
+
+        Args:
+            ranges: ``[min, max]`` by variable, or ``None``.
+
+        Returns:
+            dict: ``(min, max)`` for each variable in ``DEFAULT_RANGES``.
+
+        Raises:
+            ValueError: If *ranges* names an unknown variable or a range
+                isn't two numbers, min before max.
+        """
+        checked = dict(DEFAULT_RANGES)
+        for col, limits in (ranges or {}).items():
+            if col not in DEFAULT_RANGES:
+                raise ValueError(f"Unknown range '{col}': must be one of {', '.join(DEFAULT_RANGES)}")
+            try:
+                low, high = (float(value) for value in limits)
+            except (TypeError, ValueError) as err:
+                raise ValueError(f"Range for {col} must be two numbers, got {limits!r}") from err
+            if low >= high:
+                raise ValueError(f"Range for {col} must be min then max, got {limits!r}")
+            checked[col] = (low, high)
+        return checked
 
     @staticmethod
     def find_xmlcon(filepath):
@@ -221,6 +288,7 @@ class CTDProfileParser(OpenVDMCSVParser):
             raise ValueError(f"Calibration file {xmlcon_path} isn't valid XML: {err}") from err
 
         self.scans_averaged = self._get_float(root, 'ScansToAverage')
+        self.nmea_position_added = self._get_float(root, 'NmeaPositionDataAdded') == 1
         self.nmea_offset = self._nmea_offset(root)
 
         for index, name in SENSOR_COEFFS:
@@ -498,15 +566,18 @@ class CTDProfileParser(OpenVDMCSVParser):
 
         raw_data = {col: [] for col in self.proc_cols + ['latitude', 'longitude']}
         errors = []
+        position_too_short = False
         if self.nmea_offset is not None and self.bytes_per_scan and \
                 self.nmea_offset + NMEA_POSITION_BYTES > self.bytes_per_scan - SCAN_TRAILER_BYTES:
             logging.warning("Scans in %s are too short for the NMEA position the XMLCON says they have",
                             filepath)
             self.nmea_offset = None
+            position_too_short = True
 
         # First pass: check each scan and collect its pressure sensor
         # temperature word, which is averaged over time before use
         scans = []          # (line number, scan number, data line, temperature word)
+        scan_counts = []    # each data line's 8-bit scan count, for HEX Lost Scans
         header_passed = False
         scan_no = -1
         with open(filepath, 'r', encoding='latin-1', errors='ignore') as hex_file:
@@ -518,6 +589,10 @@ class CTDProfileParser(OpenVDMCSVParser):
                 if not raw:
                     continue
                 scan_no += 1
+                try:
+                    scan_counts.append(int(raw[-2:], 16))
+                except ValueError:
+                    pass
                 try:
                     if self.bytes_per_scan and len(raw) != 2 * self.bytes_per_scan:
                         raise ValueError(f"scan is {len(raw)} characters, expected {2 * self.bytes_per_scan}")
@@ -567,8 +642,12 @@ class CTDProfileParser(OpenVDMCSVParser):
         if self.plot_dir:
             self.save_plot(df.reset_index(drop=True), filepath)
 
+        # Before add_depth fills in the header's position
+        scans_with_position = int(df['latitude'].notna().sum())
+
         df = self.add_depth(df, filepath)
         series = ([DEPTH_SERIES] if 'depth' in df else []) + SERIES
+        in_range = self.in_range(df)
 
         self.add_row_validity_stat([len(df), len(errors)])
         self.add_time_bounds_stat([df['date_time'].min().to_pydatetime(), df['date_time'].max().to_pydatetime()])
@@ -576,6 +655,9 @@ class CTDProfileParser(OpenVDMCSVParser):
             self.add_bounds_stat([round(df[col].min(), ROUNDING[col]),
                                   round(df[col].max(), ROUNDING[col])], label, unit)
         self.add_geobounds(df)
+        for col, label, _ in SERIES:
+            inside = int(in_range[col].sum())
+            self.add_value_validity_stat([inside, len(in_range[col]) - inside], f'{label} Validity')
 
         rate = len(errors) / (len(df) + len(errors))
         if rate > 0.25:
@@ -584,6 +666,10 @@ class CTDProfileParser(OpenVDMCSVParser):
             self.add_quality_test_warning('Rows')
         else:
             self.add_quality_test_passed('Rows')
+
+        self.add_navigation_tests(filepath, len(df), scans_with_position, position_too_short)
+        self.add_lost_scans_test(filepath, scan_counts)
+        self.add_ranges_test(filepath, in_range)
 
         df = df.drop(columns=['latitude', 'longitude'])
         df = self.resample_data(df.set_index('date_time'), RESAMPLE_INTERVAL)
@@ -638,6 +724,119 @@ class CTDProfileParser(OpenVDMCSVParser):
         lat, lon = positions['latitude'], positions['longitude']
         self.add_geobounds_stat([round(float(value), POSITION_DECIMALS)
                                  for value in (lat.max(), lon.max(), lat.min(), lon.min())])
+
+    def in_range(self, df):
+        """Return which values are inside their plausible range, by variable.
+
+        Pressure is checked in every scan; temperature, conductivity and
+        salinity only below ``RANGE_MIN_PRESSURE``, since a cast can start
+        on deck.
+
+        Args:
+            df: The cast's scans.
+
+        Returns:
+            dict: A boolean ``pandas.Series`` of the checked scans for each
+            variable in ``DEFAULT_RANGES``.
+        """
+        deep = df['pressure'] > RANGE_MIN_PRESSURE
+        return {col: (df[col] if col == 'pressure' else df.loc[deep, col]).between(low, high)
+                for col, (low, high) in self.ranges.items()}
+
+    def _add_quality_test(self, name, result, filepath, reason=''):
+        """Record a quality test, and log a warning naming the file if it failed.
+
+        Args:
+            name: Name of the test.
+            result: ``'Passed'``, ``'Warning'`` or ``'Failed'``.
+            filepath: Path to the cast, for the log.
+            reason: Why the test didn't pass, for the log.
+        """
+        {'Passed': self.add_quality_test_passed,
+         'Warning': self.add_quality_test_warning,
+         'Failed': self.add_quality_test_failed}[result](name)
+        if result == 'Failed':
+            logging.warning("%s test failed for %s: %s", name, filepath, reason)
+
+    def add_navigation_tests(self, filepath, scan_count, scans_with_position, position_too_short):
+        """Add the tests for the NMEA position in the XMLCON, the header and the scans.
+
+        ``HEX Scan Positions`` is only added when the XMLCON says the deck
+        unit appends a position to each scan.
+
+        Args:
+            filepath: Path to the cast.
+            scan_count: Number of valid scans.
+            scans_with_position: Number of them with their own position.
+            position_too_short: Whether the scans are too short for the
+                position the XMLCON describes.
+        """
+        self._add_quality_test('XMLCON NMEA Position', 'Passed' if self.nmea_position_added else 'Failed',
+                               filepath, "the XMLCON doesn't have the deck unit add the NMEA position to each scan")
+
+        header = self.latitude is not None and self.longitude is not None
+        self._add_quality_test('HEX Header Position', 'Passed' if header else 'Failed',
+                               filepath, "no NMEA Latitude and Longitude in the header")
+
+        if not self.nmea_position_added:
+            return
+        if position_too_short:
+            result, reason = 'Failed', "the scans are too short for the NMEA position"
+        elif scans_with_position == 0:
+            result, reason = 'Failed', "no scan has an NMEA position"
+        elif scan_count - scans_with_position <= MAX_MISSING_POSITION_SHARE * scan_count:
+            result, reason = 'Passed', ''
+        else:
+            result, reason = 'Warning', ''
+        self._add_quality_test('HEX Scan Positions', result, filepath, reason)
+
+    def add_lost_scans_test(self, filepath, scan_counts):
+        """Add the test for scans lost between the deck unit and the file.
+
+        Each scan ends with an 8-bit count that steps by the same amount
+        from one scan to the next (1 for every scan at 24 Hz; the most
+        common step is used, in case the deck unit's averaging changes it).
+        A bigger step means lost scans. The count wraps at 256, so a gap of
+        256 scans or more is undercounted (e.g. 500 lost reads as 244).
+
+        Args:
+            filepath: Path to the cast.
+            scan_counts: Each data line's scan count, in file order.
+        """
+        steps = [(after - before) % 256 for before, after in zip(scan_counts, scan_counts[1:])]
+        steps = [step for step in steps if step]    # 0: a repeated scan
+        if not steps:
+            return
+        usual = Counter(steps).most_common(1)[0][0]
+        lost = sum(max(round(step / usual) - 1, 0) for step in steps)
+        if lost == 0:
+            result = 'Passed'
+        elif lost <= MAX_LOST_SCAN_SHARE * (len(scan_counts) + lost):
+            result = 'Warning'
+        else:
+            result = 'Failed'
+        self._add_quality_test('HEX Lost Scans', result, filepath,
+                               f"{lost} of {len(scan_counts) + lost} scans lost")
+
+    def add_ranges_test(self, filepath, in_range):
+        """Add the test for values outside their plausible range.
+
+        Args:
+            filepath: Path to the cast.
+            in_range: From :meth:`in_range`.
+        """
+        checked = sum(len(inside) for inside in in_range.values())
+        outside = {col: int((~inside).sum()) for col, inside in in_range.items()}
+        total = sum(outside.values())
+        if total == 0:
+            result = 'Passed'
+        elif total <= MAX_OUT_OF_RANGE_SHARE * checked:
+            result = 'Warning'
+        else:
+            result = 'Failed'
+        self._add_quality_test('Ranges', result, filepath, ', '.join(
+            f"{count} {col} values outside {self.ranges[col][0]:g} to {self.ranges[col][1]:g}"
+            for col, count in outside.items() if count))
 
     def save_plot(self, df, filepath):
         """Save a PNG profile plot of the cast to ``plot_dir`` (``<cast>.png``).
@@ -712,10 +911,16 @@ class CTDProfileParser(OpenVDMCSVParser):
                             help='Save a PNG profile plot of the cast in this directory (needs matplotlib)')
         parser.add_argument('--latitude', type=float, default=None,
                             help='Latitude (decimal degrees) for depth when the cast has no position')
+        for col, (low, high) in DEFAULT_RANGES.items():
+            parser.add_argument(f'--{col}Range', type=float, nargs=2, metavar=('MIN', 'MAX'), default=None,
+                                help=f'Plausible {col} range for the Ranges test (default {low:g} {high:g})')
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'plot_dir': getattr(args, 'plotDir', None), 'latitude': getattr(args, 'latitude', None)}
+        ranges = {col: getattr(args, f'{col}Range') for col in DEFAULT_RANGES
+                  if getattr(args, f'{col}Range', None) is not None}
+        return {'plot_dir': getattr(args, 'plotDir', None), 'latitude': getattr(args, 'latitude', None),
+                'ranges': ranges}
 
 
 class CTDPositionParser(CTDProfileParser):
@@ -788,7 +993,7 @@ class CTDPositionParser(CTDProfileParser):
 
     @classmethod
     def add_cli_arguments(cls, parser):
-        """Add no options (the profile parser's ``--plotDir`` and ``--latitude`` don't apply).
+        """Add no options (the profile parser's ``--plotDir``, ``--latitude`` and range options don't apply).
 
         Args:
             parser: The ``argparse.ArgumentParser``.
