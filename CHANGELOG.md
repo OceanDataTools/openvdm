@@ -15,6 +15,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - `HEX Lost Scans`: gaps in the scans' modulo counter;
   - `Ranges`: temperature, conductivity, salinity and pressure within plausible limits, with a `<Variable> Validity` stat for each. The `ranges` parser option (`--<variable>Range` on the command line) changes the limits, e.g. for fresh water (#368).
 - **Queue an MD5 summary update for files a hook or script writes** into the cruise directory, which no transfer or data dashboard job lists: `OpenVDM.update_md5_summary()` in Python, or `utils/update_md5_summary.py` on the command line. Paths are relative to the cruise directory, or absolute inside it (#373).
+- **CTD profile plots in an extra directory:** `bin/plot_ctd_casts.py.dist`, run as a `postCollectionSystemTransfer` hook (example in `openvdm.yaml.dist`), saves a PNG plot of each new or updated cast, or of a cast whose `.xmlcon` arrives later, in an extra directory (`CTD_Plots` by default). The plots are part of the cruise, owned by the warehouse user and added to the MD5 summary. `--all --collectionSystem <name>` re-plots every cast. The script needs matplotlib (not in `requirements.txt`) and exits with a message if it's missing (#372).
 
 ---
 
