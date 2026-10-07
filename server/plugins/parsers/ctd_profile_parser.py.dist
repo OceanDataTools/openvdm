@@ -654,10 +654,10 @@ class CTDProfileParser(OpenVDMCSVParser):
         for col, label, unit in series:
             self.add_bounds_stat([round(df[col].min(), ROUNDING[col]),
                                   round(df[col].max(), ROUNDING[col])], label, unit)
+            if col in in_range:
+                inside = int(in_range[col].sum())
+                self.add_value_validity_stat([inside, len(in_range[col]) - inside], f'{label} Validity')
         self.add_geobounds(df)
-        for col, label, _ in SERIES:
-            inside = int(in_range[col].sum())
-            self.add_value_validity_stat([inside, len(in_range[col]) - inside], f'{label} Validity')
 
         rate = len(errors) / (len(df) + len(errors))
         if rate > 0.25:
