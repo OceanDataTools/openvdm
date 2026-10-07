@@ -30,7 +30,9 @@ from server.plugins.parsers.ctd_profile_parser import CTDPositionParser, CTDProf
 # matched case-insensitively. Set "plot_dir" in parser_options to also save a PNG
 # profile plot of each cast there (needs matplotlib). For casts with no position
 # (no NMEA in their scans or header), set "latitude" in the ctd filter's
-# parser_options so depth can be computed, e.g. {"latitude": 27.5}.
+# parser_options so depth can be computed, e.g. {"latitude": 27.5}. Set "ranges"
+# in the ctd filter's parser_options to change the plausible [min, max] ranges
+# of the Ranges quality test, e.g. {"ranges": {"salinity": [0, 42]}} for fresh water.
 # -------------------------------------------------------------------------------------
 FILE_TYPE_FILTERS = [
     {"data_type": "ctd", "regex": "*.hex", "parser": "CTDProfile", "parser_options": {}},

@@ -4,6 +4,19 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.16.1] – Unreleased
+
+**Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts.
+
+### Added
+- **CTD profile quality tests** for problems that used to pass silently:
+  - `XMLCON NMEA Position`: the deck unit is set to append the NMEA position to each scan;
+  - `HEX Header Position` and `HEX Scan Positions`: the `.hex` header and scans have positions;
+  - `HEX Lost Scans`: gaps in the scans' modulo counter;
+  - `Ranges`: temperature, conductivity, salinity and pressure within plausible limits, with a `<Variable> Validity` stat for each. The `ranges` parser option (`--<variable>Range` on the command line) changes the limits, e.g. for fresh water (#368).
+
+---
+
 ## [2.16.0] – 2026-09-28
 
 **Highlights**
