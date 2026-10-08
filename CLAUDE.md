@@ -43,6 +43,7 @@ OpenVDM is a 3-tier distributed system:
 - Server config: `server/etc/openvdm.yaml` (copy from `openvdm.yaml.dist`)
 - Web config: `www/app/Core/Config.php` (copy from `Config.php.dist`)
 - Hooks in `openvdm.yaml` map Gearman task names to downstream tasks; `postHookCommands` run shell commands after task completion
+- `openvdm.yaml`'s `vessel` block (name, contact, optional `r2r` IDs) is set by the installer and read with `OpenVDM.get_vessel_config()`; the cruise worker copies it into each `ovdmConfig.json` (#365)
 
 ## Development Setup
 

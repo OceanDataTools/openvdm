@@ -202,6 +202,14 @@ function set_default_variables {
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
 
+    DEFAULT_VESSEL_NAME=
+    DEFAULT_VESSEL_CONTACT_INSTITUTION=
+    DEFAULT_VESSEL_CONTACT_EMAIL=
+    DEFAULT_VESSEL_R2R=no
+    DEFAULT_R2R_VESSEL_ID=
+    DEFAULT_R2R_OPERATOR_ID=
+    DEFAULT_R2R_SCHEDULER_ID=
+
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
         echo Reading pre-saved defaults from "$PREFERENCES_FILE"
@@ -245,6 +253,14 @@ DEFAULT_SAMPLEDATA_BRANCH=$SAMPLEDATA_BRANCH
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
+
+DEFAULT_VESSEL_NAME=$(printf '%q' "$VESSEL_NAME")
+DEFAULT_VESSEL_CONTACT_INSTITUTION=$(printf '%q' "$VESSEL_CONTACT_INSTITUTION")
+DEFAULT_VESSEL_CONTACT_EMAIL=$(printf '%q' "$VESSEL_CONTACT_EMAIL")
+DEFAULT_VESSEL_R2R=$VESSEL_R2R
+DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
+DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
+DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
 EOF
     chmod 600 "$PREFERENCES_FILE"
 }
@@ -1800,6 +1816,97 @@ function setup_ssh {
 ###########################################################################
 ###########################################################################
 # Install OpenVDM
+function _vessel_yaml_get {
+    # Print the value of $2 in the top-level "vessel:" block of the
+    # openvdm.yaml file $1, unquoted. Prints nothing if the file, block or
+    # key is missing, or the key is commented out.
+    awk -v key="$2" -v q="'" '
+        /^vessel:/ { in_block = 1; next }
+        in_block && /^[^[:space:]#]/ { exit }
+        in_block && $0 ~ "^[[:space:]]+" key ":" {
+            value = $0
+            sub("^[[:space:]]+" key ":[[:space:]]*", "", value)
+            if (value ~ /^"/) {
+                sub(/^"/, "", value); sub(/"[[:space:]]*(#.*)?$/, "", value)
+                gsub(/\\"/, "\"", value); gsub(/\\\\/, "\\", value)
+            } else if (substr(value, 1, 1) == q) {
+                value = substr(value, 2); sub(q "[[:space:]]*(#.*)?$", "", value)
+                gsub(q q, q, value)
+            } else {
+                sub(/[[:space:]]+#.*$/, "", value); sub(/[[:space:]]+$/, "", value)
+            }
+            print value
+            exit
+        }' "$1" 2>/dev/null
+}
+
+function _yaml_quote {
+    # Print $1 as a double-quoted YAML string
+    local value=${1//\\/\\\\}
+    printf '"%s"' "${value//\"/\\\"}"
+}
+
+function write_vessel_config {
+    # Write the "vessel:" block of the openvdm.yaml file $1 from the VESSEL_*
+    # and R2R_* answers, in place of the existing block, or at the end of
+    # the file if it has none (files from before 2.17). The rest of the file
+    # is left as it is.
+    local yaml_file=$1
+    local block_file
+    block_file=$(mktemp)
+
+    {
+        echo "vessel:"
+        echo "    name: $(_yaml_quote "$VESSEL_NAME")"
+        echo "    contact:"
+        echo "        institution: $(_yaml_quote "$VESSEL_CONTACT_INSTITUTION")"
+        echo "        email: $(_yaml_quote "$VESSEL_CONTACT_EMAIL")"
+        echo "    # Only for vessels that submit data to R2R (Rolling Deck to Repository)"
+        if [ "$VESSEL_R2R" = "yes" ]; then
+            echo "    r2r:"
+            echo "        vesselID: $(_yaml_quote "$R2R_VESSEL_ID")     # R2R vessel ID (ICES code), e.g. 33RR"
+            echo "        operatorID: $(_yaml_quote "$R2R_OPERATOR_ID")   # e.g. edu.ucsd.sio"
+            echo "        schedulerID: $(_yaml_quote "$R2R_SCHEDULER_ID")  # e.g. org.unols"
+        else
+            echo "    #r2r:"
+            echo "    #    vesselID: \"\"     # R2R vessel ID (ICES code), e.g. 33RR"
+            echo "    #    operatorID: \"\"   # e.g. edu.ucsd.sio"
+            echo "    #    schedulerID: \"\"  # e.g. org.unols"
+        fi
+    } > "$block_file"
+
+    if grep -q '^vessel:' "$yaml_file"; then
+        # Replace the block: the "vessel:" line and the indented, blank or
+        # commented-out lines after it, up to the next top-level line
+        awk -v block_file="$block_file" '
+            /^vessel:/ {
+                while ((getline line < block_file) > 0) print line
+                skipping = 1; blank = 0; next
+            }
+            skipping && /^([[:space:]]|$)/ { if ($0 ~ /^[[:space:]]*$/) blank = 1; next }
+            skipping { skipping = 0; if (blank) print "" }
+            { print }' "$yaml_file" > "${yaml_file}.new"
+    else
+        {
+            cat "$yaml_file"
+            [ -n "$(tail -c1 "$yaml_file")" ] && echo
+            echo
+            echo "# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json"
+            echo "# and read by QA tools (e.g. sbe-qa-processing). All fields are optional."
+            cat "$block_file"
+        } > "${yaml_file}.new"
+    fi
+
+    # Keep the file's owner and permissions
+    cat "${yaml_file}.new" > "$yaml_file"
+    rm -f "${yaml_file}.new" "$block_file"
+
+    local venv_python=${INSTALL_ROOT}/openvdm/venv/bin/python
+    if [ -x "$venv_python" ] && ! "$venv_python" -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' "$yaml_file" 2>/dev/null; then
+        echo "WARNING: ${yaml_file} isn't valid YAML after setting the vessel; please check it."
+    fi
+}
+
 function install_openvdm {
     # Expect the following shell variables to be appropriately set:
     # DATA_ROOT - path where data will be stored is
@@ -2002,6 +2109,9 @@ EOF
             echo "transferPublicData: ${_TRANSFER_PUBLICDATA}" >> "${_YAML}"
         fi
     fi
+
+    echo "Setting the vessel in ${_YAML}"
+    write_vessel_config "${_YAML}"
 
     cd ${startingDir}
 }
@@ -2558,6 +2668,59 @@ fi
 if [ "$INSTALL_SAMPLEDATA" = "yes" ] && [ "$INSTALL_TITILER" != "yes" ]; then
     echo "Sample data requires TiTiler — enabling TiTiler install."
     INSTALL_TITILER=yes
+fi
+echo
+
+#########################################################################
+# Vessel
+echo "#####################################################################"
+echo "The vessel this OpenVDM install is on. It's saved with each cruise and"
+echo "used by QA tools. All of these are optional, and can be changed later"
+echo "in the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
+echo
+
+# An existing openvdm.yaml's vessel settings win over the saved defaults,
+# so changes made there by hand are kept
+_EXISTING_YAML=${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
+    DEFAULT_VESSEL_NAME=$(_vessel_yaml_get "$_EXISTING_YAML" name)
+    DEFAULT_VESSEL_CONTACT_INSTITUTION=$(_vessel_yaml_get "$_EXISTING_YAML" institution)
+    DEFAULT_VESSEL_CONTACT_EMAIL=$(_vessel_yaml_get "$_EXISTING_YAML" email)
+    DEFAULT_R2R_VESSEL_ID=$(_vessel_yaml_get "$_EXISTING_YAML" vesselID)
+    DEFAULT_R2R_OPERATOR_ID=$(_vessel_yaml_get "$_EXISTING_YAML" operatorID)
+    DEFAULT_R2R_SCHEDULER_ID=$(_vessel_yaml_get "$_EXISTING_YAML" schedulerID)
+    DEFAULT_VESSEL_R2R=no
+    if [ -n "$DEFAULT_R2R_VESSEL_ID$DEFAULT_R2R_OPERATOR_ID$DEFAULT_R2R_SCHEDULER_ID" ]; then
+        DEFAULT_VESSEL_R2R=yes
+    fi
+fi
+
+read -r -p "Vessel name? ($DEFAULT_VESSEL_NAME) " VESSEL_NAME
+VESSEL_NAME=${VESSEL_NAME:-$DEFAULT_VESSEL_NAME}
+
+read -r -p "Contact institution (operator of the vessel)? ($DEFAULT_VESSEL_CONTACT_INSTITUTION) " VESSEL_CONTACT_INSTITUTION
+VESSEL_CONTACT_INSTITUTION=${VESSEL_CONTACT_INSTITUTION:-$DEFAULT_VESSEL_CONTACT_INSTITUTION}
+
+read -r -p "Contact email? ($DEFAULT_VESSEL_CONTACT_EMAIL) " VESSEL_CONTACT_EMAIL
+VESSEL_CONTACT_EMAIL=${VESSEL_CONTACT_EMAIL:-$DEFAULT_VESSEL_CONTACT_EMAIL}
+
+echo
+yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEFAULT_VESSEL_R2R
+VESSEL_R2R=$YES_NO_RESULT
+
+if [ "$VESSEL_R2R" = "yes" ]; then
+    read -r -p "R2R vessel ID (ICES code, e.g. 33RR)? ($DEFAULT_R2R_VESSEL_ID) " R2R_VESSEL_ID
+    R2R_VESSEL_ID=${R2R_VESSEL_ID:-$DEFAULT_R2R_VESSEL_ID}
+
+    read -r -p "R2R operator ID (e.g. edu.ucsd.sio)? ($DEFAULT_R2R_OPERATOR_ID) " R2R_OPERATOR_ID
+    R2R_OPERATOR_ID=${R2R_OPERATOR_ID:-$DEFAULT_R2R_OPERATOR_ID}
+
+    read -r -p "R2R scheduler ID (e.g. org.unols)? ($DEFAULT_R2R_SCHEDULER_ID) " R2R_SCHEDULER_ID
+    R2R_SCHEDULER_ID=${R2R_SCHEDULER_ID:-$DEFAULT_R2R_SCHEDULER_ID}
+else
+    R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID}
+    R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID}
+    R2R_SCHEDULER_ID=${DEFAULT_R2R_SCHEDULER_ID}
 fi
 echo
 

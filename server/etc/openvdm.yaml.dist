@@ -22,6 +22,19 @@ siteRoot: "http://127.0.0.1/"
 # Change this to a strong random value before deploying (e.g. openssl rand -hex 32).
 workerApiKey: "change-me-to-a-strong-random-value"
 
+# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json
+# and read by QA tools (e.g. sbe-qa-processing). All fields are optional.
+vessel:
+    name: ""
+    contact:
+        institution: ""
+        email: ""
+    # Only for vessels that submit data to R2R (Rolling Deck to Repository)
+    #r2r:
+    #    vesselID: ""     # R2R vessel ID (ICES code), e.g. 33RR
+    #    operatorID: ""   # e.g. edu.ucsd.sio
+    #    schedulerID: ""  # e.g. org.unols
+
 # The transferInterval defines the interval for performing collectionSystemTransfer.
 # The unit is in minutes.
 transferInterval: 5
