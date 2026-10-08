@@ -4,6 +4,15 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.17.0] – Unreleased
+
+**Upgrading:** update the database with `database/openvdm_216_to_217.sql`.
+
+### Added
+- **Cruise Description:** an optional, multi-line description on the Setup New Cruise and Edit Cruise forms. It's returned by `getCruiseConfig` (and `api/warehouse/getCruiseDescription`), saved in each cruise's `ovdmConfig.json`, and shown on the main page's cruise information panel. Cruises from before 2.17 have an empty description. The CoreVars `value` column becomes `text`, since `tinytext` holds only 255 bytes (#367).
+
+---
+
 ## [2.16.1] – Unreleased
 
 **Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts.

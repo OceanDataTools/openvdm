@@ -131,6 +131,7 @@ Router::any('api/warehouse/getCruiseStartPort', 'Controllers\Api\Warehouse@getCr
 Router::any('api/warehouse/getCruiseEndPort', 'Controllers\Api\Warehouse@getCruiseEndPort');
 Router::any('api/warehouse/getCruisePI', 'Controllers\Api\Warehouse@getCruisePI');
 Router::any('api/warehouse/getCruiseLocation', 'Controllers\Api\Warehouse@getCruiseLocation');
+Router::any('api/warehouse/getCruiseDescription', 'Controllers\Api\Warehouse@getCruiseDescription');
 Router::any('api/warehouse/getCruiseFinalizedDate', 'Controllers\Api\Warehouse@getCruiseFinalizedDate');
 Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
 Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');

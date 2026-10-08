@@ -77,6 +77,14 @@ use Helpers\Form;
                             </div>
                         </div>
                         <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Description</label>
+                                    <?php echo Form::textBox(array('class'=>'form-control', 'name'=>'cruiseDescription', 'rows'=>'3', 'value'=>$data['cruiseDescription'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> Start Date/Time (UTC)</label>

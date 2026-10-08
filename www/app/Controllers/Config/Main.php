@@ -66,6 +66,7 @@ class Main extends Controller {
         $data['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $data['cruisePI'] = $this->_warehouseModel->getCruisePI();
         $data['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
+        $data['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
         $data['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $data['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $data['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
@@ -88,6 +89,7 @@ class Main extends Controller {
             $cruiseName = $_POST['cruiseName'] ?? '';
             $cruisePI = $_POST['cruisePI'] ?? '';
             $cruiseLocation = $_POST['cruiseLocation'] ?? '';
+            $cruiseDescription = $_POST['cruiseDescription'] ?? '';
 
             $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
             $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
@@ -100,6 +102,7 @@ class Main extends Controller {
                 $cruiseName = $this->_warehouseModel->getCruiseName($_POST['cruiseID']);
                 $cruisePI = $this->_warehouseModel->getCruisePI($_POST['cruiseID']);
                 $cruiseLocation = $this->_warehouseModel->getCruiseLocation($_POST['cruiseID']);
+                $cruiseDescription = $this->_warehouseModel->getCruiseDescription($_POST['cruiseID']);
 
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
                 $cruiseStartDate = $cruiseDates['cruiseStartDate'] ?? '';
@@ -144,6 +147,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
+                $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
@@ -189,6 +193,7 @@ class Main extends Controller {
                 $data['cruiseName'] = $cruiseName;
                 $data['cruisePI'] = $cruisePI;
                 $data['cruiseLocation'] = $cruiseLocation;
+                $data['cruiseDescription'] = $cruiseDescription;
                 $data['cruiseStartDate'] = $cruiseStartDate;
                 $data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
@@ -449,6 +454,7 @@ class Main extends Controller {
         $data['cruiseName'] = '';
         $data['cruisePI'] = '';
         $data['cruiseLocation'] = '';
+        $data['cruiseDescription'] = '';
         $data['cruiseStartDate'] = '';
         $data['cruiseEndDate'] = '';
         $data['cruiseStartPort'] = '';
@@ -460,6 +466,7 @@ class Main extends Controller {
             $cruiseName = $_POST['cruiseName'] ?? '';
             $cruisePI = $_POST['cruisePI'] ?? '';
             $cruiseLocation = $_POST['cruiseLocation'] ?? '';
+            $cruiseDescription = $_POST['cruiseDescription'] ?? '';
             $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
             $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
             $cruiseStartPort = $_POST['cruiseStartPort'] ?? '';
@@ -499,6 +506,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
+                $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
@@ -538,6 +546,7 @@ class Main extends Controller {
                 $data['cruiseName'] = $cruiseName;
                 $data['cruisePI'] = $cruisePI;
                 $data['cruiseLocation'] = $cruiseLocation;
+                $data['cruiseDescription'] = $cruiseDescription;
                 $data['cruiseStartDate'] = $cruiseStartDate;
                 $data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
@@ -548,6 +557,7 @@ class Main extends Controller {
             $data['cruiseName'] = $_POST['cruiseName'] ?? '';
             $data['cruisePI'] = $_POST['cruisePI'] ?? '';
             $data['cruiseLocation'] = $_POST['cruiseLocation'] ?? '';
+            $data['cruiseDescription'] = $_POST['cruiseDescription'] ?? '';
             $data['cruiseStartDate'] = $_POST['cruiseStartDate'] ?? '';
             $data['cruiseEndDate'] = $_POST['cruiseEndDate'] ?? '';
             $data['cruiseStartPort'] = $_POST['cruiseStartPort'] ?? '';
