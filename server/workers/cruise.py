@@ -88,9 +88,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """Write the current cruise configuration to the cruise config file.
 
         Transfer entries are reduced to their name, long name and destination
-        directory (no credentials). When the file already exists, its
-        ``cruiseFinalizedOn`` value is kept. Queues an MD5 summary update for
-        the file.
+        directory (no credentials), and the vessel settings from
+        ``openvdm.yaml`` are added as ``vessel`` when any are set. When the
+        file already exists, its ``cruiseFinalizedOn`` value is kept. Queues
+        an MD5 summary update for the file.
 
         Args:
             finalize: Mark the configuration as finalized (sets
@@ -152,6 +153,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             cruise_config['loweringConfigPath'] = os.path.join(
                 lowering_data_base_dir, '<loweringID>', cruise_config['loweringConfigFn']
             )
+
+        # The vessel the cruise was on, from openvdm.yaml (#365)
+        cruise_config['vessel'] = self.ovdm.get_vessel_config() or None
 
         del cruise_config['warehouseConfig']
         del cruise_config['cruiseDataTransfersConfig']

@@ -250,6 +250,30 @@ class OpenVDM():
         return self.config['siteRoot']
 
 
+    def get_vessel_config(self) -> dict:
+        """Return the vessel settings (the ``vessel`` block of ``openvdm.yaml``).
+
+        Unset fields are left out: empty values, and sub-blocks with nothing
+        set. Values are strings, so an R2R ID such as ``3301`` keeps its
+        form.
+
+        Returns:
+            dict: e.g. ``{'name': 'Roger Revelle', 'contact': {'institution':
+            ..., 'email': ...}, 'r2r': {'vesselID': '33RR', 'operatorID':
+            ..., 'schedulerID': ...}}``; ``{}`` if nothing is set. ``r2r`` is
+            only there for vessels that submit data to R2R.
+        """
+
+        def prune(value):
+            if isinstance(value, dict):
+                pruned = {key: prune(item) for key, item in value.items()}
+                return {key: item for key, item in pruned.items() if item not in ('', {})}
+            return '' if value is None else str(value).strip()
+
+        vessel = self.config.get('vessel')
+        return prune(vessel) if isinstance(vessel, dict) else {}
+
+
     def get_transfer_public_data(self):
         """Return whether PublicData is copied into the cruise when it is finalized.
 

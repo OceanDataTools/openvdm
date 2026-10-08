@@ -6,10 +6,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.17.0] – Unreleased
 
-**Upgrading:** update the database with `database/openvdm_216_to_217.sql`.
+**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
 
 ### Added
 - **Cruise Description:** an optional, multi-line description on the Setup New Cruise and Edit Cruise forms. It's returned by `getCruiseConfig` (and `api/warehouse/getCruiseDescription`), saved in each cruise's `ovdmConfig.json`, and shown on the main page's cruise information panel. Cruises from before 2.17 have an empty description. The CoreVars `value` column becomes `text`, since `tinytext` holds only 255 bytes (#367).
+- **Vessel settings in `openvdm.yaml`:** a `vessel` block with the vessel's name and contact (institution, email), and, only for vessels that submit data to R2R, an `r2r` sub-block with R2R's vessel, operator and scheduler IDs.
+  - The installer asks for them. It asks for the R2R IDs only if the vessel submits data to R2R (default no), and on a re-run it keeps the values in `openvdm.yaml`.
+  - Each cruise's `ovdmConfig.json` gets the block as `vessel`, and `OpenVDM.get_vessel_config()` returns it for plugins and hooks (#365).
 
 ---
 
