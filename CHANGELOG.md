@@ -4,6 +4,26 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.16.1] – Unreleased
+
+**Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts.
+
+### Added
+- **CTD profile quality tests** for problems that used to pass silently:
+  - `XMLCON NMEA Position`: the deck unit is set to append the NMEA position to each scan;
+  - `HEX Header Position` and `HEX Scan Positions`: the `.hex` header and scans have positions;
+  - `HEX Lost Scans`: gaps in the scans' modulo counter;
+  - `Ranges`: temperature, conductivity, salinity and pressure within plausible limits, with a `<Variable> Validity` stat for each. The `ranges` parser option (`--<variable>Range` on the command line) changes the limits, e.g. for fresh water (#368).
+- **Queue an MD5 summary update for files a hook or script writes** into the cruise directory, which no transfer or data dashboard job lists: `OpenVDM.update_md5_summary()` in Python, or `utils/update_md5_summary.py` on the command line. Paths are relative to the cruise directory, or absolute inside it (#373).
+- **CTD profile plots in an extra directory:** `bin/plot_ctd_casts.py.dist`, run as a `postCollectionSystemTransfer` hook (example in `openvdm.yaml.dist`), saves a PNG plot of each new or updated cast, or of a cast whose `.xmlcon` arrives later, in an extra directory (`CTD_Plots` by default). The plots are part of the cruise, owned by the warehouse user and added to the MD5 summary. `--all --collectionSystem <name>` re-plots every cast. The script needs matplotlib (not in `requirements.txt`) and exits with a message if it's missing (#372).
+
+### Changed
+- **CTD profile plot header:** the Date is the cast's start date (`System UTC`), the Cast is the file's basename, and Depth is the cast's maximum depth calculated from pressure, left out when it can't be calculated. They had come from `** Date:`, `** Cast:` and `** Bottom Depth:` header lines, which most ships don't write that way (#376).
+- **CTD profile plot position:** the plot header gives the cast's position in decimal degrees (`Position: lat 27.61917, lng -93.86167`): the header's NMEA position, else the first scan's. It's left out when the cast has no position (#379, #381).
+- **Post-hook failures say why:** the OpenVDM message for a failed hook command now gives the command's name, exit status and the end of its error output (stderr, or stdout if that's empty), instead of only its command line. Message titles and bodies are now shown as text on the Messages page and in the message list, not as HTML (#378).
+
+---
+
 ## [2.16.0] – 2026-09-28
 
 **Highlights**

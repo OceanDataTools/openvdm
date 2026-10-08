@@ -28,7 +28,6 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
-from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
@@ -77,30 +76,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         log_dir = self.ovdm.get_transfer_log_dir()
         os.makedirs(log_dir, exist_ok=True)
         return log_dir
-
-
-    def update_md5_summary(self, files):
-        """Submit an ``updateMD5Summary`` Gearman job for the given files.
-
-        Args:
-            files: ``{'new': [...], 'updated': [...], 'deleted': [...]}`` with
-                paths relative to the cruise directory; missing keys are
-                treated as empty.
-        """
-
-        gm_data = {
-            'cruiseID': self.cruise_id,
-            'files': {
-                'new': files.get('new', []),
-                'updated': files.get('updated', []),
-                'deleted': files.get('deleted', [])
-            }
-        }
-
-        gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
-        gm_client.submit_job(MD5_TASK_NAMES['UPDATE_MD5_SUMMARY'], json.dumps(gm_data))
-
-        logging.debug("MD5 Summary Task Complete")
 
 
     def export_lowering_config(self, finalize=False):
@@ -156,7 +131,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         if not results['verdict']:
             return {'verdict': False, 'reason': results['reason']}
 
-        self.update_md5_summary({'new':[], 'updated':[lowering_config_relfilepath]})
+        self.ovdm.update_md5_summary(updated=[lowering_config_relfilepath], cruise_id=self.cruise_id,
+                                      background=False)
 
         return {'verdict': True}
 

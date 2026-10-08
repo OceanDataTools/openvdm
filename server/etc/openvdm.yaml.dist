@@ -92,6 +92,17 @@ postHookCommands:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/r2r_nav_manager.py
         #    - OpenRVDAS
+        # Plot new and updated CTD casts into the CTD_Plots extra directory
+        # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
+        #- collectionSystemTransferName: CTD
+        #  commandList:
+        #  - name: "Plot CTD casts"
+        #    command:
+        #    - /opt/openvdm/venv/bin/python
+        #    - /opt/openvdm/bin/plot_ctd_casts.py
+        #    - --extraDirectory=CTD_Plots
+        #    - "{newFiles}"
+        #    - "{updatedFiles}"
     postDataDashboard:
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
