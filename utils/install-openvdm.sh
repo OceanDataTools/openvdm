@@ -2675,8 +2675,10 @@ echo
 # Vessel
 echo "#####################################################################"
 echo "The vessel this OpenVDM install is on. It's saved with each cruise and"
-echo "used by QA tools. All of these are optional, and can be changed later"
-echo "in the ${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml file."
+echo "used by QA tools. All of these are optional: press Enter to leave one"
+echo "blank and add it later in the vessel section of"
+echo "${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml. On a re-run, a blank"
+echo "answer keeps the value already in that file."
 echo
 
 # An existing openvdm.yaml's vessel settings win over the saved defaults,
@@ -2709,6 +2711,7 @@ yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEF
 VESSEL_R2R=$YES_NO_RESULT
 
 if [ "$VESSEL_R2R" = "yes" ]; then
+    echo "Leave any of the R2R IDs blank to add them later in openvdm.yaml."
     read -r -p "R2R vessel ID (ICES code, e.g. 33RR)? ($DEFAULT_R2R_VESSEL_ID) " R2R_VESSEL_ID
     R2R_VESSEL_ID=${R2R_VESSEL_ID:-$DEFAULT_R2R_VESSEL_ID}
 
