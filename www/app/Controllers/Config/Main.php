@@ -79,6 +79,7 @@ class Main extends Controller {
 
             $cruiseID = null;
             $setLatestLowering = false;
+            $cruiseExtent = null;
 
             if (!empty($_POST['cruiseID'])) {
                 $cruiseID = $_POST['cruiseID'];
@@ -103,6 +104,7 @@ class Main extends Controller {
                 $cruisePI = $this->_warehouseModel->getCruisePI($_POST['cruiseID']);
                 $cruiseLocation = $this->_warehouseModel->getCruiseLocation($_POST['cruiseID']);
                 $cruiseDescription = $this->_warehouseModel->getCruiseDescription($_POST['cruiseID']);
+                $cruiseExtent = $this->_warehouseModel->getCruiseExtent($_POST['cruiseID']);
 
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
                 $cruiseStartDate = $cruiseDates['cruiseStartDate'] ?? '';
@@ -148,6 +150,10 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
+                if ($setLatestLowering) {
+                    # Switching to another cruise: its extent, from its ovdmConfig.json
+                    $this->_warehouseModel->setCruiseExtent(array('value' => $cruiseExtent ? json_encode($cruiseExtent) : ''));
+                }
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
@@ -507,6 +513,8 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
+                # A new cruise has no track yet; build_cruise_tracks sets the extent
+                $this->_warehouseModel->setCruiseExtent(array('value' => ''));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));

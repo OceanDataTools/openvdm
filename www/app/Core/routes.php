@@ -132,6 +132,7 @@ Router::any('api/warehouse/getCruiseEndPort', 'Controllers\Api\Warehouse@getCrui
 Router::any('api/warehouse/getCruisePI', 'Controllers\Api\Warehouse@getCruisePI');
 Router::any('api/warehouse/getCruiseLocation', 'Controllers\Api\Warehouse@getCruiseLocation');
 Router::any('api/warehouse/getCruiseDescription', 'Controllers\Api\Warehouse@getCruiseDescription');
+Router::any('api/warehouse/getCruiseExtent', 'Controllers\Api\Warehouse@getCruiseExtent');
 Router::any('api/warehouse/getCruiseFinalizedDate', 'Controllers\Api\Warehouse@getCruiseFinalizedDate');
 Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
 Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');
@@ -159,6 +160,7 @@ Router::any('api/warehouse/getShowLoweringComponents', 'Controllers\Api\Warehous
 Router::any('api/warehouse/getDataDashboardManifestFn', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::any('api/warehouse/getCruiseDataURL', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::post('api/warehouse/setCruiseSize', 'Controllers\Api\Warehouse@setCruiseSize');
+Router::post('api/warehouse/setCruiseExtent', 'Controllers\Api\Warehouse@setCruiseExtent');
 Router::post('api/warehouse/setLoweringSize', 'Controllers\Api\Warehouse@setLoweringSize');
 
 Router::any('api/collectionSystemTransfers/getCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getCollectionSystemTransfers');

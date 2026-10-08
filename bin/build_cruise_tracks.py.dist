@@ -17,14 +17,20 @@ converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
 
 GPS sources are configured via an embedded YAML block
 (``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
-with ``--gps-sources``.
+with ``--config_file``.
+
+It also sets the current cruise's bounding box in OpenVDM (``cruiseExtent``,
+read by QA tools) from one GPS source's combined track: the one marked
+``extent: true`` in the GPS sources, else the first. The whole track is used
+on every run, so the extent is recomputed, not merged with the last one. It's
+only set when the cruise is OpenVDM's current cruise, and not with
+``--no_extent``.
 
 Usage::
 
-    build_cruise_tracks.py [-h] [-v ...] [-c CRUISEID]
-                           [--gps-sources FILE] [--no-combine]
-                           [--geojson-only | --kml-only]
-                           [--output-dir DIR] [--username USER]
+    build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
+                           [-o OUTPUTDIR] [-u USERNAME]
+                           [--config_file FILE] [--no_extent]
                            collectionSystem
 """
 
@@ -39,7 +45,7 @@ from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
 from server.lib.file_utils import set_owner_group_permissions, output_json_data_to_file
-from server.lib.geojson_utils import convert_to_kml, combine_geojson_files
+from server.lib.geojson_utils import convert_to_kml, combine_geojson_files, geojson_extent
 from server.lib.openvdm import OpenVDM
 
 # Name of the extra directory the trackline files are written to.
@@ -52,6 +58,8 @@ DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
 # ----------------------------------------------------------------------
 
 # GPS sources used when no --config_file is given; edit to match this ship.
+# Add "extent: true" to the source the cruise's bounding box should come from
+# (default: the first).
 DEFAULT_GPS_SOURCES_YAML = """
 CollectionSystem: OpenRVDAS
 GPSSources:
@@ -329,6 +337,10 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
         tracklineDir: Directory where output files are written.
         args: Parsed ``argparse.Namespace``.
         outputUser: Username for ``chown`` after writing each file.
+
+    Returns:
+        dict | None: The combined trackline, or ``None`` with
+        ``--no_combine`` or if the source has no usable files.
     """
 
     logging.info(
@@ -345,7 +357,7 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
         logging.warning(
             "No manifest entries found for %s", gps_source["device"]
         )
-        return
+        return None
 
     if not args.no_combine:
         combined = combine_geojson_files(
@@ -353,7 +365,7 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
         )
         if not combined:
             logging.error("Failed to combine files for %s", gps_source["device"])
-            return
+            return None
 
         write_outputs(
             combined,
@@ -363,7 +375,7 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
             args,
             outputUser,
         )
-        return
+        return combined
 
     # no-combine mode
     for file in files:
@@ -384,6 +396,63 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
             args,
             outputUser,
         )
+
+    return None
+
+
+def extent_gps_source(gps_sources):
+    """Return the GPS source the cruise's bounding box comes from.
+
+    Args:
+        gps_sources: GPS source dicts (from :func:`get_gps_sources`).
+
+    Returns:
+        dict: The source marked ``extent: true``, else the first.
+
+    Raises:
+        RuntimeError: If more than one source is marked.
+    """
+
+    marked = [src for src in gps_sources if src.get("extent") is True]
+    if len(marked) > 1:
+        raise RuntimeError("Only one GPS source can be marked 'extent: true'")
+    return marked[0] if marked else gps_sources[0]
+
+
+def update_cruise_extent(openvdm, gps_source, combined, manifest, cruise_base_dir, cruise_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Set the current cruise's bounding box in OpenVDM from a GPS source's track.
+
+    Nothing is set if *cruise_id* isn't OpenVDM's current cruise (e.g. with
+    ``-c`` for an old cruise), or if the source has no positions yet.
+
+    Args:
+        openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        gps_source: The GPS source (from :func:`extent_gps_source`).
+        combined: Its combined trackline from :func:`process_gps_source`, or
+            ``None`` to combine its dashboard files here (``--no_combine``).
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        cruise_id: The cruise being processed.
+
+    Raises:
+        Exception: If OpenVDM refuses the extent or can't be reached.
+    """
+
+    if cruise_id != openvdm.get_cruise_id():
+        logging.info("%s isn't the current cruise; not setting its extent", cruise_id)
+        return
+
+    if combined is None:
+        files = get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir)
+        combined = combine_geojson_files(files, cruise_id, gps_source["device"]) if files else None
+
+    extent = geojson_extent(combined) if combined else None
+    if extent is None:
+        logging.warning("No positions from %s yet; the cruise extent isn't set", gps_source["device"])
+        return
+
+    logging.info("Setting the cruise extent from %s: %s", gps_source["device"], extent)
+    openvdm.set_cruise_extent(extent)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
@@ -437,7 +506,7 @@ def resolve_cruise_and_dirs(openVDM, args):
     return cruiseID, cruise_base_dir, tracklineDir, outputUser
 
 
-def main():
+def main():  # pylint: disable=too-many-locals
     """Parse arguments and build cruise trackline files."""
 
     parser = argparse.ArgumentParser(
@@ -451,6 +520,8 @@ def main():
     parser.add_argument("-o", dest="outputDir")
     parser.add_argument("-u", "--username")
     parser.add_argument("--config_file", dest="gps_sources_file")
+    parser.add_argument("--no_extent", action="store_true",
+                        help="don't set the cruise's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
 
     args = parser.parse_args()
@@ -470,6 +541,7 @@ def main():
             resolve_cruise_and_dirs(openVDM, args)
         )
         gps_sources = get_gps_sources(args)
+        extent_source = extent_gps_source(gps_sources)
 
         manifest_path = resolve_manifest_path(openVDM, cruise_base_dir, cruiseID)
         manifest = load_manifest(manifest_path)
@@ -479,9 +551,19 @@ def main():
 
     logging.info("Using manifest: %s", manifest_path)
 
+    extent_track = None
     for gps_source in gps_sources:
-        process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
-                           tracklineDir,args,outputUser)
+        combined = process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
+                                      tracklineDir,args,outputUser)
+        if gps_source is extent_source:
+            extent_track = combined
+
+    if not args.no_extent:
+        try:
+            update_cruise_extent(openVDM, extent_source, extent_track, manifest, cruise_base_dir, cruiseID)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            print(f"Unable to set the cruise extent: {err}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -306,6 +306,11 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
+    public function setCruiseExtent($data) {
+        $where = array('name' => 'cruiseExtent');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseDescription($data) {
         $where = array('name' => 'cruiseDescription');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -586,6 +591,25 @@ class Warehouse extends Model {
         }
         $ovdmConfigJSON = json_decode(file_get_contents($configFile), true);
         return $ovdmConfigJSON['cruiseDescription'] ?? '';
+    }
+
+    // A cruise's bounding box (#366): the current one (cruiseExtent, set by
+    // build_cruise_tracks through api/warehouse/setCruiseExtent), or another
+    // cruise's from its ovdmConfig.json. An array with westernmost,
+    // easternmost, southernmost and northernmost, or null if there's none.
+    public function getCruiseExtent($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseExtent'");
+            $extent = json_decode($row[0]->value ?? '', true);
+        } else {
+            $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn();
+            if (!is_file($configFile)) {
+                return null;
+            }
+            $ovdmConfigJSON = json_decode(file_get_contents($configFile), true);
+            $extent = $ovdmConfigJSON['cruiseExtent'] ?? null;
+        }
+        return is_array($extent) ? $extent : null;
     }
 
     public function getCruiseDates($cruiseID = '') {
