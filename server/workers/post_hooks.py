@@ -42,6 +42,11 @@ TASK_NAMES = {
     'POST_FINALIZE_LOWERING_HOOK': 'postFinalizeCurrentLowering'
 }
 
+# How much of a failed command's output goes into the job's reason, and so
+# into the OpenVDM message: its last lines, up to this many characters
+MAX_OUTPUT_LINES = 20
+MAX_OUTPUT_CHARS = 2000
+
 # Tasks with no row in OpenVDM's Tasks table (taskID 0); used instead of an API lookup.
 CUSTOM_TASKS = [
     {
@@ -128,28 +133,66 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
 
     @staticmethod
+    def _output_tail(output):
+        """Return the end of a command's output, for the job's reason.
+
+        Args:
+            output: The command's stderr or stdout.
+
+        Returns:
+            str: Its last ``MAX_OUTPUT_LINES`` lines, at most
+            ``MAX_OUTPUT_CHARS`` characters, with a note when anything was
+            cut.
+        """
+
+        output = output.strip()
+        tail = '\n'.join(output.splitlines()[-MAX_OUTPUT_LINES:])[-MAX_OUTPUT_CHARS:]
+        return tail if tail == output else f"[earlier output cut]\n{tail}"
+
+
+    @staticmethod
     def _run_command(command):
+        """Run one hook command.
+
+        Args:
+            command: ``{'name': ..., 'command': [...]}`` from ``openvdm.yaml``,
+                with its placeholders filled in.
+
+        Returns:
+            dict: ``{'verdict': True}``, or ``{'verdict': False, 'reason': ...}``
+            if the command couldn't start or exited non-zero. The reason
+            names the command and gives its exit status and the end of its
+            error output (stdout if stderr is empty); it becomes the OpenVDM
+            message's body. The command line itself goes only to the log.
         """
-        Run the commands in the command_list
-        """
+
+        command_line = ' '.join(command['command'])
+        logging.debug("Command: %s", command_line)
 
         try:
-            logging.debug("Command: %s", ' '.join(command['command']))
-            proc = subprocess.run(command['command'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            proc = subprocess.run(command['command'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                  check=False)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logging.error("Error executing %s: %s: %s", command['name'], command_line, exc)
+            program = command['command'][0] if command['command'] else 'an empty command'
+            return {"verdict": False, "reason": f"{command['name']}: couldn't run {program}: {exc}"}
 
-            if len(proc.stdout) > 0:
-                logging.debug("stdout: %s", proc.stdout)
+        if len(proc.stdout) > 0:
+            logging.debug("stdout: %s", proc.stdout)
 
-            if len(proc.stderr) > 0:
-                logging.debug("stderr: %s", proc.stderr)
+        if len(proc.stderr) > 0:
+            logging.debug("stderr: %s", proc.stderr)
 
-        except Exception as exc:
-            reason = f"Error executing {command['name']}: {' '.join(command['command'])}"
-            logging.error(reason)
-            logging.debug(str(exc))
-            return {"verdict": False, "reason": reason}
+        if proc.returncode == 0:
+            return {"verdict": True}
 
-        return {"verdict": True}
+        status = f"exit {proc.returncode}" if proc.returncode > 0 else f"killed by signal {-proc.returncode}"
+        output = proc.stderr if proc.stderr.strip() else proc.stdout
+        reason = f"{command['name']} ({status})"
+        if output.strip():
+            reason += f":\n{OVDMGearmanWorker._output_tail(output)}"
+        logging.error("Error executing %s: %s (%s)", command['name'], command_line, status)
+        return {"verdict": False, "reason": reason}
 
 
     def _build_commands(self, command_list: list, cst_cfg: dict = None) -> list:
@@ -473,7 +516,7 @@ def task_post_hook(worker: OVDMGearmanWorker, current_job) -> str:
             reasons.append(output_results['reason'])
 
     if len(reasons) > 0:
-        job_results['parts'].append({"partName": "Running commands", "result": "Fail", "reason": '\n'.join(reasons)})
+        job_results['parts'].append({"partName": "Running commands", "result": "Fail", "reason": '\n\n'.join(reasons)})
     else:
         job_results['parts'].append({"partName": "Running commands", "result": "Pass"})
 
