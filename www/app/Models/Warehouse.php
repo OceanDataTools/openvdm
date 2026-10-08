@@ -306,6 +306,11 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
+    public function setCruiseDescription($data) {
+        $where = array('name' => 'cruiseDescription');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseStartDate($data) {
         $where = array('name' => 'cruiseStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -563,6 +568,24 @@ class Warehouse extends Model {
         } else {
             return "Could not find cruise directory.";
         }
+    }
+
+    // A cruise's description: the current one, or another cruise's from its
+    // ovdmConfig.json. Empty when there's none, including for cruises from
+    // before 2.17 or without a config file, so an error text is never saved
+    // as the description.
+    public function getCruiseDescription($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseDescription'");
+            return $row[0]->value ?? '';
+        }
+
+        $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn();
+        if (!is_file($configFile)) {
+            return '';
+        }
+        $ovdmConfigJSON = json_decode(file_get_contents($configFile), true);
+        return $ovdmConfigJSON['cruiseDescription'] ?? '';
     }
 
     public function getCruiseDates($cruiseID = '') {

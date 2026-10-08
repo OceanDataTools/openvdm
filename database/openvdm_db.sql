@@ -91,7 +91,7 @@ DROP TABLE IF EXISTS `OVDM_CoreVars`;
 CREATE TABLE `OVDM_CoreVars` (
   `coreVarID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
-  `value` tinytext,
+  `value` text,
   PRIMARY KEY (`coreVarID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -122,7 +122,8 @@ VALUES
   (20,'shipToShoreBWLimitStatus','Off'),
   (21,'md5FilesizeLimit','10'),
   (22,'md5FilesizeLimitStatus','On'),
-  (23,'showLoweringComponents','No');
+  (23,'showLoweringComponents','No'),
+  (24,'cruiseDescription','Sample cruise for exploring OpenVDM with its sample data.');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;

@@ -128,6 +128,13 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    // getCruiseDescription - return the current cruise description.
+    public function getCruiseDescription() {
+
+        $response['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
+        echo json_encode($response);
+    }
+
     // getCruiseDates - return the current cruise start/end dates.
     public function getCruiseDates() {
 
@@ -326,6 +333,7 @@ class Warehouse extends Controller {
         $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
         $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
+        $response['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
