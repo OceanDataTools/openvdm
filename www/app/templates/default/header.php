@@ -232,7 +232,7 @@ use Helpers\Hooks;
 ?>
                     <li>
                             <a class="OVDM_message" messageID="<?php echo $row->messageID; ?>" href="#">
-                                <strong><?php echo $row->messageTitle; ?><span class="pull-right text-muted small"><?php echo time_elapsed_string($row->messageTS); ?></span></strong>
+                                <strong><?php echo htmlspecialchars($row->messageTitle); ?><span class="pull-right text-muted small"><?php echo time_elapsed_string($row->messageTS); ?></span></strong>
                             </a>
                     </li>
                     <li class="divider"></li>
