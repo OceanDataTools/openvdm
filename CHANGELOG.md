@@ -19,7 +19,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ### Changed
 - **CTD profile plot header:** the Date is the cast's start date (`System UTC`), the Cast is the file's basename, and Depth is the cast's maximum depth calculated from pressure, left out when it can't be calculated. They had come from `** Date:`, `** Cast:` and `** Bottom Depth:` header lines, which most ships don't write that way (#376).
-- **CTD profile plot position:** the plot header gives the cast's position in decimal degrees: the header's NMEA position, else the first scan's. It's left out when the cast has no position (#379).
+- **CTD profile plot position:** the plot header gives the cast's position in decimal degrees (`Position: lat 27.61917, lng -93.86167`): the header's NMEA position, else the first scan's. It's left out when the cast has no position (#379, #381).
 
 ---
 

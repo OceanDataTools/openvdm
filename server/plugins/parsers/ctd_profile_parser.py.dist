@@ -896,7 +896,8 @@ class CTDProfileParser(OpenVDMCSVParser):
             ]
             position = self.cast_position(df)
             if position:
-                lines.append(f"Position: {position[0]:.{POSITION_DECIMALS}f}, {position[1]:.{POSITION_DECIMALS}f}")
+                lines.append(f"Position: lat {position[0]:.{POSITION_DECIMALS}f}, "
+                             f"lng {position[1]:.{POSITION_DECIMALS}f}")
             header_text = '\n'.join(lines)
             # The box grows with the number of lines, centred on the text
             box_height = 0.02 + 0.02 * len(lines)
