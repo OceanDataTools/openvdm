@@ -838,19 +838,39 @@ class CTDProfileParser(OpenVDMCSVParser):
             f"{count} {col} values outside {self.ranges[col][0]:g} to {self.ranges[col][1]:g}"
             for col, count in outside.items() if count))
 
+    def cast_position(self, df):
+        """Return the cast's position: the header's NMEA position, else the first scan's.
+
+        Args:
+            df: The cast's scans, in time order, with ``latitude`` and
+                ``longitude`` columns.
+
+        Returns:
+            tuple | None: ``(latitude, longitude)`` in decimal degrees, or
+            ``None`` if neither the header nor any scan has a position.
+        """
+        if self.latitude is not None and self.longitude is not None:
+            return self.latitude, self.longitude
+        positions = df[['latitude', 'longitude']].dropna()
+        if positions.empty:
+            return None
+        return float(positions['latitude'].iloc[0]), float(positions['longitude'].iloc[0])
+
     def save_plot(self, df, filepath):
         """Save a PNG profile plot of the cast to ``plot_dir`` (``<cast>.png``).
 
         Temperature, conductivity and salinity against pressure, with the
         downcast drawn darker than the upcast. The header gives the ship,
         cruise and station from the ``**`` header lines, the date of the
-        cast's start (``System UTC``), the file's basename as the cast, and
-        the cast's maximum depth if it could be calculated. A failure is
-        logged and doesn't stop the parsing.
+        cast's start (``System UTC``), the file's basename as the cast, the
+        cast's maximum depth if it could be calculated, and its position (see
+        :meth:`cast_position`) if known. A failure is logged and doesn't stop
+        the parsing.
 
         Args:
-            df: The cast's scans, in time order, with a ``depth`` column if
-                depth could be calculated.
+            df: The cast's scans, in time order, with ``latitude`` and
+                ``longitude`` columns and a ``depth`` column if depth could be
+                calculated.
             filepath: Path to the cast's ``.hex`` file.
         """
         try:
@@ -869,13 +889,19 @@ class CTDProfileParser(OpenVDMCSVParser):
 
             date = self.start_time.strftime('%Y-%m-%d') if self.start_time else 'N/A'
             depth = f"  |  Depth: {df['depth'].max():.1f} m" if 'depth' in df else ''
-            header_text = (
-                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {date}\n"
-                f"Station: {self.metadata['Station']}  |  Cast: {splitext(basename(filepath))[0]}{depth}\n"
-                f"File: {basename(filepath)}  |  System Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            fig.patches.append(patches.Rectangle((0.05, 0.88), 0.70, 0.08, linewidth=0.8, edgecolor='black',
-                                                 facecolor='none', transform=fig.transFigure))
+            lines = [
+                f"Ship: {self.metadata['Ship']}  |  Cruise: {self.metadata['Cruise']}  |  Date: {date}",
+                f"Station: {self.metadata['Station']}  |  Cast: {splitext(basename(filepath))[0]}{depth}",
+                f"File: {basename(filepath)}  |  System Time: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}",
+            ]
+            position = self.cast_position(df)
+            if position:
+                lines.append(f"Position: {position[0]:.{POSITION_DECIMALS}f}, {position[1]:.{POSITION_DECIMALS}f}")
+            header_text = '\n'.join(lines)
+            # The box grows with the number of lines, centred on the text
+            box_height = 0.02 + 0.02 * len(lines)
+            fig.patches.append(patches.Rectangle((0.05, 0.92 - box_height / 2), 0.70, box_height, linewidth=0.8,
+                                                 edgecolor='black', facecolor='none', transform=fig.transFigure))
             fig.text(0.40, 0.92, header_text, transform=fig.transFigure, fontsize=11, family='monospace',
                      ha='center', va='center', linespacing=1.6)
 
