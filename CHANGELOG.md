@@ -13,6 +13,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Vessel settings in `openvdm.yaml`:** a `vessel` block with the vessel's name and contact (institution, email), and, only for vessels that submit data to R2R, an `r2r` sub-block with R2R's vessel, operator and scheduler IDs.
   - The installer asks for them. It asks for the R2R IDs only if the vessel submits data to R2R (default no), and on a re-run it keeps the values in `openvdm.yaml`.
   - Each cruise's `ovdmConfig.json` gets the block as `vessel`, and `OpenVDM.get_vessel_config()` returns it for plugins and hooks (#365).
+- **Cruise extent:** `bin/build_cruise_tracks.py` sets the current cruise's bounding box (`cruiseExtent`) from one GPS source's whole track on every run.
+  - **Source:** the GPS source marked `extent: true`, else the first.
+  - **Antimeridian:** a track that crosses it gives westernmost > easternmost, as R2R does.
+  - **Where it's available:** `getCruiseConfig` (and `api/warehouse/getCruiseExtent`) and each cruise's `ovdmConfig.json`.
+  - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
+  - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no_extent` skips it.
+  - Copy the updated `build_cruise_tracks.py.dist` over your `build_cruise_tracks.py` (#366).
 
 ---
 

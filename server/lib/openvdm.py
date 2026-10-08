@@ -1884,6 +1884,34 @@ class OpenVDM():
             raise exc
 
 
+    def set_cruise_extent(self, extent):
+        """Record the current cruise's bounding box in OpenVDM (``cruiseExtent``).
+
+        The API only accepts it with the worker key (``workerApiKey``), since
+        the value ends up in QA reports.
+
+        Args:
+            extent: ``westernmost``, ``easternmost``, ``southernmost`` and
+                ``northernmost`` in decimal degrees (e.g. from
+                :func:`server.lib.geojson_utils.geojson_extent`), or ``None``
+                to clear it.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or refuses the
+                extent (e.g. a wrong worker key).
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/setCruiseExtent"
+        payload = {'extent': json.dumps(extent) if extent else ''}
+
+        try:
+            req = requests.post(url, data=payload, headers=self._worker_headers(), timeout=TIMEOUT)
+            req.raise_for_status()
+        except Exception as exc:
+            logging.error("Unable to set cruise extent with OpenVDM API")
+            raise exc
+
+
     def set_lowering_size(self, size_in_bytes=None):
         """Record the current lowering's total size in OpenVDM.
 

@@ -128,6 +128,55 @@ class Warehouse extends Controller {
         echo json_encode($response);
     }
 
+    // getCruiseExtent - return the current cruise's bounding box, or null.
+    public function getCruiseExtent() {
+
+        $response['cruiseExtent'] = $this->_warehouseModel->getCruiseExtent();
+        echo json_encode($response);
+    }
+
+    // setCruiseExtent - set the current cruise's bounding box (#366), from
+    // POST 'extent': JSON with westernmost, easternmost, southernmost and
+    // northernmost in decimal degrees, or empty to clear it. Only for workers
+    // (X-Worker-Token), since the value ends up in QA reports. westernmost >
+    // easternmost is a box across the antimeridian.
+    public function setCruiseExtent() {
+
+        if (!TransferCredentials::isWorkerRequest()) {
+            http_response_code(403);
+            echo json_encode(array('error' => 'A worker token is required'));
+            return;
+        }
+
+        $raw = $_POST['extent'] ?? '';
+        if ($raw === '') {
+            $this->_warehouseModel->setCruiseExtent(array('value' => ''));
+            echo json_encode(array('cruiseExtent' => null));
+            return;
+        }
+
+        $extent = json_decode($raw, true);
+        $limits = array('westernmost' => 180, 'easternmost' => 180, 'southernmost' => 90, 'northernmost' => 90);
+        $checked = array();
+        foreach ($limits as $edge => $limit) {
+            $value = is_array($extent) ? ($extent[$edge] ?? null) : null;
+            if ((!is_int($value) && !is_float($value)) || abs($value) > $limit) {
+                http_response_code(400);
+                echo json_encode(array('error' => "Invalid or missing $edge"));
+                return;
+            }
+            $checked[$edge] = (float) $value;
+        }
+        if ($checked['southernmost'] > $checked['northernmost']) {
+            http_response_code(400);
+            echo json_encode(array('error' => 'southernmost is north of northernmost'));
+            return;
+        }
+
+        $this->_warehouseModel->setCruiseExtent(array('value' => json_encode($checked)));
+        echo json_encode(array('cruiseExtent' => $checked));
+    }
+
     // getCruiseDescription - return the current cruise description.
     public function getCruiseDescription() {
 
@@ -334,6 +383,7 @@ class Warehouse extends Controller {
         $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
         $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
         $response['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
+        $response['cruiseExtent'] = $this->_warehouseModel->getCruiseExtent();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();

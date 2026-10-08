@@ -117,6 +117,8 @@ postHookCommands:
         #    - "{newFiles}"
         #    - "{updatedFiles}"
     postDataDashboard:
+        # build_cruise_tracks.py also sets the cruise's bounding box (cruiseExtent)
+        # from its GPS sources, for QA tools
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
         #  - name: "Build cruise tracks"
