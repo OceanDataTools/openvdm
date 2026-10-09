@@ -98,13 +98,6 @@ hooks:
 # OpenVDM's primary operation.
 postHookCommands:
     postCollectionSystemTransfer:
-        #- collectionSystemTransferName: OpenRVDAS
-        #  commandList:
-        #  - name: "R2R NavManager"
-        #    command:
-        #    - /opt/openvdm/venv/bin/python
-        #    - /opt/openvdm/bin/r2r_nav_manager.py
-        #    - OpenRVDAS
         # Plot new and updated CTD casts into the CTD_Plots extra directory
         # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
         #- collectionSystemTransferName: CTD
@@ -117,17 +110,40 @@ postHookCommands:
         #    - "{newFiles}"
         #    - "{updatedFiles}"
     postDataDashboard:
-        # build_cruise_tracks.py writes GeoJSON/KML tracklines to the Tracklines extra
-        # directory (-e NAME for another) and sets the cruise's bounding box
-        # (cruiseExtent) for QA tools. If nav-qa-processing's OpenVDM hook sets the
-        # extent, add "--no-extent" here so this quick-look extent doesn't overwrite it.
+        # Tracklines: after each data dashboard update or rebuild for a collection
+        # system, write a GeoJSON and a KML trackline per position source to the
+        # Tracklines extra directory (owned by the warehouse user and added to the
+        # cruise's MD5 summary). bin/build_cruise_tracks.py and
+        # bin/build_lowering_tracks.py are copied from their .dist files.
+        # To use a block, remove the first "#" from each of its lines; to use an
+        # option, also remove the "#" before its "-":
+        #   --position-sources  a PositionSources YAML file, instead of editing the
+        #                       script's embedded default
+        #   --extra-directory   another extra directory for the files
+        #   --no-extent         don't set the cruise's bounding box (cruiseExtent);
+        #                       add it when nav-qa-processing's hook sets the extent
+        #
+        # Cruise tracklines, which also set the cruise's bounding box for QA tools
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
         #  - name: "Build cruise tracks"
         #    command:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/build_cruise_tracks.py
-        #    - OpenRVDAS
+        #    #- --position-sources=/opt/openvdm/server/etc/cruise_position_sources.yaml
+        #    #- --extra-directory=Tracklines
+        #    #- --no-extent
+        #    - "{collectionSystemTransferName}"
+        # Lowering tracklines, for the current lowering
+        #- collectionSystemTransferName: ROV_OpenRVDAS
+        #  commandList:
+        #  - name: "Build lowering tracks"
+        #    command:
+        #    - /opt/openvdm/venv/bin/python
+        #    - /opt/openvdm/bin/build_lowering_tracks.py
+        #    #- --position-sources=/opt/openvdm/server/etc/lowering_position_sources.yaml
+        #    #- --extra-directory=Tracklines
+        #    - "{collectionSystemTransferName}"
     postSetupNewCruise:
         #commandList:
         #- name: "Setup Remote Cruise Directories"
