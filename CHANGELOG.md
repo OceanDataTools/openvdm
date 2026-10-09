@@ -20,6 +20,12 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
   - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no_extent` skips it.
   - Copy the updated `build_cruise_tracks.py.dist` over your `build_cruise_tracks.py` (#366).
+- **`build_cruise_tracks.py` output:**
+  - **Where it goes:** `-e/--extra_directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
+  - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
+  - **MD5 summary:** tracklines in an extra directory are now added to the cruise's MD5 summary. `-o` output isn't.
+  - **Failures:** if setting the extent or queueing the MD5 update fails, the script reports it and exits 1, so the hook's OpenVDM message says why.
+  - If nav-qa-processing's OpenVDM hook sets the cruise extent, add `--no_extent` to the `build_cruise_tracks.py` hook (#388).
 
 ---
 
