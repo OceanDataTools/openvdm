@@ -117,8 +117,10 @@ postHookCommands:
         #    - "{newFiles}"
         #    - "{updatedFiles}"
     postDataDashboard:
-        # build_cruise_tracks.py also sets the cruise's bounding box (cruiseExtent)
-        # from its GPS sources, for QA tools
+        # build_cruise_tracks.py writes GeoJSON/KML tracklines to the Tracklines extra
+        # directory (-e NAME for another) and sets the cruise's bounding box
+        # (cruiseExtent) for QA tools. If nav-qa-processing's OpenVDM hook sets the
+        # extent, add "--no-extent" here so this quick-look extent doesn't overwrite it.
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
         #  - name: "Build cruise tracks"
