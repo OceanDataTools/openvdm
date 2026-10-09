@@ -20,6 +20,12 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
   - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no-extent` skips it.
   - Copy the updated `build_cruise_tracks.py.dist` over your `build_cruise_tracks.py` (#366).
+- **`build_lowering_tracks.py` output:** the same changes as `build_cruise_tracks.py`, adapted for lowerings.
+  - **Where it goes:** `-e/--extra-directory NAME` (default `Tracklines`) or `-o OUTPUTDIR`, not both.
+  - **Checks:** the extra directory must exist, be enabled and have its folder. A lowering-level one is inside the lowering (`<loweringDataBaseDir>/<loweringID>/<destDir>`), and `{loweringID}` in a cruise-level one's path is filled in.
+  - **Ownership and MD5:** extra-directory output always belongs to OpenVDM's warehouse user and is added to the cruise's MD5 summary. `-o` output isn't. `-u/--username` is removed, so take it out of your hook.
+  - **Renamed:** `--position-sources FILE` replaces `--gps-sources`. The sources YAML's list is now `PositionSources`, and `GPSSources` is still accepted.
+  - **Failures:** a failed MD5 update exits 1 with a message. Copy the updated `build_lowering_tracks.py.dist` over your `build_lowering_tracks.py` (#392).
 - **`build_cruise_tracks.py` output:**
   - **Where it goes:** `-e/--extra-directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
   - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
