@@ -6,27 +6,28 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.17.0] – Unreleased
 
-**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. If your `openvdm.yaml` hooks run `build_cruise_tracks.py` with `-u`, remove it (#388). Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
+**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. If your `openvdm.yaml` hooks run `build_cruise_tracks.py`, remove `-u` and use the renamed options: `--no-combine`, `--kml-only`, `--geojson-only`, `--no-extent`, and `--position-sources` instead of `--config_file` (#388). Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
 
 ### Added
 - **Cruise Description:** an optional, multi-line description on the Setup New Cruise and Edit Cruise forms. It's returned by `getCruiseConfig` (and `api/warehouse/getCruiseDescription`), saved in each cruise's `ovdmConfig.json`, and shown on the main page's cruise information panel. Cruises from before 2.17 have an empty description. The CoreVars `value` column becomes `text`, since `tinytext` holds only 255 bytes (#367).
 - **Vessel settings in `openvdm.yaml`:** a `vessel` block with the vessel's name and contact (institution, email), and, only for vessels that submit data to R2R, an `r2r` sub-block with R2R's vessel, operator and scheduler IDs.
   - The installer asks for them. It asks for the R2R IDs only if the vessel submits data to R2R (default no), and on a re-run it keeps the values in `openvdm.yaml`.
   - Each cruise's `ovdmConfig.json` gets the block as `vessel`, and `OpenVDM.get_vessel_config()` returns it for plugins and hooks (#365).
-- **Cruise extent:** `bin/build_cruise_tracks.py` sets the current cruise's bounding box (`cruiseExtent`) from one GPS source's whole track on every run.
-  - **Source:** the GPS source marked `extent: true`, else the first.
+- **Cruise extent:** `bin/build_cruise_tracks.py` sets the current cruise's bounding box (`cruiseExtent`) from one position source's whole track on every run.
+  - **Source:** the position source marked `extent: true`, else the first.
   - **Antimeridian:** a track that crosses it gives westernmost > easternmost, as R2R does.
   - **Where it's available:** `getCruiseConfig` (and `api/warehouse/getCruiseExtent`) and each cruise's `ovdmConfig.json`.
   - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
-  - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no_extent` skips it.
+  - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no-extent` skips it.
   - Copy the updated `build_cruise_tracks.py.dist` over your `build_cruise_tracks.py` (#366).
 - **`build_cruise_tracks.py` output:**
-  - **Where it goes:** `-e/--extra_directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
+  - **Where it goes:** `-e/--extra-directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
   - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
   - **MD5 summary:** tracklines in an extra directory are now added to the cruise's MD5 summary. `-o` output isn't.
   - **Ownership:** tracklines in an extra directory always belong to OpenVDM's warehouse user (the installer's OpenVDM user). `-o` files keep whoever wrote them. The `-u/--username` option is removed, so take `-u` out of your `build_cruise_tracks.py` hook in `openvdm.yaml`, or the script stops with a usage error.
   - **Failures:** if setting the extent or queueing the MD5 update fails, the script reports it and exits 1, so the hook's OpenVDM message says why.
-  - If nav-qa-processing's OpenVDM hook sets the cruise extent, add `--no_extent` to the `build_cruise_tracks.py` hook (#388).
+  - If nav-qa-processing's OpenVDM hook sets the cruise extent, add `--no-extent` to the `build_cruise_tracks.py` hook.
+  - **Renamed options:** long options now use hyphens: `--no-combine`, `--kml-only`, `--geojson-only` and `--no-extent`. The sources file option is now `--position-sources`, replacing `--config_file`. The sources YAML's list is now `PositionSources`, and `GPSSources` is still accepted (#388).
 
 ---
 

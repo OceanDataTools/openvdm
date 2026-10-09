@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build GeoJSON and KML ship-track files for a cruise.
 
-Reads dashboard data files produced by OpenVDM plugins for one or more GPS
+Reads dashboard data files produced by OpenVDM plugins for one or more position
 sources, concatenates the ``LineString`` coordinates across all files, and
 writes per-device trackline outputs into the ``Tracklines`` extra directory.
 
@@ -15,9 +15,9 @@ visualizer data (e.g. time-series charts) is silently skipped.  When
 ``coordTimes`` arrays are present they are preserved in GeoJSON output and
 converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
 
-GPS sources are configured via an embedded YAML block
-(``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
-with ``--config_file``.
+Position sources are configured via an embedded YAML block
+(``DEFAULT_POSITION_SOURCES_YAML``) that can be overridden by passing a YAML file
+with ``--position-sources``.
 
 The tracklines go to an OpenVDM extra directory: ``Tracklines``, or the one
 named with ``-e``. They're given to OpenVDM's warehouse user (the installer's
@@ -26,19 +26,19 @@ them to a folder instead, owned by whoever runs the script and not added to
 the MD5 summary; ``-e`` and ``-o`` can't be used together.
 
 It also sets the current cruise's bounding box in OpenVDM (``cruiseExtent``,
-read by QA tools) from one GPS source's combined track: the one marked
-``extent: true`` in the GPS sources, else the first. The whole track is used
+read by QA tools) from one position source's combined track: the one marked
+``extent: true`` in the position sources, else the first. The whole track is used
 on every run, so the extent is recomputed, not merged with the last one. It's
 only set when the cruise is OpenVDM's current cruise, and not with
-``--no_extent``. If nav-qa-processing's OpenVDM hook sets the extent from its
-quality-checked fixes, add ``--no_extent`` to this script's hook so the
+``--no-extent``. If nav-qa-processing's OpenVDM hook sets the extent from its
+quality-checked fixes, add ``--no-extent`` to this script's hook so the
 quick-look extent doesn't overwrite it.
 
 Usage::
 
     build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
                            [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
-                           [--config_file FILE] [--no_extent]
+                           [--position-sources FILE] [--no-extent]
                            collectionSystem
 """
 
@@ -62,15 +62,15 @@ TRACKLINE_EXTRA_DIR_NAME = "Tracklines"
 DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
 
 # ----------------------------------------------------------------------
-# Default GPS source configuration (embedded YAML)
+# Default position source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
-# GPS sources used when no --config_file is given; edit to match this ship.
+# Position sources used when no --position-sources is given; edit to match this ship.
 # Add "extent: true" to the source the cruise's bounding box should come from
 # (default: the first).
-DEFAULT_GPS_SOURCES_YAML = """
+DEFAULT_POSITION_SOURCES_YAML = """
 CollectionSystem: OpenRVDAS
-GPSSources:
+PositionSources:
   - device: POSMV
     type: gga
 """
@@ -79,16 +79,17 @@ GPSSources:
 # Configuration & validation
 # ----------------------------------------------------------------------
 
-def load_gps_sources_from_yaml(
+def load_position_sources_from_yaml(
     *,
     yaml_str: str | None = None,
     yaml_path: str | None = None,
     collection_system: str
 ) -> list:
-    """Parse and validate a GPS sources YAML definition.
+    """Parse and validate a position sources YAML definition.
 
     Exactly one of *yaml_str* or *yaml_path* must be provided.  The YAML must
-    describe a mapping with ``CollectionSystem`` and ``GPSSources`` keys; the
+    describe a mapping with ``CollectionSystem`` and ``PositionSources`` keys
+    (``GPSSources``, the old name, is also accepted); the
     ``CollectionSystem`` value must match *collection_system*.  Duplicate device
     names or reused data types raise ``RuntimeError``.
 
@@ -101,7 +102,7 @@ def load_gps_sources_from_yaml(
             used to guard against loading a config for the wrong system.
 
     Returns:
-        List of GPS source dicts, each containing ``device`` and ``type``
+        List of position source dicts, each containing ``device`` and ``type``
         string keys.
 
     Raises:
@@ -114,41 +115,41 @@ def load_gps_sources_from_yaml(
     try:
         if yaml_path:
             if not os.path.isfile(yaml_path):
-                raise RuntimeError(f"GPS sources YAML not found: {yaml_path}")
+                raise RuntimeError(f"position sources YAML not found: {yaml_path}")
             with open(yaml_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         else:
             data = yaml.safe_load(yaml_str)
     except yaml.YAMLError as err:
-        raise RuntimeError(f"Invalid GPS sources YAML: {err}")
+        raise RuntimeError(f"Invalid position sources YAML: {err}")
 
     if not isinstance(data, dict):
-        raise RuntimeError("GPS sources YAML must be a mapping")
+        raise RuntimeError("position sources YAML must be a mapping")
 
     if data.get("CollectionSystem") != collection_system:
         raise RuntimeError(
-            f"GPS sources CollectionSystem mismatch: "
+            f"position sources CollectionSystem mismatch: "
             f"{data.get('CollectionSystem')} != {collection_system}"
         )
 
-    gps_sources = data.get("GPSSources")
-    if not isinstance(gps_sources, list):
-        raise RuntimeError("GPSSources must be a list")
+    position_sources = data.get("PositionSources", data.get("GPSSources"))
+    if not isinstance(position_sources, list):
+        raise RuntimeError("PositionSources must be a list")
 
     seen_devices = set()
     seen_types = set()
 
-    for src in gps_sources:
+    for src in position_sources:
         device = src.get("device")
         dtype = src.get("type")
 
         if not device or not dtype:
             raise RuntimeError(
-                "Each GPSSource must define exactly one 'device' and one 'type'"
+                "Each position source must define exactly one 'device' and one 'type'"
             )
 
         if device in seen_devices:
-            raise RuntimeError(f"Duplicate GPS device: {device}")
+            raise RuntimeError(f"Duplicate position source device: {device}")
 
         if dtype in seen_types:
             raise RuntimeError(f"Manifest type reused across devices: {dtype}")
@@ -156,31 +157,31 @@ def load_gps_sources_from_yaml(
         seen_devices.add(device)
         seen_types.add(dtype)
 
-    return gps_sources
+    return position_sources
 
 
-def get_gps_sources(args):
-    """Return the GPS source list from a file or the embedded YAML default.
+def get_position_sources(args):
+    """Return the position source list from a file or the embedded YAML default.
 
     Args:
-        args: Parsed ``argparse.Namespace`` containing ``gps_sources_file`` and
+        args: Parsed ``argparse.Namespace`` containing ``position_sources_file`` and
             ``collectionSystem`` attributes.
 
     Returns:
-        List of GPS source dicts validated by
-        :func:`load_gps_sources_from_yaml`.
+        List of position source dicts validated by
+        :func:`load_position_sources_from_yaml`.
     """
 
-    if args.gps_sources_file:
-        logging.info("Loading GPS sources from %s", args.gps_sources_file)
-        return load_gps_sources_from_yaml(
-            yaml_path=args.gps_sources_file,
+    if args.position_sources_file:
+        logging.info("Loading position sources from %s", args.position_sources_file)
+        return load_position_sources_from_yaml(
+            yaml_path=args.position_sources_file,
             collection_system=args.collectionSystem,
         )
 
-    logging.debug("Using embedded GPS sources")
-    return load_gps_sources_from_yaml(
-        yaml_str=DEFAULT_GPS_SOURCES_YAML,
+    logging.debug("Using embedded position sources")
+    return load_position_sources_from_yaml(
+        yaml_str=DEFAULT_POSITION_SOURCES_YAML,
         collection_system=args.collectionSystem,
     )
 
@@ -257,12 +258,12 @@ def load_manifest(manifest_path: str):
     return manifest
 
 
-def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
-    """Return dashboard JSON file paths matching a GPS source type.
+def get_dd_json_files_for_position_source(manifest, position_source, cruise_base_dir):
+    """Return dashboard JSON file paths matching a position source type.
 
     Args:
         manifest: Loaded manifest list (from :func:`load_manifest`).
-        gps_source: GPS source dict with at least a ``type`` key.
+        position_source: position source dict with at least a ``type`` key.
         cruise_base_dir: Warehouse base directory prepended to each ``dd_json``
             entry path.
 
@@ -270,7 +271,7 @@ def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
         Sorted list of absolute file paths for the matching entries.
     """
 
-    wanted_type = gps_source["type"]
+    wanted_type = position_source["type"]
     files = []
 
     for entry in manifest:
@@ -285,7 +286,7 @@ def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
 
 def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUser,  # pylint: disable=too-many-arguments,too-many-positional-arguments
                   written=None):
-    """Write GeoJSON and/or KML trackline files for one GPS source.
+    """Write GeoJSON and/or KML trackline files for one position source.
 
     Files are named ``<cruiseID>_<base_name>_Trackline.json`` / ``.kml``.
 
@@ -342,15 +343,15 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
 # Core processing
 # ----------------------------------------------------------------------
 
-def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def process_position_source(position_source,manifest,cruise_base_dir,cruiseID,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                        tracklineDir,args,outputUser,written=None):
-    """Process one GPS source: find its dashboard files and write tracklines.
+    """Process one position source: find its dashboard files and write tracklines.
 
-    Unless ``--no_combine`` is given, the source's dashboard files are combined
+    Unless ``--no-combine`` is given, the source's dashboard files are combined
     into a single trackline.
 
     Args:
-        gps_source: GPS source dict with ``device`` and ``type`` keys.
+        position_source: position source dict with ``device`` and ``type`` keys.
         manifest: Loaded manifest list.
         cruise_base_dir: Warehouse base directory.
         cruiseID: Current cruise identifier.
@@ -361,36 +362,36 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,  # pylint: 
 
     Returns:
         dict | None: The combined trackline, or ``None`` with
-        ``--no_combine`` or if the source has no usable files.
+        ``--no-combine`` or if the source has no usable files.
     """
 
     logging.info(
         "Processing %s (type=%s)",
-        gps_source["device"],
-        gps_source["type"],
+        position_source["device"],
+        position_source["type"],
     )
 
-    files = get_dd_json_files_for_gps_source(
-        manifest, gps_source, cruise_base_dir
+    files = get_dd_json_files_for_position_source(
+        manifest, position_source, cruise_base_dir
     )
 
     if not files:
         logging.warning(
-            "No manifest entries found for %s", gps_source["device"]
+            "No manifest entries found for %s", position_source["device"]
         )
         return None
 
     if not args.no_combine:
         combined = combine_geojson_files(
-            files, cruiseID, gps_source["device"]
+            files, cruiseID, position_source["device"]
         )
         if not combined:
-            logging.error("Failed to combine files for %s", gps_source["device"])
+            logging.error("Failed to combine files for %s", position_source["device"])
             return None
 
         write_outputs(
             combined,
-            gps_source["device"],
+            position_source["device"],
             cruiseID,
             tracklineDir,
             args,
@@ -423,11 +424,11 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,  # pylint: 
     return None
 
 
-def extent_gps_source(gps_sources):
-    """Return the GPS source the cruise's bounding box comes from.
+def extent_position_source(position_sources):
+    """Return the position source the cruise's bounding box comes from.
 
     Args:
-        gps_sources: GPS source dicts (from :func:`get_gps_sources`).
+        position_sources: position source dicts (from :func:`get_position_sources`).
 
     Returns:
         dict: The source marked ``extent: true``, else the first.
@@ -436,23 +437,23 @@ def extent_gps_source(gps_sources):
         RuntimeError: If more than one source is marked.
     """
 
-    marked = [src for src in gps_sources if src.get("extent") is True]
+    marked = [src for src in position_sources if src.get("extent") is True]
     if len(marked) > 1:
-        raise RuntimeError("Only one GPS source can be marked 'extent: true'")
-    return marked[0] if marked else gps_sources[0]
+        raise RuntimeError("Only one position source can be marked 'extent: true'")
+    return marked[0] if marked else position_sources[0]
 
 
-def update_cruise_extent(openvdm, gps_source, combined, manifest, cruise_base_dir, cruise_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    """Set the current cruise's bounding box in OpenVDM from a GPS source's track.
+def update_cruise_extent(openvdm, position_source, combined, manifest, cruise_base_dir, cruise_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Set the current cruise's bounding box in OpenVDM from a position source's track.
 
     Nothing is set if *cruise_id* isn't OpenVDM's current cruise (e.g. with
     ``-c`` for an old cruise), or if the source has no positions yet.
 
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
-        gps_source: The GPS source (from :func:`extent_gps_source`).
-        combined: Its combined trackline from :func:`process_gps_source`, or
-            ``None`` to combine its dashboard files here (``--no_combine``).
+        position_source: The position source (from :func:`extent_position_source`).
+        combined: Its combined trackline from :func:`process_position_source`, or
+            ``None`` to combine its dashboard files here (``--no-combine``).
         manifest: Loaded manifest list.
         cruise_base_dir: Warehouse base directory.
         cruise_id: The cruise being processed.
@@ -466,15 +467,15 @@ def update_cruise_extent(openvdm, gps_source, combined, manifest, cruise_base_di
         return
 
     if combined is None:
-        files = get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir)
-        combined = combine_geojson_files(files, cruise_id, gps_source["device"]) if files else None
+        files = get_dd_json_files_for_position_source(manifest, position_source, cruise_base_dir)
+        combined = combine_geojson_files(files, cruise_id, position_source["device"]) if files else None
 
     extent = geojson_extent(combined) if combined else None
     if extent is None:
-        logging.warning("No positions from %s yet; the cruise extent isn't set", gps_source["device"])
+        logging.warning("No positions from %s yet; the cruise extent isn't set", position_source["device"])
         return
 
-    logging.info("Setting the cruise extent from %s: %s", gps_source["device"], extent)
+    logging.info("Setting the cruise extent from %s: %s", position_source["device"], extent)
     openvdm.set_cruise_extent(extent)
 
 # ----------------------------------------------------------------------
@@ -572,18 +573,18 @@ def main():  # pylint: disable=too-many-locals
         description="build cruise tracklines post-dashboard processing"
     )
     parser.add_argument("-v", "--verbosity", default=0, action="count")
-    parser.add_argument("-n", "--no_combine", action="store_true")
-    parser.add_argument("-k", "--kml_only", action="store_true")
-    parser.add_argument("-g", "--geojson_only", action="store_true")
+    parser.add_argument("-n", "--no-combine", action="store_true")
+    parser.add_argument("-k", "--kml-only", action="store_true")
+    parser.add_argument("-g", "--geojson-only", action="store_true")
     parser.add_argument("-c", dest="cruiseID")
     output = parser.add_mutually_exclusive_group()
-    output.add_argument("-e", "--extra_directory", dest="extraDirectory",
+    output.add_argument("-e", "--extra-directory", dest="extraDirectory",
                         help=f"OpenVDM extra directory to write the tracklines to (default: {TRACKLINE_EXTRA_DIR_NAME})")
     output.add_argument("-o", dest="outputDir",
                         help="folder to write the tracklines to instead of an extra directory; "
                              "they aren't added to the MD5 summary")
-    parser.add_argument("--config_file", dest="gps_sources_file")
-    parser.add_argument("--no_extent", action="store_true",
+    parser.add_argument("--position-sources", dest="position_sources_file")
+    parser.add_argument("--no-extent", action="store_true",
                         help="don't set the cruise's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
 
@@ -603,8 +604,8 @@ def main():  # pylint: disable=too-many-locals
         cruiseID, cruise_base_dir, tracklineDir, outputUser = (
             resolve_cruise_and_dirs(openVDM, args)
         )
-        gps_sources = get_gps_sources(args)
-        extent_source = extent_gps_source(gps_sources)
+        position_sources = get_position_sources(args)
+        extent_source = extent_position_source(position_sources)
 
         manifest_path = resolve_manifest_path(openVDM, cruise_base_dir, cruiseID)
         manifest = load_manifest(manifest_path)
@@ -616,10 +617,10 @@ def main():  # pylint: disable=too-many-locals
 
     extent_track = None
     written = []
-    for gps_source in gps_sources:
-        combined = process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
+    for position_source in position_sources:
+        combined = process_position_source(position_source,manifest,cruise_base_dir,cruiseID,
                                       tracklineDir,args,outputUser,written)
-        if gps_source is extent_source:
+        if position_source is extent_source:
             extent_track = combined
 
     failures = []
