@@ -19,8 +19,8 @@ visualizer data (e.g. time-series charts) is silently skipped.  When
 converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
 
 Navigation sources are configured via an embedded YAML block
-(``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
-with ``--gps-sources``.
+(``DEFAULT_POSITION_SOURCES_YAML``) that can be overridden by passing a YAML file
+with ``--position-sources``.
 
 The tracklines go to an OpenVDM extra directory: ``Tracklines``, or the one
 named with ``-e``. A lowering-level extra directory is inside the lowering
@@ -35,7 +35,7 @@ Usage::
 
     build_lowering_tracks.py [-h] [-v ...] [-n] [-k | -g] [-l LOWERINGID]
                              [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
-                             [--gps-sources FILE]
+                             [--position-sources FILE]
                              collectionSystem
 """
 
@@ -59,13 +59,13 @@ TRACKLINE_EXTRA_DIR_NAME = 'Tracklines'
 DASHBOARD_EXTRA_DIR_NAME = 'Dashboard_Data'
 
 # ----------------------------------------------------------------------
-# Default GPS source configuration (embedded YAML)
+# Default position source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
-# GPS sources used when no --gps-sources file is given; edit to match this vehicle.
-DEFAULT_GPS_SOURCES_YAML = """
+# Position sources used when no --position-sources file is given; edit to match this vehicle.
+DEFAULT_POSITION_SOURCES_YAML = """
 CollectionSystem: ROV_OpenRVDAS
-GPSSources:
+PositionSources:
   - device: USBL-PRI
     type: usbl_pri_gga
   - device: USBL-SEC
@@ -78,16 +78,17 @@ GPSSources:
 # Configuration & validation
 # ----------------------------------------------------------------------
 
-def load_gps_sources_from_yaml(
+def load_position_sources_from_yaml(
     *,
     yaml_str: str | None = None,
     yaml_path: str | None = None,
     collection_system: str
 ) -> list:
-    """Parse and validate a GPS sources YAML definition.
+    """Parse and validate a position sources YAML definition.
 
     Exactly one of *yaml_str* or *yaml_path* must be provided.  The YAML must
-    describe a mapping with ``CollectionSystem`` and ``GPSSources`` keys; the
+    describe a mapping with ``CollectionSystem`` and ``PositionSources`` keys
+    (``GPSSources``, the old name, is also accepted); the
     ``CollectionSystem`` value must match *collection_system*.  Duplicate device
     names or reused data types raise ``RuntimeError``.
 
@@ -100,7 +101,7 @@ def load_gps_sources_from_yaml(
             used to guard against loading a config for the wrong system.
 
     Returns:
-        List of GPS source dicts, each containing ``device`` and ``type``
+        List of position source dicts, each containing ``device`` and ``type``
         string keys.
 
     Raises:
@@ -113,41 +114,41 @@ def load_gps_sources_from_yaml(
     try:
         if yaml_path:
             if not os.path.isfile(yaml_path):
-                raise RuntimeError(f"GPS sources YAML not found: {yaml_path}")
+                raise RuntimeError(f"position sources YAML not found: {yaml_path}")
             with open(yaml_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         else:
             data = yaml.safe_load(yaml_str)
     except yaml.YAMLError as err:
-        raise RuntimeError(f"Invalid GPS sources YAML: {err}")
+        raise RuntimeError(f"Invalid position sources YAML: {err}")
 
     if not isinstance(data, dict):
-        raise RuntimeError("GPS sources YAML must be a mapping")
+        raise RuntimeError("position sources YAML must be a mapping")
 
     if data.get("CollectionSystem") != collection_system:
         raise RuntimeError(
-            f"GPS sources CollectionSystem mismatch: "
+            f"position sources CollectionSystem mismatch: "
             f"{data.get('CollectionSystem')} != {collection_system}"
         )
 
-    gps_sources = data.get("GPSSources")
-    if not isinstance(gps_sources, list):
-        raise RuntimeError("GPSSources must be a list")
+    position_sources = data.get("PositionSources", data.get("GPSSources"))
+    if not isinstance(position_sources, list):
+        raise RuntimeError("PositionSources must be a list")
 
     seen_devices: set = set()
     seen_types: set = set()
 
-    for src in gps_sources:
+    for src in position_sources:
         device = src.get("device")
         dtype = src.get("type")
 
         if not device or not dtype:
             raise RuntimeError(
-                "Each GPSSource must define exactly one 'device' and one 'type'"
+                "Each position source must define exactly one 'device' and one 'type'"
             )
 
         if device in seen_devices:
-            raise RuntimeError(f"Duplicate GPS device: {device}")
+            raise RuntimeError(f"Duplicate position source device: {device}")
 
         if dtype in seen_types:
             raise RuntimeError(f"Manifest type reused across devices: {dtype}")
@@ -155,29 +156,29 @@ def load_gps_sources_from_yaml(
         seen_devices.add(device)
         seen_types.add(dtype)
 
-    return gps_sources
+    return position_sources
 
 
-def get_gps_sources(args) -> list:
-    """Return the GPS source list from a file or the embedded YAML default.
+def get_position_sources(args) -> list:
+    """Return the position source list from a file or the embedded YAML default.
 
     Args:
-        args: Parsed ``argparse.Namespace`` containing ``gps_sources_file``
+        args: Parsed ``argparse.Namespace`` containing ``position_sources_file``
             and ``collectionSystem`` attributes.
 
     Returns:
-        List of GPS source dicts validated by :func:`load_gps_sources_from_yaml`.
+        List of position source dicts validated by :func:`load_position_sources_from_yaml`.
     """
-    if args.gps_sources_file:
-        logging.info("Loading GPS sources from %s", args.gps_sources_file)
-        return load_gps_sources_from_yaml(
-            yaml_path=args.gps_sources_file,
+    if args.position_sources_file:
+        logging.info("Loading position sources from %s", args.position_sources_file)
+        return load_position_sources_from_yaml(
+            yaml_path=args.position_sources_file,
             collection_system=args.collectionSystem,
         )
 
-    logging.debug("Using embedded GPS sources")
-    return load_gps_sources_from_yaml(
-        yaml_str=DEFAULT_GPS_SOURCES_YAML,
+    logging.debug("Using embedded position sources")
+    return load_position_sources_from_yaml(
+        yaml_str=DEFAULT_POSITION_SOURCES_YAML,
         collection_system=args.collectionSystem,
     )
 
@@ -259,21 +260,21 @@ def load_manifest(manifest_path: str) -> list:
     return manifest
 
 
-def get_dd_json_files_for_gps_source(
-    manifest: list, gps_source: dict, cruise_base_dir: str
+def get_dd_json_files_for_position_source(
+    manifest: list, position_source: dict, cruise_base_dir: str
 ) -> list:
-    """Return dashboard JSON file paths matching a GPS source type.
+    """Return dashboard JSON file paths matching a position source type.
 
     Args:
         manifest: Loaded manifest list (from :func:`load_manifest`).
-        gps_source: GPS source dict with at least a ``type`` key.
+        position_source: position source dict with at least a ``type`` key.
         cruise_base_dir: Warehouse base directory prepended to each
             ``dd_json`` entry path.
 
     Returns:
         Sorted list of absolute file paths for the matching entries.
     """
-    wanted_type = gps_source["type"]
+    wanted_type = position_source["type"]
     files = []
 
     for entry in manifest:
@@ -290,7 +291,7 @@ def write_outputs(  # pylint: disable=too-many-arguments,too-many-positional-arg
     geojson_obj: dict, base_name: str, loweringID: str,
     tracklineDir: str, args, outputUser, written=None
 ) -> None:
-    """Write GeoJSON and/or KML trackline files for one GPS source.
+    """Write GeoJSON and/or KML trackline files for one position source.
 
     Args:
         geojson_obj: GeoJSON ``FeatureCollection`` dict to serialise.
@@ -344,14 +345,14 @@ def write_outputs(  # pylint: disable=too-many-arguments,too-many-positional-arg
 # Core processing
 # ----------------------------------------------------------------------
 
-def process_gps_source(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-    gps_source: dict, manifest: list, cruise_base_dir: str, loweringID: str,
+def process_position_source(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    position_source: dict, manifest: list, cruise_base_dir: str, loweringID: str,
     tracklineDir: str, args, outputUser, written=None
 ) -> None:
-    """Process one GPS source: find its dashboard files and write tracklines.
+    """Process one position source: find its dashboard files and write tracklines.
 
     Args:
-        gps_source: GPS source dict with ``device`` and ``type`` keys.
+        position_source: position source dict with ``device`` and ``type`` keys.
         manifest: Loaded manifest list.
         cruise_base_dir: Warehouse base directory.
         loweringID: Current lowering identifier.
@@ -362,25 +363,25 @@ def process_gps_source(  # pylint: disable=too-many-arguments,too-many-positiona
     """
     logging.info(
         "Processing %s (type=%s)",
-        gps_source["device"],
-        gps_source["type"],
+        position_source["device"],
+        position_source["type"],
     )
 
-    files = get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir)
+    files = get_dd_json_files_for_position_source(manifest, position_source, cruise_base_dir)
 
     if not files:
-        logging.warning("No manifest entries found for %s", gps_source["device"])
+        logging.warning("No manifest entries found for %s", position_source["device"])
         return
 
     if not args.no_combine:
-        combined = combine_geojson_files(files, loweringID, gps_source["device"])
+        combined = combine_geojson_files(files, loweringID, position_source["device"])
         if not combined:
-            logging.error("Failed to combine files for %s", gps_source["device"])
+            logging.error("Failed to combine files for %s", position_source["device"])
             return
 
         write_outputs(
             combined,
-            gps_source["device"],
+            position_source["device"],
             loweringID,
             tracklineDir,
             args,
@@ -535,7 +536,7 @@ def main() -> None:
     output.add_argument("-o", dest="outputDir",
                         help="folder to write the tracklines to instead of an extra directory; "
                              "they aren't added to the MD5 summary")
-    parser.add_argument("--gps-sources", dest="gps_sources_file")
+    parser.add_argument("--position-sources", dest="position_sources_file")
     parser.add_argument("collectionSystem")
 
     args = parser.parse_args()
@@ -552,7 +553,7 @@ def main() -> None:
         cruiseID, loweringID, cruise_base_dir, lowering_base_dir, tracklineDir, outputUser = (
             resolve_lowering_and_dirs(openVDM, args)
         )
-        gps_sources = get_gps_sources(args)
+        position_sources = get_position_sources(args)
 
         manifest_path = resolve_manifest_path(
             openVDM, cruise_base_dir, cruiseID, loweringID, lowering_base_dir
@@ -565,9 +566,9 @@ def main() -> None:
     logging.info("Using manifest: %s", manifest_path)
 
     written = []
-    for gps_source in gps_sources:
-        process_gps_source(
-            gps_source, manifest, cruise_base_dir, loweringID,
+    for position_source in position_sources:
+        process_position_source(
+            position_source, manifest, cruise_base_dir, loweringID,
             tracklineDir, args, outputUser, written,
         )
 
