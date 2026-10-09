@@ -26,6 +26,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **Ownership and MD5:** extra-directory output always belongs to OpenVDM's warehouse user and is added to the cruise's MD5 summary. `-o` output isn't. `-u/--username` is removed, so take it out of your hook.
   - **Renamed:** `--position-sources FILE` replaces `--gps-sources`. The sources YAML's list is now `PositionSources`, and `GPSSources` is still accepted.
   - **Failures:** a failed MD5 update exits 1 with a message. Copy the updated `build_lowering_tracks.py.dist` over your `build_lowering_tracks.py` (#392).
+- **Trackline scripts share their code:** the code common to `build_cruise_tracks.py` and `build_lowering_tracks.py` is now in `server/lib/tracks.py`, so future fixes arrive with an OpenVDM update instead of a new `.dist` copy. Their options and output are unchanged. Copy both updated `.dist` files over your scripts once more, keeping your own position sources (#394).
 - **`build_cruise_tracks.py` output:**
   - **Where it goes:** `-e/--extra-directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
   - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
