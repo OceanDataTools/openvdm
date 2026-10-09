@@ -20,10 +20,10 @@ GPS sources are configured via an embedded YAML block
 with ``--config_file``.
 
 The tracklines go to an OpenVDM extra directory: ``Tracklines``, or the one
-named with ``-e``. They're given to the warehouse user and added to the
-cruise's MD5 summary. ``-o OUTPUTDIR`` writes them to a folder instead (owned
-by ``-u USERNAME`` if given, and not added to the MD5 summary); ``-e`` and
-``-o`` can't be used together.
+named with ``-e``. They're given to OpenVDM's warehouse user (the installer's
+OpenVDM user) and added to the cruise's MD5 summary. ``-o OUTPUTDIR`` writes
+them to a folder instead, owned by whoever runs the script and not added to
+the MD5 summary; ``-e`` and ``-o`` can't be used together.
 
 It also sets the current cruise's bounding box in OpenVDM (``cruiseExtent``,
 read by QA tools) from one GPS source's combined track: the one marked
@@ -37,7 +37,7 @@ quick-look extent doesn't overwrite it.
 Usage::
 
     build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
-                           [-e EXTRA_DIRECTORY | -o OUTPUTDIR] [-u USERNAME]
+                           [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
                            [--config_file FILE] [--no_extent]
                            collectionSystem
 """
@@ -295,8 +295,9 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
         cruiseID: Current cruise identifier, used as filename prefix.
         tracklineDir: Directory where output files are written.
         args: Parsed ``argparse.Namespace`` containing ``kml_only``,
-            ``geojson_only``, ``outputDir``, and ``username`` attributes.
-        outputUser: Username for ``chown`` after writing each file.
+            ``geojson_only`` and ``outputDir`` attributes.
+        outputUser: Username to ``chown`` each file to, or ``None`` to leave
+            ownership as it is (``-o``).
         written: List to append ``(path, existed_before)`` to for each file
             written, for the MD5 summary update.
     """
@@ -316,7 +317,7 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
             logging.error("Write failed: %s", result["reason"])
         else:
             written.append((json_path, existed))
-            if not args.outputDir or args.username:
+            if outputUser:
                 set_owner_group_permissions(outputUser, json_path)
 
     if not args.geojson_only:
@@ -334,7 +335,7 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
             return
 
         written.append((kml_path, existed))
-        if not args.outputDir or args.username:
+        if outputUser:
             set_owner_group_permissions(outputUser, kml_path)
 
 # ----------------------------------------------------------------------
@@ -355,7 +356,7 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,  # pylint: 
         cruiseID: Current cruise identifier.
         tracklineDir: Directory where output files are written.
         args: Parsed ``argparse.Namespace``.
-        outputUser: Username for ``chown`` after writing each file.
+        outputUser: Username to ``chown`` each file to, or ``None`` (``-o``).
         written: List of written files, passed to :func:`write_outputs`.
 
     Returns:
@@ -520,8 +521,8 @@ def resolve_cruise_and_dirs(openVDM, args):
     Args:
         openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
         args: Parsed ``argparse.Namespace`` containing ``cruiseID``,
-            ``collectionSystem``, ``outputDir``, ``extraDirectory`` and
-            ``username`` attributes.
+            ``collectionSystem``, ``outputDir`` and ``extraDirectory``
+            attributes.
 
     Returns:
         A 4-tuple of ``(cruiseID, cruise_base_dir, tracklineDir, outputUser)``.
@@ -557,7 +558,9 @@ def resolve_cruise_and_dirs(openVDM, args):
         warehouse_cfg,
     )
 
-    outputUser = args.username or warehouse_cfg["shipboardDataWarehouseUsername"]
+    # Files in an extra directory belong to OpenVDM's warehouse user; -o
+    # output keeps whoever wrote it
+    outputUser = None if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
 
     return cruiseID, cruise_base_dir, tracklineDir, outputUser
 
@@ -579,7 +582,6 @@ def main():  # pylint: disable=too-many-locals
     output.add_argument("-o", dest="outputDir",
                         help="folder to write the tracklines to instead of an extra directory; "
                              "they aren't added to the MD5 summary")
-    parser.add_argument("-u", "--username")
     parser.add_argument("--config_file", dest="gps_sources_file")
     parser.add_argument("--no_extent", action="store_true",
                         help="don't set the cruise's bounding box in OpenVDM")

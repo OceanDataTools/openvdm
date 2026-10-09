@@ -6,7 +6,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.17.0] – Unreleased
 
-**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
+**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. If your `openvdm.yaml` hooks run `build_cruise_tracks.py` with `-u`, remove it (#388). Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
 
 ### Added
 - **Cruise Description:** an optional, multi-line description on the Setup New Cruise and Edit Cruise forms. It's returned by `getCruiseConfig` (and `api/warehouse/getCruiseDescription`), saved in each cruise's `ovdmConfig.json`, and shown on the main page's cruise information panel. Cruises from before 2.17 have an empty description. The CoreVars `value` column becomes `text`, since `tinytext` holds only 255 bytes (#367).
@@ -24,6 +24,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **Where it goes:** `-e/--extra_directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
   - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
   - **MD5 summary:** tracklines in an extra directory are now added to the cruise's MD5 summary. `-o` output isn't.
+  - **Ownership:** tracklines in an extra directory always belong to OpenVDM's warehouse user (the installer's OpenVDM user). `-o` files keep whoever wrote them. The `-u/--username` option is removed, so take `-u` out of your `build_cruise_tracks.py` hook in `openvdm.yaml`, or the script stops with a usage error.
   - **Failures:** if setting the extent or queueing the MD5 update fails, the script reports it and exits 1, so the hook's OpenVDM message says why.
   - If nav-qa-processing's OpenVDM hook sets the cruise extent, add `--no_extent` to the `build_cruise_tracks.py` hook (#388).
 
