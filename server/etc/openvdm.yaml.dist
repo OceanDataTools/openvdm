@@ -100,7 +100,7 @@ postHookCommands:
         #    command:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/plot_ctd_casts.py
-        #    - --extraDirectory=CTD_Plots
+        #    - --extra-directory=CTD_Plots
         #    - "{newFiles}"
         #    - "{updatedFiles}"
     postDataDashboard:

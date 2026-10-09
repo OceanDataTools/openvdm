@@ -26,7 +26,7 @@ sys.path.append(dirname(dirname(realpath(__file__))))
 from server.lib.file_utils import set_owner_group_permissions  # noqa: E402  pylint: disable=wrong-import-position
 from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
 
-# Extra directory the plots are saved in, unless --extraDirectory names another
+# Extra directory the plots are saved in, unless -e/--extra-directory names another
 DEFAULT_EXTRA_DIRECTORY = 'CTD_Plots'
 
 
@@ -190,30 +190,30 @@ def main():  # pylint: disable=too-many-locals
     parser.add_argument('files', metavar='FILE', nargs='*',
                         help='new or updated files, relative to the cruise directory; an argument can '
                              'hold several, separated by spaces, as OpenVDM\'s {newFiles} does')
-    parser.add_argument('--extraDirectory', default=DEFAULT_EXTRA_DIRECTORY,
+    parser.add_argument('-e', '--extra-directory', default=DEFAULT_EXTRA_DIRECTORY,
                         help=f'extra directory to save the plots in (default: {DEFAULT_EXTRA_DIRECTORY})')
     parser.add_argument('--all', action='store_true',
-                        help='plot every cast in the --collectionSystem\'s folder instead of FILEs')
-    parser.add_argument('--collectionSystem', help='collection system transfer, for --all')
-    parser.add_argument('-c', '--cruiseID', help='cruise (default: the current cruise)')
+                        help='plot every cast in the --collection-system\'s folder instead of FILEs')
+    parser.add_argument('--collection-system', help='collection system transfer, for --all')
+    parser.add_argument('-c', '--cruise-id', help='cruise (default: the current cruise)')
     parser.add_argument('-v', '--verbosity', default=0, action='count', help='increase verbosity')
     args = parser.parse_args()
 
     logging.basicConfig(format='%(asctime)-15s %(levelname)s - %(message)s',
                         level=[logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbosity, 2)])
-    if args.all and not args.collectionSystem:
-        parser.error('--all needs --collectionSystem')
+    if args.all and not args.collection_system:
+        parser.error('--all needs --collection-system')
 
     failures = []
     try:
         parser_class = check_requirements()
         ovdm = OpenVDM()
-        cruise_id = args.cruiseID or ovdm.get_cruise_id()
+        cruise_id = args.cruise_id or ovdm.get_cruise_id()
         warehouse_config = ovdm.get_shipboard_data_warehouse_config()
         cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
-        plot_dir = resolve_plot_dir(ovdm, args.extraDirectory, cruise_dir, cruise_id, warehouse_config)
+        plot_dir = resolve_plot_dir(ovdm, args.extra_directory, cruise_dir, cruise_id, warehouse_config)
         if args.all:
-            casts = find_all_casts(ovdm, args.collectionSystem, cruise_dir, cruise_id, warehouse_config)
+            casts = find_all_casts(ovdm, args.collection_system, cruise_dir, cruise_id, warehouse_config)
         else:
             casts = find_casts([path for arg in args.files for path in arg.split()], cruise_dir)
     except PlotError as err:
