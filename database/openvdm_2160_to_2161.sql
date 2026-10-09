@@ -1,4 +1,4 @@
--- Migration: OpenVDM 2.16 -> 2.17
+-- Migration: OpenVDM 2.16.0 -> 2.16.1
 --
 -- Remove trailing slashes from legacy destination directories. The UI already
 -- normalizes new saves, but old values produce unmatched exclusions such as
