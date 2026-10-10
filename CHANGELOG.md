@@ -6,7 +6,11 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.16.1] – Unreleased
 
-**Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts. If you run `build_cruise_tracks.py` or `build_lowering_tracks.py`, copy their `.dist` files over your copies too, keeping your own position sources; the `Tracklines` extra directory they write to must exist and be enabled.
+**Upgrading:** follow "Upgrading from 2.16.0" in [INSTALL.md](INSTALL.md):
+- update the database with `database/openvdm_2160_to_2161.sql` (#389);
+- copy the updated `.dist` files you use over your copies: the CTD profile parser, `build_cruise_tracks.py` and `build_lowering_tracks.py` (keeping your own position sources), and the new `plot_ctd_casts.py` if wanted;
+- change your trackline hooks to the new option names and remove `-u`; the `Tracklines` extra directory they write to must exist and be enabled;
+- set `SITETITLE` in `Config.php` to v2.16.1, restart the workers (`supervisorctl restart openvdm:*`), and rebuild the data dashboard to add the new CTD tests and stats to existing casts.
 
 ### Added
 - **CTD profile quality tests** for problems that used to pass silently:
@@ -23,6 +27,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Post-hook failures say why:** the OpenVDM message for a failed hook command now gives the command's name, exit status and the end of its error output (stderr, or stdout if that's empty), instead of only its command line. Message titles and bodies are now shown as text on the Messages page and in the message list, not as HTML (#378).
 
 ### Fixed
+- **Cruise data exclusions for paths saved with a trailing `/`:** a collection system or extra directory whose destination directory ended in `/` (saved before the forms started removing it, #96) gave an exclusion such as `Sensors/Example//**`, which excluded nothing, so cruise data transfers copied it anyway. `database/openvdm_2160_to_2161.sql` removes the trailing `/` from existing records (root paths, empty values and NULL are left as they are). Start running transfers again afterwards so they rebuild their filters (#389).
 - **Trackline scripts' output folder:** `build_cruise_tracks.py` and `build_lowering_tracks.py` crashed when there was no `Tracklines` extra directory, used its `destDir` without filling in `{cruiseID}` and `{loweringDataBaseDir}`, and wrote to it when disabled. They now exit with a message when it's missing, disabled or has no folder; `build_cruise_tracks.py` refuses a per-lowering one. `build_lowering_tracks.py` puts the tracklines in the lowering when `Tracklines` is a lowering-level extra directory, where OpenVDM creates it, not in the cruise. `-e/--extra-directory NAME` writes to another extra directory; it can't be used with `-o` (#401).
 - **Tracklines in the MD5 summary:** the trackline files written to an extra directory are queued for the cruise's MD5 summary (new or updated); a failed update exits 1 with a message. They always belong to the warehouse user; `-u/--username` now applies only to `-o` output, which still isn't added to the summary (#401).
 - **Trackline scripts share their code:** the code common to both scripts is now in `server/lib/tracks.py` (as in 2.17, #394), so future fixes arrive with an OpenVDM update instead of a new `.dist` copy. The scripts take the 2.17 option names: `--no-combine`, `--kml-only`, `--geojson-only`, and `--position-sources` for `--config_file` (cruise) or `--gps-sources` (lowering). The sources YAML's list can be called `PositionSources` (`GPSSources` still works). The 2.16.0 names `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file`, `--gps-sources` and `-u/--username` still work but print a deprecation warning, and post it as an OpenVDM message (`<script> uses deprecated options`, posted again only after it's been read): they will be removed in 2.17, so change your `openvdm.yaml` hooks to the new names and drop `-u` (#401).
