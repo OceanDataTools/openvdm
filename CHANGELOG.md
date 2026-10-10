@@ -6,12 +6,16 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [Unreleased]
 
+**Upgrading:** copy the updated `.dist` files of the parsers you use over your copies (`met`, `metpakpro`, `twind`, `mwv`, `wind_gill_wo75`, `mwd`, `hdt`, `vtg`, `gnss`, `hpr`, `pashr`, `psxn23`), then rebuild the data dashboard so existing cruises' direction charts are replotted (#410).
+
 ### Added
 - **Scripps MetAcq `$WICOR` parser** (`wicor_parser.py.dist`), for SIO's ships, which log MetAcq's underway data with OpenRVDAS (R/V Robert Gordon Sproul and R/V Sally Ride). It reads OpenRVDAS log files of `$WICOR` lines; MetAcq's own `.COR` files aren't supported. It reads the `value,TAGn` pairs by tag, since each ship's MetAcq setup decides which values are written and in what order. A second sensor with the same tag is `<tag>_2`, e.g. `WS_2`. Values flagged out of range, emulated or invalid (digit 7, 8 or 9), and the `-99` and `99999999` markers, are left out and counted in that value's Validity stat. Lines with a bad checksum are rejected.
   - **One output per category:** `category` charts every field of one kind in the file, second sensors included, so each kind is its own data type on the Data Dashboard with only a few series: `air` (air temperature, relative humidity and sea-level pressure), `dew_point`, `precipitation`, `radiation`, `wind_speed`, `wind_direction`, `water_temp`, `tsg`, `oxygen`, `fluorometer`, `optics_chem` (optics and carbonate chemistry) or `usw_system` (underway seawater flow, line pressure, pump and overflow status). `fields` picks the values instead; one of the two is required. The met, radiation, wind and seawater tags in SIO's OpenRVDAS `wicor_params.yaml` can be charted, with their units. The Fahrenheit and knots copies of values, the RH module's air temperature, the station barometer, the uncorrected TSG conductivity, and navigation (position included), depth, gravity, magnetics, winch and CTD values, are left out; other parsers handle the latter.
   - `max_delta_t` (default 60 s) is the longest expected time between lines; longer gaps count against the DeltaT Validity stat, whose name gives the limit, and the DeltaT quality test.
-  - Wind directions are averaged as angles, so 359° and 1° average to 0°, not 180°.
   - The parser isn't listed in `openrvdas_plugin.py.dist`: SIO's ships add it to their own `openrvdas_plugin.py`, one entry per category (#408).
+
+### Fixed
+- **Direction charts near north:** the data dashboard's 1-minute averages took a plain mean of wind direction, heading and course, so readings either side of north (e.g. 359° and 1°) plotted as the opposite direction (180°), a false spike whenever the value crossed north within a minute. `resample_data()` now takes `angle_cols`, which it averages as angles (from the mean sine and cosine) and returns in 0–360°. The `met`, `metpakpro`, `twind`, `mwv`, `wind_gill_wo75`, `mwd`, `hdt`, `vtg`, `gnss`, `hpr`, `pashr` and `psxn23` parsers pass their direction columns, and `wicor_parser` uses it instead of its own averaging. Only the plotted series change; the stats and quality tests come from the raw values, as before. A direction logged as −180–180° is now plotted as 0–360° (#410).
 
 ## [2.16.1] – 2026-10-10
 

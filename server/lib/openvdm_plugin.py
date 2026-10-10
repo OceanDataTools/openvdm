@@ -800,13 +800,18 @@ class OpenVDMCSVParser(OpenVDMParser):
 
 
     @staticmethod
-    def resample_data(data_frame, resample_interval='1min'):
+    def resample_data(data_frame, resample_interval='1min', angle_cols=None):
         """Average the data into fixed time intervals.
 
         Args:
             data_frame: DataFrame indexed by timestamp.
             resample_interval: pandas offset alias for the interval (default
                 ``'1min'``). Each interval is labelled by its end time.
+            angle_cols: Columns holding angles in degrees (wind direction,
+                heading, course). They're averaged as angles, from the mean
+                sine and cosine, and returned in [0, 360): 359 and 1 average
+                to 0, not 180. Columns not in *data_frame* are ignored. The
+                other columns get the arithmetic mean.
 
         Returns:
             pandas.DataFrame: The resampled data, with the timestamps moved
@@ -816,12 +821,28 @@ class OpenVDMCSVParser(OpenVDMParser):
             Exception: If the data can't be resampled.
         """
 
+        columns = list(data_frame.columns)
+        angle_cols = [col for col in (angle_cols or []) if col in columns]
+        if angle_cols:
+            radians = np.deg2rad(data_frame[angle_cols].astype(float))
+            data_frame = data_frame.drop(columns=angle_cols)
+            for col in angle_cols:
+                data_frame[f'{col}__sin'] = np.sin(radians[col])
+                data_frame[f'{col}__cos'] = np.cos(radians[col])
+
         try:
             resample_df = data_frame.resample(resample_interval, label='right', closed='right').mean()
         except Exception as exc:
             logging.error("Could not resample data")
             logging.error(str(exc))
             raise exc
+
+        for col in angle_cols:
+            angle = np.rad2deg(np.arctan2(resample_df.pop(f'{col}__sin'), resample_df.pop(f'{col}__cos')))
+            # Rounded first, so a mean a hair under 360 becomes 0, not 360
+            resample_df[col] = np.round(angle, 6) % 360
+        if angle_cols:
+            resample_df = resample_df[columns]
 
         # reset index
         return resample_df.reset_index()

@@ -136,7 +136,7 @@ class HDTParser(OpenVDMCSVParser):
         # -------------------------
         # Resample and round
         # -------------------------
-        df = self.resample_data(df)
+        df = self.resample_data(df, angle_cols=['hdg_t'])
         df = self.round_data(df, ROUNDING)
         df = df.set_index('date_time')
 

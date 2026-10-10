@@ -187,7 +187,7 @@ class VTGParser(OpenVDMCSVParser):
         # -------------------------
         # Resample and round
         # -------------------------
-        df = self.resample_data(df)
+        df = self.resample_data(df, angle_cols=['cog_t', 'cog_m'])
         df = self.round_data(df, ROUNDING)
         df = df.set_index('date_time')
 
