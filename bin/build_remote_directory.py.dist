@@ -43,6 +43,7 @@ import subprocess
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
+from server.lib.connection_utils import smb_credentials_file, ssh_password_file
 from server.lib.file_utils import set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
 
@@ -67,6 +68,35 @@ def make_system_call(command):
 
     if len(err) > 0:
         logging.error("stderr:\n%s",err)
+
+def smbclient_call(collection_system, args):
+    """Run ``smbclient`` on a collection system's SMB share with :func:`make_system_call`.
+
+    The login is passed in a credentials file, not on the command line (#426).
+
+    Args:
+        collection_system: The collection system transfer, with ``smbServer``,
+            ``smbDomain``, ``smbUser`` and ``smbPass``.
+        args: The rest of the ``smbclient`` arguments, e.g. ``['-c', ...]``.
+    """
+    with smb_credentials_file(collection_system) as credentials:
+        make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'],
+                          "-A", credentials, "-m", "SMB2"] + args)
+
+
+def sshpass_call(collection_system, command):
+    """Run an ``ssh``/``scp`` command with ``sshpass`` and :func:`make_system_call`.
+
+    The password is passed to ``sshpass`` in a file, not on the command line
+    (#426).
+
+    Args:
+        collection_system: The collection system transfer, with ``sshPass``.
+        command: The ``ssh`` or ``scp`` command as an argument list.
+    """
+    with ssh_password_file(collection_system['sshPass']) as passwd_file:
+        make_system_call(['sshpass', '-f', passwd_file] + command)
+
 
 def make_local_directory(directory, create_source_dir=False):
     """Create a local directory (``mkdir -p`` style when *create_source_dir* is set).
@@ -181,11 +211,11 @@ if __name__ == "__main__":
                 set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir))
 
             if collection_system['transferType'] == "3":
-                make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + "%" + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
+                smbclient_call(collection_system, ["-c 'mkdir \"" + source_dir + "\"'"])
 
             if collection_system['transferType'] == "4":
                 # ssh remote-host-ip '. ~/your_profile; test -d your_directory || mkdir your_directory'
-                make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "test", "-d", "mkdir \"" + source_dir + "\"", "||", "mkdir \"" + source_dir + "\""])
+                sshpass_call(collection_system, ["ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "test", "-d", "mkdir \"" + source_dir + "\"", "||", "mkdir \"" + source_dir + "\""])
 
         for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
             root = root.replace(template_directory, '').lstrip('/')
@@ -200,11 +230,11 @@ if __name__ == "__main__":
                     make_local_directory(os.path.join(source_dir, root, name), parsed_args.create_source)
 
                 if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
+                    smbclient_call(collection_system, ["-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
 
                 if collection_system['transferType'] == "4":
                     # ssh remote-host-ip '. ~/your_profile; mkdir your_directory'
-                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "mkdir \"" + os.path.join(source_dir, root, name) + "\""])
+                    sshpass_call(collection_system, ["ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "mkdir \"" + os.path.join(source_dir, root, name) + "\""])
 
             for name in files:
                 new_name = name.replace("{cruiseID}", cruise_id)
@@ -217,8 +247,8 @@ if __name__ == "__main__":
                     set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir, root, new_name))
 
                 if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
+                    smbclient_call(collection_system, ["-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
 
                 if collection_system['transferType'] == "4":
-                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "scp",  os.path.join(source_dir, root, name), collection_system['sshUser'] + '@' + collection_system['sshServer'] + ':' + os.path.join(source_dir, root, new_name)])
+                    sshpass_call(collection_system, ["scp",  os.path.join(source_dir, root, name), collection_system['sshUser'] + '@' + collection_system['sshServer'] + ':' + os.path.join(source_dir, root, new_name)])
 
