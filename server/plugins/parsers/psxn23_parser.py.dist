@@ -205,7 +205,7 @@ class PSXN23Parser(OpenVDMCSVParser):
 
         df_env = df[envelope_cols].copy()
 
-        df_env = self.resample_data(df_env)
+        df_env = self.resample_data(df_env, angle_cols=['heading'])
         df_env = self.round_data(
             df_env,
             {

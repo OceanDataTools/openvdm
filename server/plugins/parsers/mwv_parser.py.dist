@@ -160,7 +160,7 @@ class MWVParser(OpenVDMCSVParser):
         # -------------------------
         # Resample and round
         # -------------------------
-        df = self.resample_data(df)
+        df = self.resample_data(df, angle_cols=['dir_rel'])
         df = self.round_data(df, ROUNDING)
         df = df.set_index('date_time')
 

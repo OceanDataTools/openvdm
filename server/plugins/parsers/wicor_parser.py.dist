@@ -225,28 +225,6 @@ class WicorParser(OpenVDMCSVParser):
                 values[name] = number
         return values, invalid
 
-    def _resample(self, df):
-        """Resample the data, averaging direction columns as angles.
-
-        Args:
-            df: Data indexed by time.
-
-        Returns:
-            pandas.DataFrame: The resampled data, with the timestamps in a
-            ``date_time`` column.
-        """
-        directions = [col for col in df.columns if _base_tag(col) in DIRECTION_FIELDS]
-        radians = np.deg2rad(df[directions])
-        df = df.drop(columns=directions)
-        for col in directions:
-            df[f'{col}_sin'] = np.sin(radians[col])
-            df[f'{col}_cos'] = np.cos(radians[col])
-        df = self.resample_data(df)
-        for col in directions:
-            # Rounded first, so a mean a hair under 360 becomes 0, not 360
-            df[col] = np.round(np.rad2deg(np.arctan2(df.pop(f'{col}_sin'), df.pop(f'{col}_cos'))), 6) % 360
-        return df
-
     def _columns(self, found):
         """Return the fields to process, given the field names found in the file.
 
@@ -352,7 +330,7 @@ class WicorParser(OpenVDMCSVParser):
         # -------------------------
         # Visualization
         # -------------------------
-        df = self._resample(df[columns])
+        df = self.resample_data(df[columns], angle_cols=[col for col in columns if _base_tag(col) in DIRECTION_FIELDS])
         df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
         for col in columns:
             series = df[col].dropna()
