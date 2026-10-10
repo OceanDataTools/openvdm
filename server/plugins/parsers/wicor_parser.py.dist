@@ -118,10 +118,11 @@ FIELDS = {
     'RX': ('Accelerometer X', 'm/s', 3),
     'RY': ('Accelerometer Y', 'm/s', 3),
     'RZ': ('Accelerometer Z', 'm/s', 3),
-    # Winch and CTD
+    # Winch
     'ZO': ('Winch Wire Out', 'm', 1),
     'ZS': ('Winch Speed', 'm/min', 1),
     'ZT': ('Winch Tension', 'lbs', 0),
+    # CTD
     'IP': ('CTD Depth', 'm', 1),
     'IT': ('CTD Temperature', 'C', 3),
     'IS': ('CTD Salinity', 'PSU', 3),
@@ -134,10 +135,27 @@ FIELDS = {
     'XX': ('Unspecified', '', 3),
 }
 
+# Field categories, each charted as its own output with the "category" option.
+# LA and LO aren't charted; the "track" option maps them.
+CATEGORIES = {
+    'met': ['AT', 'AF', 'AX', 'BP', 'BS', 'BC', 'RH', 'RT', 'RF', 'DP', 'DF', 'WB', 'WC', 'WF',
+            'PR', 'PT', 'SW', 'LW', 'LD', 'LB', 'LT', 'PA'],
+    'wind': ['WS', 'WK', 'WD', 'TW', 'TK', 'TI'],
+    'seawater': ['ST', 'SF', 'TT', 'TF', 'TC', 'TG', 'SA', 'SD', 'SV', 'WT', 'OX', 'OG', 'OM',
+                 'OC', 'OT', 'OS', 'PH', 'PC', 'FL', 'FB', 'FO', 'FF', 'FT', 'TB', 'TR', 'BA',
+                 'FM', 'FI', 'PS', 'PZ', 'OF'],
+    'geophysics': ['BT', 'LF', 'HF', 'MB', 'GV', 'GC', 'MG', 'MD', 'MS'],
+    'nav': ['CR', 'SP', 'SL', 'SX', 'GY', 'SH', 'SM', 'SR', 'GA', 'VP', 'VR', 'VH', 'VY', 'VX',
+            'RX', 'RY', 'RZ'],
+    'winch': ['ZO', 'ZS', 'ZT'],
+    'ctd': ['IP', 'IT', 'IS', 'IA', 'IV', 'IX'],
+    'other': ['VT', 'MA', 'XX'],
+}
+
 # Directions are averaged as angles when the data is resampled
 DIRECTION_FIELDS = {'WD', 'TI', 'CR', 'GY', 'SH'}
 
-# Fields charted when no "fields" option is given
+# Fields charted when neither "fields" nor "category" is given
 DEFAULT_FIELDS = ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW',
                   'TT', 'SA', 'TC', 'FL', 'OX', 'ST', 'SP', 'GY']
 
@@ -169,12 +187,18 @@ def _label(field):
     return label if field == _base_tag(field) else f"{label} {field.split('_')[1]}"
 
 
+def _field_order(field):
+    """Sort key: FIELDS order, a second sensor right after the first."""
+    tag, _, number = field.partition('_')
+    return list(FIELDS).index(tag), int(number or 1)
+
+
 class WicorParser(OpenVDMCSVParser):
     """Parser for timestamped MetAcq ``$WICOR`` sentences."""
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
-                 skip_header=False, use_openvdm_api=False, fields=None, track=False,
-                 max_delta_t=60):
+                 skip_header=False, use_openvdm_api=False, fields=None, category=None,
+                 track=False, max_delta_t=60):
         """Initialise the parser.
 
         Args:
@@ -184,25 +208,35 @@ class WicorParser(OpenVDMCSVParser):
             skip_header: Skip the file's first line.
             use_openvdm_api: Send parse errors to OpenVDM as a message.
             fields: Fields to chart, by tag (``'AT'``), or ``'<tag>_2'`` for
-                a second sensor with the same tag (``'WS_2'``). Default:
-                ``DEFAULT_FIELDS``. Fields not in the file are skipped.
+                a second sensor with the same tag (``'WS_2'``). Fields not in
+                the file are skipped.
+            category: Chart every field of this category (a key of
+                ``CATEGORIES``, e.g. ``'wind'``) that's in the file, second
+                sensors included. Can't be used with *fields*. With neither,
+                ``DEFAULT_FIELDS`` are charted.
             track: Return the ship's track (GeoJSON, from ``LA``/``LO``)
-                instead of charts; *fields* is then ignored.
+                instead of charts; *fields* and *category* are then ignored.
             max_delta_t: Longest expected time between lines, in seconds
                 (default 60). Longer gaps count against the DeltaT Validity
                 stat and the DeltaT quality test.
 
         Raises:
-            ValueError: If a field's tag isn't one this parser knows.
+            ValueError: If a field's tag or the category isn't one this
+                parser knows, or both *fields* and *category* are given.
         """
-        self.fields = list(fields) if fields else list(DEFAULT_FIELDS)
+        if fields and category:
+            raise ValueError("Give either fields or a category, not both")
+        if category and category not in CATEGORIES:
+            raise ValueError(f"Unknown $WICOR category: {category} (one of {', '.join(CATEGORIES)})")
+        self.fields = list(fields) if fields else ([] if category else list(DEFAULT_FIELDS))
         unknown = [field for field in self.fields if _base_tag(field) not in FIELDS]
         if unknown:
             raise ValueError(f"Unknown $WICOR field(s): {', '.join(unknown)}")
+        self.category = category
         self.track = track
         self.max_delta_t = pd.Timedelta(seconds=float(max_delta_t))
-        proc_cols = ['date_time', 'LA', 'LO', 'SP'] if track else ['date_time'] + self.fields
-        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
+        # The columns are chosen once the file is read (see _columns())
+        super().__init__(None, ['date_time'], start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
 
@@ -264,11 +298,28 @@ class WicorParser(OpenVDMCSVParser):
             df[col] = np.round(np.rad2deg(np.arctan2(df.pop(f'{col}_sin'), df.pop(f'{col}_cos'))), 6) % 360
         return df
 
+    def _columns(self, found):
+        """Return the fields to process, given the field names found in the file.
+
+        Args:
+            found: Every field name (``WS``, ``WS_2``, ...) in the file's lines.
+
+        Returns:
+            list: ``LA``, ``LO`` and ``SP`` for a track; the category's fields
+            in the file, in ``FIELDS`` order, for a category; else the
+            requested fields.
+        """
+        if self.track:
+            return ['LA', 'LO', 'SP']
+        if self.category:
+            return sorted((field for field in found
+                           if field.split('_')[0] in CATEGORIES[self.category]), key=_field_order)
+        return self.fields
+
     def parse(self, filepath):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Parse the $WICOR file and return plugin data dict."""
-        columns = self.proc_cols[1:]
-        rows, errors = [], []
-        invalid_counts = dict.fromkeys(columns, 0)
+        rows, errors, found = [], [], set()
+        invalid_counts = {}
 
         try:
             for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='WICOR'):
@@ -281,9 +332,10 @@ class WicorParser(OpenVDMCSVParser):
                     errors.append(lineno)
                     logging.debug("Line %s skipped: %s", lineno, err)
                     continue
-                rows.append([timestamp_str] + [values.get(col, np.nan) for col in columns])
-                for col in invalid.intersection(columns):
-                    invalid_counts[col] += 1
+                rows.append((timestamp_str, values))
+                found.update(values)
+                for col in invalid:
+                    invalid_counts[col] = invalid_counts.get(col, 0) + 1
         except Exception as err:  # pylint: disable=broad-exception-caught
             logging.error("Failed to read file %s: %s", filepath, err)
             return None
@@ -292,7 +344,13 @@ class WicorParser(OpenVDMCSVParser):
             logging.warning("No valid $WICOR data in file: %s", filepath)
             return None
 
-        df = pd.DataFrame(rows, columns=self.proc_cols)
+        columns = self._columns(found)
+        if not columns:
+            logging.warning("No %s fields in file: %s", self.category, filepath)
+            return None
+        invalid_counts = {col: invalid_counts.get(col, 0) for col in columns}
+        df = pd.DataFrame([[timestamp] + [values.get(col, np.nan) for col in columns]
+                           for timestamp, values in rows], columns=['date_time'] + columns)
         df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
         df = df.dropna(subset=['date_time']).set_index('date_time')
 
@@ -373,6 +431,8 @@ class WicorParser(OpenVDMCSVParser):
             df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
             for col in columns:
                 series = df[col].dropna()
+                if series.empty:  # never valid in this file; its Validity stat says so
+                    continue
                 times = series.index.tz_localize('UTC') if series.index.tz is None else series.index
                 self.add_visualization_data({
                     'data': [[int(ts.timestamp() * 1000), value] for ts, value in zip(times, series)],
@@ -394,6 +454,8 @@ class WicorParser(OpenVDMCSVParser):
         parser.add_argument('--fields', default=None,
                             help='comma-separated fields to chart, e.g. AT,BP,WS,WS_2 '
                                  f'(default: {",".join(DEFAULT_FIELDS)})')
+        parser.add_argument('--category', default=None, choices=list(CATEGORIES),
+                            help="chart every field of this category in the file (can't be used with --fields)")
         parser.add_argument('--track', action='store_true', default=False,
                             help="return the ship's track from LA/LO instead of charts")
         parser.add_argument('--max-delta-t', type=float, default=60,
@@ -403,6 +465,7 @@ class WicorParser(OpenVDMCSVParser):
     def _extract_custom_cli_kwargs(cls, args):
         return {
             'fields': args.fields.split(',') if args.fields else None,
+            'category': args.category,
             'track': args.track,
             'max_delta_t': args.max_delta_t,
         }

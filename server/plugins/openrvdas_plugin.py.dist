@@ -39,16 +39,21 @@ fileTypeFilters = [
     {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{'sbe38': True, 'col_names':True}},
     {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
     # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
-    # Scripps MetAcq $WICOR: one file gives the met and TSG charts and the ship's
-    # track. These use the met, tsg and gga data types, which the default
-    # datadashboard.yaml shows, so comment out the entries above they replace
-    # (or give them new data types and add those to datadashboard.yaml).
-    # "fields" picks the values to chart: 2-letter tags, "<tag>_2" for a second
-    # sensor with the same tag (see FIELDS in wicor_parser.py). "max_delta_t" is
-    # the longest expected time between lines, in seconds (default 60).
-    # {"data_type":"met",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'fields': ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW'], 'max_delta_t': 30}},
-    # {"data_type":"tsg",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'fields': ['TT', 'SA', 'TC', 'FL', 'OX', 'ST']}},
-    # {"data_type":"gga",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'track': True}},
+    # Scripps MetAcq $WICOR: one file, charted by category (each its own data
+    # type on the dashboard) and mapped as the ship's track. met, twind, tsg and
+    # gga are data types the default datadashboard.yaml shows, so comment out the
+    # entries above these replace; the other categories need data types added to
+    # datadashboard.yaml. A category charts every field of that class in the file;
+    # "fields" picks them instead (see CATEGORIES and FIELDS in wicor_parser.py).
+    # "max_delta_t" is the longest expected time between lines, in seconds
+    # (default 60).
+    # {"data_type":"met",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'category': 'met', 'max_delta_t': 30}},
+    # {"data_type":"twind", "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'category': 'wind', 'max_delta_t': 30}},
+    # {"data_type":"tsg",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'category': 'seawater', 'max_delta_t': 30}},
+    # {"data_type":"gga",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'track': True, 'max_delta_t': 30}},
+    # {"data_type":"wicor-nav",        "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'nav', 'max_delta_t': 30}},
+    # {"data_type":"wicor-geophysics", "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'geophysics', 'max_delta_t': 30}},
+    # {"data_type":"wicor-winch",      "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'winch', 'max_delta_t': 30}},
 ]
 
 # -------------------------------
