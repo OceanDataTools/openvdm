@@ -5,9 +5,10 @@ Parses OpenRVDAS log files of MetAcq's combined, corrected ``$WICOR``
 sentences (met, thermosalinograph, navigation and winch values tagged with a
 2-letter ID and a calibration/validity digit), each line prefixed with the
 logger's timestamp, and returns the JSON-formatted plugin data used by
-OpenVDM's Data Dashboard: time series of the chosen fields, or (``track``) the
-ship's track from its latitude and longitude. MetAcq's own ``.COR`` files
-aren't supported.
+OpenVDM's Data Dashboard: time series of its met, radiation, wind or seawater
+values, or (``track``) the ship's track from its latitude and longitude. The
+other values are left to other parsers. MetAcq's own ``.COR`` files aren't
+supported.
 """
 
 import logging
@@ -20,11 +21,11 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: disable=wrong-import-position
 
-# The fields MetAcq can write, from SIO's OpenRVDAS wicor_params.yaml (which
-# extends the MetAcq Operator's Manual, Appendix A): tag -> (label, unit,
-# decimals). A repeated tag is a second sensor of the same kind; it's named
-# <tag>_2. GS (GPS status and number of satellites) and ZI (winch ID) are
-# codes, not measurements, so they aren't listed.
+# The $WICOR fields this parser charts, from SIO's OpenRVDAS wicor_params.yaml
+# (which extends the MetAcq Operator's Manual, Appendix A): tag -> (label,
+# unit, decimals). A repeated tag is a second sensor of the same kind; it's
+# named <tag>_2. Navigation, depth, gravity, magnetics, winch and CTD values
+# are left out: other parsers handle them. So are codes (GS, ZI) and times.
 FIELDS = {
     # Met
     'AT': ('Air Temperature', 'C', 2),
@@ -43,6 +44,7 @@ FIELDS = {
     'WF': ('Wet Bulb Temperature (F)', 'F', 2),
     'PR': ('Precipitation', 'mm', 2),
     'PT': ('Precipitation Rate', 'mm/hr', 2),
+    # Radiation
     'SW': ('Short Wave Radiation', 'W/m^2', 1),
     'LW': ('Long Wave Radiation', 'W/m^2', 1),
     'LD': ('LWR Dome Temperature', 'K', 2),
@@ -88,76 +90,28 @@ FIELDS = {
     'PS': ('Pressure', 'PSI', 2),
     'PZ': ('UCW Pump Status', 'on/off', 0),
     'OF': ('UCW Overflow', '0/1', 0),
-    # Depth, gravity and magnetics
-    'BT': ('Bottom Depth', 'm', 1),
-    'LF': ('Depth (3.5 kHz)', 'm', 1),
-    'HF': ('Depth (12 kHz)', 'm', 1),
-    'MB': ('Multibeam Depth', 'm', 1),
-    'GV': ('Gravity', 'mGal', 2),
-    'GC': ('Gravity Counts', 'counts', 0),
-    'MG': ('Magnetometer', 'nT', 2),
-    'MD': ('Magnetometer Depth', 'm', 1),
-    'MS': ('Magnetometer Signal Strength', '', 0),
-    # Navigation and attitude
+    # Position (mapped with the "track" option, not charted)
     'LA': ('Latitude', 'ddeg', 6),
     'LO': ('Longitude', 'ddeg', 6),
-    'CR': ('Course Over Ground', 'deg', 1),
-    'SP': ('Speed Over Ground', 'kts', 1),
-    'SL': ('Speed Log (longitudinal)', 'kts', 2),
-    'SX': ('Speed Log (transverse)', 'kts', 2),
-    'GY': ('Gyro Heading', 'deg', 1),
-    'SH': ('Ashtech Heading', 'deg', 1),
-    'SM': ('Ashtech Pitch', 'deg', 2),
-    'SR': ('Ashtech Roll', 'deg', 2),
-    'GA': ('GPS Altitude', 'm', 1),
-    'VP': ('VRU Pitch', 'deg', 2),
-    'VR': ('VRU Roll', 'deg', 2),
-    'VH': ('VRU Heave', 'm', 2),
-    'VY': ('List', 'deg', 2),
-    'VX': ('Trim', 'deg', 2),
-    'RX': ('Accelerometer X', 'm/s', 3),
-    'RY': ('Accelerometer Y', 'm/s', 3),
-    'RZ': ('Accelerometer Z', 'm/s', 3),
-    # Winch
-    'ZO': ('Winch Wire Out', 'm', 1),
-    'ZS': ('Winch Speed', 'm/min', 1),
-    'ZT': ('Winch Tension', 'lbs', 0),
-    # CTD
-    'IP': ('CTD Depth', 'm', 1),
-    'IT': ('CTD Temperature', 'C', 3),
-    'IS': ('CTD Salinity', 'PSU', 3),
-    'IA': ('CTD Altimeter', 'm', 1),
-    'IV': ('CTD Velocity', 'm/s', 2),
-    'IX': ('CTD Auxiliary', '', 3),
-    # Other
-    'VT': ('Volts', 'V', 3),
-    'MA': ('Current', 'mA', 3),
-    'XX': ('Unspecified', '', 3),
 }
 
-# Field categories, each charted as its own output with the "category" option.
-# LA and LO aren't charted; the "track" option maps them.
+# Field categories, each charted as its own output with the "category" option
 CATEGORIES = {
     'met': ['AT', 'AF', 'AX', 'BP', 'BS', 'BC', 'RH', 'RT', 'RF', 'DP', 'DF', 'WB', 'WC', 'WF',
-            'PR', 'PT', 'SW', 'LW', 'LD', 'LB', 'LT', 'PA'],
+            'PR', 'PT'],
+    'radiation': ['SW', 'LW', 'LD', 'LB', 'LT', 'PA'],
     'wind': ['WS', 'WK', 'WD', 'TW', 'TK', 'TI'],
     'seawater': ['ST', 'SF', 'TT', 'TF', 'TC', 'TG', 'SA', 'SD', 'SV', 'WT', 'OX', 'OG', 'OM',
                  'OC', 'OT', 'OS', 'PH', 'PC', 'FL', 'FB', 'FO', 'FF', 'FT', 'TB', 'TR', 'BA',
                  'FM', 'FI', 'PS', 'PZ', 'OF'],
-    'geophysics': ['BT', 'LF', 'HF', 'MB', 'GV', 'GC', 'MG', 'MD', 'MS'],
-    'nav': ['CR', 'SP', 'SL', 'SX', 'GY', 'SH', 'SM', 'SR', 'GA', 'VP', 'VR', 'VH', 'VY', 'VX',
-            'RX', 'RY', 'RZ'],
-    'winch': ['ZO', 'ZS', 'ZT'],
-    'ctd': ['IP', 'IT', 'IS', 'IA', 'IV', 'IX'],
-    'other': ['VT', 'MA', 'XX'],
 }
 
 # Directions are averaged as angles when the data is resampled
-DIRECTION_FIELDS = {'WD', 'TI', 'CR', 'GY', 'SH'}
+DIRECTION_FIELDS = {'WD', 'TI'}
 
 # Fields charted when neither "fields" nor "category" is given
 DEFAULT_FIELDS = ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW',
-                  'TT', 'SA', 'TC', 'FL', 'OX', 'ST', 'SP', 'GY']
+                  'TT', 'SA', 'TC', 'FL', 'OX', 'ST']
 
 # Calibration/validity digits that mark a value as unusable: 7 = out of
 # range, 8 = emulated (not real), 9 = invalid
@@ -305,12 +259,12 @@ class WicorParser(OpenVDMCSVParser):
             found: Every field name (``WS``, ``WS_2``, ...) in the file's lines.
 
         Returns:
-            list: ``LA``, ``LO`` and ``SP`` for a track; the category's fields
+            list: ``LA`` and ``LO`` for a track; the category's fields
             in the file, in ``FIELDS`` order, for a category; else the
             requested fields.
         """
         if self.track:
-            return ['LA', 'LO', 'SP']
+            return ['LA', 'LO']
         if self.category:
             return sorted((field for field in found
                            if field.split('_')[0] in CATEGORIES[self.category]), key=_field_order)
@@ -383,7 +337,7 @@ class WicorParser(OpenVDMCSVParser):
                 return None
             self.add_geobounds_stat([round(df['LA'].max(), 6), round(df['LO'].max(), 6),
                                      round(df['LA'].min(), 6), round(df['LO'].min(), 6)])
-            checks = ['LA', 'LO', 'SP'] if 'SP' in columns else ['LA', 'LO']
+            checks = ['LA', 'LO']
         else:
             checks = columns
 
