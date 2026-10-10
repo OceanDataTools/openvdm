@@ -26,7 +26,6 @@ from server.plugins.parsers.ssv_parser   import SSVParser
 from server.plugins.parsers.tsg45_parser   import SBE45TSGParser as TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
 # from server.plugins.parsers.vtg_parser   import VTGParser
-# from server.plugins.parsers.wicor_parser import WicorParser
 
 # -------------------------------
 # File type filters
@@ -39,27 +38,6 @@ fileTypeFilters = [
     {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{'sbe38': True, 'col_names':True}},
     {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
     # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
-    # Scripps (SIO) MetAcq $WICOR, as logged by SIO's OpenRVDAS (logger
-    # met_metacq_wicor on R/V Sproul and R/V Sally Ride): one file per day,
-    # <cruise>_met_metacq_wicor-YYYY-MM-DD.txt. "regex" is a glob matched against
-    # the file's full path in the cruise directory ("*" also matches "/"), so
-    # these match the file in whichever folder the collection system puts it.
-    # Each entry charts one category as its own data type on the dashboard.
-    # met, twind and tsg are data types the default datadashboard.yaml shows;
-    # the others need adding to it. "max_delta_t" is the longest expected time
-    # between lines, in seconds (default 60; MetAcq logs every 15 s).
-    # {"data_type":"met",            "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'air', 'max_delta_t': 30}},
-    # {"data_type":"dew_point",      "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'dew_point', 'max_delta_t': 30}},
-    # {"data_type":"precipitation",  "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'precipitation', 'max_delta_t': 30}},
-    # {"data_type":"radiation",      "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'radiation', 'max_delta_t': 30}},
-    # {"data_type":"twind",          "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'wind_speed', 'max_delta_t': 30}},
-    # {"data_type":"wind_direction", "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'wind_direction', 'max_delta_t': 30}},
-    # {"data_type":"water_temp",     "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'water_temp', 'max_delta_t': 30}},
-    # {"data_type":"tsg",            "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'tsg', 'max_delta_t': 30}},
-    # {"data_type":"oxygen",         "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'oxygen', 'max_delta_t': 30}},
-    # {"data_type":"fluorometer",    "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'fluorometer', 'max_delta_t': 30}},
-    # {"data_type":"optics_chem",    "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'optics_chem', 'max_delta_t': 30}},
-    # {"data_type":"usw_system",     "regex": "*/*_met_metacq_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'usw_system', 'max_delta_t': 30}},
 ]
 
 # -------------------------------
@@ -76,7 +54,6 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         "TSG": TSGParser,
         "TWind": TWindParser,
         # "VTG": VTGParser,
-        # "WICOR": WicorParser,
     }
 
     def __init__(self):
