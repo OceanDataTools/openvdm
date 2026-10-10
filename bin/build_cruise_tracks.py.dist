@@ -26,8 +26,11 @@ them to a folder instead, owned by whoever runs the script and not added to
 the MD5 summary; ``-e`` and ``-o`` can't be used together. ``-u USERNAME``
 gives ``-o`` output to that user.
 
-The 2.16.0 option spellings ``--no_combine``, ``--kml_only``,
-``--geojson_only`` and ``--config_file`` are still accepted.
+The 2.16.0 options ``--no_combine``, ``--kml_only``, ``--geojson_only``,
+``--config_file`` and ``-u/--username`` still work, but print a warning: they
+are deprecated and will be removed in OpenVDM 2.17. Use ``--no-combine``,
+``--kml-only``, ``--geojson-only`` and ``--position-sources``; 2.17 has no
+``-u`` (``-o`` output keeps whoever wrote it).
 
 The shared trackline code is in ``server/lib/tracks.py``; this script adds
 the cruise's ID, manifest location and default position sources.
@@ -66,6 +69,40 @@ PositionSources:
   - device: POSMV
     type: gga
 """
+
+# ----------------------------------------------------------------------
+# Deprecated 2.16.0 options
+# ----------------------------------------------------------------------
+
+class DeprecatedOption(argparse.Action):
+    """An option's 2.16.0 name, which still works but warns that 2.17 removes it.
+
+    For a flag (``nargs=0``) the destination is set to ``True``; otherwise to
+    the option's value.
+    """
+
+    def __init__(self, option_strings, dest, instead, **kwargs):
+        """Create the action.
+
+        Args:
+            option_strings: The deprecated option's names.
+            dest: The attribute it sets, shared with its replacement.
+            instead: The end of the warning, after "removed in OpenVDM
+                2.17;", e.g. ``"use --no-combine"``.
+            **kwargs: Other :class:`argparse.Action` arguments. Unless given,
+                the option is left out of ``--help`` and sets no default (its
+                replacement's applies).
+        """
+        kwargs.setdefault("help", argparse.SUPPRESS)
+        kwargs.setdefault("default", argparse.SUPPRESS)
+        super().__init__(option_strings, dest, **kwargs)
+        self.instead = instead
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Warn on stderr and set the destination."""
+        print(f"Warning: {option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}",
+              file=sys.stderr)
+        setattr(namespace, self.dest, True if self.nargs == 0 else values)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
@@ -123,13 +160,23 @@ def main():  # pylint: disable=too-many-locals
         description="build cruise tracklines post-dashboard processing"
     )
     parser.add_argument("-v", "--verbosity", default=0, action="count")
-    parser.add_argument("-n", "--no-combine", "--no_combine", dest="no_combine", action="store_true")
-    parser.add_argument("-k", "--kml-only", "--kml_only", dest="kml_only", action="store_true")
-    parser.add_argument("-g", "--geojson-only", "--geojson_only", dest="geojson_only", action="store_true")
+    parser.add_argument("-n", "--no-combine", dest="no_combine", action="store_true")
+    parser.add_argument("-k", "--kml-only", dest="kml_only", action="store_true")
+    parser.add_argument("-g", "--geojson-only", dest="geojson_only", action="store_true")
     parser.add_argument("-c", dest="cruiseID")
     add_output_arguments(parser)
-    parser.add_argument("-u", "--username", help="owner of the files written with -o")
-    parser.add_argument("--position-sources", "--config_file", dest="position_sources_file")
+    parser.add_argument("--position-sources", dest="position_sources_file")
+
+    # 2.16.0 names, removed in 2.17
+    for old, new, dest in (("--no_combine", "--no-combine", "no_combine"),
+                           ("--kml_only", "--kml-only", "kml_only"),
+                           ("--geojson_only", "--geojson-only", "geojson_only")):
+        parser.add_argument(old, dest=dest, action=DeprecatedOption, nargs=0, instead=f"use {new}")
+    parser.add_argument("--config_file", dest="position_sources_file", action=DeprecatedOption,
+                        instead="use --position-sources")
+    parser.add_argument("-u", "--username", action=DeprecatedOption, default=None,
+                        instead="-o output will keep whoever wrote it",
+                        help="owner of the files written with -o (deprecated, removed in 2.17)")
     parser.add_argument("collectionSystem")
 
     args = parser.parse_args()
