@@ -4,7 +4,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [2.16.1] – Unreleased
+## [2.16.1] – 2026-10-10
 
 **Upgrading:** follow "Upgrading from 2.16.0" in [INSTALL.md](INSTALL.md):
 - update the database with `database/openvdm_2160_to_2161.sql` (#389);
