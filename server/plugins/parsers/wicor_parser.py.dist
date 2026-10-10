@@ -56,7 +56,6 @@ FIELDS = {
     'TI': ('True Wind Direction', 'deg', 1),
     # Water temperature
     'ST': ('Sea Surface Temperature', 'C', 3),
-    'OT': ('Oxygen Temperature', 'C', 3),
     'WT': ('Auxiliary Water Temperature', 'C', 3),
     'FT': ('Fluorometer Temperature', 'C', 3),
     # TSG
@@ -71,6 +70,7 @@ FIELDS = {
     'OG': ('Oxygen (mg/l)', 'mg/l', 3),
     'OM': ('Oxygen (umol/kg)', 'umol/kg', 3),
     'OC': ('Oxygen Current', 'uA', 3),
+    'OT': ('Oxygen Temperature', 'C', 3),
     # Biology, chemistry and flow
     'FL': ('Fluorometer', 'ug/l', 3),
     'FB': ('Fluorometer (optical brighteners)', 'ppb', 3),
@@ -97,9 +97,9 @@ CATEGORIES = {
     'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
     'wind_speed': ['WS', 'TW'],
     'wind_direction': ['WD', 'TI'],
-    'water_temp': ['ST', 'OT', 'WT', 'FT'],
+    'water_temp': ['ST', 'WT', 'FT'],
     'tsg': ['TT', 'TC', 'SA', 'SD', 'SV'],
-    'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC'],
+    'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC', 'OT'],
     'bio': ['FL', 'FB', 'FO', 'FF', 'TB', 'TR', 'BA', 'PH', 'PC', 'FI', 'FM', 'PS', 'PZ',
             'OF'],
 }
