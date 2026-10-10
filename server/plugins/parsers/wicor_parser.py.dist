@@ -145,7 +145,7 @@ def _field_order(field):
     return list(FIELDS).index(tag), int(number or 1)
 
 
-class WicorParser(OpenVDMCSVParser):
+class WICORParser(OpenVDMCSVParser):
     """Parser for timestamped MetAcq ``$WICOR`` sentences."""
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -375,4 +375,4 @@ class WicorParser(OpenVDMCSVParser):
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    WicorParser.run_cli()
+    WICORParser.run_cli()
