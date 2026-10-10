@@ -4,6 +4,37 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.16.1] – 2026-10-10
+
+**Upgrading:** follow "Upgrading from 2.16.0" in [INSTALL.md](INSTALL.md):
+- update the database with `database/openvdm_2160_to_2161.sql` (#389);
+- copy the updated `.dist` files you use over your copies: the CTD profile parser, `build_cruise_tracks.py` and `build_lowering_tracks.py` (keeping your own position sources), and the new `plot_ctd_casts.py` if wanted;
+- change your trackline hooks to the new option names and remove `-u`; the `Tracklines` extra directory they write to must exist and be enabled;
+- set `SITETITLE` in `Config.php` to v2.16.1, restart the workers (`supervisorctl restart openvdm:*`), and rebuild the data dashboard to add the new CTD tests and stats to existing casts.
+
+### Added
+- **CTD profile quality tests** for problems that used to pass silently:
+  - `XMLCON NMEA Position`: the deck unit is set to append the NMEA position to each scan;
+  - `HEX Header Position` and `HEX Scan Positions`: the `.hex` header and scans have positions;
+  - `HEX Lost Scans`: gaps in the scans' modulo counter;
+  - `Ranges`: temperature, conductivity, salinity and pressure within plausible limits, with a `<Variable> Validity` stat for each. The `ranges` parser option (`--<variable>Range` on the command line) changes the limits, e.g. for fresh water (#368).
+- **Queue an MD5 summary update for files a hook or script writes** into the cruise directory, which no transfer or data dashboard job lists: `OpenVDM.update_md5_summary()` in Python, or `utils/update_md5_summary.py FILE... [--deleted FILE...] [-c/--cruise-id ID] [--wait]` on the command line. Paths are relative to the cruise directory, or absolute inside it (#373, #398).
+- **CTD profile plots in an extra directory:** `bin/plot_ctd_casts.py.dist`, run as a `postCollectionSystemTransfer` hook (example in `openvdm.yaml.dist`), saves a PNG plot of each new or updated cast, or of a cast whose `.xmlcon` arrives later, in an extra directory (`CTD_Plots` by default). The plots are part of the cruise, owned by the warehouse user and added to the MD5 summary. `--all --collection-system <name>` re-plots every cast. Its options: `-e/--extra-directory`, `--collection-system`, `-c/--cruise-id`, `--all` (#398). The script needs matplotlib (not in `requirements.txt`) and exits with a message if it's missing (#372).
+
+### Changed
+- **CTD profile plot header:** the Date is the cast's start date (`System UTC`), the Cast is the file's basename, and Depth is the cast's maximum depth calculated from pressure, left out when it can't be calculated. They had come from `** Date:`, `** Cast:` and `** Bottom Depth:` header lines, which most ships don't write that way (#376).
+- **CTD profile plot position:** the plot header gives the cast's position in decimal degrees (`Position: lat 27.61917, lng -93.86167`): the header's NMEA position, else the first scan's. It's left out when the cast has no position (#379, #381).
+- **Post-hook failures say why:** the OpenVDM message for a failed hook command now gives the command's name, exit status and the end of its error output (stderr, or stdout if that's empty), instead of only its command line. Message titles and bodies are now shown as text on the Messages page and in the message list, not as HTML (#378).
+
+### Fixed
+- **Cruise data exclusions for paths saved with a trailing `/`:** a collection system or extra directory whose destination directory ended in `/` (saved before the forms started removing it, #96) gave an exclusion such as `Sensors/Example//**`, which excluded nothing, so cruise data transfers copied it anyway. `database/openvdm_2160_to_2161.sql` removes the trailing `/` from existing records (root paths, empty values and NULL are left as they are). Start running transfers again afterwards so they rebuild their filters (#389).
+- **Trackline scripts' output folder:** `build_cruise_tracks.py` and `build_lowering_tracks.py` crashed when there was no `Tracklines` extra directory, used its `destDir` without filling in `{cruiseID}` and `{loweringDataBaseDir}`, and wrote to it when disabled. They now exit with a message when it's missing, disabled or has no folder; `build_cruise_tracks.py` refuses a per-lowering one. `build_lowering_tracks.py` puts the tracklines in the lowering when `Tracklines` is a lowering-level extra directory, where OpenVDM creates it, not in the cruise. `-e/--extra-directory NAME` writes to another extra directory; it can't be used with `-o` (#401).
+- **Tracklines in the MD5 summary:** the trackline files written to an extra directory are queued for the cruise's MD5 summary (new or updated); a failed update exits 1 with a message. They always belong to the warehouse user; `-u/--username` now applies only to `-o` output, which still isn't added to the summary (#401).
+- **Trackline scripts share their code:** the code common to both scripts is now in `server/lib/tracks.py` (as in 2.17, #394), so future fixes arrive with an OpenVDM update instead of a new `.dist` copy. The scripts take the 2.17 option names: `--no-combine`, `--kml-only`, `--geojson-only`, and `--position-sources` for `--config_file` (cruise) or `--gps-sources` (lowering). The sources YAML's list can be called `PositionSources` (`GPSSources` still works). The 2.16.0 names `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file`, `--gps-sources` and `-u/--username` still work but print a deprecation warning, and post it as an OpenVDM message (`<script> uses deprecated options`, posted again only after it's been read): they will be removed in 2.17, so change your `openvdm.yaml` hooks to the new names and drop `-u` (#401).
+- **`openvdm.yaml.dist`:** removed the `postCollectionSystemTransfer` example for `bin/r2r_nav_manager.py`, which doesn't exist (#401).
+
+---
+
 ## [2.16.0] – 2026-09-28
 
 **Highlights**

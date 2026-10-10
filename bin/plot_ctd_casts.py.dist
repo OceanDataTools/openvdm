@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Plot Sea-Bird CTD casts into an OpenVDM extra directory.
+
+Run as a ``postCollectionSystemTransfer`` hook for the collection system that
+brings in the casts (see ``openvdm.yaml.dist``). For each new or updated
+``.hex`` cast, and each cast whose ``.xmlcon`` is new or updated, it saves the
+CTD profile parser's PNG plot (``<cast>.png``) in the extra directory, gives it
+to the warehouse user and queues an MD5 summary update for it.
+
+The plots need matplotlib, which ``requirements.txt`` doesn't install; without
+it, the script exits with a message before plotting anything. It also needs
+``server/plugins/parsers/ctd_profile_parser.py`` (copied from its ``.dist``).
+
+It exits non-zero with a message on stderr if the extra directory can't be
+used or any cast couldn't be plotted; the other casts are still plotted.
+"""
+
+import argparse
+import logging
+import os
+import sys
+from os.path import basename, dirname, isfile, join, realpath, splitext
+
+sys.path.append(dirname(dirname(realpath(__file__))))
+
+from server.lib.file_utils import set_owner_group_permissions  # noqa: E402  pylint: disable=wrong-import-position
+from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
+
+# Extra directory the plots are saved in, unless -e/--extra-directory names another
+DEFAULT_EXTRA_DIRECTORY = 'CTD_Plots'
+
+
+class PlotError(RuntimeError):
+    """The plots can't be made at all (e.g. no matplotlib, or no extra directory)."""
+
+
+def check_requirements():
+    """Return the CTD profile parser class, once its requirements are met.
+
+    Returns:
+        type: ``CTDProfileParser``.
+
+    Raises:
+        PlotError: If matplotlib or the parser isn't installed.
+    """
+    try:
+        import matplotlib  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+    except ImportError as err:
+        raise PlotError(f"matplotlib isn't installed, so no CTD plots were made. "
+                        f"Install it with: {sys.executable} -m pip install matplotlib") from err
+    try:
+        from server.plugins.parsers.ctd_profile_parser import CTDProfileParser  # pylint: disable=import-outside-toplevel
+    except ImportError as err:
+        raise PlotError("The CTD profile parser isn't installed: copy "
+                        "server/plugins/parsers/ctd_profile_parser.py.dist to ctd_profile_parser.py") from err
+    return CTDProfileParser
+
+
+def replace_tokens(path, cruise_id, warehouse_config):
+    """Return an OpenVDM destination directory with its placeholders replaced.
+
+    Args:
+        path: ``destDir`` of an extra directory or collection system transfer.
+        cruise_id: The cruise.
+        warehouse_config: From ``OpenVDM.get_shipboard_data_warehouse_config()``.
+
+    Returns:
+        str: The directory, relative to the cruise directory.
+
+    Raises:
+        PlotError: If the directory is per lowering (``{loweringID}``).
+    """
+    if '{loweringID}' in path:
+        raise PlotError(f"{path} is a per-lowering directory, which isn't supported")
+    return path.replace('{cruiseID}', cruise_id) \
+               .replace('{loweringDataBaseDir}', warehouse_config['loweringDataBaseDir']).strip('/')
+
+
+def resolve_plot_dir(ovdm, name, cruise_dir, cruise_id, warehouse_config):
+    """Return the extra directory's folder in the cruise directory.
+
+    Args:
+        ovdm: The ``OpenVDM`` API wrapper.
+        name: The extra directory's name.
+        cruise_dir: The cruise directory.
+        cruise_id: The cruise.
+        warehouse_config: From ``OpenVDM.get_shipboard_data_warehouse_config()``.
+
+    Returns:
+        str: The folder's absolute path.
+
+    Raises:
+        PlotError: If there's no such extra directory, it isn't enabled, or
+            its folder doesn't exist.
+    """
+    extra_dir = ovdm.get_extra_directory_by_name(name)
+    if not extra_dir:
+        raise PlotError(f"No extra directory named {name}: add it in OpenVDM's Configuration > Extra Directories")
+    if str(extra_dir.get('enable')) != '1':
+        raise PlotError(f"The {name} extra directory isn't enabled")
+    plot_dir = join(cruise_dir, replace_tokens(extra_dir['destDir'], cruise_id, warehouse_config))
+    if not os.path.isdir(plot_dir):
+        raise PlotError(f"The {name} extra directory's folder doesn't exist: {plot_dir}")
+    return plot_dir
+
+
+def find_casts(paths, cruise_dir):
+    """Return the ``.hex`` casts to plot for new or updated files.
+
+    A ``.hex`` file means itself, and an ``.xmlcon`` file its cast's ``.hex``
+    (same basename, extensions in any case) if there is one yet; other files
+    are ignored.
+
+    Args:
+        paths: File paths, relative to the cruise directory or absolute.
+        cruise_dir: The cruise directory.
+
+    Returns:
+        list[str]: Absolute paths of the casts, without duplicates.
+    """
+    casts = []
+    for path in paths:
+        path = join(cruise_dir, path)
+        stem, ext = splitext(path)
+        if ext.lower() == '.hex':
+            casts.append(path)
+        elif ext.lower() == '.xmlcon' and os.path.isdir(dirname(path)):
+            casts.extend(join(dirname(path), name) for name in sorted(os.listdir(dirname(path)))
+                         if splitext(name)[0] == basename(stem) and splitext(name)[1].lower() == '.hex')
+    return list(dict.fromkeys(casts))
+
+
+def find_all_casts(ovdm, collection_system, cruise_dir, cruise_id, warehouse_config):
+    """Return every ``.hex`` cast in a collection system's folder.
+
+    Args:
+        ovdm: The ``OpenVDM`` API wrapper.
+        collection_system: The collection system transfer's name.
+        cruise_dir: The cruise directory.
+        cruise_id: The cruise.
+        warehouse_config: From ``OpenVDM.get_shipboard_data_warehouse_config()``.
+
+    Returns:
+        list[str]: Absolute paths of the casts.
+
+    Raises:
+        PlotError: If there's no such collection system transfer.
+    """
+    transfer = ovdm.get_collection_system_transfer_by_name(collection_system)
+    if not transfer:
+        raise PlotError(f"No collection system transfer named {collection_system}")
+    source_dir = join(cruise_dir, replace_tokens(transfer['destDir'], cruise_id, warehouse_config))
+    return sorted(join(root, name) for root, _, names in os.walk(source_dir)
+                  for name in names if splitext(name)[1].lower() == '.hex')
+
+
+def plot_cast(parser_class, cast, plot_dir):
+    """Save a cast's plot in *plot_dir*.
+
+    Args:
+        parser_class: ``CTDProfileParser``.
+        cast: The cast's ``.hex`` file.
+        plot_dir: Folder to save ``<cast>.png`` in.
+
+    Returns:
+        tuple: ``(png_path, existed)``: the plot, and whether it replaced one.
+
+    Raises:
+        ValueError: If no plot was saved (e.g. no ``.xmlcon`` yet, or no valid
+            scans); the parser logs why.
+    """
+    png = join(plot_dir, splitext(basename(cast))[0] + '.png')
+    before = os.stat(png).st_mtime_ns if isfile(png) else None
+    try:
+        parser_class(plot_dir=plot_dir).parse(cast)
+    except (FileNotFoundError, ValueError, OSError) as err:
+        raise ValueError(str(err)) from err
+    if not isfile(png) or os.stat(png).st_mtime_ns == before:
+        raise ValueError("no plot saved; see the log")
+    return png, before is not None
+
+
+def main():  # pylint: disable=too-many-locals
+    """Parse the command line and plot the casts.
+
+    Returns:
+        int: The exit status: 0 on success, 1 if anything couldn't be plotted.
+    """
+    parser = argparse.ArgumentParser(description='Plot Sea-Bird CTD casts into an OpenVDM extra directory')
+    parser.add_argument('files', metavar='FILE', nargs='*',
+                        help='new or updated files, relative to the cruise directory; an argument can '
+                             'hold several, separated by spaces, as OpenVDM\'s {newFiles} does')
+    parser.add_argument('-e', '--extra-directory', default=DEFAULT_EXTRA_DIRECTORY,
+                        help=f'extra directory to save the plots in (default: {DEFAULT_EXTRA_DIRECTORY})')
+    parser.add_argument('--all', action='store_true',
+                        help='plot every cast in the --collection-system\'s folder instead of FILEs')
+    parser.add_argument('--collection-system', help='collection system transfer, for --all')
+    parser.add_argument('-c', '--cruise-id', help='cruise (default: the current cruise)')
+    parser.add_argument('-v', '--verbosity', default=0, action='count', help='increase verbosity')
+    args = parser.parse_args()
+
+    logging.basicConfig(format='%(asctime)-15s %(levelname)s - %(message)s',
+                        level=[logging.WARNING, logging.INFO, logging.DEBUG][min(args.verbosity, 2)])
+    if args.all and not args.collection_system:
+        parser.error('--all needs --collection-system')
+
+    failures = []
+    try:
+        parser_class = check_requirements()
+        ovdm = OpenVDM()
+        cruise_id = args.cruise_id or ovdm.get_cruise_id()
+        warehouse_config = ovdm.get_shipboard_data_warehouse_config()
+        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
+        plot_dir = resolve_plot_dir(ovdm, args.extra_directory, cruise_dir, cruise_id, warehouse_config)
+        if args.all:
+            casts = find_all_casts(ovdm, args.collection_system, cruise_dir, cruise_id, warehouse_config)
+        else:
+            casts = find_casts([path for arg in args.files for path in arg.split()], cruise_dir)
+    except PlotError as err:
+        print(err, file=sys.stderr)
+        return 1
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        print(f"Unable to get OpenVDM's configuration: {err}", file=sys.stderr)
+        return 1
+
+    new, updated = [], []
+    for cast in casts:
+        try:
+            png, existed = plot_cast(parser_class, cast, plot_dir)
+        except ValueError as err:
+            failures.append(f"{basename(cast)}: {err}")
+            continue
+        results = set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], png)
+        if not results['verdict']:
+            failures.append(f"{basename(png)}: {results['reason']}")
+        (updated if existed else new).append(png)
+        logging.info("Plotted %s", basename(cast))
+
+    if new or updated:
+        try:
+            ovdm.update_md5_summary(new=new, updated=updated, cruise_id=cruise_id)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            failures.append(f"MD5 summary update: {err}")
+
+    if failures:
+        print(f"CTD plots: {len(failures)} problem(s) with {len(casts)} cast(s):\n" + '\n'.join(failures),
+              file=sys.stderr)
+        return 1
+    logging.info("Plotted %d CTD cast(s) into %s", len(new) + len(updated), plot_dir)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
