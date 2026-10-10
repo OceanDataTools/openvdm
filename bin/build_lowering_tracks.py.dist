@@ -51,10 +51,10 @@ import argparse
 import logging
 import os
 import sys
+from os.path import dirname, realpath
 
 import requests
 
-from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
 from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
