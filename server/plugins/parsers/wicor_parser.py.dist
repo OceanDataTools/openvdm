@@ -36,7 +36,7 @@ FIELDS = {
     'WC': ('Wind Chill', 'C', 2),
     'RH': ('Relative Humidity', '%', 2),
     'BS': ('Barometric Pressure (sea level)', 'mBar', 2),
-    # Humidity
+    # Dew point
     'DP': ('Dew Point', 'C', 2),
     # Precipitation
     'PR': ('Precipitation', 'mm', 2),
@@ -93,7 +93,7 @@ FIELDS = {
 # Each holds one kind of value, so its chart has only a few series.
 CATEGORIES = {
     'air': ['AT', 'AX', 'WB', 'WC', 'RH', 'BS'],
-    'humidity': ['DP'],
+    'dew_point': ['DP'],
     'precipitation': ['PR', 'PT'],
     'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
     'wind_speed': ['WS', 'TW'],
