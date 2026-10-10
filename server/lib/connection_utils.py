@@ -22,6 +22,7 @@ import subprocess
 import time
 import configparser
 import fnmatch
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 from os.path import dirname, realpath
@@ -169,12 +170,37 @@ def check_darwin(cfg):
         return False
 
 
+@contextmanager
+def smb_credentials_file(cfg):
+    """Write a transfer's SMB username and password to a temporary credentials file.
+
+    ``mount.cifs`` (``credentials=``) and ``smbclient`` (``-A``) read the
+    login from the file, which keeps the password off the command line: a
+    failed command's error text, and ``ps``, would show it there (#424). The
+    file is readable by its owner only and deleted on exit.
+
+    Args:
+        cfg: Transfer configuration with ``smbUser`` and ``smbPass``.
+
+    Yields:
+        str: Path of the credentials file.
+    """
+    fd, path = tempfile.mkstemp(prefix='openvdm_smb_')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(f"username={cfg['smbUser']}\npassword={cfg.get('smbPass') or ''}\n")
+        yield path
+    finally:
+        os.remove(path)
+
+
 def detect_smb_version(cfg):
     """Detect which SMB protocol version to mount a transfer's server with.
 
     Lists the server's shares with ``smbclient`` (as guest if ``smbUser`` is
     ``'guest'``). Windows XP-era servers (``OS=[Windows 5.1]``) get ``'1.0'``;
-    all others get ``'2.1'``.
+    all others get ``'2.1'``. The login is passed in a credentials file
+    (:func:`smb_credentials_file`), not on the command line.
 
     Args:
         cfg: Transfer configuration with ``smbServer``, ``smbDomain``,
@@ -186,21 +212,14 @@ def detect_smb_version(cfg):
         authentication fails.
     """
 
-    if cfg.get('smbUser') == 'guest':
-        cmd = [
-            'smbclient', '-L', cfg['smbServer'],
-            '-W', cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
-        ]
-    else:
-        cmd = [
-            'smbclient', '-L', cfg['smbServer'],
-            '-W', cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{cfg['smbUser']}%{cfg.get('smbPass', '')}"
-        ]
+    cmd = ['smbclient', '-L', cfg['smbServer'], '-W', cfg['smbDomain'], '-m', 'SMB2', '-g']
 
-    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'%{cfg.get("smbPass", "")}', '%****'))
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if cfg.get('smbUser') == 'guest':
+            proc = _run_smbclient(cmd + ['-N'])
+        else:
+            with smb_credentials_file(cfg) as credentials:
+                proc = _run_smbclient(cmd + ['-A', credentials])
 
         if proc.returncode != 0 or "NT_STATUS" in proc.stderr or "failed" in proc.stderr.lower():
             detail = proc.stderr.strip()
@@ -212,17 +231,25 @@ def detect_smb_version(cfg):
                 return '1.0', ""
         return '2.1', ""
 
-    except subprocess.SubprocessError as exc:
+    except (subprocess.SubprocessError, OSError) as exc:
         detail = str(exc)
         logging.error("SMB version detection failed: %s", detail)
         return None, detail
+
+
+def _run_smbclient(cmd):
+    """Run an ``smbclient`` command with a 10 s timeout and return the completed process."""
+    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd))
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
     """Mount a transfer's SMB share (CIFS) on a local directory.
 
     The share is mounted read-write if the transfer removes source files
-    (``removeSourceFiles``), otherwise read-only. On failure the mount point is
+    (``removeSourceFiles``), otherwise read-only. The login is passed in a
+    credentials file (:func:`smb_credentials_file`), not on the command line,
+    which also lets a password contain commas. On failure the mount point is
     unmounted again. Requires root.
 
     Args:
@@ -242,25 +269,36 @@ def mount_smb_share(cfg, mntpoint, smb_version):
 
     opts = f"{read_write},domain={cfg['smbDomain']},vers={smb_version}"
 
-    if cfg['smbUser'] == 'guest':
-        opts += ",guest"
-    else:
-        opts += f",username={cfg['smbUser']},password={cfg.get('smbPass', '')}"
-
-    cmd = ['mount', '-t', 'cifs', cfg['smbServer'], mntpoint, '-o', opts]
-
-    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cfg.get("smbPass", "")}', 'password=****'))
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        if cfg['smbUser'] == 'guest':
+            _run_mount(cfg, mntpoint, opts + ",guest")
+        else:
+            # The login goes in a credentials file, off the command line (#424)
+            with smb_credentials_file(cfg) as credentials:
+                _run_mount(cfg, mntpoint, opts + f",credentials={credentials}")
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
         return True, ""
     except subprocess.CalledProcessError as exc:
-        detail = exc.stderr.strip() if exc.stderr else str(exc)
-        logging.error("Failed to mount SMB share: %s.  Are you running as root?", detail)
+        detail = (exc.stderr or exc.stdout or '').strip() or str(exc)
+    except OSError as exc:
+        detail = str(exc)
 
-        # Try to unmount in case of partial mount
-        subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return False, detail
+    logging.error("Failed to mount SMB share: %s.  Are you running as root?", detail)
+
+    # Try to unmount in case of partial mount
+    subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return False, detail
+
+
+def _run_mount(cfg, mntpoint, opts):
+    """Run ``mount -t cifs`` for a transfer's share.
+
+    Raises:
+        subprocess.CalledProcessError: If ``mount`` fails.
+    """
+    cmd = ['mount', '-t', 'cifs', cfg['smbServer'], mntpoint, '-o', opts]
+    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd))
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath,
@@ -731,8 +769,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     # If password provided, obscure it; otherwise use key file
     if cfg["sshUseKey"] == 0:
         try:
+            # Read from stdin: on the command line, a failure's error text
+            # would show the password (#424)
             result = subprocess.run(
-                ["rclone", "obscure", cfg["sshPass"]],
+                ["rclone", "obscure", "-"],
+                input=cfg["sshPass"],
                 capture_output=True,
                 text=True,
                 check=True,
