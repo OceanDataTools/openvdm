@@ -26,8 +26,8 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: di
 # named <tag>_2. Navigation, depth, gravity, magnetics, winch and CTD values
 # are left out: other parsers handle them. So are codes (GS, ZI), times, the
 # Fahrenheit and knots copies of values (AF, RF, DF, WF, SF, TF, WK, TK), the
-# RH module's air temperature (RT) and the station barometer (BP, BC); the
-# sea-level pressure (BS) is charted.
+# RH module's air temperature (RT), the station barometer (BP, BC; the
+# sea-level pressure, BS, is charted) and the uncorrected TSG conductivity (TG).
 FIELDS = {
     # Air: temperature, humidity and sea-level pressure
     'AT': ('Air Temperature', 'C', 2),
@@ -56,13 +56,12 @@ FIELDS = {
     'TI': ('True Wind Direction', 'deg', 1),
     # Water temperature
     'ST': ('Sea Surface Temperature', 'C', 3),
-    'TT': ('TSG Temperature', 'C', 3),
     'OT': ('Oxygen Temperature', 'C', 3),
     'WT': ('Auxiliary Water Temperature', 'C', 3),
     'FT': ('Fluorometer Temperature', 'C', 3),
     # TSG
+    'TT': ('TSG Temperature', 'C', 3),
     'TC': ('TSG Conductivity', 'mS/cm', 4),
-    'TG': ('TSG Conductivity (uncorrected)', 'mS/cm', 4),
     'SA': ('Salinity', 'PSU', 3),
     'SD': ('Sigma-t', 'kg/m^3', 3),
     'SV': ('Sound Velocity', 'm/s', 2),
@@ -98,8 +97,8 @@ CATEGORIES = {
     'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
     'wind_speed': ['WS', 'TW'],
     'wind_direction': ['WD', 'TI'],
-    'water_temp': ['ST', 'TT', 'OT', 'WT', 'FT'],
-    'tsg': ['TC', 'TG', 'SA', 'SD', 'SV'],
+    'water_temp': ['ST', 'OT', 'WT', 'FT'],
+    'tsg': ['TT', 'TC', 'SA', 'SD', 'SV'],
     'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC'],
     'bio': ['FL', 'FB', 'FO', 'FF', 'TB', 'TR', 'BA', 'PH', 'PC', 'FI', 'FM', 'PS', 'PZ',
             'OF'],
