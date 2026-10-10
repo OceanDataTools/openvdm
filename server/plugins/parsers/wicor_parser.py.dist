@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Parser for Scripps MetAcq $WICOR sentences.
 
-Parses timestamped log files of MetAcq's combined, corrected ``$WICOR``
+Parses OpenRVDAS log files of MetAcq's combined, corrected ``$WICOR``
 sentences (met, thermosalinograph, navigation and winch values tagged with a
-2-letter ID and a calibration/validity digit) and returns the JSON-formatted
-plugin data used by OpenVDM's Data Dashboard: time series of the chosen
-fields, or (``track``) the ship's track from its latitude and longitude.
+2-letter ID and a calibration/validity digit), each line prefixed with the
+logger's timestamp, and returns the JSON-formatted plugin data used by
+OpenVDM's Data Dashboard: time series of the chosen fields, or (``track``) the
+ship's track from its latitude and longitude. MetAcq's own ``.COR`` files
+aren't supported.
 """
 
 import logging

@@ -7,7 +7,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 ## [Unreleased]
 
 ### Added
-- **Scripps MetAcq `$WICOR` parser** (`wicor_parser.py.dist`), for ships that log their underway data with MetAcq (e.g. R/V Robert Gordon Sproul). It reads the `value,TAGn` pairs by tag, since each ship's MetAcq setup decides which values are written and in what order. A second sensor with the same tag is `<tag>_2`, e.g. `WS_2`. Values flagged out of range, emulated or invalid (digit 7, 8 or 9), and the `-99` and `99999999` markers, are left out and counted in that value's Validity stat. Lines with a bad checksum are rejected.
+- **Scripps MetAcq `$WICOR` parser** (`wicor_parser.py.dist`), for ships that log MetAcq's underway data with OpenRVDAS (e.g. R/V Robert Gordon Sproul). It reads OpenRVDAS log files of `$WICOR` lines; MetAcq's own `.COR` files aren't supported. It reads the `value,TAGn` pairs by tag, since each ship's MetAcq setup decides which values are written and in what order. A second sensor with the same tag is `<tag>_2`, e.g. `WS_2`. Values flagged out of range, emulated or invalid (digit 7, 8 or 9), and the `-99` and `99999999` markers, are left out and counted in that value's Validity stat. Lines with a bad checksum are rejected.
   - The `fields` option picks the values to chart (default: the main met, TSG and navigation values), and `track` returns the ship's track from `LA`/`LO` instead.
   - Wind direction, course and heading are averaged as angles, so 359° and 1° average to 0°, not 180°.
   - `openrvdas_plugin.py.dist` has commented-out entries that chart one `$WICOR` file as the `met` and `tsg` data types and map it as `gga` (#408).
