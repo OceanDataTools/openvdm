@@ -17,14 +17,20 @@ converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
 
 GPS sources are configured via an embedded YAML block
 (``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
-with ``--gps-sources``.
+with ``--config_file``.
+
+The ``Tracklines`` extra directory must exist and be enabled, and its folder
+must exist in the cruise. Files written there belong to OpenVDM's warehouse
+user and are queued for the cruise's MD5 summary. With ``-o OUTPUTDIR`` the
+files go to that folder instead, keep whoever wrote them (unless ``-u`` is
+given) and aren't added to the MD5 summary.
 
 Usage::
 
     build_cruise_tracks.py [-h] [-v ...] [-c CRUISEID]
-                           [--gps-sources FILE] [--no-combine]
-                           [--geojson-only | --kml-only]
-                           [--output-dir DIR] [--username USER]
+                           [--config_file FILE] [--no_combine]
+                           [--geojson_only] [--kml_only]
+                           [-o OUTPUTDIR] [-u USERNAME]
                            collectionSystem
 """
 
@@ -267,7 +273,8 @@ def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
 # Output helpers
 # ----------------------------------------------------------------------
 
-def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUser):
+def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUser,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                  written=None):
     """Write GeoJSON and/or KML trackline files for one GPS source.
 
     Files are named ``<cruiseID>_<base_name>_Trackline.json`` / ``.kml``.
@@ -277,10 +284,15 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
         base_name: Device name or file stem used to build the output filename.
         cruiseID: Current cruise identifier, used as filename prefix.
         tracklineDir: Directory where output files are written.
-        args: Parsed ``argparse.Namespace`` containing ``kml_only``,
-            ``geojson_only``, ``outputDir``, and ``username`` attributes.
-        outputUser: Username for ``chown`` after writing each file.
+        args: Parsed ``argparse.Namespace`` containing ``kml_only`` and
+            ``geojson_only`` attributes.
+        outputUser: Username to ``chown`` each file to, or ``None`` to leave
+            ownership as it is.
+        written: List to append ``(path, existed_before)`` to for each file
+            written, for the MD5 summary update.
     """
+    if written is None:
+        written = []
 
     if not args.kml_only:
         json_path = os.path.join(
@@ -288,11 +300,14 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
         )
         logging.info("Saving %s", json_path)
 
+        existed = os.path.isfile(json_path)
         result = output_json_data_to_file(json_path, geojson_obj)
         if not result["verdict"]:
             logging.error("Write failed: %s", result["reason"])
-        elif not args.outputDir or args.username:
-            set_owner_group_permissions(outputUser, json_path)
+        else:
+            written.append((json_path, existed))
+            if outputUser:
+                set_owner_group_permissions(outputUser, json_path)
 
     if not args.geojson_only:
         kml_path = os.path.join(
@@ -300,6 +315,7 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
         )
         logging.info("Saving %s", kml_path)
 
+        existed = os.path.isfile(kml_path)
         try:
             with open(kml_path, "w", encoding="utf-8") as f:
                 f.write(convert_to_kml(geojson_obj))
@@ -307,15 +323,16 @@ def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUs
             logging.error("KML write failed: %s", err)
             return
 
-        if not args.outputDir or args.username:
+        written.append((kml_path, existed))
+        if outputUser:
             set_owner_group_permissions(outputUser, kml_path)
 
 # ----------------------------------------------------------------------
 # Core processing
 # ----------------------------------------------------------------------
 
-def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
-                       tracklineDir,args,outputUser):
+def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                       tracklineDir,args,outputUser,written=None):
     """Process one GPS source: find its dashboard files and write tracklines.
 
     Unless ``--no_combine`` is given, the source's dashboard files are combined
@@ -328,7 +345,9 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
         cruiseID: Current cruise identifier.
         tracklineDir: Directory where output files are written.
         args: Parsed ``argparse.Namespace``.
-        outputUser: Username for ``chown`` after writing each file.
+        outputUser: Username to ``chown`` each file to, or ``None``.
+        written: List to append ``(path, existed_before)`` to for each file
+            written (see :func:`write_outputs`).
     """
 
     logging.info(
@@ -362,6 +381,7 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
             tracklineDir,
             args,
             outputUser,
+            written,
         )
         return
 
@@ -383,11 +403,71 @@ def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
             tracklineDir,
             args,
             outputUser,
+            written,
         )
+
+def queue_md5_update(openVDM, written, cruiseID):
+    """Queue the cruise's MD5 summary update for the trackline files written.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        written: ``(path, existed_before)`` for each file written (from
+            :func:`write_outputs`); files that didn't exist are ``new``.
+        cruiseID: The cruise whose summary to update.
+
+    Returns:
+        A message if the update couldn't be queued, else ``None``.
+    """
+    try:
+        openVDM.update_md5_summary(new=[path for path, existed in written if not existed],
+                                   updated=[path for path, existed in written if existed],
+                                   cruise_id=cruiseID)
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        return f"Unable to queue the MD5 summary update for the tracklines: {err}"
+    return None
 
 # ----------------------------------------------------------------------
 # Setup & entry point
 # ----------------------------------------------------------------------
+
+def resolve_extra_directory(openVDM, name, cruise_dir, cruiseID, warehouse_cfg):
+    """Return the folder of an OpenVDM extra directory.
+
+    ``{cruiseID}`` and ``{loweringDataBaseDir}`` in its ``destDir`` are filled
+    in. A per-lowering directory (``{loweringID}``) is refused.
+
+    Args:
+        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        name: The extra directory's name.
+        cruise_dir: The cruise directory.
+        cruiseID: The cruise.
+        warehouse_cfg: From ``OpenVDM.get_shipboard_data_warehouse_config()``.
+
+    Returns:
+        The folder's absolute path.
+
+    Raises:
+        RuntimeError: If there's no such extra directory, it isn't enabled,
+            it's per lowering, or its folder doesn't exist.
+    """
+    extra_dir = openVDM.get_extra_directory_by_name(name)
+    if not extra_dir:
+        raise RuntimeError(f"No extra directory named {name}: add it in OpenVDM's Configuration > Extra Directories")
+    if str(extra_dir.get("enable")) != "1":
+        raise RuntimeError(f"The {name} extra directory isn't enabled")
+
+    dest_dir = extra_dir.get("destDir") or ""
+    if "{loweringID}" in dest_dir:
+        raise RuntimeError(f"The {name} extra directory is per lowering ({dest_dir}), which isn't supported")
+    dest_dir = dest_dir.replace("{cruiseID}", cruiseID) \
+                       .replace("{loweringDataBaseDir}", warehouse_cfg["loweringDataBaseDir"]) \
+                       .strip("/")
+
+    folder = os.path.join(cruise_dir, dest_dir)
+    if not os.path.isdir(folder):
+        raise RuntimeError(f"The {name} extra directory's folder doesn't exist: {folder}")
+    return folder
+
 
 def resolve_cruise_and_dirs(openVDM, args):
     """Resolve the cruise identifier and output directories from OpenVDM.
@@ -399,10 +479,13 @@ def resolve_cruise_and_dirs(openVDM, args):
 
     Returns:
         A 4-tuple of ``(cruiseID, cruise_base_dir, tracklineDir, outputUser)``.
+        ``outputUser`` is the warehouse user for the ``Tracklines`` extra
+        directory; for ``-o`` it's ``-u``'s user, or ``None`` (no ``chown``).
 
     Raises:
         RuntimeError: If the cruise ID cannot be determined, the collection
-            system is not found, or the trackline directory does not exist.
+            system is not found, or the trackline directory can't be used
+            (see :func:`resolve_extra_directory`).
     """
 
     cruiseID = args.cruiseID or openVDM.get_cruise_id()
@@ -418,26 +501,22 @@ def resolve_cruise_and_dirs(openVDM, args):
     warehouse_cfg = openVDM.get_shipboard_data_warehouse_config()
     cruise_base_dir = os.path.join(warehouse_cfg["shipboardDataWarehouseBaseDir"])
 
-    tracklineDir = (
-        args.outputDir
-        or os.path.join(
-            cruise_base_dir,
-            cruiseID,
-            openVDM.get_extra_directory_by_name(
-                TRACKLINE_EXTRA_DIR_NAME
-            )["destDir"],
+    if args.outputDir:
+        tracklineDir = args.outputDir
+        if not os.path.isdir(tracklineDir):
+            raise RuntimeError(f"Trackline directory not found: {tracklineDir}")
+        outputUser = args.username
+    else:
+        tracklineDir = resolve_extra_directory(
+            openVDM, TRACKLINE_EXTRA_DIR_NAME,
+            os.path.join(cruise_base_dir, cruiseID), cruiseID, warehouse_cfg
         )
-    )
-
-    if not os.path.isdir(tracklineDir):
-        raise RuntimeError(f"Trackline directory not found: {tracklineDir}")
-
-    outputUser = args.username or warehouse_cfg["shipboardDataWarehouseUsername"]
+        outputUser = warehouse_cfg["shipboardDataWarehouseUsername"]
 
     return cruiseID, cruise_base_dir, tracklineDir, outputUser
 
 
-def main():
+def main():  # pylint: disable=too-many-locals
     """Parse arguments and build cruise trackline files."""
 
     parser = argparse.ArgumentParser(
@@ -448,8 +527,9 @@ def main():
     parser.add_argument("-k", "--kml_only", action="store_true")
     parser.add_argument("-g", "--geojson_only", action="store_true")
     parser.add_argument("-c", dest="cruiseID")
-    parser.add_argument("-o", dest="outputDir")
-    parser.add_argument("-u", "--username")
+    parser.add_argument("-o", dest="outputDir",
+                        help="write to this folder instead of the Tracklines extra directory")
+    parser.add_argument("-u", "--username", help="owner of the files written with -o")
     parser.add_argument("--config_file", dest="gps_sources_file")
     parser.add_argument("collectionSystem")
 
@@ -479,9 +559,17 @@ def main():
 
     logging.info("Using manifest: %s", manifest_path)
 
+    written = []
     for gps_source in gps_sources:
         process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
-                           tracklineDir,args,outputUser)
+                           tracklineDir,args,outputUser,written)
+
+    # Files in the Tracklines extra directory are part of the cruise; -o folders aren't
+    if written and not args.outputDir:
+        message = queue_md5_update(openVDM, written, cruiseID)
+        if message:
+            print(message, file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

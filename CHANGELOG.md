@@ -6,7 +6,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.16.1] – Unreleased
 
-**Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts.
+**Upgrading:** copy `server/plugins/parsers/ctd_profile_parser.py.dist` over your `ctd_profile_parser.py`, and rebuild the data dashboard to add the new tests and stats to existing casts. If you run `build_cruise_tracks.py` or `build_lowering_tracks.py`, copy their `.dist` files over your copies too; the `Tracklines` extra directory they write to must exist and be enabled.
 
 ### Added
 - **CTD profile quality tests** for problems that used to pass silently:
@@ -21,6 +21,11 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **CTD profile plot header:** the Date is the cast's start date (`System UTC`), the Cast is the file's basename, and Depth is the cast's maximum depth calculated from pressure, left out when it can't be calculated. They had come from `** Date:`, `** Cast:` and `** Bottom Depth:` header lines, which most ships don't write that way (#376).
 - **CTD profile plot position:** the plot header gives the cast's position in decimal degrees (`Position: lat 27.61917, lng -93.86167`): the header's NMEA position, else the first scan's. It's left out when the cast has no position (#379, #381).
 - **Post-hook failures say why:** the OpenVDM message for a failed hook command now gives the command's name, exit status and the end of its error output (stderr, or stdout if that's empty), instead of only its command line. Message titles and bodies are now shown as text on the Messages page and in the message list, not as HTML (#378).
+
+### Fixed
+- **Trackline scripts' output folder:** `build_cruise_tracks.py` and `build_lowering_tracks.py` crashed when there was no `Tracklines` extra directory, used its `destDir` without filling in `{cruiseID}` and `{loweringDataBaseDir}`, and wrote to it when disabled. They now exit with a message when it's missing, disabled or has no folder; `build_cruise_tracks.py` refuses a per-lowering one. `build_lowering_tracks.py` puts the tracklines in the lowering when `Tracklines` is a lowering-level extra directory, where OpenVDM creates it, not in the cruise (#401).
+- **Tracklines in the MD5 summary:** the trackline files written to the `Tracklines` extra directory are queued for the cruise's MD5 summary (new or updated); a failed update exits 1 with a message. They always belong to the warehouse user; `-u/--username` now applies only to `-o` output, which still isn't added to the summary. The usage text lists the options the scripts really take (#401).
+- **`openvdm.yaml.dist`:** removed the `postCollectionSystemTransfer` example for `bin/r2r_nav_manager.py`, which doesn't exist (#401).
 
 ---
 
