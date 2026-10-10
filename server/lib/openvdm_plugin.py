@@ -664,6 +664,34 @@ class OpenVDMCSVParser(OpenVDMParser):
         """
         pass
 
+    @staticmethod
+    def nmea_checksum_ok(sentence: str, required: bool = False) -> bool:
+        """Return whether an NMEA sentence's checksum matches its contents.
+
+        The checksum is the two hex digits after ``*``: the XOR of every
+        character between the leading ``$`` (or ``!``) and the ``*``. Serial
+        loggers can splice or truncate sentences, which the checksum catches.
+
+        Args:
+            sentence: The sentence, e.g. ``'$GPGGA,...*73'``; surrounding
+                whitespace is ignored.
+            required: Treat a sentence without a checksum as bad. The
+                checksum is optional in NMEA 0183, but a sentence that should
+                have one and doesn't has usually been cut short.
+
+        Returns:
+            bool: ``True`` if the checksum matches, or if the sentence has none
+            and *required* is false; ``False`` if it doesn't match, isn't two
+            hex digits, or is missing and *required*.
+        """
+        body, star, checksum = sentence.strip().lstrip('$!').partition('*')
+        if not star:
+            return not required
+        calculated = 0
+        for char in body:
+            calculated ^= ord(char)
+        return checksum[:2].upper() == f'{calculated:02X}' and len(checksum.strip()) == 2
+
     def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
         """Yield each timestamped data line of a file, split into fields.
 
