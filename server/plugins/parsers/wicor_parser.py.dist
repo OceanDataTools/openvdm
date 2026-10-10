@@ -103,7 +103,7 @@ CATEGORIES = {
     'tsg': ['TT', 'TC', 'SA', 'SD', 'SV'],
     'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC', 'OT'],
     'fluorometer': ['FL', 'FB', 'FO', 'FF', 'FT'],
-    'bio': ['TB', 'TR', 'BA', 'PH', 'PC'],
+    'optics_chem': ['TB', 'TR', 'BA', 'PH', 'PC'],
     'usw_system': ['FI', 'FM', 'PS', 'PZ', 'OF'],
 }
 

@@ -56,7 +56,7 @@ fileTypeFilters = [
     # {"data_type":"tsg",            "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'tsg', 'max_delta_t': 30}},
     # {"data_type":"oxygen",         "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'oxygen', 'max_delta_t': 30}},
     # {"data_type":"fluorometer",    "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'fluorometer', 'max_delta_t': 30}},
-    # {"data_type":"bio",            "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'bio', 'max_delta_t': 30}},
+    # {"data_type":"optics_chem",    "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'optics_chem', 'max_delta_t': 30}},
     # {"data_type":"usw_system",     "regex": "*/raw/*_wicor-*.txt", "parser": "WICOR", 'parser_options':{'category': 'usw_system', 'max_delta_t': 30}},
 ]
 
