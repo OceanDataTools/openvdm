@@ -57,7 +57,6 @@ FIELDS = {
     # Water temperature
     'ST': ('Sea Surface Temperature', 'C', 3),
     'WT': ('Auxiliary Water Temperature', 'C', 3),
-    'FT': ('Fluorometer Temperature', 'C', 3),
     # TSG
     'TT': ('TSG Temperature', 'C', 3),
     'TC': ('TSG Conductivity', 'mS/cm', 4),
@@ -71,16 +70,19 @@ FIELDS = {
     'OM': ('Oxygen (umol/kg)', 'umol/kg', 3),
     'OC': ('Oxygen Current', 'uA', 3),
     'OT': ('Oxygen Temperature', 'C', 3),
-    # Biology, chemistry and flow
+    # Fluorometers
     'FL': ('Fluorometer', 'ug/l', 3),
     'FB': ('Fluorometer (optical brighteners)', 'ppb', 3),
     'FO': ('Fluorometer (oil)', 'ppb', 3),
     'FF': ('Fluorometer (fuel)', 'ppb', 3),
+    'FT': ('Fluorometer Temperature', 'C', 3),
+    # Optics and carbonate chemistry
     'TB': ('Turbidity', 'NTU', 3),
     'TR': ('Transmissometer', '%', 2),
     'BA': ('Beam Attenuation', '1/m', 4),
     'PH': ('pH', 'pH', 3),
     'PC': ('pCO2', 'uatm', 2),
+    # Underway seawater system: flow, line pressure, pump and overflow
     'FI': ('Underway Seawater Flow', 'l/min', 2),
     'FM': ('Underway Seawater Flow (gal/min)', 'gal/min', 2),
     'PS': ('Pressure', 'PSI', 2),
@@ -97,11 +99,12 @@ CATEGORIES = {
     'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
     'wind_speed': ['WS', 'TW'],
     'wind_direction': ['WD', 'TI'],
-    'water_temp': ['ST', 'WT', 'FT'],
+    'water_temp': ['ST', 'WT'],
     'tsg': ['TT', 'TC', 'SA', 'SD', 'SV'],
     'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC', 'OT'],
-    'bio': ['FL', 'FB', 'FO', 'FF', 'TB', 'TR', 'BA', 'PH', 'PC', 'FI', 'FM', 'PS', 'PZ',
-            'OF'],
+    'fluorometer': ['FL', 'FB', 'FO', 'FF', 'FT'],
+    'bio': ['TB', 'TR', 'BA', 'PH', 'PC'],
+    'usw_system': ['FI', 'FM', 'PS', 'PZ', 'OF'],
 }
 
 
