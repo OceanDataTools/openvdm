@@ -501,3 +501,38 @@ sudo -H -u <openvdm_user> /usr/local/bin/composer install --no-dev
 `composer install` also runs `npm install` (through `post_composer.sh`).
 
 If you contribute to OpenVDM: `pre-commit` now also runs ESLint, `php -l` and PHPStan. Run `composer install` (without `--no-dev`) in `www/` to install PHPStan, and see CONTRIBUTING.md.
+
+## Upgrading from 2.16.0.
+
+OpenVDM v2.16.1 fixes cruise data exclusions for directories saved with a trailing `/`, which needs a database update (step 3). It also adds CTD quality tests, CTD profile plots and MD5 summary updates for files written by hooks, and fixes the trackline scripts. See the 2.16.1 entry in [CHANGELOG.md](CHANGELOG.md) for the details. No PHP, JavaScript or Python dependencies changed, so the installer doesn't need to be re-run.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Update the code, as the OpenVDM user (git refuses to work in a checkout owned by another user):
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> git pull --ff-only
+```
+3. Update the database. Back up the database first, so it can be restored if the update fails. The backup script asks for the MySQL root password twice, and the update once:
+```
+cd <openvdm_root>
+sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_backup_before_2.16.1.sql
+mysql -u root -p openvdm < ./database/openvdm_2160_to_2161.sql
+```
+   The update removes the trailing `/` from collection system and extra directory destination directories, so that cruise data transfers exclude them again (#389). It prints nothing when it succeeds, and is safe to run again. If you see errors, save them and contact OceanDataTools.
+4. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+| File (in `<openvdm_root>`) | Why |
+|---|---|
+| `server/plugins/parsers/ctd_profile_parser.py` | New CTD quality tests and Validity stats; plot header Date, Cast, Depth and Position (#368, #370, #376, #379, #381) |
+| `bin/build_cruise_tracks.py`, `bin/build_lowering_tracks.py` | `Tracklines` extra directory checks, MD5 summary, shared code in `server/lib/tracks.py`, renamed options. **Keep your own position sources** (#401) |
+| `bin/plot_ctd_casts.py` | New: CTD profile plots in an extra directory, run as a hook; needs matplotlib (#372) |
+
+   `server/plugins/ctd_plugin.py.dist` and `server/etc/openvdm.yaml.dist` have documentation and example changes only. `openvdm.yaml.dist` has a commented-out `plot_ctd_casts.py` hook to copy into your `openvdm.yaml` if you want the plots.
+5. If your `openvdm.yaml` hooks run `build_cruise_tracks.py` or `build_lowering_tracks.py`, change their options to the new names (`--no-combine`, `--kml-only`, `--geojson-only`, `--position-sources`) and remove `-u`. The old names still work in 2.16.1, but they post a deprecation message in OpenVDM and will be removed in 2.17. The scripts now need an enabled `Tracklines` extra directory (or another one named with `-e`) whose folder exists.
+6. In `www/app/Core/Config.php`, change `SITETITLE` to `Open Vessel Data Management v2.16.1`.
+7. Restart the OpenVDM workers so they load the updated code and plugins:
+```
+sudo supervisorctl restart openvdm:*
+```
+8. Set OpenVDM back to On.
+9. If you use the CTD parser, rebuild the data dashboard so existing casts get the new quality tests and stats. Run **Rebuild Data Dashboard** under **Maintenance Tasks** on the **Configuration** page. This rebuilds the current cruise only.
