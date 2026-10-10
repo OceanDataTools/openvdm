@@ -6,8 +6,7 @@ sentences (met, thermosalinograph, navigation and winch values tagged with a
 2-letter ID and a calibration/validity digit), each line prefixed with the
 logger's timestamp, and returns the JSON-formatted plugin data used by
 OpenVDM's Data Dashboard: time series of its met, radiation, wind or seawater
-values, or (``track``) the ship's track from its latitude and longitude. The
-other values are left to other parsers. MetAcq's own ``.COR`` files aren't
+values. The other values, navigation included, are left to other parsers. MetAcq's own ``.COR`` files aren't
 supported.
 """
 
@@ -90,9 +89,6 @@ FIELDS = {
     'PS': ('Pressure', 'PSI', 2),
     'PZ': ('UCW Pump Status', 'on/off', 0),
     'OF': ('UCW Overflow', '0/1', 0),
-    # Position (mapped with the "track" option, not charted)
-    'LA': ('Latitude', 'ddeg', 6),
-    'LO': ('Longitude', 'ddeg', 6),
 }
 
 # Field categories, each charted as its own output with the "category" option
@@ -152,7 +148,7 @@ class WicorParser(OpenVDMCSVParser):
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
                  skip_header=False, use_openvdm_api=False, fields=None, category=None,
-                 track=False, max_delta_t=60):
+                 max_delta_t=60):
         """Initialise the parser.
 
         Args:
@@ -168,8 +164,6 @@ class WicorParser(OpenVDMCSVParser):
                 ``CATEGORIES``, e.g. ``'wind'``) that's in the file, second
                 sensors included. Can't be used with *fields*. With neither,
                 ``DEFAULT_FIELDS`` are charted.
-            track: Return the ship's track (GeoJSON, from ``LA``/``LO``)
-                instead of charts; *fields* and *category* are then ignored.
             max_delta_t: Longest expected time between lines, in seconds
                 (default 60). Longer gaps count against the DeltaT Validity
                 stat and the DeltaT quality test.
@@ -187,7 +181,6 @@ class WicorParser(OpenVDMCSVParser):
         if unknown:
             raise ValueError(f"Unknown $WICOR field(s): {', '.join(unknown)}")
         self.category = category
-        self.track = track
         self.max_delta_t = pd.Timedelta(seconds=float(max_delta_t))
         # The columns are chosen once the file is read (see _columns())
         super().__init__(None, ['date_time'], start_dt=start_dt, stop_dt=stop_dt,
@@ -259,12 +252,10 @@ class WicorParser(OpenVDMCSVParser):
             found: Every field name (``WS``, ``WS_2``, ...) in the file's lines.
 
         Returns:
-            list: ``LA`` and ``LO`` for a track; the category's fields
+            list: The category's fields
             in the file, in ``FIELDS`` order, for a category; else the
             requested fields.
         """
-        if self.track:
-            return ['LA', 'LO']
         if self.category:
             return sorted((field for field in found
                            if field.split('_')[0] in CATEGORIES[self.category]), key=_field_order)
@@ -331,17 +322,7 @@ class WicorParser(OpenVDMCSVParser):
         self.add_value_validity_stat([int((deltas <= self.max_delta_t).sum()), int((deltas > self.max_delta_t).sum())],
                                      f'DeltaT Validity (<= {self.max_delta_t.total_seconds():g} s)')
 
-        if self.track:
-            if {'LA', 'LO'} - set(columns):
-                logging.warning("No latitude/longitude in file: %s", filepath)
-                return None
-            self.add_geobounds_stat([round(df['LA'].max(), 6), round(df['LO'].max(), 6),
-                                     round(df['LA'].min(), 6), round(df['LO'].min(), 6)])
-            checks = ['LA', 'LO']
-        else:
-            checks = columns
-
-        for col in checks:
+        for col in columns:
             label, (_, unit, decimals) = _label(col), FIELDS[_base_tag(col)]
             if df[col].notna().any():
                 # + 0.0 turns -0.0 into 0.0
@@ -355,7 +336,7 @@ class WicorParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df) + len(errors), len(errors)),
             ('DeltaT', len(df), int((deltas > self.max_delta_t).sum())),
-        ] + [(_label(col), len(df), invalid_counts[col]) for col in checks]
+        ] + [(_label(col), len(df), invalid_counts[col]) for col in columns]
 
         for name, total, bad in quality_checks:
             rate = bad / total if total else 0
@@ -369,30 +350,18 @@ class WicorParser(OpenVDMCSVParser):
         # -------------------------
         # Visualization
         # -------------------------
-        if self.track:
-            df = df[['LA', 'LO']]
-            df = self.round_data(self.resample_data(df), {'LA': 6, 'LO': 6}).set_index('date_time')
-            gap_id = (df['LA'].isna() | df['LO'].isna()).cumsum()
-            segments = [seg.dropna(subset=['LA', 'LO']) for _, seg in df.groupby(gap_id)]
-            features = [{
-                'type': 'Feature',
-                'geometry': {'type': 'LineString', 'coordinates': seg[['LO', 'LA']].values.tolist()},
-                'properties': {'coordTimes': (seg.index.view('int64') // 1_000_000).tolist(), 'name': filepath},
-            } for seg in segments if not seg.empty]
-            self.add_visualization_data({'type': 'FeatureCollection', 'features': features})
-        else:
-            df = self._resample(df[columns])
-            df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
-            for col in columns:
-                series = df[col].dropna()
-                if series.empty:  # never valid in this file; its Validity stat says so
-                    continue
-                times = series.index.tz_localize('UTC') if series.index.tz is None else series.index
-                self.add_visualization_data({
-                    'data': [[int(ts.timestamp() * 1000), value] for ts, value in zip(times, series)],
-                    'unit': FIELDS[_base_tag(col)][1],
-                    'label': _label(col),
-                })
+        df = self._resample(df[columns])
+        df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
+        for col in columns:
+            series = df[col].dropna()
+            if series.empty:  # never valid in this file; its Validity stat says so
+                continue
+            times = series.index.tz_localize('UTC') if series.index.tz is None else series.index
+            self.add_visualization_data({
+                'data': [[int(ts.timestamp() * 1000), value] for ts, value in zip(times, series)],
+                'unit': FIELDS[_base_tag(col)][1],
+                'label': _label(col),
+            })
 
         self.send_error_msg(errors, filepath)
         self.plugin_data = self._sanitize_for_json(self.plugin_data)  # pylint: disable=attribute-defined-outside-init
@@ -410,8 +379,6 @@ class WicorParser(OpenVDMCSVParser):
                                  f'(default: {",".join(DEFAULT_FIELDS)})')
         parser.add_argument('--category', default=None, choices=list(CATEGORIES),
                             help="chart every field of this category in the file (can't be used with --fields)")
-        parser.add_argument('--track', action='store_true', default=False,
-                            help="return the ship's track from LA/LO instead of charts")
         parser.add_argument('--max-delta-t', type=float, default=60,
                             help='longest expected time between lines, in seconds (default: 60)')
 
@@ -420,7 +387,6 @@ class WicorParser(OpenVDMCSVParser):
         return {
             'fields': args.fields.split(',') if args.fields else None,
             'category': args.category,
-            'track': args.track,
             'max_delta_t': args.max_delta_t,
         }
 

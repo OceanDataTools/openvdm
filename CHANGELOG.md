@@ -8,10 +8,10 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ### Added
 - **Scripps MetAcq `$WICOR` parser** (`wicor_parser.py.dist`), for ships that log MetAcq's underway data with OpenRVDAS (e.g. R/V Robert Gordon Sproul). It reads OpenRVDAS log files of `$WICOR` lines; MetAcq's own `.COR` files aren't supported. It reads the `value,TAGn` pairs by tag, since each ship's MetAcq setup decides which values are written and in what order. A second sensor with the same tag is `<tag>_2`, e.g. `WS_2`. Values flagged out of range, emulated or invalid (digit 7, 8 or 9), and the `-99` and `99999999` markers, are left out and counted in that value's Validity stat. Lines with a bad checksum are rejected.
-  - **One output per category:** `category` (`met`, `radiation`, `wind` or `seawater`) charts every field of that class in the file, second sensors included, so each class is its own data type on the Data Dashboard. `fields` picks the values instead (default: the main met, radiation, wind and seawater values), and `track` returns the ship's track from `LA`/`LO`. The met, radiation, wind and seawater tags in SIO's OpenRVDAS `wicor_params.yaml` can be charted, with their units; navigation, depth, gravity, magnetics, winch and CTD values are left to other parsers.
+  - **One output per category:** `category` (`met`, `radiation`, `wind` or `seawater`) charts every field of that class in the file, second sensors included, so each class is its own data type on the Data Dashboard. `fields` picks the values instead (default: the main met, radiation, wind and seawater values). The met, radiation, wind and seawater tags in SIO's OpenRVDAS `wicor_params.yaml` can be charted, with their units; navigation (position included), depth, gravity, magnetics, winch and CTD values are left to other parsers.
   - `max_delta_t` (default 60 s) is the longest expected time between lines; longer gaps count against the DeltaT Validity stat, whose name gives the limit, and the DeltaT quality test.
   - Wind directions are averaged as angles, so 359° and 1° average to 0°, not 180°.
-  - `openrvdas_plugin.py.dist` has commented-out entries that chart one `$WICOR` file by category, as the `met`, `twind` and `tsg` data types and a new `radiation` one, and map it as `gga` (#408).
+  - `openrvdas_plugin.py.dist` has commented-out entries that chart one `$WICOR` file by category, as the `met`, `twind` and `tsg` data types and a new `radiation` one (#408).
 
 ## [2.16.1] – 2026-10-10
 
