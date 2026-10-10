@@ -24,90 +24,93 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: di
 # (which extends the MetAcq Operator's Manual, Appendix A): tag -> (label,
 # unit, decimals). A repeated tag is a second sensor of the same kind; it's
 # named <tag>_2. Navigation, depth, gravity, magnetics, winch and CTD values
-# are left out: other parsers handle them. So are codes (GS, ZI) and times.
+# are left out: other parsers handle them. So are codes (GS, ZI), times, and
+# the Fahrenheit and knots copies of values (AF, RF, DF, WF, SF, TF, WK, TK).
 FIELDS = {
-    # Met
+    # Air temperature
     'AT': ('Air Temperature', 'C', 2),
-    'AF': ('Air Temperature (F)', 'F', 2),
+    'RT': ('Air Temperature (RH module)', 'C', 2),
     'AX': ('Auxiliary Air Temperature', 'C', 2),
+    'WB': ('Wet Bulb Temperature', 'C', 2),
+    'WC': ('Wind Chill', 'C', 2),
+    # Humidity
+    'RH': ('Relative Humidity', '%', 2),
+    'DP': ('Dew Point', 'C', 2),
+    # Pressure
     'BP': ('Barometric Pressure', 'mBar', 2),
     'BS': ('Barometric Pressure (sea level)', 'mBar', 2),
     'BC': ('Barometer Temperature', 'C', 2),
-    'RH': ('Relative Humidity', '%', 2),
-    'RT': ('Air Temperature (RH module)', 'C', 2),
-    'RF': ('Air Temperature (RH module, F)', 'F', 2),
-    'DP': ('Dew Point', 'C', 2),
-    'DF': ('Dew Point (F)', 'F', 2),
-    'WB': ('Wet Bulb Temperature', 'C', 2),
-    'WC': ('Wind Chill', 'C', 2),
-    'WF': ('Wet Bulb Temperature (F)', 'F', 2),
+    # Precipitation
     'PR': ('Precipitation', 'mm', 2),
     'PT': ('Precipitation Rate', 'mm/hr', 2),
     # Radiation
     'SW': ('Short Wave Radiation', 'W/m^2', 1),
     'LW': ('Long Wave Radiation', 'W/m^2', 1),
+    'PA': ('Surface PAR', 'uE/s/m^2', 1),
     'LD': ('LWR Dome Temperature', 'K', 2),
     'LB': ('LWR Body Temperature', 'K', 2),
     'LT': ('LWR Thermopile', 'V', 4),
-    'PA': ('Surface PAR', 'uE/s/m^2', 1),
-    # Wind
+    # Wind speed
     'WS': ('Relative Wind Speed', 'm/s', 1),
-    'WK': ('Relative Wind Speed (kts)', 'kts', 1),
-    'WD': ('Relative Wind Direction', 'deg', 1),
     'TW': ('True Wind Speed', 'm/s', 1),
-    'TK': ('True Wind Speed (kts)', 'kts', 1),
+    # Wind direction
+    'WD': ('Relative Wind Direction', 'deg', 1),
     'TI': ('True Wind Direction', 'deg', 1),
-    # Underway seawater
+    # Water temperature
     'ST': ('Sea Surface Temperature', 'C', 3),
-    'SF': ('Sea Surface Temperature (F)', 'F', 3),
     'TT': ('TSG Temperature', 'C', 3),
-    'TF': ('TSG Temperature (F)', 'F', 3),
+    'OT': ('Oxygen Temperature', 'C', 3),
+    'WT': ('Auxiliary Water Temperature', 'C', 3),
+    'FT': ('Fluorometer Temperature', 'C', 3),
+    # TSG
     'TC': ('TSG Conductivity', 'mS/cm', 4),
     'TG': ('TSG Conductivity (uncorrected)', 'mS/cm', 4),
     'SA': ('Salinity', 'PSU', 3),
     'SD': ('Sigma-t', 'kg/m^3', 3),
     'SV': ('Sound Velocity', 'm/s', 2),
-    'WT': ('Auxiliary Water Temperature', 'C', 3),
+    # Oxygen
     'OX': ('Oxygen', 'ml/l', 3),
+    'OS': ('Oxygen Saturation', 'ml/l', 3),
     'OG': ('Oxygen (mg/l)', 'mg/l', 3),
     'OM': ('Oxygen (umol/kg)', 'umol/kg', 3),
     'OC': ('Oxygen Current', 'uA', 3),
-    'OT': ('Oxygen Temperature', 'C', 3),
-    'OS': ('Oxygen Saturation', 'ml/l', 3),
-    'PH': ('pH', 'pH', 3),
-    'PC': ('pCO2', 'uatm', 2),
+    # Biology, chemistry and flow
     'FL': ('Fluorometer', 'ug/l', 3),
     'FB': ('Fluorometer (optical brighteners)', 'ppb', 3),
     'FO': ('Fluorometer (oil)', 'ppb', 3),
     'FF': ('Fluorometer (fuel)', 'ppb', 3),
-    'FT': ('Fluorometer Temperature', 'C', 3),
     'TB': ('Turbidity', 'NTU', 3),
     'TR': ('Transmissometer', '%', 2),
     'BA': ('Beam Attenuation', '1/m', 4),
-    'FM': ('Underway Seawater Flow (gal/min)', 'gal/min', 2),
+    'PH': ('pH', 'pH', 3),
+    'PC': ('pCO2', 'uatm', 2),
     'FI': ('Underway Seawater Flow', 'l/min', 2),
+    'FM': ('Underway Seawater Flow (gal/min)', 'gal/min', 2),
     'PS': ('Pressure', 'PSI', 2),
     'PZ': ('UCW Pump Status', 'on/off', 0),
     'OF': ('UCW Overflow', '0/1', 0),
 }
 
-# Field categories, each charted as its own output with the "category" option
+# Field categories, each charted as its own output with the "category" option.
+# Each holds one kind of value, so its chart has only a few series.
 CATEGORIES = {
-    'met': ['AT', 'AF', 'AX', 'BP', 'BS', 'BC', 'RH', 'RT', 'RF', 'DP', 'DF', 'WB', 'WC', 'WF',
-            'PR', 'PT'],
-    'radiation': ['SW', 'LW', 'LD', 'LB', 'LT', 'PA'],
-    'wind': ['WS', 'WK', 'WD', 'TW', 'TK', 'TI'],
-    'seawater': ['ST', 'SF', 'TT', 'TF', 'TC', 'TG', 'SA', 'SD', 'SV', 'WT', 'OX', 'OG', 'OM',
-                 'OC', 'OT', 'OS', 'PH', 'PC', 'FL', 'FB', 'FO', 'FF', 'FT', 'TB', 'TR', 'BA',
-                 'FM', 'FI', 'PS', 'PZ', 'OF'],
+    'air': ['AT', 'RT', 'AX', 'WB', 'WC'],
+    'humidity': ['RH', 'DP'],
+    'pressure': ['BP', 'BS', 'BC'],
+    'precipitation': ['PR', 'PT'],
+    'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
+    'wind_speed': ['WS', 'TW'],
+    'wind_direction': ['WD', 'TI'],
+    'water_temp': ['ST', 'TT', 'OT', 'WT', 'FT'],
+    'tsg': ['TC', 'TG', 'SA', 'SD', 'SV'],
+    'oxygen': ['OX', 'OS', 'OG', 'OM', 'OC'],
+    'bio': ['FL', 'FB', 'FO', 'FF', 'TB', 'TR', 'BA', 'PH', 'PC', 'FI', 'FM', 'PS', 'PZ',
+            'OF'],
 }
+
 
 # Directions are averaged as angles when the data is resampled
 DIRECTION_FIELDS = {'WD', 'TI'}
-
-# Fields charted when neither "fields" nor "category" is given
-DEFAULT_FIELDS = ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW',
-                  'TT', 'SA', 'TC', 'FL', 'OX', 'ST']
 
 # Calibration/validity digits that mark a value as unusable: 7 = out of
 # range, 8 = emulated (not real), 9 = invalid
@@ -161,22 +164,22 @@ class WicorParser(OpenVDMCSVParser):
                 a second sensor with the same tag (``'WS_2'``). Fields not in
                 the file are skipped.
             category: Chart every field of this category (a key of
-                ``CATEGORIES``, e.g. ``'wind'``) that's in the file, second
-                sensors included. Can't be used with *fields*. With neither,
-                ``DEFAULT_FIELDS`` are charted.
+                ``CATEGORIES``, e.g. ``'wind_speed'``) that's in the file,
+                second sensors included. Give either *fields* or *category*.
             max_delta_t: Longest expected time between lines, in seconds
                 (default 60). Longer gaps count against the DeltaT Validity
                 stat and the DeltaT quality test.
 
         Raises:
             ValueError: If a field's tag or the category isn't one this
-                parser knows, or both *fields* and *category* are given.
+                parser knows, or not exactly one of *fields* and *category*
+                is given.
         """
-        if fields and category:
-            raise ValueError("Give either fields or a category, not both")
+        if bool(fields) == bool(category):
+            raise ValueError("Give either fields or a category")
         if category and category not in CATEGORIES:
             raise ValueError(f"Unknown $WICOR category: {category} (one of {', '.join(CATEGORIES)})")
-        self.fields = list(fields) if fields else ([] if category else list(DEFAULT_FIELDS))
+        self.fields = list(fields or [])
         unknown = [field for field in self.fields if _base_tag(field) not in FIELDS]
         if unknown:
             raise ValueError(f"Unknown $WICOR field(s): {', '.join(unknown)}")
@@ -374,11 +377,11 @@ class WicorParser(OpenVDMCSVParser):
         Args:
             parser: The ``argparse.ArgumentParser`` to add the options to.
         """
-        parser.add_argument('--fields', default=None,
-                            help='comma-separated fields to chart, e.g. AT,BP,WS,WS_2 '
-                                 f'(default: {",".join(DEFAULT_FIELDS)})')
-        parser.add_argument('--category', default=None, choices=list(CATEGORIES),
-                            help="chart every field of this category in the file (can't be used with --fields)")
+        charts = parser.add_mutually_exclusive_group(required=True)
+        charts.add_argument('--category', default=None, choices=list(CATEGORIES),
+                            help='chart every field of this category in the file')
+        charts.add_argument('--fields', default=None,
+                            help='comma-separated fields to chart instead, e.g. AT,BP,WS,WS_2')
         parser.add_argument('--max-delta-t', type=float, default=60,
                             help='longest expected time between lines, in seconds (default: 60)')
 
