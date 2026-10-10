@@ -20,55 +20,122 @@ import pandas as pd
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: disable=wrong-import-position
 
-# The fields MetAcq can write (MetAcq Operator's Manual, Appendix A, plus the
-# BS, LF, HF and ZI tags seen in newer files): tag -> (label, unit, decimals).
-# A repeated tag is a second sensor of the same kind; it's named <tag>_2.
+# The fields MetAcq can write, from SIO's OpenRVDAS wicor_params.yaml (which
+# extends the MetAcq Operator's Manual, Appendix A): tag -> (label, unit,
+# decimals). A repeated tag is a second sensor of the same kind; it's named
+# <tag>_2. GS (GPS status and number of satellites) and ZI (winch ID) are
+# codes, not measurements, so they aren't listed.
 FIELDS = {
+    # Met
     'AT': ('Air Temperature', 'C', 2),
+    'AF': ('Air Temperature (F)', 'F', 2),
+    'AX': ('Auxiliary Air Temperature', 'C', 2),
     'BP': ('Barometric Pressure', 'mBar', 2),
     'BS': ('Barometric Pressure (sea level)', 'mBar', 2),
     'BC': ('Barometer Temperature', 'C', 2),
-    'SW': ('Short Wave Radiation', 'W/m^2', 1),
-    'LW': ('Long Wave Radiation', 'W/m^2', 1),
-    'PR': ('Precipitation', 'mm', 2),
-    'PT': ('Precipitation Rate', 'mm/hr', 2),
     'RH': ('Relative Humidity', '%', 2),
     'RT': ('Air Temperature (RH module)', 'C', 2),
+    'RF': ('Air Temperature (RH module, F)', 'F', 2),
     'DP': ('Dew Point', 'C', 2),
+    'DF': ('Dew Point (F)', 'F', 2),
+    'WB': ('Wet Bulb Temperature', 'C', 2),
+    'WC': ('Wind Chill', 'C', 2),
+    'WF': ('Wet Bulb Temperature (F)', 'F', 2),
+    'PR': ('Precipitation', 'mm', 2),
+    'PT': ('Precipitation Rate', 'mm/hr', 2),
+    'SW': ('Short Wave Radiation', 'W/m^2', 1),
+    'LW': ('Long Wave Radiation', 'W/m^2', 1),
+    'LD': ('LWR Dome Temperature', 'K', 2),
+    'LB': ('LWR Body Temperature', 'K', 2),
+    'LT': ('LWR Thermopile', 'V', 4),
+    'PA': ('Surface PAR', 'uE/s/m^2', 1),
+    # Wind
     'WS': ('Relative Wind Speed', 'm/s', 1),
+    'WK': ('Relative Wind Speed (kts)', 'kts', 1),
     'WD': ('Relative Wind Direction', 'deg', 1),
     'TW': ('True Wind Speed', 'm/s', 1),
+    'TK': ('True Wind Speed (kts)', 'kts', 1),
     'TI': ('True Wind Direction', 'deg', 1),
+    # Underway seawater
     'ST': ('Sea Surface Temperature', 'C', 3),
+    'SF': ('Sea Surface Temperature (F)', 'F', 3),
     'TT': ('TSG Temperature', 'C', 3),
+    'TF': ('TSG Temperature (F)', 'F', 3),
     'TC': ('TSG Conductivity', 'mS/cm', 4),
     'TG': ('TSG Conductivity (uncorrected)', 'mS/cm', 4),
     'SA': ('Salinity', 'PSU', 3),
     'SD': ('Sigma-t', 'kg/m^3', 3),
     'SV': ('Sound Velocity', 'm/s', 2),
+    'WT': ('Auxiliary Water Temperature', 'C', 3),
     'OX': ('Oxygen', 'ml/l', 3),
+    'OG': ('Oxygen (mg/l)', 'mg/l', 3),
+    'OM': ('Oxygen (umol/kg)', 'umol/kg', 3),
+    'OC': ('Oxygen Current', 'uA', 3),
     'OT': ('Oxygen Temperature', 'C', 3),
     'OS': ('Oxygen Saturation', 'ml/l', 3),
+    'PH': ('pH', 'pH', 3),
+    'PC': ('pCO2', 'uatm', 2),
     'FL': ('Fluorometer', 'ug/l', 3),
+    'FB': ('Fluorometer (optical brighteners)', 'ppb', 3),
+    'FO': ('Fluorometer (oil)', 'ppb', 3),
+    'FF': ('Fluorometer (fuel)', 'ppb', 3),
+    'FT': ('Fluorometer Temperature', 'C', 3),
+    'TB': ('Turbidity', 'NTU', 3),
     'TR': ('Transmissometer', '%', 2),
-    'PA': ('Surface PAR', 'uE/s/m^2', 1),
-    'FI': ('Underway Seawater Flow', 'LPM', 2),
+    'BA': ('Beam Attenuation', '1/m', 4),
+    'FM': ('Underway Seawater Flow (gal/min)', 'gal/min', 2),
+    'FI': ('Underway Seawater Flow', 'l/min', 2),
+    'PS': ('Pressure', 'PSI', 2),
+    'PZ': ('UCW Pump Status', 'on/off', 0),
+    'OF': ('UCW Overflow', '0/1', 0),
+    # Depth, gravity and magnetics
     'BT': ('Bottom Depth', 'm', 1),
-    'LF': ('Depth (low frequency)', 'm', 1),
-    'HF': ('Depth (high frequency)', 'm', 1),
+    'LF': ('Depth (3.5 kHz)', 'm', 1),
+    'HF': ('Depth (12 kHz)', 'm', 1),
+    'MB': ('Multibeam Depth', 'm', 1),
+    'GV': ('Gravity', 'mGal', 2),
+    'GC': ('Gravity Counts', 'counts', 0),
+    'MG': ('Magnetometer', 'nT', 2),
+    'MD': ('Magnetometer Depth', 'm', 1),
+    'MS': ('Magnetometer Signal Strength', '', 0),
+    # Navigation and attitude
     'LA': ('Latitude', 'ddeg', 6),
     'LO': ('Longitude', 'ddeg', 6),
     'CR': ('Course Over Ground', 'deg', 1),
     'SP': ('Speed Over Ground', 'kts', 1),
+    'SL': ('Speed Log (longitudinal)', 'kts', 2),
+    'SX': ('Speed Log (transverse)', 'kts', 2),
     'GY': ('Gyro Heading', 'deg', 1),
+    'SH': ('Ashtech Heading', 'deg', 1),
+    'SM': ('Ashtech Pitch', 'deg', 2),
+    'SR': ('Ashtech Roll', 'deg', 2),
     'GA': ('GPS Altitude', 'm', 1),
+    'VP': ('VRU Pitch', 'deg', 2),
+    'VR': ('VRU Roll', 'deg', 2),
+    'VH': ('VRU Heave', 'm', 2),
+    'VY': ('List', 'deg', 2),
+    'VX': ('Trim', 'deg', 2),
+    'RX': ('Accelerometer X', 'm/s', 3),
+    'RY': ('Accelerometer Y', 'm/s', 3),
+    'RZ': ('Accelerometer Z', 'm/s', 3),
+    # Winch and CTD
     'ZO': ('Winch Wire Out', 'm', 1),
     'ZS': ('Winch Speed', 'm/min', 1),
     'ZT': ('Winch Tension', 'lbs', 0),
+    'IP': ('CTD Depth', 'm', 1),
+    'IT': ('CTD Temperature', 'C', 3),
+    'IS': ('CTD Salinity', 'PSU', 3),
+    'IA': ('CTD Altimeter', 'm', 1),
+    'IV': ('CTD Velocity', 'm/s', 2),
+    'IX': ('CTD Auxiliary', '', 3),
+    # Other
+    'VT': ('Volts', 'V', 3),
+    'MA': ('Current', 'mA', 3),
+    'XX': ('Unspecified', '', 3),
 }
 
 # Directions are averaged as angles when the data is resampled
-DIRECTION_FIELDS = {'WD', 'TI', 'CR', 'GY'}
+DIRECTION_FIELDS = {'WD', 'TI', 'CR', 'GY', 'SH'}
 
 # Fields charted when no "fields" option is given
 DEFAULT_FIELDS = ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW',
@@ -105,10 +172,9 @@ def _label(field):
 class WicorParser(OpenVDMCSVParser):
     """Parser for timestamped MetAcq ``$WICOR`` sentences."""
 
-    MAX_DELTA_T = pd.Timedelta('60 seconds')
-
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
-                 skip_header=False, use_openvdm_api=False, fields=None, track=False):
+                 skip_header=False, use_openvdm_api=False, fields=None, track=False,
+                 max_delta_t=60):
         """Initialise the parser.
 
         Args:
@@ -122,6 +188,9 @@ class WicorParser(OpenVDMCSVParser):
                 ``DEFAULT_FIELDS``. Fields not in the file are skipped.
             track: Return the ship's track (GeoJSON, from ``LA``/``LO``)
                 instead of charts; *fields* is then ignored.
+            max_delta_t: Longest expected time between lines, in seconds
+                (default 60). Longer gaps count against the DeltaT Validity
+                stat and the DeltaT quality test.
 
         Raises:
             ValueError: If a field's tag isn't one this parser knows.
@@ -131,6 +200,7 @@ class WicorParser(OpenVDMCSVParser):
         if unknown:
             raise ValueError(f"Unknown $WICOR field(s): {', '.join(unknown)}")
         self.track = track
+        self.max_delta_t = pd.Timedelta(seconds=float(max_delta_t))
         proc_cols = ['date_time', 'LA', 'LO', 'SP'] if track else ['date_time'] + self.fields
         super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
@@ -246,8 +316,8 @@ class WicorParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df.index.min().to_pydatetime(), df.index.max().to_pydatetime()])
         self.add_bounds_stat([round(deltas.min().total_seconds(), 3), round(deltas.max().total_seconds(), 3)],
                              'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([int((deltas <= self.MAX_DELTA_T).sum()), int((deltas > self.MAX_DELTA_T).sum())],
-                                     'DeltaT Validity')
+        self.add_value_validity_stat([int((deltas <= self.max_delta_t).sum()), int((deltas > self.max_delta_t).sum())],
+                                     f'DeltaT Validity (<= {self.max_delta_t.total_seconds():g} s)')
 
         if self.track:
             if {'LA', 'LO'} - set(columns):
@@ -272,7 +342,7 @@ class WicorParser(OpenVDMCSVParser):
         # -------------------------
         quality_checks = [
             ('Rows', len(df) + len(errors), len(errors)),
-            ('DeltaT', len(df), int((deltas > self.MAX_DELTA_T).sum())),
+            ('DeltaT', len(df), int((deltas > self.max_delta_t).sum())),
         ] + [(_label(col), len(df), invalid_counts[col]) for col in checks]
 
         for name, total, bad in quality_checks:
@@ -326,12 +396,15 @@ class WicorParser(OpenVDMCSVParser):
                                  f'(default: {",".join(DEFAULT_FIELDS)})')
         parser.add_argument('--track', action='store_true', default=False,
                             help="return the ship's track from LA/LO instead of charts")
+        parser.add_argument('--max-delta-t', type=float, default=60,
+                            help='longest expected time between lines, in seconds (default: 60)')
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
         return {
             'fields': args.fields.split(',') if args.fields else None,
             'track': args.track,
+            'max_delta_t': args.max_delta_t,
         }
 
 
