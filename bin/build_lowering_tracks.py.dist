@@ -52,6 +52,8 @@ import logging
 import os
 import sys
 
+import requests
+
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
@@ -82,11 +84,17 @@ PositionSources:
 # Deprecated 2.16.0 options
 # ----------------------------------------------------------------------
 
+# Title of the OpenVDM message about deprecated options in this script's hook
+DEPRECATION_MESSAGE_TITLE = "build_lowering_tracks.py uses deprecated options"
+
+
 class DeprecatedOption(argparse.Action):
     """An option's 2.16.0 name, which still works but warns that 2.17 removes it.
 
     For a flag (``nargs=0``) the destination is set to ``True``; otherwise to
-    the option's value.
+    the option's value. The warning is printed on stderr and added to the
+    namespace's ``deprecated_options`` list, for
+    :func:`report_deprecated_options`.
     """
 
     def __init__(self, option_strings, dest, instead, **kwargs):
@@ -107,10 +115,37 @@ class DeprecatedOption(argparse.Action):
         self.instead = instead
 
     def __call__(self, parser, namespace, values, option_string=None):
-        """Warn on stderr and set the destination."""
-        print(f"Warning: {option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}",
-              file=sys.stderr)
+        """Warn on stderr, record the warning and set the destination."""
+        warning = f"{option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}"
+        print(f"Warning: {warning}", file=sys.stderr)
+        namespace.deprecated_options.append(warning)
         setattr(namespace, self.dest, True if self.nargs == 0 else values)
+
+
+def report_deprecated_options(openvdm, warnings):
+    """Post the deprecation warnings as an OpenVDM message.
+
+    A hook's warnings on stderr aren't shown in OpenVDM when it succeeds, so
+    they're posted as a message too. Nothing is posted if an unread message
+    with the same title is among OpenVDM's 10 most recent unread messages, so
+    a hook that runs after every data dashboard update doesn't fill the list.
+    A failure to check or post is logged and otherwise ignored.
+
+    Args:
+        openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        warnings: The warnings (from :class:`DeprecatedOption`).
+    """
+    if not warnings:
+        return
+    try:
+        response = requests.get(f"{openvdm.config['siteRoot']}api/messages/getRecentMessages", timeout=5)
+        response.raise_for_status()
+        if any(msg.get("messageTitle") == DEPRECATION_MESSAGE_TITLE for msg in response.json()):
+            return
+        openvdm.send_msg(DEPRECATION_MESSAGE_TITLE,
+                         "\n".join(warnings) + "\nUpdate this script's hook in openvdm.yaml before upgrading.")
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        logging.warning("Unable to post the deprecation warning to OpenVDM: %s", err)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
@@ -195,10 +230,13 @@ def main() -> None:  # pylint: disable=too-many-locals
                         help="owner of the files written with -o (deprecated, removed in 2.17)")
     parser.add_argument("collectionSystem")
 
+    parser.set_defaults(deprecated_options=[])
+
     args = parser.parse_args()
     setup_logging(args.verbosity)
 
     openvdm = OpenVDM()
+    report_deprecated_options(openvdm, args.deprecated_options)
 
     try:
         cruise_id, lowering_id, cruise_base_dir, lowering_base_dir, trackline_dir, output_user = (
