@@ -24,22 +24,20 @@ from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: di
 # (which extends the MetAcq Operator's Manual, Appendix A): tag -> (label,
 # unit, decimals). A repeated tag is a second sensor of the same kind; it's
 # named <tag>_2. Navigation, depth, gravity, magnetics, winch and CTD values
-# are left out: other parsers handle them. So are codes (GS, ZI), times, and
-# the Fahrenheit and knots copies of values (AF, RF, DF, WF, SF, TF, WK, TK).
+# are left out: other parsers handle them. So are codes (GS, ZI), times, the
+# Fahrenheit and knots copies of values (AF, RF, DF, WF, SF, TF, WK, TK), the
+# RH module's air temperature (RT) and the station barometer (BP, BC); the
+# sea-level pressure (BS) is charted.
 FIELDS = {
-    # Air temperature
+    # Air: temperature, humidity and sea-level pressure
     'AT': ('Air Temperature', 'C', 2),
-    'RT': ('Air Temperature (RH module)', 'C', 2),
     'AX': ('Auxiliary Air Temperature', 'C', 2),
     'WB': ('Wet Bulb Temperature', 'C', 2),
     'WC': ('Wind Chill', 'C', 2),
-    # Humidity
     'RH': ('Relative Humidity', '%', 2),
-    'DP': ('Dew Point', 'C', 2),
-    # Pressure
-    'BP': ('Barometric Pressure', 'mBar', 2),
     'BS': ('Barometric Pressure (sea level)', 'mBar', 2),
-    'BC': ('Barometer Temperature', 'C', 2),
+    # Humidity
+    'DP': ('Dew Point', 'C', 2),
     # Precipitation
     'PR': ('Precipitation', 'mm', 2),
     'PT': ('Precipitation Rate', 'mm/hr', 2),
@@ -94,9 +92,8 @@ FIELDS = {
 # Field categories, each charted as its own output with the "category" option.
 # Each holds one kind of value, so its chart has only a few series.
 CATEGORIES = {
-    'air': ['AT', 'RT', 'AX', 'WB', 'WC'],
-    'humidity': ['RH', 'DP'],
-    'pressure': ['BP', 'BS', 'BC'],
+    'air': ['AT', 'AX', 'WB', 'WC', 'RH', 'BS'],
+    'humidity': ['DP'],
     'precipitation': ['PR', 'PT'],
     'radiation': ['SW', 'LW', 'PA', 'LD', 'LB', 'LT'],
     'wind_speed': ['WS', 'TW'],
