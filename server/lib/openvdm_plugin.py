@@ -692,6 +692,47 @@ class OpenVDMCSVParser(OpenVDMParser):
             calculated ^= ord(char)
         return checksum[:2].upper() == f'{calculated:02X}' and len(checksum.strip()) == 2
 
+    @classmethod
+    def check_nmea_sentence(cls, sentence: str, fields: list | None = None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                            num_fields: int | tuple | None = None, required: bool = False,
+                            field_values: dict | None = None) -> None:
+        """Raise ``ValueError`` if an NMEA sentence looks corrupt.
+
+        For a parser's line loop: the error counts the line as a bad row. A
+        corrupt sentence's checksum can still match by chance (1 in 256), and
+        one cut short has none, so sentences with a fixed length or fixed unit
+        letters are also checked for them.
+
+        Args:
+            sentence: The sentence, from ``$`` to the checksum.
+            fields: *sentence* split on commas, for the field count.
+            num_fields: The number of fields the sentence has, header and
+                checksum included, or a tuple of the numbers allowed (for
+                sentences that gained fields in later NMEA versions). ``None``
+                skips the check.
+            required: Treat a sentence without a checksum as bad (see
+                :meth:`nmea_checksum_ok`).
+            field_values: The values fields must have, by position: e.g.
+                ``{2: 'T', 4: 'M'}`` for unit letters, or a tuple of the values
+                allowed. A checksum on the last field is ignored.
+
+        Raises:
+            ValueError: If the checksum doesn't match, is missing and
+                *required*, the number of fields isn't *num_fields*, or a field
+                in *field_values* has another value.
+        """
+        if not cls.nmea_checksum_ok(sentence, required=required):
+            raise ValueError("bad or missing checksum" if required else "bad checksum")
+        if num_fields is not None and fields is not None:
+            allowed = (num_fields,) if isinstance(num_fields, int) else tuple(num_fields)
+            if len(fields) not in allowed:
+                raise ValueError(f"{len(fields)} fields, not {' or '.join(str(n) for n in allowed)}")
+        for index, expected in (field_values or {}).items():
+            allowed = (expected,) if isinstance(expected, str) else tuple(expected)
+            value = fields[index].split('*')[0] if fields is not None and index < len(fields) else None
+            if value not in allowed:
+                raise ValueError(f"field {index} is {value!r}, not {' or '.join(allowed)}")
+
     def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
         """Yield each timestamped data line of a file, split into fields.
 

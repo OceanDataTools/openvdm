@@ -39,7 +39,21 @@ class HDTParser(OpenVDMCSVParser):
     MAX_HDT = 360
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False, no_mag=False,
+                 require_checksum=False):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            no_mag: Not used.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (one whose checksum doesn't match always is).
+        """
+        self.require_checksum = require_checksum
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -60,6 +74,8 @@ class HDTParser(OpenVDMCSVParser):
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
+                    self.check_nmea_sentence(remainder, fields, 3, self.require_checksum,
+                                             field_values={2: 'T'})
                     hdg_t = float(field_data['hdg_t']) if field_data['hdg_t'] else None
 
                     raw_data['date_time'].append(timestamp_str)
@@ -162,6 +178,20 @@ class HDTParser(OpenVDMCSVParser):
         # Send errors to OpenVDM
         # -------------------------
         self.send_error_msg(errors, filepath)
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add the parser's command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--require-checksum', action='store_true', default=False,
+                            help='treat a sentence without a checksum as a bad row')
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'require_checksum': getattr(args, 'require_checksum', False)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI

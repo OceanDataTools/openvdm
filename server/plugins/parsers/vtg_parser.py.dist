@@ -53,7 +53,8 @@ class VTGParser(OpenVDMCSVParser):
     MAX_SOG_KPH = MAX_SOG_KTS * 1.852
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False, no_mag=False,
+                 require_checksum=False):
         """Initialise the parser.
 
         Args:
@@ -63,7 +64,10 @@ class VTGParser(OpenVDMCSVParser):
             skip_header: Skip the first line of each data file when ``True``.
             use_openvdm_api: Enable OpenVDM API message posting.
             no_mag: Skip the magnetic course over ground field when ``True``.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (one whose checksum doesn't match always is).
         """
+        self.require_checksum = require_checksum
         self.no_mag = no_mag
         proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'cog_m']
         super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
@@ -86,6 +90,8 @@ class VTGParser(OpenVDMCSVParser):
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
+                    self.check_nmea_sentence(remainder, fields, (9, 10), self.require_checksum,
+                                             field_values={2: 'T', 4: 'M', 6: 'N', 8: 'K'})
                     cog_t = float(field_data['cog_t']) if field_data['cog_t'] else None
                     cog_m = float(field_data['cog_m']) if (not self.no_mag and field_data['cog_m']) else None
                     sog_kts = float(field_data['sog_kts']) if field_data['sog_kts'] else None
@@ -230,10 +236,13 @@ class VTGParser(OpenVDMCSVParser):
             parser: The ``argparse.ArgumentParser`` to add the options to.
         """
         parser.add_argument('--noMag', action='store_true', default=False, help='Skip COG Magnetic')
+        parser.add_argument('--require-checksum', action='store_true', default=False,
+                            help='treat a sentence without a checksum as a bad row')
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'no_mag': getattr(args, 'noMag', False)}
+        return {'no_mag': getattr(args, 'noMag', False),
+                'require_checksum': getattr(args, 'require_checksum', False)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI
