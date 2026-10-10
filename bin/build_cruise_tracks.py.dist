@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build GeoJSON and KML ship-track files for a cruise.
 
-Reads dashboard data files produced by OpenVDM plugins for one or more GPS
+Reads dashboard data files produced by OpenVDM plugins for one or more position
 sources, concatenates the ``LineString`` coordinates across all files, and
 writes per-device trackline outputs into the ``Tracklines`` extra directory.
 
@@ -15,463 +15,218 @@ visualizer data (e.g. time-series charts) is silently skipped.  When
 ``coordTimes`` arrays are present they are preserved in GeoJSON output and
 converted to ISO-8601 ``<TimeSpan>`` elements in KML output.
 
-GPS sources are configured via an embedded YAML block
-(``DEFAULT_GPS_SOURCES_YAML``) that can be overridden by passing a YAML file
-with ``--gps-sources``.
+Position sources are configured via an embedded YAML block
+(``DEFAULT_POSITION_SOURCES_YAML``) that can be overridden by passing a YAML file
+with ``--position-sources``.
+
+The tracklines go to an OpenVDM extra directory: ``Tracklines``, or the one
+named with ``-e``. They're given to OpenVDM's warehouse user (the installer's
+OpenVDM user) and added to the cruise's MD5 summary. ``-o OUTPUTDIR`` writes
+them to a folder instead, owned by whoever runs the script and not added to
+the MD5 summary; ``-e`` and ``-o`` can't be used together. ``-u USERNAME``
+gives ``-o`` output to that user.
+
+The 2.16.0 options ``--no_combine``, ``--kml_only``, ``--geojson_only``,
+``--config_file`` and ``-u/--username`` still work, but print a warning: they
+are deprecated and will be removed in OpenVDM 2.17. Use ``--no-combine``,
+``--kml-only``, ``--geojson-only`` and ``--position-sources``; 2.17 has no
+``-u`` (``-o`` output keeps whoever wrote it).
+
+The shared trackline code is in ``server/lib/tracks.py``; this script adds
+the cruise's ID, manifest location and default position sources.
 
 Usage::
 
-    build_cruise_tracks.py [-h] [-v ...] [-c CRUISEID]
-                           [--gps-sources FILE] [--no-combine]
-                           [--geojson-only | --kml-only]
-                           [--output-dir DIR] [--username USER]
+    build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
+                           [-e EXTRA_DIRECTORY | -o OUTPUTDIR] [-u USERNAME]
+                           [--position-sources FILE]
                            collectionSystem
 """
 
 import argparse
-import json
 import logging
 import os
 import sys
-import yaml
-
 from os.path import dirname, realpath
+
+import requests
+
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.file_utils import set_owner_group_permissions, output_json_data_to_file
-from server.lib.geojson_utils import convert_to_kml, combine_geojson_files
-from server.lib.openvdm import OpenVDM
-
-# Name of the extra directory the trackline files are written to.
-TRACKLINE_EXTRA_DIR_NAME = "Tracklines"
-# Name of the extra directory holding the data dashboard files and manifest.
-DASHBOARD_EXTRA_DIR_NAME = "Dashboard_Data"
+from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
+from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-position
+    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, get_position_sources, load_manifest,
+    process_position_source, queue_md5_update, resolve_extra_directory, resolve_manifest_path,
+    setup_logging,
+)
 
 # ----------------------------------------------------------------------
-# Default GPS source configuration (embedded YAML)
+# Default position source configuration (embedded YAML)
 # ----------------------------------------------------------------------
 
-# GPS sources used when no --config_file is given; edit to match this ship.
-DEFAULT_GPS_SOURCES_YAML = """
+# Position sources used when no --position-sources is given; edit to match this ship.
+DEFAULT_POSITION_SOURCES_YAML = """
 CollectionSystem: OpenRVDAS
-GPSSources:
+PositionSources:
   - device: POSMV
     type: gga
 """
 
 # ----------------------------------------------------------------------
-# Configuration & validation
+# Deprecated 2.16.0 options
 # ----------------------------------------------------------------------
 
-def load_gps_sources_from_yaml(
-    *,
-    yaml_str: str | None = None,
-    yaml_path: str | None = None,
-    collection_system: str
-) -> list:
-    """Parse and validate a GPS sources YAML definition.
-
-    Exactly one of *yaml_str* or *yaml_path* must be provided.  The YAML must
-    describe a mapping with ``CollectionSystem`` and ``GPSSources`` keys; the
-    ``CollectionSystem`` value must match *collection_system*.  Duplicate device
-    names or reused data types raise ``RuntimeError``.
-
-    Args:
-        yaml_str: Raw YAML string to parse (mutually exclusive with
-            *yaml_path*).
-        yaml_path: Path to a YAML file to load (mutually exclusive with
-            *yaml_str*).
-        collection_system: Expected value of the ``CollectionSystem`` key;
-            used to guard against loading a config for the wrong system.
-
-    Returns:
-        List of GPS source dicts, each containing ``device`` and ``type``
-        string keys.
-
-    Raises:
-        RuntimeError: On missing arguments, file-not-found, YAML parse
-            errors, schema violations, or ``CollectionSystem`` mismatch.
-    """
-    if not yaml_str and not yaml_path:
-        raise RuntimeError("Either yaml_str or yaml_path must be provided")
-
-    try:
-        if yaml_path:
-            if not os.path.isfile(yaml_path):
-                raise RuntimeError(f"GPS sources YAML not found: {yaml_path}")
-            with open(yaml_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-        else:
-            data = yaml.safe_load(yaml_str)
-    except yaml.YAMLError as err:
-        raise RuntimeError(f"Invalid GPS sources YAML: {err}")
-
-    if not isinstance(data, dict):
-        raise RuntimeError("GPS sources YAML must be a mapping")
-
-    if data.get("CollectionSystem") != collection_system:
-        raise RuntimeError(
-            f"GPS sources CollectionSystem mismatch: "
-            f"{data.get('CollectionSystem')} != {collection_system}"
-        )
-
-    gps_sources = data.get("GPSSources")
-    if not isinstance(gps_sources, list):
-        raise RuntimeError("GPSSources must be a list")
-
-    seen_devices = set()
-    seen_types = set()
-
-    for src in gps_sources:
-        device = src.get("device")
-        dtype = src.get("type")
-
-        if not device or not dtype:
-            raise RuntimeError(
-                "Each GPSSource must define exactly one 'device' and one 'type'"
-            )
-
-        if device in seen_devices:
-            raise RuntimeError(f"Duplicate GPS device: {device}")
-
-        if dtype in seen_types:
-            raise RuntimeError(f"Manifest type reused across devices: {dtype}")
-
-        seen_devices.add(device)
-        seen_types.add(dtype)
-
-    return gps_sources
+# Title of the OpenVDM message about deprecated options in this script's hook
+DEPRECATION_MESSAGE_TITLE = "build_cruise_tracks.py uses deprecated options"
 
 
-def get_gps_sources(args):
-    """Return the GPS source list from a file or the embedded YAML default.
+class DeprecatedOption(argparse.Action):
+    """An option's 2.16.0 name, which still works but warns that 2.17 removes it.
 
-    Args:
-        args: Parsed ``argparse.Namespace`` containing ``gps_sources_file`` and
-            ``collectionSystem`` attributes.
-
-    Returns:
-        List of GPS source dicts validated by
-        :func:`load_gps_sources_from_yaml`.
+    For a flag (``nargs=0``) the destination is set to ``True``; otherwise to
+    the option's value. The warning is printed on stderr and added to the
+    namespace's ``deprecated_options`` list, for
+    :func:`report_deprecated_options`.
     """
 
-    if args.gps_sources_file:
-        logging.info("Loading GPS sources from %s", args.gps_sources_file)
-        return load_gps_sources_from_yaml(
-            yaml_path=args.gps_sources_file,
-            collection_system=args.collectionSystem,
-        )
+    def __init__(self, option_strings, dest, instead, **kwargs):
+        """Create the action.
 
-    logging.debug("Using embedded GPS sources")
-    return load_gps_sources_from_yaml(
-        yaml_str=DEFAULT_GPS_SOURCES_YAML,
-        collection_system=args.collectionSystem,
-    )
+        Args:
+            option_strings: The deprecated option's names.
+            dest: The attribute it sets, shared with its replacement.
+            instead: The end of the warning, after "removed in OpenVDM
+                2.17;", e.g. ``"use --no-combine"``.
+            **kwargs: Other :class:`argparse.Action` arguments. Unless given,
+                the option is left out of ``--help`` and sets no default (its
+                replacement's applies).
+        """
+        kwargs.setdefault("help", argparse.SUPPRESS)
+        kwargs.setdefault("default", argparse.SUPPRESS)
+        super().__init__(option_strings, dest, **kwargs)
+        self.instead = instead
 
-# ----------------------------------------------------------------------
-# Manifest handling (authoritative source)
-# ----------------------------------------------------------------------
-
-def resolve_manifest_path(openVDM, cruise_base_dir, cruiseID):
-    """Locate the dashboard data manifest file for a cruise.
-
-    Args:
-        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
-        cruise_base_dir: Warehouse base directory (e.g. ``/data``).
-        cruiseID: Current cruise identifier.
-
-    Returns:
-        Absolute path to the manifest file.
-
-    Raises:
-        RuntimeError: If the manifest filename cannot be retrieved, the
-            ``Dashboard_Data`` extra directory is absent, or the manifest file
-            does not exist on disk.
-    """
-
-    manifest_fn = openVDM.get_data_dashboard_manifest_fn()
-    if not manifest_fn:
-        raise RuntimeError("OpenVDM returned no manifest filename")
-
-    extra_dir = openVDM.get_required_extra_directory_by_name(DASHBOARD_EXTRA_DIR_NAME)
-
-    if not extra_dir:
-        raise RuntimeError(f"Unable to find extra directory: {DASHBOARD_EXTRA_DIR_NAME}")
-
-    manifest_path = os.path.join(
-        cruise_base_dir,
-        cruiseID,
-        extra_dir["destDir"],
-        manifest_fn
-    )
-    if not os.path.isfile(manifest_path):
-        raise RuntimeError(f"Manifest not found: {manifest_path}")
-
-    return manifest_path
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Warn on stderr, record the warning and set the destination."""
+        warning = f"{option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}"
+        print(f"Warning: {warning}", file=sys.stderr)
+        namespace.deprecated_options.append(warning)
+        setattr(namespace, self.dest, True if self.nargs == 0 else values)
 
 
-def load_manifest(manifest_path: str):
-    """Load and validate a dashboard data manifest JSON file.
+def report_deprecated_options(openvdm, warnings):
+    """Post the deprecation warnings as an OpenVDM message.
+
+    A hook's warnings on stderr aren't shown in OpenVDM when it succeeds, so
+    they're posted as a message too. Nothing is posted if an unread message
+    with the same title is among OpenVDM's 10 most recent unread messages, so
+    a hook that runs after every data dashboard update doesn't fill the list.
+    A failure to check or post is logged and otherwise ignored.
 
     Args:
-        manifest_path: Absolute path to the manifest file.
-
-    Returns:
-        List of manifest entry dicts, each containing at least ``type`` and
-        ``dd_json`` keys.
-
-    Raises:
-        RuntimeError: On JSON parse errors, non-list manifests, or entries
-            missing required keys.
+        openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        warnings: The warnings (from :class:`DeprecatedOption`).
     """
-
-    try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
-    except json.JSONDecodeError as err:
-        raise RuntimeError(f"Invalid manifest JSON: {err}")
-
-    if not isinstance(manifest, list):
-        raise RuntimeError("Manifest must be a list")
-
-    for entry in manifest:
-        if "type" not in entry or "dd_json" not in entry:
-            raise RuntimeError("Manifest entry missing 'type' or 'dd_json'")
-
-    return manifest
-
-
-def get_dd_json_files_for_gps_source(manifest, gps_source, cruise_base_dir):
-    """Return dashboard JSON file paths matching a GPS source type.
-
-    Args:
-        manifest: Loaded manifest list (from :func:`load_manifest`).
-        gps_source: GPS source dict with at least a ``type`` key.
-        cruise_base_dir: Warehouse base directory prepended to each ``dd_json``
-            entry path.
-
-    Returns:
-        Sorted list of absolute file paths for the matching entries.
-    """
-
-    wanted_type = gps_source["type"]
-    files = []
-
-    for entry in manifest:
-        if entry["type"] == wanted_type:
-            files.append(os.path.join(cruise_base_dir, entry["dd_json"]))
-
-    return sorted(files)
-
-# ----------------------------------------------------------------------
-# Output helpers
-# ----------------------------------------------------------------------
-
-def write_outputs(geojson_obj, base_name, cruiseID, tracklineDir, args, outputUser):
-    """Write GeoJSON and/or KML trackline files for one GPS source.
-
-    Files are named ``<cruiseID>_<base_name>_Trackline.json`` / ``.kml``.
-
-    Args:
-        geojson_obj: GeoJSON ``FeatureCollection`` dict to serialise.
-        base_name: Device name or file stem used to build the output filename.
-        cruiseID: Current cruise identifier, used as filename prefix.
-        tracklineDir: Directory where output files are written.
-        args: Parsed ``argparse.Namespace`` containing ``kml_only``,
-            ``geojson_only``, ``outputDir``, and ``username`` attributes.
-        outputUser: Username for ``chown`` after writing each file.
-    """
-
-    if not args.kml_only:
-        json_path = os.path.join(
-            tracklineDir, f"{cruiseID}_{base_name}_Trackline.json"
-        )
-        logging.info("Saving %s", json_path)
-
-        result = output_json_data_to_file(json_path, geojson_obj)
-        if not result["verdict"]:
-            logging.error("Write failed: %s", result["reason"])
-        elif not args.outputDir or args.username:
-            set_owner_group_permissions(outputUser, json_path)
-
-    if not args.geojson_only:
-        kml_path = os.path.join(
-            tracklineDir, f"{cruiseID}_{base_name}_Trackline.kml"
-        )
-        logging.info("Saving %s", kml_path)
-
-        try:
-            with open(kml_path, "w", encoding="utf-8") as f:
-                f.write(convert_to_kml(geojson_obj))
-        except OSError as err:
-            logging.error("KML write failed: %s", err)
-            return
-
-        if not args.outputDir or args.username:
-            set_owner_group_permissions(outputUser, kml_path)
-
-# ----------------------------------------------------------------------
-# Core processing
-# ----------------------------------------------------------------------
-
-def process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
-                       tracklineDir,args,outputUser):
-    """Process one GPS source: find its dashboard files and write tracklines.
-
-    Unless ``--no_combine`` is given, the source's dashboard files are combined
-    into a single trackline.
-
-    Args:
-        gps_source: GPS source dict with ``device`` and ``type`` keys.
-        manifest: Loaded manifest list.
-        cruise_base_dir: Warehouse base directory.
-        cruiseID: Current cruise identifier.
-        tracklineDir: Directory where output files are written.
-        args: Parsed ``argparse.Namespace``.
-        outputUser: Username for ``chown`` after writing each file.
-    """
-
-    logging.info(
-        "Processing %s (type=%s)",
-        gps_source["device"],
-        gps_source["type"],
-    )
-
-    files = get_dd_json_files_for_gps_source(
-        manifest, gps_source, cruise_base_dir
-    )
-
-    if not files:
-        logging.warning(
-            "No manifest entries found for %s", gps_source["device"]
-        )
+    if not warnings:
         return
-
-    if not args.no_combine:
-        combined = combine_geojson_files(
-            files, cruiseID, gps_source["device"]
-        )
-        if not combined:
-            logging.error("Failed to combine files for %s", gps_source["device"])
+    try:
+        response = requests.get(f"{openvdm.config['siteRoot']}api/messages/getRecentMessages", timeout=5)
+        response.raise_for_status()
+        if any(msg.get("messageTitle") == DEPRECATION_MESSAGE_TITLE for msg in response.json()):
             return
-
-        write_outputs(
-            combined,
-            gps_source["device"],
-            cruiseID,
-            tracklineDir,
-            args,
-            outputUser,
-        )
-        return
-
-    # no-combine mode
-    for file in files:
-        try:
-            with open(file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            geojson_obj = data["visualizerData"][0]
-        except (OSError, KeyError, IndexError, json.JSONDecodeError) as err:
-            logging.error("Invalid dashboard file %s: %s", file, err)
-            continue
-
-        base_name = os.path.basename(file).split(".")[0]
-        write_outputs(
-            geojson_obj,
-            base_name,
-            cruiseID,
-            tracklineDir,
-            args,
-            outputUser,
-        )
+        openvdm.send_msg(DEPRECATION_MESSAGE_TITLE,
+                         "\n".join(warnings) + "\nUpdate this script's hook in openvdm.yaml before upgrading.")
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        logging.warning("Unable to post the deprecation warning to OpenVDM: %s", err)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
 # ----------------------------------------------------------------------
 
-def resolve_cruise_and_dirs(openVDM, args):
-    """Resolve the cruise identifier and output directories from OpenVDM.
+def resolve_cruise_and_dirs(openvdm, args):
+    """Resolve the cruise and the output directory from OpenVDM.
 
     Args:
-        openVDM: Active :class:`~server.lib.openvdm.OpenVDM` instance.
+        openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
         args: Parsed ``argparse.Namespace`` containing ``cruiseID``,
-            ``collectionSystem``, ``outputDir``, and ``username`` attributes.
+            ``collectionSystem``, ``outputDir``, ``extraDirectory`` and
+            ``username`` attributes.
 
     Returns:
-        A 4-tuple of ``(cruiseID, cruise_base_dir, tracklineDir, outputUser)``.
+        A 4-tuple of ``(cruise_id, cruise_base_dir, trackline_dir, output_user)``;
+        for ``-o`` output *output_user* is ``-u``'s user, or ``None``.
 
     Raises:
         RuntimeError: If the cruise ID cannot be determined, the collection
-            system is not found, or the trackline directory does not exist.
+            system is not found, the extra directory can't be used (see
+            :func:`~server.lib.tracks.resolve_extra_directory`), or the
+            ``-o`` folder does not exist.
     """
 
-    cruiseID = args.cruiseID or openVDM.get_cruise_id()
-    if not cruiseID:
+    cruise_id = args.cruiseID or openvdm.get_cruise_id()
+    if not cruise_id:
         raise RuntimeError("Unable to determine CruiseID")
 
-    collectionSystem = openVDM.get_collection_system_transfer_by_name(
-        args.collectionSystem
-    )
-    if not collectionSystem:
+    if not openvdm.get_collection_system_transfer_by_name(args.collectionSystem):
         raise RuntimeError(f"Collection System not found: {args.collectionSystem}")
 
-    warehouse_cfg = openVDM.get_shipboard_data_warehouse_config()
-    cruise_base_dir = os.path.join(warehouse_cfg["shipboardDataWarehouseBaseDir"])
+    warehouse_cfg = openvdm.get_shipboard_data_warehouse_config()
+    cruise_base_dir = warehouse_cfg["shipboardDataWarehouseBaseDir"]
 
-    tracklineDir = (
-        args.outputDir
-        or os.path.join(
-            cruise_base_dir,
-            cruiseID,
-            openVDM.get_extra_directory_by_name(
-                TRACKLINE_EXTRA_DIR_NAME
-            )["destDir"],
-        )
+    if args.outputDir and not os.path.isdir(args.outputDir):
+        raise RuntimeError(f"Trackline directory not found: {args.outputDir}")
+
+    trackline_dir = args.outputDir or resolve_extra_directory(
+        openvdm, args.extraDirectory or TRACKLINE_EXTRA_DIR_NAME,
+        os.path.join(cruise_base_dir, cruise_id), cruise_id, warehouse_cfg,
     )
 
-    if not os.path.isdir(tracklineDir):
-        raise RuntimeError(f"Trackline directory not found: {tracklineDir}")
+    # Files in an extra directory belong to OpenVDM's warehouse user; -o
+    # output keeps whoever wrote it, unless -u is given
+    output_user = args.username if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
 
-    outputUser = args.username or warehouse_cfg["shipboardDataWarehouseUsername"]
-
-    return cruiseID, cruise_base_dir, tracklineDir, outputUser
+    return cruise_id, cruise_base_dir, trackline_dir, output_user
 
 
-def main():
+def main():  # pylint: disable=too-many-locals
     """Parse arguments and build cruise trackline files."""
 
     parser = argparse.ArgumentParser(
         description="build cruise tracklines post-dashboard processing"
     )
     parser.add_argument("-v", "--verbosity", default=0, action="count")
-    parser.add_argument("-n", "--no_combine", action="store_true")
-    parser.add_argument("-k", "--kml_only", action="store_true")
-    parser.add_argument("-g", "--geojson_only", action="store_true")
+    parser.add_argument("-n", "--no-combine", dest="no_combine", action="store_true")
+    parser.add_argument("-k", "--kml-only", dest="kml_only", action="store_true")
+    parser.add_argument("-g", "--geojson-only", dest="geojson_only", action="store_true")
     parser.add_argument("-c", dest="cruiseID")
-    parser.add_argument("-o", dest="outputDir")
-    parser.add_argument("-u", "--username")
-    parser.add_argument("--config_file", dest="gps_sources_file")
+    add_output_arguments(parser)
+    parser.add_argument("--position-sources", dest="position_sources_file")
+
+    # 2.16.0 names, removed in 2.17
+    for old, new, dest in (("--no_combine", "--no-combine", "no_combine"),
+                           ("--kml_only", "--kml-only", "kml_only"),
+                           ("--geojson_only", "--geojson-only", "geojson_only")):
+        parser.add_argument(old, dest=dest, action=DeprecatedOption, nargs=0, instead=f"use {new}")
+    parser.add_argument("--config_file", dest="position_sources_file", action=DeprecatedOption,
+                        instead="use --position-sources")
+    parser.add_argument("-u", "--username", action=DeprecatedOption, default=None,
+                        instead="-o output will keep whoever wrote it",
+                        help="owner of the files written with -o (deprecated, removed in 2.17)")
     parser.add_argument("collectionSystem")
 
+    parser.set_defaults(deprecated_options=[])
+
     args = parser.parse_args()
+    setup_logging(args.verbosity)
 
-    LOGGING_FORMAT = "%(asctime)-15s %(levelname)s - %(message)s"
-    logging.basicConfig(format=LOGGING_FORMAT)
-    logging.getLogger().setLevel(
-        [logging.WARNING, logging.INFO, logging.DEBUG][
-            min(args.verbosity, 2)
-        ]
-    )
-
-    openVDM = OpenVDM()
+    openvdm = OpenVDM()
+    report_deprecated_options(openvdm, args.deprecated_options)
 
     try:
-        cruiseID, cruise_base_dir, tracklineDir, outputUser = (
-            resolve_cruise_and_dirs(openVDM, args)
-        )
-        gps_sources = get_gps_sources(args)
+        cruise_id, cruise_base_dir, trackline_dir, output_user = resolve_cruise_and_dirs(openvdm, args)
+        position_sources = get_position_sources(args, DEFAULT_POSITION_SOURCES_YAML)
 
-        manifest_path = resolve_manifest_path(openVDM, cruise_base_dir, cruiseID)
+        manifest_path = resolve_manifest_path(openvdm, cruise_base_dir, cruise_id)
         manifest = load_manifest(manifest_path)
     except RuntimeError as err:
         logging.error(str(err))
@@ -479,9 +234,17 @@ def main():
 
     logging.info("Using manifest: %s", manifest_path)
 
-    for gps_source in gps_sources:
-        process_gps_source(gps_source,manifest,cruise_base_dir,cruiseID,
-                           tracklineDir,args,outputUser)
+    written = []
+    for position_source in position_sources:
+        process_position_source(position_source, manifest, cruise_base_dir, cruise_id,
+                                trackline_dir, args, output_user, written)
+
+    # Files in an extra directory are part of the cruise; -o folders aren't
+    if written and not args.outputDir:
+        message = queue_md5_update(openvdm, written, cruise_id)
+        if message:
+            print(message, file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
