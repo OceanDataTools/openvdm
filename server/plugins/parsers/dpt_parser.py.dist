@@ -165,10 +165,6 @@ class DPTParser(OpenVDMCSVParser):
         # -------------------------
         self.send_error_msg(errors, filepath)
 
-# The class was named DBTParser until #419; the name is kept so ship plugins that
-# import that name still work.
-DBTParser = DPTParser
-
 # -------------------------------------------------------------------------------------
 # Standalone CLI
 # -------------------------------------------------------------------------------------
