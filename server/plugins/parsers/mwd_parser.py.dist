@@ -52,7 +52,8 @@ class MWDParser(OpenVDMCSVParser):
     MAX_SPD_MPH = MAX_SPD_KTS * 1.15078
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False, no_mag=False,
+                 require_checksum=True):
         """Initialise the parser.
 
         Args:
@@ -62,7 +63,11 @@ class MWDParser(OpenVDMCSVParser):
             skip_header: Skip the first line of each data file when ``True``.
             use_openvdm_api: Enable OpenVDM API message posting.
             no_mag: Skip the magnetic wind direction field when ``True``.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row.
         """
+        self.require_checksum = require_checksum
         self.no_mag = no_mag
         proc_cols = PROC_COLS if not no_mag else [col for col in PROC_COLS if col != 'dir_m']
         super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
@@ -85,6 +90,8 @@ class MWDParser(OpenVDMCSVParser):
                 mwd_data = dict(zip(FIELDS, fields))
 
                 try:
+                    self.check_nmea_sentence(remainder, fields, 9, self.require_checksum,
+                                             field_values={2: 'T', 4: 'M', 6: 'N', 8: 'M'})
                     dir_t = float(mwd_data['dir_t']) if mwd_data['dir_t'] else None
                     dir_m = float(mwd_data['dir_m']) if (not self.no_mag and mwd_data['dir_m']) else None
                     spd_kts = float(mwd_data['spd_kts']) if mwd_data['spd_kts'] else None
@@ -229,10 +236,14 @@ class MWDParser(OpenVDMCSVParser):
             parser: The ``argparse.ArgumentParser`` to add the options to.
         """
         parser.add_argument('--noMag', action='store_true', default=False, help='Skip Direction Magnetic')
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'no_mag': getattr(args, 'noMag', False)}
+        return {'no_mag': getattr(args, 'noMag', False),
+                'require_checksum': getattr(args, 'require_checksum', True)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI
