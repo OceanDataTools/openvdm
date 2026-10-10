@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+"""Parser for Scripps MetAcq $WICOR sentences.
+
+Parses timestamped log files of MetAcq's combined, corrected ``$WICOR``
+sentences (met, thermosalinograph, navigation and winch values tagged with a
+2-letter ID and a calibration/validity digit) and returns the JSON-formatted
+plugin data used by OpenVDM's Data Dashboard: time series of the chosen
+fields, or (``track``) the ship's track from its latitude and longitude.
+"""
+
+import logging
+import sys
+from os.path import dirname, realpath
+
+import numpy as np
+import pandas as pd
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: disable=wrong-import-position
+
+# The fields MetAcq can write (MetAcq Operator's Manual, Appendix A, plus the
+# BS, LF, HF and ZI tags seen in newer files): tag -> (label, unit, decimals).
+# A repeated tag is a second sensor of the same kind; it's named <tag>_2.
+FIELDS = {
+    'AT': ('Air Temperature', 'C', 2),
+    'BP': ('Barometric Pressure', 'mBar', 2),
+    'BS': ('Barometric Pressure (sea level)', 'mBar', 2),
+    'BC': ('Barometer Temperature', 'C', 2),
+    'SW': ('Short Wave Radiation', 'W/m^2', 1),
+    'LW': ('Long Wave Radiation', 'W/m^2', 1),
+    'PR': ('Precipitation', 'mm', 2),
+    'PT': ('Precipitation Rate', 'mm/hr', 2),
+    'RH': ('Relative Humidity', '%', 2),
+    'RT': ('Air Temperature (RH module)', 'C', 2),
+    'DP': ('Dew Point', 'C', 2),
+    'WS': ('Relative Wind Speed', 'm/s', 1),
+    'WD': ('Relative Wind Direction', 'deg', 1),
+    'TW': ('True Wind Speed', 'm/s', 1),
+    'TI': ('True Wind Direction', 'deg', 1),
+    'ST': ('Sea Surface Temperature', 'C', 3),
+    'TT': ('TSG Temperature', 'C', 3),
+    'TC': ('TSG Conductivity', 'mS/cm', 4),
+    'TG': ('TSG Conductivity (uncorrected)', 'mS/cm', 4),
+    'SA': ('Salinity', 'PSU', 3),
+    'SD': ('Sigma-t', 'kg/m^3', 3),
+    'SV': ('Sound Velocity', 'm/s', 2),
+    'OX': ('Oxygen', 'ml/l', 3),
+    'OT': ('Oxygen Temperature', 'C', 3),
+    'OS': ('Oxygen Saturation', 'ml/l', 3),
+    'FL': ('Fluorometer', 'ug/l', 3),
+    'TR': ('Transmissometer', '%', 2),
+    'PA': ('Surface PAR', 'uE/s/m^2', 1),
+    'FI': ('Underway Seawater Flow', 'LPM', 2),
+    'BT': ('Bottom Depth', 'm', 1),
+    'LF': ('Depth (low frequency)', 'm', 1),
+    'HF': ('Depth (high frequency)', 'm', 1),
+    'LA': ('Latitude', 'ddeg', 6),
+    'LO': ('Longitude', 'ddeg', 6),
+    'CR': ('Course Over Ground', 'deg', 1),
+    'SP': ('Speed Over Ground', 'kts', 1),
+    'GY': ('Gyro Heading', 'deg', 1),
+    'GA': ('GPS Altitude', 'm', 1),
+    'ZO': ('Winch Wire Out', 'm', 1),
+    'ZS': ('Winch Speed', 'm/min', 1),
+    'ZT': ('Winch Tension', 'lbs', 0),
+}
+
+# Directions are averaged as angles when the data is resampled
+DIRECTION_FIELDS = {'WD', 'TI', 'CR', 'GY'}
+
+# Fields charted when no "fields" option is given
+DEFAULT_FIELDS = ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW',
+                  'TT', 'SA', 'TC', 'FL', 'OX', 'ST', 'SP', 'GY']
+
+# Calibration/validity digits that mark a value as unusable: 7 = out of
+# range, 8 = emulated (not real), 9 = invalid
+INVALID_FLAGS = {'7', '8', '9'}
+
+# Values MetAcq writes for missing data, whatever the digit says
+MISSING_VALUES = {-99.0, 99999999.0}
+
+
+def _checksum_ok(sentence):
+    """Return whether an NMEA sentence's ``*hh`` checksum matches its body."""
+    body, _, checksum = sentence.lstrip('$').partition('*')
+    calculated = 0
+    for char in body:
+        calculated ^= ord(char)
+    return checksum[:2].upper() == f'{calculated:02X}'
+
+
+def _base_tag(field):
+    """Return the 2-letter tag of a field name such as ``WS`` or ``WS_2``."""
+    return field.split('_')[0]
+
+
+def _label(field):
+    """Return a field's label, numbered for a second sensor (``Relative Wind Speed 2``)."""
+    label = FIELDS[_base_tag(field)][0]
+    return label if field == _base_tag(field) else f"{label} {field.split('_')[1]}"
+
+
+class WicorParser(OpenVDMCSVParser):
+    """Parser for timestamped MetAcq ``$WICOR`` sentences."""
+
+    MAX_DELTA_T = pd.Timedelta('60 seconds')
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                 skip_header=False, use_openvdm_api=False, fields=None, track=False):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Crop the data to start at this time.
+            stop_dt: Crop the data to end at this time.
+            time_format: Format of the logger timestamps (default ISO 8601).
+            skip_header: Skip the file's first line.
+            use_openvdm_api: Send parse errors to OpenVDM as a message.
+            fields: Fields to chart, by tag (``'AT'``), or ``'<tag>_2'`` for
+                a second sensor with the same tag (``'WS_2'``). Default:
+                ``DEFAULT_FIELDS``. Fields not in the file are skipped.
+            track: Return the ship's track (GeoJSON, from ``LA``/``LO``)
+                instead of charts; *fields* is then ignored.
+
+        Raises:
+            ValueError: If a field's tag isn't one this parser knows.
+        """
+        self.fields = list(fields) if fields else list(DEFAULT_FIELDS)
+        unknown = [field for field in self.fields if _base_tag(field) not in FIELDS]
+        if unknown:
+            raise ValueError(f"Unknown $WICOR field(s): {', '.join(unknown)}")
+        self.track = track
+        proc_cols = ['date_time', 'LA', 'LO', 'SP'] if track else ['date_time'] + self.fields
+        super().__init__(None, proc_cols, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
+
+    @staticmethod
+    def _parse_pairs(fields):
+        """Return a sentence's values by field name, and the names it had invalid.
+
+        Args:
+            fields: The sentence split on commas, from ``$WICOR`` on, with
+                the checksum removed.
+
+        Returns:
+            tuple: ``(values, invalid)``: *values* maps each field name
+            (``WS``, ``WS_2``, ...) to a float, or NaN if it's flagged
+            unusable or missing; *invalid* is the set of those names.
+
+        Raises:
+            ValueError: If the fields aren't in ``value,TAGn`` pairs, or a
+                value isn't a number.
+        """
+        pairs = fields[3:]
+        if len(pairs) % 2:
+            raise ValueError("odd number of value/tag fields")
+        values, invalid, seen = {}, set(), {}
+        for value, tag in zip(pairs[0::2], pairs[1::2]):
+            name, flag = tag[:2], tag[2:]
+            if name == 'CN':  # cruise ID, a string
+                continue
+            seen[name] = seen.get(name, 0) + 1
+            if seen[name] > 1:
+                name = f'{name}_{seen[name]}'
+            number = float(value)
+            if flag in INVALID_FLAGS or number in MISSING_VALUES:
+                values[name] = np.nan
+                invalid.add(name)
+            else:
+                values[name] = number
+        return values, invalid
+
+    def _resample(self, df):
+        """Resample the data, averaging direction columns as angles.
+
+        Args:
+            df: Data indexed by time.
+
+        Returns:
+            pandas.DataFrame: The resampled data, with the timestamps in a
+            ``date_time`` column.
+        """
+        directions = [col for col in df.columns if _base_tag(col) in DIRECTION_FIELDS]
+        radians = np.deg2rad(df[directions])
+        df = df.drop(columns=directions)
+        for col in directions:
+            df[f'{col}_sin'] = np.sin(radians[col])
+            df[f'{col}_cos'] = np.cos(radians[col])
+        df = self.resample_data(df)
+        for col in directions:
+            # Rounded first, so a mean a hair under 360 becomes 0, not 360
+            df[col] = np.round(np.rad2deg(np.arctan2(df.pop(f'{col}_sin'), df.pop(f'{col}_cos'))), 6) % 360
+        return df
+
+    def parse(self, filepath):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        """Parse the $WICOR file and return plugin data dict."""
+        columns = self.proc_cols[1:]
+        rows, errors = [], []
+        invalid_counts = dict.fromkeys(columns, 0)
+
+        try:
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='WICOR'):
+                try:
+                    if not _checksum_ok(remainder.strip()):
+                        raise ValueError("bad checksum")
+                    fields[-1] = fields[-1].split('*')[0]
+                    values, invalid = self._parse_pairs(fields)
+                except (ValueError, IndexError) as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped: %s", lineno, err)
+                    continue
+                rows.append([timestamp_str] + [values.get(col, np.nan) for col in columns])
+                for col in invalid.intersection(columns):
+                    invalid_counts[col] += 1
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
+
+        if not rows:
+            logging.warning("No valid $WICOR data in file: %s", filepath)
+            return None
+
+        df = pd.DataFrame(rows, columns=self.proc_cols)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        df = df.dropna(subset=['date_time']).set_index('date_time')
+
+        if self.start_dt or self.stop_dt:
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
+
+        # Fields asked for but never in the file
+        missing = [col for col in columns if df[col].isna().all() and invalid_counts[col] == 0]
+        if missing:
+            logging.warning("Field(s) not in %s: %s", filepath, ', '.join(missing))
+        columns = [col for col in columns if col not in missing]
+
+        # -------------------------
+        # Statistics
+        # -------------------------
+        deltas = df.index.to_series().diff()
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(), df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(deltas.min().total_seconds(), 3), round(deltas.max().total_seconds(), 3)],
+                             'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([int((deltas <= self.MAX_DELTA_T).sum()), int((deltas > self.MAX_DELTA_T).sum())],
+                                     'DeltaT Validity')
+
+        if self.track:
+            if {'LA', 'LO'} - set(columns):
+                logging.warning("No latitude/longitude in file: %s", filepath)
+                return None
+            self.add_geobounds_stat([round(df['LA'].max(), 6), round(df['LO'].max(), 6),
+                                     round(df['LA'].min(), 6), round(df['LO'].min(), 6)])
+            checks = ['LA', 'LO', 'SP'] if 'SP' in columns else ['LA', 'LO']
+        else:
+            checks = columns
+
+        for col in checks:
+            label, (_, unit, decimals) = _label(col), FIELDS[_base_tag(col)]
+            if df[col].notna().any():
+                # + 0.0 turns -0.0 into 0.0
+                self.add_bounds_stat([round(df[col].min(), decimals) + 0.0, round(df[col].max(), decimals) + 0.0],
+                                     f'{label} Bounds', unit)
+            self.add_value_validity_stat([len(df) - invalid_counts[col], invalid_counts[col]], f'{label} Validity')
+
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        quality_checks = [
+            ('Rows', len(df) + len(errors), len(errors)),
+            ('DeltaT', len(df), int((deltas > self.MAX_DELTA_T).sum())),
+        ] + [(_label(col), len(df), invalid_counts[col]) for col in checks]
+
+        for name, total, bad in quality_checks:
+            rate = bad / total if total else 0
+            if rate > 0.25:
+                self.add_quality_test_failed(name)
+            elif rate > 0.10:
+                self.add_quality_test_warning(name)
+            else:
+                self.add_quality_test_passed(name)
+
+        # -------------------------
+        # Visualization
+        # -------------------------
+        if self.track:
+            df = df[['LA', 'LO']]
+            df = self.round_data(self.resample_data(df), {'LA': 6, 'LO': 6}).set_index('date_time')
+            gap_id = (df['LA'].isna() | df['LO'].isna()).cumsum()
+            segments = [seg.dropna(subset=['LA', 'LO']) for _, seg in df.groupby(gap_id)]
+            features = [{
+                'type': 'Feature',
+                'geometry': {'type': 'LineString', 'coordinates': seg[['LO', 'LA']].values.tolist()},
+                'properties': {'coordTimes': (seg.index.view('int64') // 1_000_000).tolist(), 'name': filepath},
+            } for seg in segments if not seg.empty]
+            self.add_visualization_data({'type': 'FeatureCollection', 'features': features})
+        else:
+            df = self._resample(df[columns])
+            df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
+            for col in columns:
+                series = df[col].dropna()
+                times = series.index.tz_localize('UTC') if series.index.tz is None else series.index
+                self.add_visualization_data({
+                    'data': [[int(ts.timestamp() * 1000), value] for ts, value in zip(times, series)],
+                    'unit': FIELDS[_base_tag(col)][1],
+                    'label': _label(col),
+                })
+
+        self.send_error_msg(errors, filepath)
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)  # pylint: disable=attribute-defined-outside-init
+        return self.plugin_data
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add the $WICOR-specific command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--fields', default=None,
+                            help='comma-separated fields to chart, e.g. AT,BP,WS,WS_2 '
+                                 f'(default: {",".join(DEFAULT_FIELDS)})')
+        parser.add_argument('--track', action='store_true', default=False,
+                            help="return the ship's track from LA/LO instead of charts")
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {
+            'fields': args.fields.split(',') if args.fields else None,
+            'track': args.track,
+        }
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    WicorParser.run_cli()

@@ -26,6 +26,7 @@ from server.plugins.parsers.ssv_parser   import SSVParser
 from server.plugins.parsers.tsg45_parser   import SBE45TSGParser as TSGParser
 from server.plugins.parsers.twind_parser import TWindParser
 # from server.plugins.parsers.vtg_parser   import VTGParser
+# from server.plugins.parsers.wicor_parser import WicorParser
 
 # -------------------------------
 # File type filters
@@ -38,6 +39,15 @@ fileTypeFilters = [
     {"data_type":"tsg",   "regex": "*/raw/TSG_Raw-*.txt",    "parser": "TSG",    'parser_options':{'sbe38': True, 'col_names':True}},
     {"data_type":"twind", "regex": "*/proc/TrueWind-*.txt",  "parser": "TWind",  'parser_options':{}},
     # {"data_type":"vtg",   "regex": "*/raw/POSMV-*.txt",      "parser": "VTG",    'parser_options':{}},
+    # Scripps MetAcq $WICOR: one file gives the met and TSG charts and the ship's
+    # track. These use the met, tsg and gga data types, which the default
+    # datadashboard.yaml shows, so comment out the entries above they replace
+    # (or give them new data types and add those to datadashboard.yaml).
+    # "fields" picks the values to chart: 2-letter tags, "<tag>_2" for a second
+    # sensor with the same tag (see wicor_parser.py).
+    # {"data_type":"met",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'fields': ['AT', 'BP', 'RH', 'WS', 'WD', 'TW', 'TI', 'PA', 'SW', 'LW']}},
+    # {"data_type":"tsg",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'fields': ['TT', 'SA', 'TC', 'FL', 'OX', 'ST']}},
+    # {"data_type":"gga",   "regex": "*/raw/*_wicor-*.txt",    "parser": "WICOR",  'parser_options':{'track': True}},
 ]
 
 # -------------------------------
@@ -54,6 +64,7 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         "TSG": TSGParser,
         "TWind": TWindParser,
         # "VTG": VTGParser,
+        # "WICOR": WicorParser,
     }
 
     def __init__(self):
