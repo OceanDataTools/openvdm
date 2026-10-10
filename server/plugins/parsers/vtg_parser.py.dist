@@ -54,7 +54,7 @@ class VTGParser(OpenVDMCSVParser):
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False, no_mag=False,
-                 require_checksum=False):
+                 require_checksum=True):
         """Initialise the parser.
 
         Args:
@@ -65,7 +65,8 @@ class VTGParser(OpenVDMCSVParser):
             use_openvdm_api: Enable OpenVDM API message posting.
             no_mag: Skip the magnetic course over ground field when ``True``.
             require_checksum: Treat a sentence without a checksum as a bad row
-                (one whose checksum doesn't match always is).
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row.
         """
         self.require_checksum = require_checksum
         self.no_mag = no_mag
@@ -236,13 +237,14 @@ class VTGParser(OpenVDMCSVParser):
             parser: The ``argparse.ArgumentParser`` to add the options to.
         """
         parser.add_argument('--noMag', action='store_true', default=False, help='Skip COG Magnetic')
-        parser.add_argument('--require-checksum', action='store_true', default=False,
-                            help='treat a sentence without a checksum as a bad row')
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
         return {'no_mag': getattr(args, 'noMag', False),
-                'require_checksum': getattr(args, 'require_checksum', False)}
+                'require_checksum': getattr(args, 'require_checksum', True)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI

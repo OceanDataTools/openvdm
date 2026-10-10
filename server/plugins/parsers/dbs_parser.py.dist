@@ -45,7 +45,7 @@ class DBSParser(OpenVDMCSVParser):
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False,
-                 require_checksum=False):
+                 require_checksum=True):
         """Initialise the parser.
 
         Args:
@@ -55,7 +55,8 @@ class DBSParser(OpenVDMCSVParser):
             skip_header: Skip the first line of each data file when ``True``.
             use_openvdm_api: Enable OpenVDM API message posting.
             require_checksum: Treat a sentence without a checksum as a bad row
-                (one whose checksum doesn't match always is).
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row.
         """
         self.require_checksum = require_checksum
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
@@ -192,12 +193,13 @@ class DBSParser(OpenVDMCSVParser):
         Args:
             parser: The ``argparse.ArgumentParser`` to add the options to.
         """
-        parser.add_argument('--require-checksum', action='store_true', default=False,
-                            help='treat a sentence without a checksum as a bad row')
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
 
     @classmethod
     def _extract_custom_cli_kwargs(cls, args):
-        return {'require_checksum': getattr(args, 'require_checksum', False)}
+        return {'require_checksum': getattr(args, 'require_checksum', True)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI
