@@ -26,6 +26,7 @@ OpenVDM is a 3-tier distributed system:
 - Plugin base classes: `server/lib/openvdm_plugin.py` — `OpenVDMPlugin` and `OpenVDMParserQualityTest`
 - File utilities: `server/lib/file_utils.py`, `server/lib/geojson_utils.py`
 - Transfer commands: `server/lib/transfer_utils.py` — `run_transfer_command()` runs rsync/rclone for all transfer workers, collects new/updated/deleted files (rsync `-i`, rclone `-v`) and raises `TransferCommandError` on failure (rsync codes 24, and 23 for vanished listed files, count as success); callers must turn that into a failed transfer (#230)
+- Trackline building: `server/lib/tracks.py` holds the code shared by `bin/build_cruise_tracks.py` and `bin/build_lowering_tracks.py` (position sources, manifest, combining, GeoJSON/KML output, ownership, MD5 update, extra directory resolution). The scripts keep only their ID, manifest location and default position sources (#394, #401)
 
 **Tier 3 — Gearman Workers (async task queue)**
 - Location: `server/workers/`
