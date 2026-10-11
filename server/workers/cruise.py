@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gearman worker that initializes and finalizes OpenVDM cruises.
 
-Registers four Gearman tasks:
+Registers five Gearman tasks:
 
 - ``setupNewCruise`` — create the cruise directory tree, initialize the data
   dashboard and MD5 summary, write the cruise README, sync public data, and run
@@ -13,6 +13,8 @@ Registers four Gearman tasks:
   the cruise directory, and the cruise README.
 - ``rsyncPublicDataToCruiseData`` — sync the ``/mnt/PublicData`` volume into
   the ``From_PublicData`` collection system transfer directory.
+- ``rebuildCruiseReadme`` — rebuild the cruise README from its template, e.g.
+  after editing the template or a directory's description.
 """
 
 import argparse
@@ -48,7 +50,8 @@ TASK_NAMES = {
     'CREATE_CRUISE': 'setupNewCruise',
     'FINALIZE_CRUISE': 'finalizeCurrentCruise',
     'EXPORT_CRUISE_CONFIG': 'exportOVDMConfig',
-    'SYNC_PUBLICDATA': 'rsyncPublicDataToCruiseData'
+    'SYNC_PUBLICDATA': 'rsyncPublicDataToCruiseData',
+    'REBUILD_CRUISE_README': 'rebuildCruiseReadme'
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
@@ -957,6 +960,43 @@ def task_export_cruise_config(worker, current_job):
     return json.dumps(job_results)
 
 
+def task_rebuild_cruise_readme(worker, current_job):
+    """Gearman task: rebuild the cruise README from its template (#431).
+
+    For changes the README would otherwise only pick up at the next config
+    export: an edited template, or a collection system's or extra
+    directory's new description. A README that OpenVDM didn't write is
+    still left alone. When the README is turned off in ``openvdm.yaml``,
+    the task fails and says so, since nothing was rebuilt.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
+    """
+
+    job_results = {'parts':[]}
+
+    logging.info("Rebuilding the cruise README")
+    worker.send_job_status(current_job, 1, 10)
+
+    output_results = worker.build_cruise_readme()
+
+    if output_results.get('skipped'):
+        job_results['parts'].append({"partName": "Write cruise README", "result": "Fail",
+                                     "reason": "The cruise README is turned off (cruiseReadme in openvdm.yaml)"})
+    elif not output_results['verdict']:
+        job_results['parts'].append({"partName": "Write cruise README", "result": "Fail", "reason": output_results['reason']})
+    else:
+        job_results['parts'].append({"partName": "Write cruise README", "result": "Pass"})
+
+    worker.send_job_status(current_job, 10, 10)
+    return json.dumps(job_results)
+
+
 # -------------------------------------------------------------------------------------
 # Required python code for running the script as a stand-alone utility
 # -------------------------------------------------------------------------------------
@@ -1025,6 +1065,8 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES.get('SYNC_PUBLICDATA'))
     new_worker.register_task(TASK_NAMES.get('SYNC_PUBLICDATA'), task_rsync_publicdata_to_cruise_data)
+    logging.info("\tTask: %s", TASK_NAMES.get('REBUILD_CRUISE_README'))
+    new_worker.register_task(TASK_NAMES.get('REBUILD_CRUISE_README'), task_rebuild_cruise_readme)
 
     logging.info("Waiting for jobs...")
     new_worker.work()
