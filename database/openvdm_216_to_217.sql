@@ -5,7 +5,8 @@
 -- CoreVars values were tinytext (255 bytes), too short for a description, so
 -- the column becomes text. Add a description to collection system transfers
 -- and extra directories (#432), and the Rebuild Cruise README (#431) and
--- Rebuild Lowering README (#445) tasks.
+-- Rebuild Lowering README (#445) tasks, and a private link to the File
+-- Naming Guide (#458).
 -- Safe to run more than once: rows and columns are only added if they're
 -- missing.
 
@@ -76,3 +77,10 @@ INSERT INTO `OVDM_Tasks` (`name`, `longName`, `cruiseOrLowering`, `status`, `ena
 SELECT 'rebuildLoweringReadme', 'Rebuild the {lowering_name} README', 1, 2, 1, 0
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `OVDM_Tasks` WHERE `name` = 'rebuildLoweringReadme');
+
+-- A private link to the File Naming Guide (#458), unless the site already
+-- has a link to it
+INSERT INTO `OVDM_Links` (`name`, `url`, `enable`, `private`)
+SELECT 'File Naming Guide', '/config/collectionSystemTransfers/fileNamingGuide', 1, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `OVDM_Links` WHERE `url` LIKE '%config/collectionSystemTransfers/fileNamingGuide%');
