@@ -258,7 +258,8 @@ VALUES
   ('Supervisord','http://{hostIP}:9001',1,1),
   ('Public Data','http://{hostIP}/PublicData/',1,0),
   ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
-  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0);
+  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
+  ('File Naming Guide','/config/collectionSystemTransfers/fileNamingGuide',1,1);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
