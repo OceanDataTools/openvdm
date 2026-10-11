@@ -53,18 +53,9 @@ This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruis
 
 {% endif %}
 {% endmacro %}
-{% if collection_systems %}
-
-{% for d in collection_systems %}
+{% for d in (collection_systems + extra_directories) | sort(attribute="destDir") %}
 {{ folder(d) }}
 {%- endfor %}
-{% endif %}
-{% if extra_directories %}
-
-{% for d in extra_directories %}
-{{ folder(d) }}
-{%- endfor %}
-{% endif %}
 
 ---
 

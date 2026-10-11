@@ -63,25 +63,17 @@ Paths are relative to this directory.
 
 {% endif %}
 {% endmacro %}
-{% if collection_systems %}
-
-{% for d in collection_systems %}
-{{ folder(d) }}
-{%- endfor %}
-{% endif %}
-{% if extra_directories %}
-
-{% for d in extra_directories %}
-{{ folder(d) }}
-{%- endfor %}
-{% endif %}
+{% set directories = collection_systems + extra_directories %}
 {% if lowerings %}
-
-### `{{ lowerings.base_dir }}/`: Lowerings
-
-A directory for each lowering (vehicle dive or deployment), named by its lowering ID: `{{ lowerings.base_dir }}/<loweringID>/`.
-
+{% set directories = directories + [{
+    "destDir": lowerings.base_dir,
+    "longName": "Lowerings",
+    "description": "A directory for each lowering (vehicle dive or deployment), named by its lowering ID: `" ~ lowerings.base_dir ~ "/<loweringID>/`."
+}] %}
 {% endif %}
+{% for d in directories | sort(attribute="destDir") %}
+{{ folder(d) }}
+{%- endfor %}
 
 ---
 
