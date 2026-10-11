@@ -192,7 +192,7 @@ if ($data['shipboardDataWarehouseStatus'] === '3') {
         foreach($data['requiredExtraDirectories'] as $row){
 ?>
                     <tr>
-                        <td><?php echo $row->longName; ?></td>
+                        <td title="<?php echo htmlspecialchars($row->description ?? '', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $row->longName; ?></td>
                         <td>
                             <a href='<?php echo DIR; ?>config/system/editExtraDirectories/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
                         </td>

@@ -4,7 +4,7 @@ use Core\Error;
 use Helpers\Form;
 use Helpers\FormCustom;
 
-$_POST += ['name' => '', 'longName' => '', 'destDir' => '', 'cruiseOrLowering' => ''];
+$_POST += ['name' => '', 'longName' => '', 'description' => '', 'destDir' => '', 'cruiseOrLowering' => ''];
 
 ?>
     <div class="row">
@@ -36,6 +36,7 @@ $_POST += ['name' => '', 'longName' => '', 'destDir' => '', 'cruiseOrLowering' =
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'name', 'value'=>$_POST['name'])); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'longName', 'value'=>$_POST['longName'])); ?></div>
+                                <div class="form-group"><label>Description</label><?php echo Form::textBox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'description', 'value'=> $_POST['description'])); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'destDir', 'value'=>$_POST['destDir'])); ?></div>
 <?php
   if ( $data['showLoweringComponents']) {

@@ -43,6 +43,7 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `collectionSystemTransferID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` text,
+  `description` text,
   `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0',
   `sourceDir` tinytext,
   `destDir` tinytext,
@@ -195,6 +196,7 @@ CREATE TABLE `OVDM_ExtraDirectories` (
   `extraDirectoryID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` tinytext,
+  `description` text,
   `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0',
   `destDir` tinytext,
   `enable` tinyint(1) DEFAULT '0',
@@ -205,10 +207,10 @@ CREATE TABLE `OVDM_ExtraDirectories` (
 LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` DISABLE KEYS */;
 
-INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
+INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `description`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
 VALUES
-  (1,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
-  (2,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
+  (1,'Dashboard_Data','Dashboard Data','The files the Data Dashboard is built from: the data and quality test results OpenVDM''s plugins extract from the raw files (JSON), and the manifest that lists them.',0,'OpenVDM/DashboardData',1,1),
+  (2,'From_PublicData','Files copied from PublicData share','Files from the ship''s PublicData share, where scientists and crew share files during the cruise. They''re copied here when the cruise is finalized.',0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;

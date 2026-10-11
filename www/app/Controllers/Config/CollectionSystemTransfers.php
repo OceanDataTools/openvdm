@@ -157,6 +157,7 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -289,6 +290,7 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -331,6 +333,7 @@ class CollectionSystemTransfers extends Controller {
         } else if(isset($_POST['inlineTest'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -445,6 +448,7 @@ class CollectionSystemTransfers extends Controller {
                    # 'collectionSystemTransferID' => '0',
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -527,6 +531,7 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -665,6 +670,7 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -713,6 +719,7 @@ class CollectionSystemTransfers extends Controller {
 
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->description = $description;
                 $data['row'][0]->transferType = $transferType;
                 $data['row'][0]->sourceDir = $sourceDir;
                 $data['row'][0]->destDir = $destDir;
@@ -743,6 +750,7 @@ class CollectionSystemTransfers extends Controller {
 
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -867,6 +875,7 @@ class CollectionSystemTransfers extends Controller {
 
                 $gmData['collectionSystemTransfer']->name = $name;
                 $gmData['collectionSystemTransfer']->longName = $longName;
+                $gmData['collectionSystemTransfer']->description = $description;
                 $gmData['collectionSystemTransfer']->transferType = (int)$transferType;
                 $gmData['collectionSystemTransfer']->sourceDir = $sourceDir;
                 $gmData['collectionSystemTransfer']->destDir = $destDir;
@@ -913,6 +922,7 @@ class CollectionSystemTransfers extends Controller {
             #additional data needed for view
             $data['row'][0]->name = $name;
             $data['row'][0]->longName = $longName;
+            $data['row'][0]->description = $description;
             $data['row'][0]->transferType = $transferType;
             $data['row'][0]->sourceDir = $sourceDir;
             $data['row'][0]->destDir = $destDir;

@@ -215,6 +215,7 @@ class System extends Controller {
 
         if(isset($_POST['submit'])){
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $destDir = $_POST['destDir'] ?? '';
 
             if($longName == ''){
@@ -228,6 +229,7 @@ class System extends Controller {
             if(!$error){
                 $postdata = array(
                     'longName' => $longName,
+                    'description' => $description,
                     'destDir' => $destDir,
                 );
 
@@ -239,6 +241,7 @@ class System extends Controller {
             } else {
 
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->description = $description;
                 $data['row'][0]->destDir = $destDir;
             }
         }

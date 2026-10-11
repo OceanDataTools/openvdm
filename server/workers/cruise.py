@@ -87,8 +87,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def export_cruise_config(self, finalize=False):
         """Write the current cruise configuration to the cruise config file.
 
-        Transfer entries are reduced to their name, long name and destination
-        directory (no credentials), and the vessel settings from
+        Transfer and extra directory entries are reduced to their name, long
+        name, description and destination directory (no credentials), and the
+        vessel settings from
         ``openvdm.yaml`` are added as ``vessel`` when any are set. When the
         file already exists, its ``cruiseFinalizedOn`` value is kept. Queues
         an MD5 summary update for the file.
@@ -121,7 +122,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         def scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
-                allowed_keys = ['name', 'longName', 'destDir']
+                allowed_keys = ['name', 'longName', 'description', 'destDir']
                 for key in list(transfer.keys()):
                     if key not in allowed_keys:
                         transfer.pop(key)
