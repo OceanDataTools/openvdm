@@ -33,8 +33,8 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
-from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_lowering_readme_context, readme_settings,
-                               render_readme, write_readme)
+from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_lowering_readme_context, readme_filename,
+                               readme_settings, render_readme, write_readme)
 from server.lib.transfer_utils import redact_payload
 
 # Gearman task names this worker registers.
@@ -174,6 +174,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             logging.info("The lowering README is turned off (loweringReadme in openvdm.yaml)")
             return {'verdict': True, 'skipped': True}
 
+        try:
+            readme_fn = readme_filename(settings['filename'], self.cruise_id, self.lowering_id)
+        except ValueError as exc:
+            return {'verdict': False, 'reason': str(exc)}
+
         lowering_config_filepath = os.path.join(self.cruise_dir, self.lowering_dir,
                                                 self.shipboard_data_warehouse_config['loweringConfigFn'])
         try:
@@ -192,7 +197,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         context = build_lowering_readme_context(
             lowering_config, cruise_config, collection_systems, extra_directories,
-            self.ovdm.get_vessel_config(), settings['filename'])
+            self.ovdm.get_vessel_config(), readme_fn)
 
         try:
             text = render_readme(settings['template'], context)
@@ -200,7 +205,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             line = f", line {exc.lineno}" if getattr(exc, 'lineno', None) else ''
             return {'verdict': False, 'reason': f"Unable to build the README from {settings['template']}{line}: {exc}"}
 
-        readme_relpath = os.path.join(self.lowering_dir, settings['filename'])
+        readme_relpath = os.path.join(self.lowering_dir, readme_fn)
         readme_path = os.path.join(self.cruise_dir, readme_relpath)
         written, reason = write_readme(readme_path, text)
         if not written:
