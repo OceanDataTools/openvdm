@@ -49,8 +49,8 @@ Paths are relative to this directory.
 
 ### `{{ files.readme }}`: this file.
 ### `{{ files.cruise_config }}`: the cruise's OpenVDM configuration (JSON): the cruise details above and the directory layout.
-### `{{ files.md5_summary }}`: the MD5 checksum of every file in this directory,
-### `{{ files.md5_summary_md5 }}` holds the checksum of `{{ files.md5_summary }}` itself.
+### `{{ files.md5_summary }}`: the MD5 checksum of every file in this directory, to check that a copy of it is complete and unchanged.
+### `{{ files.md5_summary_md5 }}`: the MD5 checksum of `{{ files.md5_summary }}` itself.
 {% if files.data_dashboard_manifest %}
 ### `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard: the data and quality test results extracted from the raw files.
 {% endif %}
