@@ -4,7 +4,8 @@
 -- and the current lowering, cruiseExtent (#366) and loweringExtent (#399).
 -- CoreVars values were tinytext (255 bytes), too short for a description, so
 -- the column becomes text. Add a description to collection system transfers
--- and extra directories (#432), and the Rebuild Cruise README task (#431).
+-- and extra directories (#432), and the Rebuild Cruise README (#431) and
+-- Rebuild Lowering README (#445) tasks.
 -- Safe to run more than once: rows and columns are only added if they're
 -- missing.
 
@@ -66,3 +67,9 @@ INSERT INTO `OVDM_Tasks` (`name`, `longName`, `cruiseOrLowering`, `status`, `ena
 SELECT 'rebuildCruiseReadme', 'Rebuild the {cruise_name} README', 0, 2, 1, 0
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `OVDM_Tasks` WHERE `name` = 'rebuildCruiseReadme');
+
+-- The Rebuild Lowering README maintenance task (#445)
+INSERT INTO `OVDM_Tasks` (`name`, `longName`, `cruiseOrLowering`, `status`, `enable`, `pid`)
+SELECT 'rebuildLoweringReadme', 'Rebuild the {lowering_name} README', 1, 2, 1, 0
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `OVDM_Tasks` WHERE `name` = 'rebuildLoweringReadme');

@@ -2110,13 +2110,15 @@ EOF
         fi
     fi
 
-    # The cruise README template (#431). A copy that's already there is the
-    # site's own, so it's kept
-    if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2 ] ; then
-        echo "Building cruise README template"
-        cp ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2.dist ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2
-        chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2
-    fi
+    # The cruise and lowering README templates (#431, #445). A copy that's
+    # already there is the site's own, so it's kept
+    for _README_TEMPLATE in cruise_readme.md.j2 lowering_readme.md.j2; do
+        if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE} ] ; then
+            echo "Building ${_README_TEMPLATE%%_*} README template"
+            cp ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}.dist ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}
+            chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}
+        fi
+    done
 
     echo "Setting the vessel in ${_YAML}"
     write_vessel_config "${_YAML}"
