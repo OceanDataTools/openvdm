@@ -51,6 +51,19 @@ showOnlyCurrentCruiseDir: False
 # directory. (True|False)
 transferPublicData: True
 
+# The cruise README: a description of the cruise and its directory layout, at
+# the top of the cruise directory. It's rebuilt whenever the cruise config is
+# exported (Setup New Cruise, Edit Cruise, Finalize and Export OpenVDM
+# Config). The template is a Jinja2 file; to change it, copy
+# server/etc/cruise_readme.md.j2.dist to server/etc/cruise_readme.md.j2 and
+# edit the copy (the .dist is used while there's no copy). A relative template
+# path is relative to the OpenVDM directory. OpenVDM won't replace a file of
+# that name that it didn't write.
+cruiseReadme:
+    enable: True
+    filename: README.md
+    template: server/etc/cruise_readme.md.j2
+
 # maximum age of transfer log files to retain. String must conform with the python
 # datetime.timedelta standard
 # logfilePurgeTimedelta: "12 hours"

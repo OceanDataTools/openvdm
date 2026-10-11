@@ -4,12 +4,13 @@
 Registers four Gearman tasks:
 
 - ``setupNewCruise`` — create the cruise directory tree, initialize the data
-  dashboard and MD5 summary, sync public data, and run post-setup hooks.
+  dashboard and MD5 summary, write the cruise README, sync public data, and run
+  post-setup hooks.
 - ``finalizeCurrentCruise`` — run pre-finalize hooks, update the data dashboard
-  and MD5 summary, apply directory permissions, export the OpenVDM config, and
-  run post-finalize hooks.
+  and MD5 summary, apply directory permissions, export the OpenVDM config and
+  write the cruise README, and run post-finalize hooks.
 - ``exportOVDMConfig`` — write the current OpenVDM configuration as JSON into
-  the cruise directory.
+  the cruise directory, and the cruise README.
 - ``rsyncPublicDataToCruiseData`` — sync the ``/mnt/PublicData`` volume into
   the ``From_PublicData`` collection system transfer directory.
 """
@@ -24,6 +25,7 @@ import sys
 import time
 import traceback
 from os.path import dirname, realpath
+import jinja2
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -39,6 +41,7 @@ from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAME
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 
 from server.lib.openvdm import OpenVDM
+from server.lib.readme import build_cruise_readme_context, readme_settings, render_readme, write_readme
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -177,6 +180,69 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return {'verdict': False, 'reason': results['reason']}
 
         self.ovdm.update_md5_summary(updated=[cruise_config_fn], cruise_id=self.cruise_id, background=False)
+
+        return {'verdict': True}
+
+
+    def build_cruise_readme(self):  # pylint: disable=too-many-locals,too-many-return-statements
+        """Write the cruise README from its template (#431).
+
+        Run after :meth:`export_cruise_config`, whose config file gives the
+        finalized date. The settings are the ``cruiseReadme`` block of
+        ``openvdm.yaml`` (:func:`server.lib.readme.readme_settings`). A file
+        with the README's name that OpenVDM didn't write is left alone. Queues
+        an MD5 summary update for the README.
+
+        Returns:
+            dict: ``{'verdict': True}``, with ``'skipped': True`` when the
+            README is turned off; or ``{'verdict': False, 'reason': ...}``.
+        """
+
+        try:
+            settings = readme_settings(self.ovdm.config)
+        except ValueError as exc:
+            return {'verdict': False, 'reason': str(exc)}
+
+        if not settings['enable']:
+            logging.info("The cruise README is turned off (cruiseReadme in openvdm.yaml)")
+            return {'verdict': True, 'skipped': True}
+
+        try:
+            cruise_config = self.ovdm.get_cruise_config()
+            collection_systems = self.ovdm.get_collection_system_transfers()
+            extra_directories = self.ovdm.get_extra_directories()
+            show_lowerings = self.ovdm.get_show_lowering_components()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            return {'verdict': False, 'reason': f"Unable to get the cruise configuration from OpenVDM: {exc}"}
+
+        finalized_on = None
+        cruise_config_file_path = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['cruiseConfigFn'])
+        try:
+            with open(cruise_config_file_path, 'r', encoding='utf-8') as f:
+                finalized_on = json.load(f).get('cruiseFinalizedOn')
+        except (OSError, ValueError) as exc:
+            logging.warning("Unable to read the finalized date from %s: %s", cruise_config_file_path, exc)
+
+        context = build_cruise_readme_context(
+            cruise_config, collection_systems, extra_directories, self.ovdm.get_vessel_config(),
+            settings['filename'], finalized_on=finalized_on, show_lowerings=show_lowerings)
+
+        try:
+            text = render_readme(settings['template'], context)
+        except (jinja2.TemplateError, OSError) as exc:
+            line = f", line {exc.lineno}" if getattr(exc, 'lineno', None) else ''
+            return {'verdict': False, 'reason': f"Unable to build the README from {settings['template']}{line}: {exc}"}
+
+        readme_path = os.path.join(self.cruise_dir, settings['filename'])
+        written, reason = write_readme(readme_path, text)
+        if not written:
+            return {'verdict': False, 'reason': reason}
+
+        results = set_owner_group_permissions(self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], readme_path)
+        if not results['verdict']:
+            return {'verdict': False, 'reason': results['reason']}
+
+        self.ovdm.update_md5_summary(updated=[settings['filename']], cruise_id=self.cruise_id, background=False)
 
         return {'verdict': True}
 
@@ -540,12 +606,42 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         }))
 
 
+def _add_readme_part(worker, job_results, notify):
+    """Write the cruise README and add the result to *job_results*.
+
+    Nothing is added when the README is turned off.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        job_results: The job's results; a ``Write cruise README`` part is
+            appended.
+        notify: Also post an OpenVDM message when it fails, for tasks that
+            carry on afterwards (their outcome is their last part).
+    """
+
+    logging.info("Writing the cruise README")
+    output_results = worker.build_cruise_readme()
+
+    if output_results.get('skipped'):
+        return
+
+    if output_results['verdict']:
+        job_results['parts'].append({"partName": "Write cruise README", "result": "Pass"})
+        return
+
+    logging.error("Unable to write the cruise README: %s", output_results['reason'])
+    job_results['parts'].append({"partName": "Write cruise README", "result": "Fail", "reason": output_results['reason']})
+    if notify:
+        worker.ovdm.send_msg("Cruise README not written", output_results['reason'])
+
+
 def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-return-statements,too-many-statements
     """Gearman task: set up a new cruise.
 
     Creates the cruise directory structure, creates the MD5 summary files,
-    exports the cruise config, sets up the data dashboard directory and
-    manifest, and clears out the PublicData directory.
+    exports the cruise config, writes the cruise README (a failure there is
+    reported but doesn't stop the setup), sets up the data dashboard
+    directory and manifest, and clears out the PublicData directory.
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -613,6 +709,8 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
 
+    _add_readme_part(worker, job_results, notify=True)
+
     logging.info("Creating data dashboard directory structure and manifest file")
     worker.send_job_status(current_job, 7, 10)
 
@@ -660,8 +758,9 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     """Gearman task: finalize the current cruise.
 
     Runs the collection system transfers one last time, copies PublicData into
-    the cruise, exports the finalized cruise config, runs the post-finalize
-    hook tasks, then runs the cruise data transfers. (The pre-finalize hook
+    the cruise, exports the finalized cruise config, writes the cruise README
+    (a failure there is reported but doesn't stop finalizing), runs the
+    post-finalize hook tasks, then runs the cruise data transfers. (The pre-finalize hook
     tasks run in ``on_job_execute()``.)
 
     Args:
@@ -740,6 +839,8 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+
+    _add_readme_part(worker, job_results, notify=True)
 
     gm_data_post = {
         'cruiseID': worker.cruise_id,
@@ -821,10 +922,11 @@ def task_rsync_publicdata_to_cruise_data(worker, current_job):
 
 
 def task_export_cruise_config(worker, current_job):
-    """Gearman task: write the cruise config file.
+    """Gearman task: write the cruise config file and the cruise README.
 
     Exports the current cruise configuration to the cruise's config file
-    (``cruiseConfigFn``) and queues an MD5 summary update for it.
+    (``cruiseConfigFn``), writes the cruise README (#431), and queues MD5
+    summary updates for both.
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -847,6 +949,9 @@ def task_export_cruise_config(worker, current_job):
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+
+    # The README is this task's last part, so a failure fails the task
+    _add_readme_part(worker, job_results, notify=False)
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
