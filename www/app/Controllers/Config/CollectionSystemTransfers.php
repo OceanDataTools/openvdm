@@ -9,6 +9,7 @@ use Helpers\PendingPasswords;
 use Helpers\FtpFields;
 use Helpers\TransferFields;
 use Helpers\DescriptionTemplates;
+use Helpers\FileNamingGuide;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -133,6 +134,53 @@ class CollectionSystemTransfers extends Controller {
 
         View::rendertemplate('header',$data);
         View::render('Config/collectionSystemTransfers',$data);
+        View::rendertemplate('footer',$data);
+    }
+
+    // File Naming Guide (#451): what each collection system's files must be
+    // called to be transferred, from its filters. ?all=1 includes disabled
+    // transfers, ?id=N shows one transfer. Lowering-level transfers are only
+    // shown when lowerings are used.
+    public function fileNamingGuide(){
+        $warehouseModel = new \Models\Warehouse();
+        $showLowerings = $warehouseModel->getShowLoweringComponents();
+        $showAll = !empty($_GET['all']);
+        $onlyID = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+        $context = array(
+            'cruiseID' => (string) $warehouseModel->getCruiseID(),
+            'loweringID' => $showLowerings ? (string) $warehouseModel->getLoweringID() : '',
+            'cruiseStartDate' => (string) $warehouseModel->getCruiseStartDate(),
+            'cruiseEndDate' => (string) $warehouseModel->getCruiseEndDate(),
+            'loweringStartDate' => (string) $warehouseModel->getLoweringStartDate(),
+            'loweringEndDate' => (string) $warehouseModel->getLoweringEndDate(),
+            'now' => time(),
+        );
+        $typeNames = $this->_buildTransferTypesOptions();
+
+        $guides = array();
+        foreach ($this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName") as $cst) {
+            if ($onlyID && (int) $cst->collectionSystemTransferID !== $onlyID) {
+                continue;
+            }
+            if (!$onlyID && !$showAll && (int) $cst->enable !== 1) {
+                continue;
+            }
+            if (!$showLowerings && (int) $cst->cruiseOrLowering === 1) {
+                continue;
+            }
+            $guides[] = FileNamingGuide::guideFor($cst, $typeNames[$cst->transferType] ?? '', $context);
+        }
+
+        $data['title'] = 'File Naming Guide';
+        $data['guides'] = $guides;
+        $data['context'] = $context;
+        $data['placeholders'] = FileNamingGuide::placeholderKey($context);
+        $data['showAll'] = $showAll;
+        $data['onlyID'] = $onlyID;
+
+        View::rendertemplate('header',$data);
+        View::render('Config/fileNamingGuide',$data);
         View::rendertemplate('footer',$data);
     }
 
