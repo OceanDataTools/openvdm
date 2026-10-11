@@ -13,7 +13,8 @@
         }
     ],
     "require": {
-        "php": ">=8.2.0"
+        "php": ">=8.2.0",
+        "league/commonmark": "^2.7"
     },
     "autoload": {
         "psr-4": {"": "app/"}

@@ -515,7 +515,7 @@ function _install_packages_debian {
         cifs-utils fuse3 gdal-bin gearman-job-server git \
         libapache2-mod-php${PHP_VER} libapache2-mod-wsgi-py3 libgearman-dev \
         $MYSQL_PKGS \
-        php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl \
+        php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl php${PHP_VER}-mbstring \
         php${PHP_VER}-mysql php${PHP_VER}-yaml php${PHP_VER}-zip \
         python3 python3-dev python3-pip python3-venv \
         rclone rsync samba smbclient sshpass supervisor
@@ -664,7 +664,7 @@ function _install_packages_rhel {
         # does not prevent PHP itself from being installed).
         dnf module reset php -y 2>/dev/null || true
         dnf module enable php:8.3 -y 2>/dev/null || true
-        dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip
+        dnf install -y php php-cli php-common php-devel php-mbstring php-mysqlnd php-pear php-yaml php-zip
         # gearmand and libgearman are not in EPEL 10 — build from source so that
         # both the daemon and the headers needed for the PECL extension are available.
         if command -v gearmand &>/dev/null; then
@@ -695,12 +695,12 @@ function _install_packages_rhel {
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip
     else
         dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip
     fi
 
     # On RHEL 9, enable the mysql:8.0 module stream if the system has one.
