@@ -6,7 +6,11 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.17.0] – Unreleased
 
-**Upgrading:** update the database with `database/openvdm_216_to_217.sql`. If your `openvdm.yaml` hooks run `build_cruise_tracks.py`, remove `-u` and use the renamed options: `--no-combine`, `--kml-only`, `--geojson-only`, `--no-extent`, and `--position-sources` instead of `--config_file` (#388). Re-running the installer asks for the vessel settings and adds the `vessel` block to your `openvdm.yaml` (or copy it from `openvdm.yaml.dist`).
+**Upgrading:** the step-by-step instructions will be in INSTALL.md.
+- **Database:** update it with `database/openvdm_216_to_217.sql`. From 2.16.0, run `database/openvdm_2160_to_2161.sql` first.
+- **Trackline hooks:** in your `openvdm.yaml`, remove `-u` from the `build_cruise_tracks.py` and `build_lowering_tracks.py` hooks, and change any 2.16.0 option names that 2.16.1 and 2.16.2 warned about: `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file` and `--gps-sources` (#388, #392).
+- **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366).
+- **Vessel settings:** re-run the installer, which asks for them, or copy the `vessel` block from `openvdm.yaml.dist` into your `openvdm.yaml` (#365).
 
 ### Added
 - **Cruise Description:** an optional, multi-line description on the Setup New Cruise and Edit Cruise forms. It's returned by `getCruiseConfig` (and `api/warehouse/getCruiseDescription`), saved in each cruise's `ovdmConfig.json`, and shown on the main page's cruise information panel. Cruises from before 2.17 have an empty description. The CoreVars `value` column becomes `text`, since `tinytext` holds only 255 bytes (#367).
@@ -18,24 +22,16 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **Antimeridian:** a track that crosses it gives westernmost > easternmost, as R2R does.
   - **Where it's available:** `getCruiseConfig` (and `api/warehouse/getCruiseExtent`) and each cruise's `ovdmConfig.json`.
   - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
-  - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no-extent` skips it.
-  - Copy the updated `build_cruise_tracks.py.dist` over your `build_cruise_tracks.py` (#366).
-- **`build_lowering_tracks.py` output:** the same changes as `build_cruise_tracks.py`, adapted for lowerings.
-  - **Where it goes:** `-e/--extra-directory NAME` (default `Tracklines`) or `-o OUTPUTDIR`, not both.
-  - **Checks:** the extra directory must exist, be enabled and have its folder. A lowering-level one is inside the lowering (`<loweringDataBaseDir>/<loweringID>/<destDir>`), and `{loweringID}` in a cruise-level one's path is filled in.
-  - **Ownership and MD5:** extra-directory output always belongs to OpenVDM's warehouse user and is added to the cruise's MD5 summary. `-o` output isn't. `-u/--username` is removed, so take it out of your hook.
-  - **Renamed:** `--position-sources FILE` replaces `--gps-sources`. The sources YAML's list is now `PositionSources`, and `GPSSources` is still accepted.
-  - **Failures:** a failed MD5 update exits 1 with a message. Copy the updated `build_lowering_tracks.py.dist` over your `build_lowering_tracks.py` (#392).
-- **Trackline scripts share their code:** the code common to `build_cruise_tracks.py` and `build_lowering_tracks.py` is now in `server/lib/tracks.py`, so future fixes arrive with an OpenVDM update instead of a new `.dist` copy. Their options and output are unchanged. Copy both updated `.dist` files over your scripts once more, keeping your own position sources (#394).
-- **`openvdm.yaml.dist` hook examples:** commented-out `postDataDashboard` blocks for `build_cruise_tracks.py` and `build_lowering_tracks.py`. Each uses the `{collectionSystemTransferName}` token for the collection system, and shows `--position-sources`, `--extra-directory` and `--no-extent` commented out. The example for the nonexistent `r2r_nav_manager.py` is removed (#396).
-- **`build_cruise_tracks.py` output:**
-  - **Where it goes:** `-e/--extra-directory NAME` writes the tracklines to that extra directory (default `Tracklines`). It can't be used with `-o OUTPUTDIR`, which writes to a folder.
-  - **Checks:** the extra directory must exist, be enabled and have its folder, and `{cruiseID}` in its path is filled in. A per-lowering directory is refused. Each problem stops the script with a one-line message.
-  - **MD5 summary:** tracklines in an extra directory are now added to the cruise's MD5 summary. `-o` output isn't.
-  - **Ownership:** tracklines in an extra directory always belong to OpenVDM's warehouse user (the installer's OpenVDM user). `-o` files keep whoever wrote them. The `-u/--username` option is removed, so take `-u` out of your `build_cruise_tracks.py` hook in `openvdm.yaml`, or the script stops with a usage error.
-  - **Failures:** if setting the extent or queueing the MD5 update fails, the script reports it and exits 1, so the hook's OpenVDM message says why.
-  - If nav-qa-processing's OpenVDM hook sets the cruise extent, add `--no-extent` to the `build_cruise_tracks.py` hook.
-  - **Renamed options:** long options now use hyphens: `--no-combine`, `--kml-only`, `--geojson-only` and `--no-extent`. The sources file option is now `--position-sources`, replacing `--config_file`. The sources YAML's list is now `PositionSources`, and `GPSSources` is still accepted (#388).
+  - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no-extent` skips it. If nav-qa-processing's OpenVDM hook sets the extent from its quality-checked fixes, add `--no-extent` to the `build_cruise_tracks.py` hook.
+  - **Failures:** if setting the extent fails, the script reports it and exits 1, as it does for a failed MD5 update, so the hook's OpenVDM message says why (#366, #388).
+- **`openvdm.yaml.dist` trackline hook examples:** commented-out `postDataDashboard` blocks for `build_cruise_tracks.py` and `build_lowering_tracks.py`. Each uses the `{collectionSystemTransferName}` token for the collection system, and shows `--position-sources`, `--extra-directory` and `--no-extent` commented out (#396).
+
+### Removed
+- **Trackline scripts' 2.16.0 options:** `build_cruise_tracks.py` and `build_lowering_tracks.py` no longer accept the names that 2.16.1 deprecated:
+  - `--no_combine`, `--kml_only` and `--geojson_only`; use `--no-combine`, `--kml-only` and `--geojson-only`;
+  - `--config_file` and `--gps-sources`; use `--position-sources`.
+  - `-u/--username` is removed too: `-o` output keeps whoever wrote it, and extra directory output belongs to the warehouse user, as before.
+  - A hook that still uses one stops with a usage error (#388, #392).
 
 ---
 
