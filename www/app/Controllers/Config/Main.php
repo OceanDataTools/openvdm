@@ -13,6 +13,7 @@ class Main extends Controller {
     private $_collectionSystemTransfersModel;
     private $_extraDirectoriesModel;
     private $_cruiseDataTransfersModel;
+    private \Models\Config\Messages $_messagesModel;
 
     public function __construct(){
 
@@ -25,6 +26,7 @@ class Main extends Controller {
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
+        $this->_messagesModel = new \Models\Config\Messages();
     }
 
     /**
@@ -507,6 +509,11 @@ class Main extends Controller {
             }
 
             if(!$error){
+
+                # Start the new cruise with no messages, so every message is
+                # about it. Cleared before the setupNewCruise job, so a message
+                # the job posts (e.g. that it failed) is kept (#403)
+                $this->_messagesModel->deleteAllMessages();
 
                 $this->_warehouseModel->setCruiseID(array('value' => $cruiseID));
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
