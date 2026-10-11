@@ -816,6 +816,27 @@ class Main extends Controller {
         View::rendertemplate('footer',$data);
     }
 
+    public function rebuildCruiseReadme() {
+
+        $gmData = (object) array();
+
+        # create the gearman client
+        $gmc= new \GearmanClient();
+
+        # add the default server (localhost)
+        $gmc->addServer();
+
+        #submit job to Gearman, wait for results
+        $data['jobResults'] = json_decode($gmc->doNormal("rebuildCruiseReadme", json_encode($gmData)));
+        $data = array_merge($data, $this->mainPageData());
+
+        $data['jobName'] = 'Rebuild ' . CRUISE_NAME . ' README';
+
+        View::rendertemplate('header',$data);
+        View::render('Config/main',$data);
+        View::rendertemplate('footer',$data);
+    }
+
     public function exportLoweringConfig() {
 
         $gmData = (object) array();

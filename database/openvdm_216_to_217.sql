@@ -3,8 +3,9 @@
 -- Add the cruise description (#367) and the cruise's bounding box,
 -- cruiseExtent (#366). CoreVars values were tinytext (255 bytes), too short
 -- for a description, so the column becomes text. Add a description to
--- collection system transfers and extra directories (#432). Safe to run more
--- than once: rows and columns are only added if they're missing.
+-- collection system transfers and extra directories (#432), and the Rebuild
+-- Cruise README task (#431). Safe to run more than once: rows and columns are
+-- only added if they're missing.
 
 ALTER TABLE `OVDM_CoreVars` MODIFY `value` text;
 
@@ -53,3 +54,9 @@ UPDATE `OVDM_ExtraDirectories`
 SET `description` = 'Files from the ship''s PublicData share, where scientists and crew share files during the cruise. They''re copied here when the cruise is finalized.'
 WHERE `name` = 'From_PublicData' AND `required` = 1
   AND (`description` IS NULL OR `description` = '');
+
+-- The Rebuild Cruise README maintenance task (#431)
+INSERT INTO `OVDM_Tasks` (`name`, `longName`, `cruiseOrLowering`, `status`, `enable`, `pid`)
+SELECT 'rebuildCruiseReadme', 'Rebuild the {cruise_name} README', 0, 2, 1, 0
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `OVDM_Tasks` WHERE `name` = 'rebuildCruiseReadme');
