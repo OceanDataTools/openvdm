@@ -59,13 +59,14 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
             :data:`DEFAULT_TEMPLATE` or :data:`DEFAULT_LOWERING_TEMPLATE`.
 
     Returns:
-        dict: ``enable`` (bool), ``filename`` (the README's name in the
-        cruise directory) and ``template`` (absolute path of the template to
-        use).
+        dict: ``enable`` (bool), ``filename`` (the README's name, which may
+        use ``{cruiseID}`` and ``{loweringID}``; see :func:`readme_filename`)
+        and ``template`` (absolute path of the template to use).
 
     Raises:
-        ValueError: If the file name isn't a plain file name, or neither the
-            template nor its ``.dist`` exists.
+        ValueError: If the file name isn't text (e.g. an unquoted
+            ``{cruiseID}``) or a plain file name, or neither the template nor
+            its ``.dist`` exists.
     """
     block = config.get(block_name)
     block = block if isinstance(block, dict) else {}
@@ -73,7 +74,12 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
     enable = block.get('enable', True)
     enable = enable if isinstance(enable, bool) else str(enable).strip().lower() not in ('false', 'no', 'off', '0')
 
-    filename = str(block.get('filename') or DEFAULT_README_FN).strip()
+    filename = block.get('filename') or DEFAULT_README_FN
+    if not isinstance(filename, str):
+        # e.g. an unquoted {cruiseID}, which YAML reads as a mapping
+        raise ValueError(f"{block_name} filename must be text; put it in quotes, "
+                         f'e.g. filename: "{{cruiseID}}_README.md"')
+    filename = filename.strip()
     if os.path.basename(filename) != filename or filename in ('.', '..'):
         raise ValueError(f"{block_name} filename must be a file name, not a path: {filename}")
 
@@ -87,6 +93,33 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
             raise ValueError(f"README template not found: {template}")
 
     return {'enable': enable, 'filename': filename, 'template': template}
+
+
+def readme_filename(filename: str, cruise_id: str, lowering_id: Optional[str] = None) -> str:
+    """Return a README's file name with ``{cruiseID}`` and ``{loweringID}`` filled in (#447).
+
+    Args:
+        filename: The ``filename`` setting, e.g. ``{cruiseID}_README.md``.
+        cruise_id: The cruise's ID.
+        lowering_id: The lowering's ID, for a lowering README; ``None`` for the
+            cruise README, whose name can't use ``{loweringID}`` since it
+            describes every lowering.
+
+    Returns:
+        str: The file name, e.g. ``RR2601_README.md``.
+
+    Raises:
+        ValueError: If the cruise README's name uses ``{loweringID}``, or the
+            filled-in name isn't a plain file name (e.g. an ID with ``/``).
+    """
+    if lowering_id is None and '{loweringID}' in filename:
+        raise ValueError(f"The cruise README's filename can't use {{loweringID}}: {filename}")
+    name = filename.replace('{cruiseID}', cruise_id or '')
+    if lowering_id is not None:
+        name = name.replace('{loweringID}', lowering_id)
+    if not name or os.path.basename(name) != name or name in ('.', '..'):
+        raise ValueError(f"The README's filename must be a file name, not a path: {name}")
+    return name
 
 
 def openvdm_version() -> str:

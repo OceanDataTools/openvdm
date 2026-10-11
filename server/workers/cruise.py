@@ -43,7 +43,7 @@ from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAME
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 
 from server.lib.openvdm import OpenVDM
-from server.lib.readme import build_cruise_readme_context, readme_settings, render_readme, write_readme
+from server.lib.readme import build_cruise_readme_context, readme_filename, readme_settings, render_readme, write_readme
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -211,6 +211,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return {'verdict': True, 'skipped': True}
 
         try:
+            readme_fn = readme_filename(settings['filename'], self.cruise_id)
+        except ValueError as exc:
+            return {'verdict': False, 'reason': str(exc)}
+
+        try:
             cruise_config = self.ovdm.get_cruise_config()
             collection_systems = self.ovdm.get_collection_system_transfers()
             extra_directories = self.ovdm.get_extra_directories()
@@ -228,7 +233,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         context = build_cruise_readme_context(
             cruise_config, collection_systems, extra_directories, self.ovdm.get_vessel_config(),
-            settings['filename'], finalized_on=finalized_on, show_lowerings=show_lowerings)
+            readme_fn, finalized_on=finalized_on, show_lowerings=show_lowerings)
 
         try:
             text = render_readme(settings['template'], context)
@@ -236,7 +241,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             line = f", line {exc.lineno}" if getattr(exc, 'lineno', None) else ''
             return {'verdict': False, 'reason': f"Unable to build the README from {settings['template']}{line}: {exc}"}
 
-        readme_path = os.path.join(self.cruise_dir, settings['filename'])
+        readme_path = os.path.join(self.cruise_dir, readme_fn)
         written, reason = write_readme(readme_path, text)
         if not written:
             return {'verdict': False, 'reason': reason}
@@ -245,7 +250,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if not results['verdict']:
             return {'verdict': False, 'reason': results['reason']}
 
-        self.ovdm.update_md5_summary(updated=[settings['filename']], cruise_id=self.cruise_id, background=False)
+        self.ovdm.update_md5_summary(updated=[readme_fn], cruise_id=self.cruise_id, background=False)
 
         return {'verdict': True}
 

@@ -57,8 +57,10 @@ transferPublicData: True
 # Config). The template is a Jinja2 file; to change it, copy
 # server/etc/cruise_readme.md.j2.dist to server/etc/cruise_readme.md.j2 and
 # edit the copy (the .dist is used while there's no copy). A relative template
-# path is relative to the OpenVDM directory. OpenVDM won't replace a file of
-# that name that it didn't write.
+# path is relative to the OpenVDM directory. The filename may use {cruiseID},
+# e.g. "{cruiseID}_README.md"; keep the quotes, since a name starting with "{"
+# is a YAML error without them. OpenVDM won't replace a file of that name that
+# it didn't write.
 cruiseReadme:
     enable: True
     filename: README.md
@@ -68,6 +70,8 @@ cruiseReadme:
 # whenever the lowering config is exported (Setup New Lowering, Finalize
 # Lowering and Export Lowering Config). Its template is
 # server/etc/lowering_readme.md.j2, copied from its .dist like the cruise one.
+# The filename may use {cruiseID} and {loweringID}, e.g.
+# "{cruiseID}_{loweringID}_README.md" (with the quotes).
 loweringReadme:
     enable: True
     filename: README.md
