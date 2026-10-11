@@ -116,6 +116,23 @@ class Config
         define('SHOW_CRUISE_META_IN_UI', false);
 
         /*
+         * Templates for a new collection system transfer's or extra
+         * directory's Description, shown in the cruise and lowering READMEs.
+         * The add forms start with them, and the edit forms' "Use template"
+         * button fills an empty Description with them. A line still showing
+         * its <...> prompt when the form is saved is left out. Set one to ''
+         * to turn its template off.
+         */
+        define('CST_DESCRIPTION_TEMPLATE',
+            "Source: <instrument or acquisition system, and what it records>\n" .
+            "Files: <file types and extensions, naming, how often new files appear>\n" .
+            "Sub-directories: <each sub-directory and what it holds, or \"none\">");
+        define('EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE',
+            "Contents: <what's put here, and by whom or what>\n" .
+            "Files: <file types and extensions>\n" .
+            "Sub-directories: <each sub-directory and what it holds, or \"none\">");
+
+        /*
          * Set default controller and method for legacy calls.
          */
         define('DEFAULT_CONTROLLER', 'welcome');

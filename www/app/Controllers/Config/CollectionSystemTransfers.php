@@ -8,6 +8,7 @@ use Helpers\Session;
 use Helpers\PendingPasswords;
 use Helpers\FtpFields;
 use Helpers\TransferFields;
+use Helpers\DescriptionTemplates;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -157,7 +158,7 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -333,7 +334,7 @@ class CollectionSystemTransfers extends Controller {
         } else if(isset($_POST['inlineTest'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -531,7 +532,7 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
@@ -750,7 +751,7 @@ class CollectionSystemTransfers extends Controller {
 
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
             $sourceDir = $_POST['sourceDir'] ?? '';
             $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');

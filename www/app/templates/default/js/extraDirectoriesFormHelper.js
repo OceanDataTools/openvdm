@@ -15,6 +15,28 @@ $(function () {
     }
 
     // ---------------------------------------------------------------------------
+    // Description template (#449): the "Use template" button fills an empty
+    // Description with it, and is only enabled while the Description is empty
+    // ---------------------------------------------------------------------------
+
+    function setDescriptionTemplateButton() {
+        $('.use-description-template').prop('disabled', $('textarea[name=description]').val().trim() !== '');
+    }
+
+    $('.use-description-template').on('click', function () {
+        var description = $('textarea[name=description]');
+        if (description.val().trim() === '') {
+            description.val($(this).attr('data-template')).trigger('focus');
+            setDescriptionTemplateButton();
+        }
+    });
+
+    $('textarea[name=description]').on('input', setDescriptionTemplateButton);
+    if ($('textarea[name=description]').length) {
+        setDescriptionTemplateButton();
+    }
+
+    // ---------------------------------------------------------------------------
     // Normalize on blur (immediate feedback) and on submit (safety net)
     // ---------------------------------------------------------------------------
 

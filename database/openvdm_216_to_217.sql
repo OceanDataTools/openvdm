@@ -50,17 +50,20 @@ PREPARE add_column FROM @add_column;
 EXECUTE add_column;
 DEALLOCATE PREPARE add_column;
 
--- Describe the required extra directories, as new installs do. Descriptions
--- already written are kept.
+-- Describe the required extra directories, as new installs do, in the shape
+-- of the extra directory description template (#449). Descriptions written by
+-- hand are kept; the earlier 2.17 wording (#432) is replaced.
 UPDATE `OVDM_ExtraDirectories`
-SET `description` = 'The files the Data Dashboard is built from: the data and quality test results OpenVDM''s plugins extract from the raw files (JSON), and the manifest that lists them.'
+SET `description` = CONCAT('Contents: the files OpenVDM''s Data Dashboard is built from: the data and quality test results its plugins extract from the collection systems'' raw files, and the manifest that lists them. Written by OpenVDM.', CHAR(10), 'Files: JSON (.json): one for each processed raw file, and the manifest.', CHAR(10), 'Sub-directories: the same folders as the raw files in the cruise directory. Each lowering''s files and manifest are under its lowering''s folder.')
 WHERE `name` = 'Dashboard_Data' AND `required` = 1
-  AND (`description` IS NULL OR `description` = '');
+  AND (`description` IS NULL OR `description` = ''
+       OR `description` = 'The files the Data Dashboard is built from: the data and quality test results OpenVDM''s plugins extract from the raw files (JSON), and the manifest that lists them.');
 
 UPDATE `OVDM_ExtraDirectories`
-SET `description` = 'Files from the ship''s PublicData share, where scientists and crew share files during the cruise. They''re copied here when the cruise is finalized.'
+SET `description` = CONCAT('Contents: files from the ship''s PublicData share, where scientists and crew share files during the cruise, copied here when the cruise is finalized.', CHAR(10), 'Files: any type, as saved on the share.', CHAR(10), 'Sub-directories: as on the PublicData share.')
 WHERE `name` = 'From_PublicData' AND `required` = 1
-  AND (`description` IS NULL OR `description` = '');
+  AND (`description` IS NULL OR `description` = ''
+       OR `description` = 'Files from the ship''s PublicData share, where scientists and crew share files during the cruise. They''re copied here when the cruise is finalized.');
 
 -- The Rebuild Cruise README maintenance task (#431)
 INSERT INTO `OVDM_Tasks` (`name`, `longName`, `cruiseOrLowering`, `status`, `enable`, `pid`)

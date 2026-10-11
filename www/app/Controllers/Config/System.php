@@ -5,6 +5,7 @@ use Core\Controller;
 use Core\View;
 use Helpers\Session;
 use Helpers\Url;
+use Helpers\DescriptionTemplates;
 
 class System extends Controller {
 
@@ -215,7 +216,7 @@ class System extends Controller {
 
         if(isset($_POST['submit'])){
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::extraDirectory());
             $destDir = $_POST['destDir'] ?? '';
 
             if($longName == ''){
