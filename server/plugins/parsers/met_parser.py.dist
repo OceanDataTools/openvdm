@@ -119,7 +119,7 @@ class MetParser(OpenVDMCSVParser):
             else:
                 self.add_quality_test_passed(name)
 
-        df = self.resample_data(df)
+        df = self.resample_data(df, angle_cols=['vector_wind_dir'])
         df = self.round_data(df, ROUNDING)
         df = df.set_index('date_time')
 

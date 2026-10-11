@@ -69,8 +69,9 @@ from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-posi
 # ----------------------------------------------------------------------
 
 # Position sources used when no --position-sources file is given; edit to match this vehicle.
+# They apply to the collection system the hook names; add
+# "CollectionSystem: <name>" to tie them to one.
 DEFAULT_POSITION_SOURCES_YAML = """
-CollectionSystem: ROV_OpenRVDAS
 PositionSources:
   - device: USBL-PRI
     type: usbl_pri_gga

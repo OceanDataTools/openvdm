@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Parser for Valeport thru-hull SVS (sound velocity and temperature) data.
+
+Parses timestamped log files of Valeport SVS readings, a temperature (°C) and a
+sound velocity (m/s) separated by whitespace (e.g.
+``2026-10-05T22:06:36.905856Z,21.830 1487.9``), and returns the JSON-formatted
+plugin data used by OpenVDM's Data Dashboard.
+"""
+
+import logging
+import sys
+from os.path import dirname, realpath
+
+import pandas as pd
+
+sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
+from server.lib.openvdm_plugin import OpenVDMCSVParser  # noqa: E402  pylint: disable=wrong-import-position
+
+PROC_COLS = ['date_time', 'temp_c', 'sv_ms']
+
+# The values after the timestamp, in order
+FIELDS = ['temp_c', 'sv_ms']
+
+ROUNDING = {
+    'temp_c': 3,
+    'sv_ms': 2,
+}
+
+
+class SSVValeportParser(OpenVDMCSVParser):  # pylint: disable=too-few-public-methods
+    """Parser for Valeport thru-hull SVS log files."""
+
+    MAX_DELTA_T = pd.Timedelta('10 seconds')
+
+    # Plausible sea water values
+    MIN_SV = 1400
+    MAX_SV = 1600
+    MIN_TEMP = -2
+    MAX_TEMP = 40
+
+    def __init__(self, start_dt=None, stop_dt=None, time_format=None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                 skip_header=False, use_openvdm_api=False):
+        super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
+                         time_format=time_format, skip_header=skip_header,
+                         use_openvdm_api=use_openvdm_api)
+
+    def parse(self, filepath):  # pylint: disable=too-many-locals,too-many-statements
+        """Parse the Valeport SVS file and return plugin data dict."""
+        raw_data = {col: [] for col in self.proc_cols}
+        errors = []
+
+        try:
+            for lineno, timestamp_str, remainder, _ in self.read_lines_with_timestamps(filepath):
+                values = remainder.split()
+                try:
+                    if len(values) != len(FIELDS):
+                        raise ValueError(f"{len(values)} values, not {len(FIELDS)}")
+                    field_data = dict(zip(FIELDS, (float(value) for value in values)))
+                except ValueError as err:
+                    errors.append(lineno)
+                    logging.debug("Line %s skipped: %s", lineno, err)
+                    continue
+
+                raw_data['date_time'].append(timestamp_str)
+                raw_data['temp_c'].append(field_data['temp_c'])
+                raw_data['sv_ms'].append(field_data['sv_ms'])
+
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            logging.error("Failed to read file %s: %s", filepath, err)
+            return None
+
+        if not raw_data['date_time']:
+            logging.warning("No valid Valeport SVS data in file: %s", filepath)
+            return None
+
+        df = pd.DataFrame(raw_data)
+        df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
+        df = df.dropna(subset=['date_time']).set_index('date_time')
+
+        if self.start_dt or self.stop_dt:
+            df = self.crop_data(df)
+        if df.empty:
+            logging.warning("Dataframe empty after cropping: %s", filepath)
+            return None
+
+        deltas = df.index.to_series().diff()
+        bad_sv = len(df[(df['sv_ms'] < self.MIN_SV) | (df['sv_ms'] > self.MAX_SV)])
+        bad_temp = len(df[(df['temp_c'] < self.MIN_TEMP) | (df['temp_c'] > self.MAX_TEMP)])
+        bad_delta = int((deltas > self.MAX_DELTA_T).sum())
+
+        # -------------------------
+        # Statistics
+        # -------------------------
+        self.add_row_validity_stat([len(df), len(errors)])
+        self.add_time_bounds_stat([df.index.min().to_pydatetime(), df.index.max().to_pydatetime()])
+        self.add_bounds_stat([round(deltas.min().total_seconds(), 3), round(deltas.max().total_seconds(), 3)],
+                             'DeltaT Bounds', 'seconds')
+        self.add_value_validity_stat([int((deltas <= self.MAX_DELTA_T).sum()), bad_delta], 'DeltaT Validity')
+        self.add_bounds_stat([round(df['sv_ms'].min(), ROUNDING['sv_ms']),
+                              round(df['sv_ms'].max(), ROUNDING['sv_ms'])], 'SV Bounds', 'm/s')
+        self.add_value_validity_stat([len(df) - bad_sv, bad_sv], 'SV Validity')
+        self.add_bounds_stat([round(df['temp_c'].min(), ROUNDING['temp_c']),
+                              round(df['temp_c'].max(), ROUNDING['temp_c'])], 'Temperature Bounds', 'C')
+        self.add_value_validity_stat([len(df) - bad_temp, bad_temp], 'Temperature Validity')
+
+        # -------------------------
+        # Quality tests
+        # -------------------------
+        for name, total, bad in [
+            ('Rows', len(df) + len(errors), len(errors)),
+            ('DeltaT', len(df), bad_delta),
+            ('SV', len(df), bad_sv),
+            ('Temperature', len(df), bad_temp),
+        ]:
+            rate = bad / total if total else 0
+            if rate > 0.25:
+                self.add_quality_test_failed(name)
+            elif rate > 0.10:
+                self.add_quality_test_warning(name)
+            else:
+                self.add_quality_test_passed(name)
+
+        # -------------------------
+        # Visualization
+        # -------------------------
+        df = self.round_data(self.resample_data(df), ROUNDING).set_index('date_time')
+        for col, unit, label in [('sv_ms', 'm/s', 'Sound Velocity'), ('temp_c', 'C', 'Temperature')]:
+            series = df[col].dropna()
+            times = series.index.tz_localize('UTC') if series.index.tz is None else series.index
+            self.add_visualization_data({
+                'data': [[int(ts.timestamp() * 1000), value] for ts, value in zip(times, series)],
+                'unit': unit,
+                'label': label,
+            })
+
+        self.send_error_msg(errors, filepath)
+        self.plugin_data = self._sanitize_for_json(self.plugin_data)  # pylint: disable=attribute-defined-outside-init
+        return self.plugin_data
+
+
+# -------------------------------------------------------------------------------------
+# Standalone CLI
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    SSVValeportParser.run_cli()

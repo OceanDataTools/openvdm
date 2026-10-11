@@ -6,6 +6,7 @@ satellites, HDOP, altitude and geoid height) and returns the JSON-formatted
 plugin data used by OpenVDM's Data Dashboard.
 """
 
+import re
 import sys
 import logging
 from datetime import datetime
@@ -38,6 +39,10 @@ FIELDS = [
     "dgps_station"
 ]
 
+# NMEA latitude (ddmm.mmmm) and longitude (dddmm.mmmm)
+LATITUDE_RE = re.compile(r'^\d{4}\.\d+$')
+LONGITUDE_RE = re.compile(r'^\d{5}\.\d+$')
+
 ROUNDING = {
     'latitude': 8,
     'longitude': 8,
@@ -67,6 +72,59 @@ class GGAParser(OpenVDMCSVParser):
     def _hemisphere_correction(lat_lon, hemisphere):
         return -lat_lon if hemisphere in ('S', 'W') else lat_lon
 
+    def _position(self, field_data):
+        """Return a GGA sentence's latitude and longitude in decimal degrees.
+
+        Args:
+            field_data: The sentence's fields by name (``FIELDS``).
+
+        Returns:
+            tuple: ``(latitude, longitude)``; south and west are negative.
+
+        Raises:
+            ValueError: If a value isn't a number, or the position is out of
+                range.
+        """
+        latitude = float(field_data['latitude'][:2]) + float(field_data['latitude'][2:])/60
+        latitude = self._hemisphere_correction(latitude, field_data['NS'])
+
+        longitude = float(field_data['longitude'][:3]) + float(field_data['longitude'][3:])/60
+        longitude = self._hemisphere_correction(longitude, field_data['EW'])
+
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            raise ValueError(f"position out of range: {latitude}, {longitude}")
+        return latitude, longitude
+
+    def _check_sentence(self, sentence, fields, field_data):
+        """Raise ``ValueError`` if a GGA sentence is corrupt.
+
+        Serial loggers can splice or cut short sentences; their fields would
+        be read as wrong positions. GPS receivers always send the checksum, so
+        a sentence without one has been cut short. A corrupt sentence's
+        checksum can still match by chance (1 in 256), so the fields' number
+        and format are checked too.
+
+        Args:
+            sentence: The sentence, from ``$`` to the checksum.
+            fields: *sentence* split on commas.
+            field_data: *fields* by name (``FIELDS``).
+
+        Raises:
+            ValueError: If the checksum is wrong or missing, there aren't 15
+                fields, the position isn't ``ddmm.mmmm``/``dddmm.mmmm`` with
+                ``N``/``S`` and ``E``/``W``, or the altitude units aren't ``M``.
+        """
+        if not self.nmea_checksum_ok(sentence, required=True):
+            raise ValueError("bad or missing checksum")
+        if len(fields) != len(FIELDS):
+            raise ValueError(f"{len(fields)} fields, not {len(FIELDS)}")
+        if field_data['NS'] not in ('N', 'S') or field_data['EW'] not in ('E', 'W'):
+            raise ValueError("hemisphere isn't N/S and E/W")
+        if not (LATITUDE_RE.match(field_data['latitude']) and LONGITUDE_RE.match(field_data['longitude'])):
+            raise ValueError("position isn't ddmm.mmmm, dddmm.mmmm")
+        if field_data['altitude_units'] not in ('M', '') or field_data['height_units'] not in ('M', ''):
+            raise ValueError("altitude units aren't M")
+
     def parse(self, filepath) -> dict | None:
         """Parse the GGA file and return plugin data dict."""
         raw_data = {col: [] for col in self.proc_cols}
@@ -80,11 +138,9 @@ class GGAParser(OpenVDMCSVParser):
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
-                    latitude = float(field_data['latitude'][:2]) + float(field_data['latitude'][2:])/60
-                    latitude = self._hemisphere_correction(latitude, field_data['NS'])
+                    self._check_sentence(remainder, fields, field_data)
 
-                    longitude = float(field_data['longitude'][:3]) + float(field_data['longitude'][3:])/60
-                    longitude = self._hemisphere_correction(longitude, field_data['EW'])
+                    latitude, longitude = self._position(field_data)
 
                     num_satellites = int(field_data['num_satellites'])
                     hdop = float(field_data['hdop'])
