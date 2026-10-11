@@ -38,7 +38,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, sshpass_command, test_cst_source
 from server.lib.openvdm import OpenVDM
@@ -1025,7 +1025,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
 
             cst_cfg = payload_obj.get('collectionSystemTransfer', {})
             cst_id = cst_cfg.get('collectionSystemTransferID')

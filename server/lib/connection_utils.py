@@ -822,10 +822,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
                 f"~/.ssh/{', '.join(DEFAULT_SSH_IDENTITIES)} exists")
         out[rclone_remote]["key_file"] = identity_file
 
-    # Print for debugging
+    # Print for debugging; the obscured password can be revealed with
+    # "rclone reveal", so it's masked (#430)
     logging.debug(f"[{rclone_remote}]")
     for k, v in out[rclone_remote].items():
-        logging.debug(f"{k} = {v}")
+        logging.debug(f"{k} = {'****' if k == 'pass' else v}")
 
     # Write config, overwriting existing file
     with open(rclone_config, "w") as f:

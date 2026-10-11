@@ -32,7 +32,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, set_owner_group_permissions, transfer_exclude_patterns, temporary_directory, write_list_file
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError, error_detail
+from server.lib.transfer_utils import TransferCommandError, error_detail, redact_payload
 from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
@@ -403,7 +403,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("Payload: %s", current_job.data)
+            logging.debug("Payload: %s", redact_payload(current_job.data))
 
             cdt_id = payload_obj['cruiseDataTransfer']['cruiseDataTransferID']
             self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)

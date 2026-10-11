@@ -31,6 +31,7 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_utils import redact_payload
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -158,7 +159,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)

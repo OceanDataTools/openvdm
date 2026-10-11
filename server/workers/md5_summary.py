@@ -28,6 +28,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM, UPDATE_MD5_SUMMARY_TASK
+from server.lib.transfer_utils import redact_payload
 
 BUF_SIZE = 65536  # read files in 64kb chunks
 
@@ -235,7 +236,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
