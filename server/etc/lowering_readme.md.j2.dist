@@ -23,9 +23,6 @@ This directory holds the data collected during lowering {{ lowering.loweringID }
 {% if lowering.loweringExtent %}
 - **Extent:** {{ lowering.loweringExtent.westernmost }} to {{ lowering.loweringExtent.easternmost }} longitude, {{ lowering.loweringExtent.southernmost }} to {{ lowering.loweringExtent.northernmost }} latitude (decimal degrees)
 {% endif %}
-{% if lowering.loweringFinalizedOn %}
-- **Finalized:** {{ lowering.loweringFinalizedOn }}
-{% endif %}
 {% if vessel.name %}
 - **Vessel:** {{ vessel.name }}
 {% endif %}
@@ -34,23 +31,29 @@ This directory holds the data collected during lowering {{ lowering.loweringID }
 {% endif %}
 
 ## Directory layout
-
 Paths are relative to this directory.
 {# Each line of a description ends in two spaces, a Markdown line break, so
    its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
-{% macro folder(d) %}
-- `{{ d.destDir }}/`: **{{ d.longName or d.name }}**
+
+### `{{ files.readme }}`: this file.
+### `{{ files.lowering_config }}`: the lowering's OpenVDM configuration (JSON): the lowering details above and the directory layout.
+
+This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruise.cruiseID %} of {{ cruise.cruiseID }}{% endif %}. These files there also cover it:
+
+- `{{ files.md5_summary }}`: the MD5 checksum of every file in the cruise directory, this lowering's included.
+{% if files.data_dashboard_manifest %}
+- `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard for this lowering.
+{% endif %}
+
+{% macro folder(d, prefix="") %}
+### `{{ prefix }}{{ d.destDir }}/`: {{ d.longName or d.name }}
 {% if d.description %}
 
-  {{ d.description | replace("\r\n", "\n") | indent(2) | replace("\n", "  \n") }}
+{{ d.description | replace("\r\n", "\n") | replace("\n", "  \n") }}
 
 {% endif %}
 {% endmacro %}
 {% if collection_systems %}
-
-### Collection systems
-
-The data as copied from the vehicle's and ship's data acquisition systems.
 
 {% for d in collection_systems %}
 {{ folder(d) }}
@@ -58,23 +61,9 @@ The data as copied from the vehicle's and ship's data acquisition systems.
 {% endif %}
 {% if extra_directories %}
 
-### Other directories
-
 {% for d in extra_directories %}
 {{ folder(d) }}
 {%- endfor %}
-{% endif %}
-
-### Files from OpenVDM
-
-- `{{ files.readme }}`: this file.
-- `{{ files.lowering_config }}`: the lowering's OpenVDM configuration (JSON): the lowering details above and the directory layout.
-
-This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruise.cruiseID %} of {{ cruise.cruiseID }}{% endif %}. These files there also cover it:
-
-- `{{ files.md5_summary }}`: the MD5 checksum of every file in the cruise directory, this lowering's included.
-{% if files.data_dashboard_manifest %}
-- `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard for this lowering.
 {% endif %}
 
 ---
