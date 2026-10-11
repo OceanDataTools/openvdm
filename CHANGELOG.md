@@ -7,7 +7,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 ## [2.16.2] – Unreleased
 
 **Upgrading:** follow "Upgrading from 2.16.1" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:
-- copy the updated `.dist` files of the parsers you use over your copies: `gga`, `dpt`, the other NMEA parsers, and the parsers with direction charts (#410, #416, #418, #419);
+- re-copy the `.dist` version of the parsers you use over your copies (`git pull` doesn't update them): `gga`, `dpt`, the other NMEA parsers, and the parsers with direction charts (#410, #416, #418, #419);
 - in your plugins, change `DBTParser` to `DPTParser` (#419), and add `'require_checksum': False` to the `parser_options` of any NMEA parser whose instrument doesn't send a checksum (#418);
 - copy the updated `bin/build_remote_directory.py.dist` if you use it (#426, #428), and remove the `CollectionSystem:` line from `DEFAULT_POSITION_SOURCES_YAML` in your trackline scripts (#412);
 - set `SITETITLE` in `Config.php` to v2.16.2, restart the workers (`supervisorctl restart openvdm:*`) so transfers stop putting SMB and SSH passwords on the command line (#424, #426), and rebuild the data dashboard.

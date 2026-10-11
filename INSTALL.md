@@ -549,7 +549,14 @@ If you're upgrading from 2.16.0, also do steps 3 to 5 of "Upgrading from 2.16.0"
 cd <openvdm_root>
 sudo -u <openvdm_user> git pull --ff-only
 ```
-3. Copy the updated parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+3. Copy the updated parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so a `git pull` doesn't update your parsers: OpenVDM keeps running your old copies until you re-copy them. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+   To re-copy the `.dist` version of every parser you have a copy of, run the commands below. They overwrite customized parsers too, so save a copy of those first and merge your changes back afterwards:
+```
+cd <openvdm_root>/server/plugins/parsers
+for f in *_parser.py; do [ -e "$f.dist" ] && sudo -u <openvdm_user> cp "$f.dist" "$f"; done
+```
+   The new parsers (`wicor_parser.py`, `ssv_valeport_parser.py`) have no copy yet; copy them the same way if your plugins use them. The table lists what changed:
 
 | File (in `<openvdm_root>`) | Why |
 |---|---|
