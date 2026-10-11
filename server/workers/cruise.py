@@ -43,8 +43,7 @@ from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAME
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 
 from server.lib.openvdm import OpenVDM
-from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_cruise_readme_context, readme_filename,
-                               readme_settings, render_readme, write_readme)
+from server.lib.readme import build_cruise_readme_context, readme_filename, readme_settings, render_readme, write_readme
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -232,20 +231,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         except (OSError, ValueError) as exc:
             logging.warning("Unable to read the finalized date from %s: %s", cruise_config_file_path, exc)
 
-        # The lowering README's name, for the cruise README's lowerings section
-        lowering_readme_fn = None
-        if show_lowerings:
-            try:
-                lowering_settings = readme_settings(self.ovdm.config, 'loweringReadme', DEFAULT_LOWERING_TEMPLATE)
-                if lowering_settings['enable']:
-                    lowering_readme_fn = readme_filename(lowering_settings['filename'], self.cruise_id, '<loweringID>')
-            except ValueError as exc:
-                logging.warning("Leaving the lowering README out of the cruise README: %s", exc)
-
         context = build_cruise_readme_context(
             cruise_config, collection_systems, extra_directories, self.ovdm.get_vessel_config(),
-            readme_fn, finalized_on=finalized_on, show_lowerings=show_lowerings,
-            lowering_readme_fn=lowering_readme_fn)
+            readme_fn, finalized_on=finalized_on, show_lowerings=show_lowerings)
 
         try:
             text = render_readme(settings['template'], context)
