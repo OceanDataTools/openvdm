@@ -320,14 +320,14 @@ use Helpers\Hooks;
     <!-- Page Content -->
     <div id="page-wrapper">
 
-        <div class="row">
+        <div class="row no-print">
             <div class="col-lg-12">
             </br>
 <!--                <h1 class="page-header"><?php echo $data['title']; ?></h1> -->
             </div>
         </div>
 
-        <div class="row">
+        <div class="row no-print">
 
     <?php echo $_warehouseModel->getShowLoweringComponents() ? "        <div class=\"col-lg-2 col-md-4 col-sm-6 col-xs-12\">" : "       <div class=\"col-lg-3 col-md-6 col-sm-6 col-xs-12\">"; ?>
 
