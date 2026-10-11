@@ -4,7 +4,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [2.16.2] – Unreleased
+## [2.16.2] – 2026-10-11
 
 **Upgrading:** follow "Upgrading from 2.16.1" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:
 - re-copy the `.dist` version of the parsers you use over your copies (`git pull` doesn't update them): `gga`, `dpt`, the other NMEA parsers, and the parsers with direction charts (#410, #416, #418, #419);
