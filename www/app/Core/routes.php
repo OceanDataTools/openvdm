@@ -71,6 +71,7 @@ Router::any('config/users/edit/(:num)', '\Controllers\Config\Users@editUser');
 
 Router::any('config/collectionSystemTransfers', '\Controllers\Config\CollectionSystemTransfers@index');
 Router::any('config/collectionSystemTransfers/add', '\Controllers\Config\CollectionSystemTransfers@add');
+Router::any('config/collectionSystemTransfers/fileNamingGuide', '\Controllers\Config\CollectionSystemTransfers@fileNamingGuide');
 Router::any('config/collectionSystemTransfers/edit/(:num)', '\Controllers\Config\CollectionSystemTransfers@edit');
 Router::any('config/collectionSystemTransfers/delete/(:num)', '\Controllers\Config\CollectionSystemTransfers@delete');
 Router::any('config/collectionSystemTransfers/enable/(:num)', '\Controllers\Config\CollectionSystemTransfers@enable');

@@ -31,6 +31,9 @@ use Helpers\Session;
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
                     Add New Transfer
                 </a>
+                <a class="pull-right btn btn-sm btn-default" style="margin-right: 6px" href="<?php echo DIR; ?>config/collectionSystemTransfers/fileNamingGuide">
+                    File Naming Guide
+                </a>
             </div>
             <table class='table table-striped table-hover table-bordered responsive'>
                 <thead>
