@@ -34,7 +34,10 @@ $explain = function ($described) use ($h) {
     .naming-guide-section h3 { margin-top: 0; }
     .naming-guide-section h4 { margin: 14px 0 6px; font-size: 15px; }
     .naming-guide-section ul { padding-left: 20px; margin-bottom: 6px; }
-    .naming-guide-description { white-space: pre-line; }
+    .naming-guide-description { margin-bottom: 10px; }
+    .naming-guide-description p, .naming-guide-description ul, .naming-guide-description ol { margin-bottom: 6px; }
+    .naming-guide-description h1, .naming-guide-description h2, .naming-guide-description h3,
+    .naming-guide-description h4, .naming-guide-description h5, .naming-guide-description h6 { font-size: 14px; font-weight: bold; margin: 8px 0 4px; }
     @media print {
         .navbar, .sidebar, .no-print { display: none !important; }
         #page-wrapper { margin: 0 !important; border: none !important; padding: 0 !important; }
@@ -83,7 +86,7 @@ $explain = function ($described) use ($h) {
                     <?php if (!$data['onlyID']) { ?><a class="btn btn-xs btn-default pull-right no-print" href="<?php echo DIR; ?>config/collectionSystemTransfers/fileNamingGuide?id=<?php echo $guide['id']; ?>">This one only</a><?php } ?>
                 </h3>
 <?php if ($guide['description'] !== '') { ?>
-                <p class="naming-guide-description"><?php echo $h($guide['description']); ?></p>
+                <div class="naming-guide-description"><?php echo \Helpers\Markdown::render($guide['description']); ?></div>
 <?php } ?>
                 <p>
                     <strong>Collected from:</strong> <?php echo $h($guide['typeName']); ?><?php
