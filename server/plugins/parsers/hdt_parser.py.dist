@@ -39,7 +39,22 @@ class HDTParser(OpenVDMCSVParser):
     MAX_HDT = 360
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False, no_mag=False,
+                 require_checksum=True):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            no_mag: Not used.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row.
+        """
+        self.require_checksum = require_checksum
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -60,6 +75,8 @@ class HDTParser(OpenVDMCSVParser):
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
+                    self.check_nmea_sentence(remainder, fields, 3, self.require_checksum,
+                                             field_values={2: 'T'})
                     hdg_t = float(field_data['hdg_t']) if field_data['hdg_t'] else None
 
                     raw_data['date_time'].append(timestamp_str)
@@ -136,7 +153,7 @@ class HDTParser(OpenVDMCSVParser):
         # -------------------------
         # Resample and round
         # -------------------------
-        df = self.resample_data(df)
+        df = self.resample_data(df, angle_cols=['hdg_t'])
         df = self.round_data(df, ROUNDING)
         df = df.set_index('date_time')
 
@@ -162,6 +179,21 @@ class HDTParser(OpenVDMCSVParser):
         # Send errors to OpenVDM
         # -------------------------
         self.send_error_msg(errors, filepath)
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add the parser's command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'require_checksum': getattr(args, 'require_checksum', True)}
 
 # -------------------------------------------------------------------------------------
 # Standalone CLI

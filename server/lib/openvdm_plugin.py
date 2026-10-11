@@ -664,6 +664,75 @@ class OpenVDMCSVParser(OpenVDMParser):
         """
         pass
 
+    @staticmethod
+    def nmea_checksum_ok(sentence: str, required: bool = False) -> bool:
+        """Return whether an NMEA sentence's checksum matches its contents.
+
+        The checksum is the two hex digits after ``*``: the XOR of every
+        character between the leading ``$`` (or ``!``) and the ``*``. Serial
+        loggers can splice or truncate sentences, which the checksum catches.
+
+        Args:
+            sentence: The sentence, e.g. ``'$GPGGA,...*73'``; surrounding
+                whitespace is ignored.
+            required: Treat a sentence without a checksum as bad. The
+                checksum is optional in NMEA 0183, but a sentence that should
+                have one and doesn't has usually been cut short.
+
+        Returns:
+            bool: ``True`` if the checksum matches, or if the sentence has none
+            and *required* is false; ``False`` if it doesn't match, isn't two
+            hex digits, or is missing and *required*.
+        """
+        body, star, checksum = sentence.strip().lstrip('$!').partition('*')
+        if not star:
+            return not required
+        calculated = 0
+        for char in body:
+            calculated ^= ord(char)
+        return checksum[:2].upper() == f'{calculated:02X}' and len(checksum.strip()) == 2
+
+    @classmethod
+    def check_nmea_sentence(cls, sentence: str, fields: list | None = None,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                            num_fields: int | tuple | None = None, required: bool = False,
+                            field_values: dict | None = None) -> None:
+        """Raise ``ValueError`` if an NMEA sentence looks corrupt.
+
+        For a parser's line loop: the error counts the line as a bad row. A
+        corrupt sentence's checksum can still match by chance (1 in 256), and
+        one cut short has none, so sentences with a fixed length or fixed unit
+        letters are also checked for them.
+
+        Args:
+            sentence: The sentence, from ``$`` to the checksum.
+            fields: *sentence* split on commas, for the field count.
+            num_fields: The number of fields the sentence has, header and
+                checksum included, or a tuple of the numbers allowed (for
+                sentences that gained fields in later NMEA versions). ``None``
+                skips the check.
+            required: Treat a sentence without a checksum as bad (see
+                :meth:`nmea_checksum_ok`).
+            field_values: The values fields must have, by position: e.g.
+                ``{2: 'T', 4: 'M'}`` for unit letters, or a tuple of the values
+                allowed. A checksum on the last field is ignored.
+
+        Raises:
+            ValueError: If the checksum doesn't match, is missing and
+                *required*, the number of fields isn't *num_fields*, or a field
+                in *field_values* has another value.
+        """
+        if not cls.nmea_checksum_ok(sentence, required=required):
+            raise ValueError("bad or missing checksum" if required else "bad checksum")
+        if num_fields is not None and fields is not None:
+            allowed = (num_fields,) if isinstance(num_fields, int) else tuple(num_fields)
+            if len(fields) not in allowed:
+                raise ValueError(f"{len(fields)} fields, not {' or '.join(str(n) for n in allowed)}")
+        for index, expected in (field_values or {}).items():
+            allowed = (expected,) if isinstance(expected, str) else tuple(expected)
+            value = fields[index].split('*')[0] if fields is not None and index < len(fields) else None
+            if value not in allowed:
+                raise ValueError(f"field {index} is {value!r}, not {' or '.join(allowed)}")
+
     def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
         """Yield each timestamped data line of a file, split into fields.
 
@@ -800,13 +869,18 @@ class OpenVDMCSVParser(OpenVDMParser):
 
 
     @staticmethod
-    def resample_data(data_frame, resample_interval='1min'):
+    def resample_data(data_frame, resample_interval='1min', angle_cols=None):
         """Average the data into fixed time intervals.
 
         Args:
             data_frame: DataFrame indexed by timestamp.
             resample_interval: pandas offset alias for the interval (default
                 ``'1min'``). Each interval is labelled by its end time.
+            angle_cols: Columns holding angles in degrees (wind direction,
+                heading, course). They're averaged as angles, from the mean
+                sine and cosine, and returned in [0, 360): 359 and 1 average
+                to 0, not 180. Columns not in *data_frame* are ignored. The
+                other columns get the arithmetic mean.
 
         Returns:
             pandas.DataFrame: The resampled data, with the timestamps moved
@@ -816,12 +890,28 @@ class OpenVDMCSVParser(OpenVDMParser):
             Exception: If the data can't be resampled.
         """
 
+        columns = list(data_frame.columns)
+        angle_cols = [col for col in (angle_cols or []) if col in columns]
+        if angle_cols:
+            radians = np.deg2rad(data_frame[angle_cols].astype(float))
+            data_frame = data_frame.drop(columns=angle_cols)
+            for col in angle_cols:
+                data_frame[f'{col}__sin'] = np.sin(radians[col])
+                data_frame[f'{col}__cos'] = np.cos(radians[col])
+
         try:
             resample_df = data_frame.resample(resample_interval, label='right', closed='right').mean()
         except Exception as exc:
             logging.error("Could not resample data")
             logging.error(str(exc))
             raise exc
+
+        for col in angle_cols:
+            angle = np.rad2deg(np.arctan2(resample_df.pop(f'{col}__sin'), resample_df.pop(f'{col}__cos')))
+            # Rounded first, so a mean a hair under 360 becomes 0, not 360
+            resample_df[col] = np.round(angle, 6) % 360
+        if angle_cols:
+            resample_df = resample_df[columns]
 
         # reset index
         return resample_df.reset_index()

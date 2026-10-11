@@ -37,7 +37,7 @@ def main() -> int:
                         help='file to add to the MD5 summary, or whose checksum changed')
     parser.add_argument('--deleted', metavar='FILE', nargs='+', default=[],
                         help='file to remove from the MD5 summary')
-    parser.add_argument('-c', '--cruiseID', default=None, help='cruise (default: the current cruise)')
+    parser.add_argument('-c', '--cruise-id', default=None, help='cruise (default: the current cruise)')
     parser.add_argument('--wait', action='store_true', help='wait for the update to finish')
     parser.add_argument('-v', '--verbosity', default=0, action='count', help='increase verbosity')
     args = parser.parse_args()
@@ -49,7 +49,7 @@ def main() -> int:
         parser.error('no files given')
 
     try:
-        OpenVDM().update_md5_summary(updated=args.files, deleted=args.deleted, cruise_id=args.cruiseID,
+        OpenVDM().update_md5_summary(updated=args.files, deleted=args.deleted, cruise_id=args.cruise_id,
                                      background=not args.wait)
     except Exception as exc:  # pylint: disable=broad-exception-caught
         print(f"Unable to queue the MD5 summary update: {exc}", file=sys.stderr)

@@ -501,3 +501,80 @@ sudo -H -u <openvdm_user> /usr/local/bin/composer install --no-dev
 `composer install` also runs `npm install` (through `post_composer.sh`).
 
 If you contribute to OpenVDM: `pre-commit` now also runs ESLint, `php -l` and PHPStan. Run `composer install` (without `--no-dev`) in `www/` to install PHPStan, and see CONTRIBUTING.md.
+
+## Upgrading from 2.16.0.
+
+OpenVDM v2.16.1 fixes cruise data exclusions for directories saved with a trailing `/`, which needs a database update (step 3). It also adds CTD quality tests, CTD profile plots and MD5 summary updates for files written by hooks, and fixes the trackline scripts. See the 2.16.1 entry in [CHANGELOG.md](CHANGELOG.md) for the details. No PHP, JavaScript or Python dependencies changed, so the installer doesn't need to be re-run.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Update the code, as the OpenVDM user (git refuses to work in a checkout owned by another user):
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> git pull --ff-only
+```
+3. Update the database. Back up the database first, so it can be restored if the update fails. The backup script asks for the MySQL root password twice, and the update once:
+```
+cd <openvdm_root>
+sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_backup_before_2.16.1.sql
+mysql -u root -p openvdm < ./database/openvdm_2160_to_2161.sql
+```
+   The update removes the trailing `/` from collection system and extra directory destination directories, so that cruise data transfers exclude them again (#389). It prints nothing when it succeeds, and is safe to run again. If you see errors, save them and contact OceanDataTools.
+4. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+| File (in `<openvdm_root>`) | Why |
+|---|---|
+| `server/plugins/parsers/ctd_profile_parser.py` | New CTD quality tests and Validity stats; plot header Date, Cast, Depth and Position (#368, #370, #376, #379, #381) |
+| `bin/build_cruise_tracks.py`, `bin/build_lowering_tracks.py` | `Tracklines` extra directory checks, MD5 summary, shared code in `server/lib/tracks.py`, renamed options. **Keep your own position sources** (#401) |
+| `bin/plot_ctd_casts.py` | New: CTD profile plots in an extra directory, run as a hook; needs matplotlib (#372) |
+
+   `server/plugins/ctd_plugin.py.dist` and `server/etc/openvdm.yaml.dist` have documentation and example changes only. `openvdm.yaml.dist` has a commented-out `plot_ctd_casts.py` hook to copy into your `openvdm.yaml` if you want the plots.
+5. If your `openvdm.yaml` hooks run `build_cruise_tracks.py` or `build_lowering_tracks.py`, change their options to the new names (`--no-combine`, `--kml-only`, `--geojson-only`, `--position-sources`) and remove `-u`. The old names still work in 2.16.1, but they post a deprecation message in OpenVDM and will be removed in 2.17. The scripts now need an enabled `Tracklines` extra directory (or another one named with `-e`) whose folder exists.
+6. In `www/app/Core/Config.php`, change `SITETITLE` to `Open Vessel Data Management v2.16.1`.
+7. Restart the OpenVDM workers so they load the updated code and plugins:
+```
+sudo supervisorctl restart openvdm:*
+```
+8. Set OpenVDM back to On.
+9. If you use the CTD parser, rebuild the data dashboard so existing casts get the new quality tests and stats. Run **Rebuild Data Dashboard** under **Maintenance Tasks** on the **Configuration** page. This rebuilds the current cruise only.
+
+## Upgrading from 2.16.1.
+
+OpenVDM v2.16.2 stops SMB and SSH transfers from putting passwords on the command line, where error messages and `ps` could show them, and fixes `bin/build_remote_directory.py`. The parsers now reject corrupt NMEA sentences, average direction values correctly, and `dpt_parser` reads DPT sentences. There are new parsers for Scripps MetAcq `$WICOR` data and the Valeport thru-hull SVS. See the 2.16.2 entry in [CHANGELOG.md](CHANGELOG.md) for the details. There's no database update, and no PHP, JavaScript or Python dependencies changed, so the installer doesn't need to be re-run.
+
+If you're upgrading from 2.16.0, also do steps 3 to 5 of "Upgrading from 2.16.0" (the database update, its `.dist` files and the trackline hook options) after step 2 below.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Update the code, as the OpenVDM user (git refuses to work in a checkout owned by another user):
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> git pull --ff-only
+```
+3. Copy the updated parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet, so a `git pull` doesn't update your parsers: OpenVDM keeps running your old copies until you re-copy them. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+   To re-copy the `.dist` version of every parser you have a copy of, run the commands below. They overwrite customized parsers too, so save a copy of those first and merge your changes back afterwards:
+```
+cd <openvdm_root>/server/plugins/parsers
+for f in *_parser.py; do [ -e "$f.dist" ] && sudo -u <openvdm_user> cp "$f.dist" "$f"; done
+```
+   The new parsers (`wicor_parser.py`, `ssv_valeport_parser.py`) have no copy yet; copy them the same way if your plugins use them. The table lists what changed:
+
+| File (in `<openvdm_root>`) | Why |
+|---|---|
+| `server/plugins/parsers/gga_parser.py` | Rejects corrupt sentences: checksum, field count and format (#416) |
+| `server/plugins/parsers/dpt_parser.py` | Reads DPT sentences, not DBT; class renamed `DPTParser` (#419) |
+| `hdt`, `vtg`, `mwd`, `mwv`, `dbs`, `xdr`, `psxn23`, `psxn24`, `pashr`, `gnss`, `hpr` parsers (`server/plugins/parsers/<name>_parser.py`) | Reject sentences with a missing or bad checksum (#418) |
+| `met`, `metpakpro`, `twind`, `wind_gill_wo75` parsers | Direction charts near north (#410); `mwv`, `mwd`, `hdt`, `vtg`, `gnss`, `hpr`, `pashr` and `psxn23` have this fix too |
+| `server/plugins/parsers/wicor_parser.py`, `ssv_valeport_parser.py` | New: Scripps MetAcq `$WICOR` and Valeport thru-hull SVS (#408, #422) |
+| `bin/build_remote_directory.py` | Rewritten so it works; no passwords on the command line or in the debug log (#426, #428) |
+
+4. Update your plugins (`server/plugins/<name>_plugin.py`) if they need it:
+   - If one imports or uses `DBTParser` from `dpt_parser`, change it to `DPTParser`. Until then the plugin fails to load (#419).
+   - The NMEA parsers in step 3 (except `gga`, which always needs one) now reject sentences without a checksum. For an instrument that doesn't send one, add `'require_checksum': False` to that parser's `parser_options` (#418).
+5. In your copies of `bin/build_cruise_tracks.py` and `bin/build_lowering_tracks.py`, remove the `CollectionSystem:` line from `DEFAULT_POSITION_SOURCES_YAML`, so the built-in position sources work with whichever collection system the hook names (#412). Leave it in only to tie them to one collection system.
+6. In `www/app/Core/Config.php`, change `SITETITLE` to `Open Vessel Data Management v2.16.2`.
+7. Restart the OpenVDM workers so they load the updated code and plugins. Until they're restarted, SMB and SSH transfers still put passwords on the command line (#424, #426):
+```
+sudo supervisorctl restart openvdm:*
+```
+8. Set OpenVDM back to On.
+9. Rebuild the data dashboard so existing files are re-parsed with the fixed parsers: direction charts are replotted, and corrupt NMEA sentences become bad rows. Run **Rebuild Data Dashboard** under **Maintenance Tasks** on the **Configuration** page. This rebuilds the current cruise only.

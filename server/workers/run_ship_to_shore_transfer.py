@@ -25,6 +25,7 @@ import signal
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from os.path import dirname, realpath
 from random import randint
 import python3_gearman
@@ -33,7 +34,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
-from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -322,6 +323,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return {'verdict': False, 'reason': 'Failed to write include file'}
 
 
+            use_sshpass = False
             if ':' in self.cruise_data_transfer['destDir']:
 
                 copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
@@ -336,11 +338,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 extra_args = ['-e', 'ssh']
                 cmd = build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'].rstrip('/') + '/', dest_dir.rstrip('/') + '/', include_file)
 
-                if cdt_cfg.get('sshUseKey') == 0:
-                    cmd = ['sshpass', '-p', cdt_cfg.get('sshPass', '')] + cmd
+                use_sshpass = True
 
             try:
-                files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+                # The SSH password goes to sshpass in a file, not on the command line (#426)
+                with sshpass_command(cmd, cdt_cfg) if use_sshpass else nullcontext(cmd) as cmd:
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
             except TransferCommandError as exc:
                 # Don't report a failed transfer as successful (#230)
                 return {'verdict': False, 'reason': f"Transfer failed: {exc}"}
