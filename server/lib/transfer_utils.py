@@ -5,15 +5,20 @@ ship-to-shore transfer workers (and the cruise worker's PublicData copy), of
 running a transfer command while reporting progress and collecting the new,
 updated and deleted files. A command that fails raises
 :class:`TransferCommandError`, so the caller can fail the transfer instead of
-reporting it as successful (#230).
+reporting it as successful (#230). Also the helpers that mask passwords in
+what the workers log (:func:`redact_command`, :func:`redact_payload`).
 """
 
+import json
 import logging
 import os
 import re
 import subprocess
 from collections import deque
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, Union
+
+# Transfer password fields, as in the PHP Helpers\TransferCredentials::FIELDS
+PASSWORD_FIELDS = ('rsyncPass', 'smbPass', 'sshPass', 'ftpPass')
 
 # rsync --progress: "to-chk=<remaining>/<total>"
 TO_CHK_RE = re.compile(r'to-chk=(\d+)/(\d+)')
@@ -73,6 +78,50 @@ def redact_command(cmd: list) -> str:
             parts[i + 2] = '****'
     return ' '.join(parts)
 
+
+
+def _redact_passwords(value: Any) -> Any:
+    """Return a copy of *value* with every non-empty password field masked.
+
+    Args:
+        value: Parsed JSON: a dict, list or scalar, nested to any depth.
+
+    Returns:
+        The same structure, with the value of each :data:`PASSWORD_FIELDS`
+        key replaced by ``****`` unless it's empty (an empty value shows that
+        no password was given).
+    """
+    if isinstance(value, dict):
+        return {key: '****' if key in PASSWORD_FIELDS and val else _redact_passwords(val)
+                for key, val in value.items()}
+    if isinstance(value, list):
+        return [_redact_passwords(item) for item in value]
+    return value
+
+
+def redact_payload(payload: Union[str, bytes, dict, list], indent: Optional[int] = None) -> str:
+    """Return a Gearman job payload for logging, with transfer passwords masked.
+
+    A Test Setup job's payload carries the add or edit form's fields,
+    including any password typed into it, so the workers' ``payload: ...``
+    debug lines must not log it as it is (#430).
+
+    Args:
+        payload: The job's data (a JSON string or bytes), or the payload
+            already parsed.
+        indent: Passed to :func:`json.dumps`, e.g. ``2`` to pretty-print.
+
+    Returns:
+        The payload as JSON with each non-empty ``rsyncPass``, ``smbPass``,
+        ``sshPass`` and ``ftpPass`` value, at any depth, replaced by ``****``.
+        A payload that isn't valid JSON isn't shown.
+    """
+    if isinstance(payload, (str, bytes, bytearray)):
+        try:
+            payload = json.loads(payload)
+        except ValueError:
+            return "<not valid JSON; not shown>"
+    return json.dumps(_redact_passwords(payload), indent=indent)
 
 def _rsync_failure_detail(errors: list, error_count: int, recent) -> str:
     """Return the reason for a failed rsync command.

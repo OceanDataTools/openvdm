@@ -31,7 +31,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, write_list_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
-from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
@@ -317,7 +317,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)

@@ -21,6 +21,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_utils import redact_payload
 from server.lib.connection_utils import normalize_transfer_config, test_cst_source
 
 # Gearman task names this worker registers.
@@ -153,7 +154,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)

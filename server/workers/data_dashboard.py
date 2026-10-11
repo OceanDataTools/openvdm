@@ -32,6 +32,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_utils import redact_payload
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
@@ -315,7 +316,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             return self._fail_job(current_job, "Retrieve job data", "Failed to parse current job payload")
 

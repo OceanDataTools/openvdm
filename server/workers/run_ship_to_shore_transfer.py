@@ -33,7 +33,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
@@ -370,7 +370,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+            logging.debug("Payload: %s", redact_payload(payload_obj, indent=2))
 
             self.cruise_data_transfer = self.ovdm.get_required_cruise_data_transfer_by_name("SSDW")
 

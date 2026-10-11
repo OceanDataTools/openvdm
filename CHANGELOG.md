@@ -33,6 +33,9 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - `-u/--username` is removed too: `-o` output keeps whoever wrote it, and extra directory output belongs to the warehouse user, as before.
   - A hook that still uses one stops with a usage error (#388, #392).
 
+### Fixed
+- **Transfer passwords in the workers' debug logs:** when a worker runs with debug logging (`-v`, e.g. while troubleshooting; Supervisor starts them without it), it logged each job's payload as it was. A Test Setup job's payload carries the add or edit form's fields, including any password typed into it. The SSH cruise data transfer also logged its rclone remote's `pass`, which `rclone reveal` turns back into the password. Payloads are now logged with every non-empty `rsyncPass`, `smbPass`, `sshPass` and `ftpPass` shown as `****` (`transfer_utils.redact_payload()`), a payload that isn't valid JSON isn't logged, and the rclone remote's `pass` is shown as `****` (#430).
+
 ---
 
 ## [2.16.2] – 2026-10-11
