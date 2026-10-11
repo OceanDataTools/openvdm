@@ -26,6 +26,9 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **Failures:** if setting the extent fails, the script reports it and exits 1, as it does for a failed MD5 update, so the hook's OpenVDM message says why (#366, #388).
 - **`openvdm.yaml.dist` trackline hook examples:** commented-out `postDataDashboard` blocks for `build_cruise_tracks.py` and `build_lowering_tracks.py`. Each uses the `{collectionSystemTransferName}` token for the collection system, and shows `--position-sources`, `--extra-directory` and `--no-extent` commented out (#396).
 
+### Changed
+- **Setup New Cruise deletes all OpenVDM messages,** so the Messages page and the navbar's new-message count only show messages about the current cruise. They're deleted once the form passes its checks, before the new cruise is set up, so a message the setup posts (e.g. that it failed) is kept. A rejected form deletes nothing, and Edit Cruise, Finalize and switching cruises don't delete messages (#403).
+
 ### Removed
 - **Trackline scripts' 2.16.0 options:** `build_cruise_tracks.py` and `build_lowering_tracks.py` no longer accept the names that 2.16.1 deprecated:
   - `--no_combine`, `--kml_only` and `--geojson_only`; use `--no-combine`, `--kml-only` and `--geojson-only`;
