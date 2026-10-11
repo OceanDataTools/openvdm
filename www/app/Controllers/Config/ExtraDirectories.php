@@ -78,6 +78,7 @@ class ExtraDirectories extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
             $destDir = $_POST['destDir'] ?? '';
             $enable = 0;
@@ -98,6 +99,7 @@ class ExtraDirectories extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'cruiseOrLowering' => $cruiseOrLowering,
                     'destDir' => $destDir,
                     'enable' => $enable
@@ -129,6 +131,7 @@ class ExtraDirectories extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = trim($_POST['description'] ?? '');
             $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
             $destDir = $_POST['destDir'] ?? '';
 
@@ -148,6 +151,7 @@ class ExtraDirectories extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'cruiseOrLowering' => $cruiseOrLowering,
                     'destDir' => $destDir
                 );
@@ -166,6 +170,7 @@ class ExtraDirectories extends Controller {
 
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->description = $description;
                 $data['row'][0]->cruiseOrLowering = $cruiseOrLowering;
                 $data['row'][0]->destDir = $destDir;
             }

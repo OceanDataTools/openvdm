@@ -44,7 +44,7 @@ use Helpers\Session;
         foreach($data['extraDirectories'] as $row){
 ?>
                     <tr>
-                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="name" title="<?php echo htmlspecialchars($row->description ?? '', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $row->longName; ?></td>
                         <td class="action">
                             <a href='<?php echo DIR; ?>config/extraDirectories/edit/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
                             /

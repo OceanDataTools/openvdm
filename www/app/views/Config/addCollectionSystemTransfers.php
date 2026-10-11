@@ -7,7 +7,7 @@ use Helpers\FormCustom;
 $_warehouseModel = new \Models\Warehouse();
 
 $_POST += [
-    'name' => '', 'longName' => '', 'destDir' => '', 'includeFilter' => '',
+    'name' => '', 'longName' => '', 'description' => '', 'destDir' => '', 'includeFilter' => '',
     'excludeFilter' => '', 'ignoreFilter' => '', 'staleness' => '',
     'removeSourceFiles' => '', 'useStartDate' => '', 'skipEmptyDirs' => '',
     'skipEmptyFiles' => '', 'syncFromSource' => '', 'bandwidthLimit' => '',
@@ -51,6 +51,7 @@ $_POST += [
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=> $_POST['name']));?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=> $_POST['longName'])); ?></div>
+                                <div class="form-group"><label>Description</label><?php echo Form::textBox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'description', 'value'=> $_POST['description'])); ?></div>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'placeholder'=>'e.g. XBT', 'value'=> $_POST['destDir'])); ?></div>
                                 <div class="form-group"><label>Include Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'includeFilter', 'value'=> $_POST['includeFilter'])); ?></div>
                                 <div class="form-group"><label>Exclude Filter</label><?php echo Form::textbox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'excludeFilter', 'value'=> $_POST['excludeFilter'])); ?></div>

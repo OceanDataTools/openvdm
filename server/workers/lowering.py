@@ -82,8 +82,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     def export_lowering_config(self, finalize=False):
         """Write the current lowering configuration to the lowering config file.
 
-        When the file already exists, its ``loweringFinalizedOn`` value is
-        kept. Queues an MD5 summary update for the file.
+        Collection system transfer entries are reduced to their name, long
+        name, description and destination directory (no credentials). When
+        the file already exists, its ``loweringFinalizedOn`` value is kept.
+        Queues an MD5 summary update for the file.
 
         Args:
             finalize: Mark the configuration as finalized (sets
@@ -109,7 +111,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                     lowering_config['loweringFinalizedOn'] = existing_data.get('loweringFinalizedOn')
             except OSError as exc:
                 reason = f"Unable to read configuration file: {lowering_config_fn}"
-                logging.error("%s: %s", str(exc))
+                logging.error("%s: %s", reason, str(exc))
                 return {'verdict': False, 'reason': reason}
 
         logging.debug(json.dumps(lowering_config))
@@ -117,7 +119,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         def _scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
-                allowed_keys = ['name', 'longName', 'destDir']
+                allowed_keys = ['name', 'longName', 'description', 'destDir']
                 for key in list(transfer.keys()):
                     if key not in allowed_keys:
                         transfer.pop(key)
