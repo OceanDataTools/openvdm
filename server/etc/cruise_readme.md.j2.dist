@@ -38,63 +38,44 @@ This directory holds the data collected during cruise {{ cruise.cruiseID }}{% if
 {% if cruise.cruiseExtent %}
 - **Extent:** {{ cruise.cruiseExtent.westernmost }} to {{ cruise.cruiseExtent.easternmost }} longitude, {{ cruise.cruiseExtent.southernmost }} to {{ cruise.cruiseExtent.northernmost }} latitude (decimal degrees)
 {% endif %}
-{% if cruise.cruiseFinalizedOn %}
-- **Finalized:** {{ cruise.cruiseFinalizedOn }}
-{% endif %}
 {% if vessel.contact and (vessel.contact.institution or vessel.contact.email) %}
 - **Contact:** {{ [vessel.contact.institution, vessel.contact.email] | select | join(", ") }}
 {% endif %}
 
 ## Directory layout
-
 Paths are relative to this directory.
 {# Each line of a description ends in two spaces, a Markdown line break, so
    its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
-{% macro folder(d) %}
-- `{{ d.destDir }}/`: **{{ d.longName or d.name }}**
+
+{% macro entry(d) %}
+#### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
 {% if d.description %}
 
-  {{ d.description | replace("\r\n", "\n") | indent(2) | replace("\n", "  \n") }}
+{{ d.description | replace("\r\n", "\n") | replace("\n", "  \n") }}
 
 {% endif %}
 {% endmacro %}
-{% if collection_systems %}
-
-### Collection systems
-
-The data as copied from the ship's data acquisition systems.
-
-{% for d in collection_systems %}
-{{ folder(d) }}
-{%- endfor %}
-{% endif %}
-{% if extra_directories %}
-
-### Other directories
-
-{% for d in extra_directories %}
-{{ folder(d) }}
-{%- endfor %}
+{% set entries = [
+    {"destDir": files.readme, "longName": "this file", "file": true},
+    {"destDir": files.cruise_config, "longName": "the cruise's OpenVDM configuration (JSON): the cruise details above and the directory layout", "file": true},
+    {"destDir": files.md5_summary, "longName": "the MD5 checksum of every file in this directory, to check that a copy of it is complete and unchanged", "file": true},
+    {"destDir": files.md5_summary_md5, "longName": "the MD5 checksum of `" ~ files.md5_summary ~ "` itself", "file": true},
+] + collection_systems + extra_directories %}
+{% if files.data_dashboard_manifest %}
+{% set entries = entries + [
+    {"destDir": files.data_dashboard_manifest, "longName": "the list of the files behind OpenVDM's Data Dashboard: the data and quality test results extracted from the raw files", "file": true},
+] %}
 {% endif %}
 {% if lowerings %}
-
-### Lowerings
-
-Each lowering (vehicle dive or deployment) has its own directory, `{{ lowerings.base_dir }}/<loweringID>/`, with its configuration in `{{ lowerings.base_dir }}/<loweringID>/{{ lowerings.config }}` and these directories:
-
-{% for d in lowerings.collection_systems + lowerings.extra_directories %}
-{{ folder(d) }}
+{% set entries = entries + [{
+    "destDir": lowerings.base_dir,
+    "longName": "Lowerings",
+    "description": "A directory for each lowering (vehicle dive or deployment), named by its lowering ID: `" ~ lowerings.base_dir ~ "/<loweringID>/`."
+}] %}
+{% endif %}
+{% for d in entries | sort(attribute="destDir") %}
+{{ entry(d) }}
 {%- endfor %}
-{% endif %}
-
-### Files from OpenVDM
-
-- `{{ files.readme }}`: this file.
-- `{{ files.cruise_config }}`: the cruise's OpenVDM configuration (JSON): the cruise details above and the directory layout.
-- `{{ files.md5_summary }}`: the MD5 checksum of every file in this directory, to check that a copy of it is complete and unchanged. `{{ files.md5_summary_md5 }}` holds the checksum of `{{ files.md5_summary }}` itself.
-{% if files.data_dashboard_manifest %}
-- `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard: the data and quality test results extracted from the raw files.
-{% endif %}
 
 ---
 
