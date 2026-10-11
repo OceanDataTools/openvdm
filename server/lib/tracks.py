@@ -3,7 +3,7 @@
 
 Shared by ``bin/build_cruise_tracks.py`` and ``bin/build_lowering_tracks.py``
 (#394), which differ only in which cruise or lowering they read, where its
-dashboard manifest is, and what they do with the result (the cruise extent).
+dashboard manifest is, and where they store its extent (bounding box).
 
 For each position source (a device and its dashboard data type, from a
 ``PositionSources`` YAML list), the matching dashboard files are found through
@@ -22,7 +22,7 @@ import os
 import yaml
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
-from server.lib.geojson_utils import combine_geojson_files, convert_to_kml
+from server.lib.geojson_utils import combine_geojson_files, convert_to_kml, geojson_extent
 
 # Name of the extra directory the trackline files are written to by default.
 TRACKLINE_EXTRA_DIR_NAME = "Tracklines"
@@ -339,6 +339,52 @@ def process_position_source(position_source: dict, manifest: list, cruise_base_d
         write_outputs(geojson_obj, base_name, prefix, trackline_dir, args, output_user, written)
 
     return None
+
+
+# ----------------------------------------------------------------------
+# Extent
+# ----------------------------------------------------------------------
+
+def extent_position_source(position_sources: list) -> dict:
+    """Return the position source a cruise's or lowering's bounding box comes from.
+
+    Args:
+        position_sources: Position source dicts (from :func:`get_position_sources`).
+
+    Returns:
+        dict: The source marked ``extent: true``, else the first.
+
+    Raises:
+        RuntimeError: If more than one source is marked.
+    """
+    marked = [src for src in position_sources if src.get("extent") is True]
+    if len(marked) > 1:
+        raise RuntimeError("Only one position source can be marked 'extent: true'")
+    return marked[0] if marked else position_sources[0]
+
+
+def track_extent(position_source: dict, combined: dict | None, manifest: list,
+                 cruise_base_dir: str, prefix: str) -> dict | None:
+    """Return the bounding box of a position source's whole track.
+
+    Args:
+        position_source: The position source (from :func:`extent_position_source`).
+        combined: Its combined trackline from :func:`process_position_source`,
+            or ``None`` to combine its dashboard files here (``--no-combine``).
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        prefix: Cruise or lowering ID, used when combining.
+
+    Returns:
+        dict | None: ``westernmost``, ``easternmost``, ``southernmost`` and
+        ``northernmost`` (from :func:`~server.lib.geojson_utils.geojson_extent`,
+        so a track across the antimeridian has westernmost > easternmost), or
+        ``None`` if the source has no positions yet.
+    """
+    if combined is None:
+        files = get_dd_json_files_for_position_source(manifest, position_source, cruise_base_dir)
+        combined = combine_geojson_files(files, prefix, position_source["device"]) if files else None
+    return geojson_extent(combined) if combined else None
 
 
 def queue_md5_update(openvdm, written: list, cruise_id: str) -> str | None:

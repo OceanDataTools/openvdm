@@ -142,17 +142,50 @@ class Warehouse extends Controller {
     // easternmost is a box across the antimeridian.
     public function setCruiseExtent() {
 
+        $extent = $this->_postedExtent();
+        if ($extent === false) {
+            return;
+        }
+
+        $this->_warehouseModel->setCruiseExtent(array('value' => $extent ? json_encode($extent) : ''));
+        echo json_encode(array('cruiseExtent' => $extent));
+    }
+
+    // getLoweringExtent - return the current lowering's bounding box, or null.
+    public function getLoweringExtent() {
+
+        $response['loweringExtent'] = $this->_warehouseModel->getLoweringExtent();
+        echo json_encode($response);
+    }
+
+    // setLoweringExtent - set the current lowering's bounding box (#399), as
+    // setCruiseExtent does for the cruise.
+    public function setLoweringExtent() {
+
+        $extent = $this->_postedExtent();
+        if ($extent === false) {
+            return;
+        }
+
+        $this->_warehouseModel->setLoweringExtent(array('value' => $extent ? json_encode($extent) : ''));
+        echo json_encode(array('loweringExtent' => $extent));
+    }
+
+    // The bounding box POSTed to setCruiseExtent or setLoweringExtent, checked:
+    // an array of the four edges, null to clear it, or false after sending a
+    // 403 (no worker token) or 400 (a missing or out-of-range edge, or south
+    // above north) response.
+    private function _postedExtent() {
+
         if (!TransferCredentials::isWorkerRequest()) {
             http_response_code(403);
             echo json_encode(array('error' => 'A worker token is required'));
-            return;
+            return false;
         }
 
         $raw = $_POST['extent'] ?? '';
         if ($raw === '') {
-            $this->_warehouseModel->setCruiseExtent(array('value' => ''));
-            echo json_encode(array('cruiseExtent' => null));
-            return;
+            return null;
         }
 
         $extent = json_decode($raw, true);
@@ -163,18 +196,17 @@ class Warehouse extends Controller {
             if ((!is_int($value) && !is_float($value)) || abs($value) > $limit) {
                 http_response_code(400);
                 echo json_encode(array('error' => "Invalid or missing $edge"));
-                return;
+                return false;
             }
             $checked[$edge] = (float) $value;
         }
         if ($checked['southernmost'] > $checked['northernmost']) {
             http_response_code(400);
             echo json_encode(array('error' => 'southernmost is north of northernmost'));
-            return;
+            return false;
         }
 
-        $this->_warehouseModel->setCruiseExtent(array('value' => json_encode($checked)));
-        echo json_encode(array('cruiseExtent' => $checked));
+        return $checked;
     }
 
     // getCruiseDescription - return the current cruise description.
@@ -421,6 +453,7 @@ class Warehouse extends Controller {
         $response['loweringID'] = $this->_warehouseModel->getLoweringID();
         $response['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         $response['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
+        $response['loweringExtent'] = $this->_warehouseModel->getLoweringExtent();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getLoweringOnlyCollectionSystemTransfers();
 
         $response['collectionSystemTransfersConfig'] = TransferCredentials::forResponse($response['collectionSystemTransfersConfig']);

@@ -34,8 +34,10 @@ only set when the cruise is OpenVDM's current cruise, and not with
 quality-checked fixes, add ``--no-extent`` to this script's hook so the
 quick-look extent doesn't overwrite it.
 
-The shared trackline code is in ``server/lib/tracks.py``; this script adds
-the cruise's ID, manifest location, default position sources and extent.
+The shared trackline code, including picking the extent's position source
+and computing the extent, is in ``server/lib/tracks.py``; this script adds the
+cruise's ID, manifest location and default position sources, and stores the
+cruise extent.
 
 Usage::
 
@@ -53,12 +55,11 @@ import sys
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.geojson_utils import combine_geojson_files, geojson_extent  # noqa: E402  pylint: disable=wrong-import-position
 from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
 from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-position
-    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, get_dd_json_files_for_position_source,
-    get_position_sources, load_manifest, process_position_source, queue_md5_update,
-    resolve_extra_directory, resolve_manifest_path, setup_logging,
+    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, extent_position_source, get_position_sources,
+    load_manifest, process_position_source, queue_md5_update, resolve_extra_directory,
+    resolve_manifest_path, setup_logging, track_extent,
 )
 
 # ----------------------------------------------------------------------
@@ -79,25 +80,6 @@ PositionSources:
 # Cruise extent
 # ----------------------------------------------------------------------
 
-def extent_position_source(position_sources):
-    """Return the position source the cruise's bounding box comes from.
-
-    Args:
-        position_sources: Position source dicts (from :func:`~server.lib.tracks.get_position_sources`).
-
-    Returns:
-        dict: The source marked ``extent: true``, else the first.
-
-    Raises:
-        RuntimeError: If more than one source is marked.
-    """
-
-    marked = [src for src in position_sources if src.get("extent") is True]
-    if len(marked) > 1:
-        raise RuntimeError("Only one position source can be marked 'extent: true'")
-    return marked[0] if marked else position_sources[0]
-
-
 def update_cruise_extent(openvdm, position_source, combined, manifest, cruise_base_dir, cruise_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Set the current cruise's bounding box in OpenVDM from a position source's track.
 
@@ -106,7 +88,8 @@ def update_cruise_extent(openvdm, position_source, combined, manifest, cruise_ba
 
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
-        position_source: The position source (from :func:`extent_position_source`).
+        position_source: The position source (from
+            :func:`~server.lib.tracks.extent_position_source`).
         combined: Its combined trackline from
             :func:`~server.lib.tracks.process_position_source`, or ``None`` to
             combine its dashboard files here (``--no-combine``).
@@ -122,11 +105,7 @@ def update_cruise_extent(openvdm, position_source, combined, manifest, cruise_ba
         logging.info("%s isn't the current cruise; not setting its extent", cruise_id)
         return
 
-    if combined is None:
-        files = get_dd_json_files_for_position_source(manifest, position_source, cruise_base_dir)
-        combined = combine_geojson_files(files, cruise_id, position_source["device"]) if files else None
-
-    extent = geojson_extent(combined) if combined else None
+    extent = track_extent(position_source, combined, manifest, cruise_base_dir, cruise_id)
     if extent is None:
         logging.warning("No positions from %s yet; the cruise extent isn't set", position_source["device"])
         return

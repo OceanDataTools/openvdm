@@ -365,6 +365,11 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
+    public function setLoweringExtent($data) {
+        $where = array('name' => 'loweringExtent');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setLoweringSize($data) {
         $where = array('name' => 'loweringSize');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -693,6 +698,26 @@ class Warehouse extends Model {
     public function getLatestLowering() {
         $lowerings = $this->getLowerings();
         return isset($lowerings[0]) ? $lowerings[0] : null;
+    }
+
+    // A lowering's bounding box (#399): the current one (loweringExtent, set
+    // by build_lowering_tracks through api/warehouse/setLoweringExtent), or
+    // another lowering of the current cruise's from its loweringConfig.json.
+    // An array with westernmost, easternmost, southernmost and northernmost,
+    // or null if there's none.
+    public function getLoweringExtent($loweringID = '') {
+        if (strcmp($loweringID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringExtent'");
+            $extent = json_decode($row[0]->value ?? '', true);
+        } else {
+            $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $this->getCruiseID() . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir() . DIRECTORY_SEPARATOR . $loweringID . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn();
+            if (!is_file($configFile)) {
+                return null;
+            }
+            $loweringConfigJSON = json_decode(file_get_contents($configFile), true);
+            $extent = $loweringConfigJSON['loweringExtent'] ?? null;
+        }
+        return is_array($extent) ? $extent : null;
     }
 
     public function getLoweringDates($loweringID = '') {

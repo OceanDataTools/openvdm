@@ -125,7 +125,8 @@ VALUES
   (22,'md5FilesizeLimitStatus','On'),
   (23,'showLoweringComponents','No'),
   (24,'cruiseDescription','Sample cruise for exploring OpenVDM with its sample data.'),
-  (25,'cruiseExtent','');
+  (25,'cruiseExtent',''),
+  (26,'loweringExtent','');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;

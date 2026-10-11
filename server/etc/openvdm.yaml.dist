@@ -133,8 +133,9 @@ postHookCommands:
         #   --position-sources  a PositionSources YAML file, instead of editing the
         #                       script's embedded default
         #   --extra-directory   another extra directory for the files
-        #   --no-extent         don't set the cruise's bounding box (cruiseExtent);
-        #                       add it when nav-qa-processing's hook sets the extent
+        #   --no-extent         don't set the cruise's or lowering's bounding box
+        #                       (cruiseExtent, loweringExtent); add it when another
+        #                       hook (e.g. nav-qa-processing's) sets the extent
         #
         # Cruise tracklines, which also set the cruise's bounding box for QA tools
         #- collectionSystemTransferName: OpenRVDAS
@@ -147,7 +148,7 @@ postHookCommands:
         #    #- --extra-directory=Tracklines
         #    #- --no-extent
         #    - "{collectionSystemTransferName}"
-        # Lowering tracklines, for the current lowering
+        # Lowering tracklines, which also set the current lowering's bounding box
         #- collectionSystemTransferName: ROV_OpenRVDAS
         #  commandList:
         #  - name: "Build lowering tracks"
@@ -156,6 +157,7 @@ postHookCommands:
         #    - /opt/openvdm/bin/build_lowering_tracks.py
         #    #- --position-sources=/opt/openvdm/server/etc/lowering_position_sources.yaml
         #    #- --extra-directory=Tracklines
+        #    #- --no-extent
         #    - "{collectionSystemTransferName}"
     postSetupNewCruise:
         #commandList:

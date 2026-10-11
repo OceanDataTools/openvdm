@@ -83,7 +83,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """Write the current lowering configuration to the lowering config file.
 
         Collection system transfer entries are reduced to their name, long
-        name, description and destination directory (no credentials). When
+        name, description and destination directory (no credentials), and
+        ``loweringExtent`` is left out while it isn't set. When
         the file already exists, its ``loweringFinalizedOn`` value is kept.
         Queues an MD5 summary update for the file.
 
@@ -125,6 +126,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                         transfer.pop(key)
 
         _scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
+
+        # The lowering's bounding box (#399), left out until build_lowering_tracks sets it
+        if not lowering_config.get('loweringExtent'):
+            lowering_config.pop('loweringExtent', None)
 
         results = output_json_data_to_file(lowering_config_filepath, lowering_config)
         if not results['verdict']:
