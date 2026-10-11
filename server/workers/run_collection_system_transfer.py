@@ -29,6 +29,7 @@ import subprocess
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from random import randint
@@ -39,7 +40,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
-from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, test_cst_source
+from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, sshpass_command, test_cst_source
 from server.lib.openvdm import OpenVDM
 
 # Gearman task names this worker registers.
@@ -532,9 +533,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             cmd = ['rsync', '-e', 'ssh', f"{user}@{host}:{parent}/"]
             if not is_darwin:
                 cmd.insert(1, '--protect-args')
-            if cst_cfg.get('sshUseKey') == 0:
-                cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            with sshpass_command(cmd, cst_cfg) as cmd:
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if proc.returncode != 0:
                 logging.warning("Unable to list %s to expand wildcard: %s", parent, proc.stderr.strip())
                 return []
@@ -697,11 +697,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             f"{cst_cfg['sshServer']}:{raw_source_dir}/"]
                 if not is_darwin:
                     command.insert(2, '--protect-args')
-                if cst_cfg.get('sshUseKey') == 0:
-                    command = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + command
 
-            logging.debug("File list Command: %s", transfer_utils.redact_command(command))
-            proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            # The SSH password goes to sshpass in a file, not on the command line (#426)
+            with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as command:
+                logging.debug("File list Command: %s", ' '.join(command))
+                proc = subprocess.run(command, capture_output=True, text=True, check=False)
             # A failed or partial listing looks like missing files, and
             # with syncFromSource those are deleted from the destination (#238)
             reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
@@ -976,13 +976,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     extra_args = [f"--password-file={password_file}"]
 
                 cmd = build_rsync_command(rsync_flags, extra_args, source_path, effective_dest, include_file)
-                if transfer_type == 'ssh' and cst_cfg.get('sshUseKey') == 0:
-                    cmd = ['sshpass', '-p', cst_cfg.get('sshPass', '')] + cmd
 
                 try:
-                    new_files, updated_files = run_transfer_command(
-                        self, current_job, cmd, len(files['include']), effective_dest
-                    )
+                    with sshpass_command(cmd, cst_cfg) if transfer_type == 'ssh' else nullcontext(cmd) as cmd:
+                        new_files, updated_files = run_transfer_command(
+                            self, current_job, cmd, len(files['include']), effective_dest
+                        )
                 except TransferCommandError as exc:
                     # Don't report a failed transfer as successful (#230), but
                     # return what was copied (here and from any earlier

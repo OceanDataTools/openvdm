@@ -22,13 +22,13 @@ import subprocess
 import time
 import configparser
 import fnmatch
+from contextlib import contextmanager, nullcontext
 from datetime import datetime
 from typing import Optional
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import test_write_access, temporary_directory
-from server.lib.transfer_utils import redact_command
 
 # Integer fields that PHP/PDO returns as strings but Python code compares with == 1 / == 0
 _TRANSFER_INT_FIELDS = frozenset([
@@ -157,16 +157,95 @@ def check_darwin(cfg):
 
     cfg = normalize_transfer_config(cfg)
     cmd = ['ssh', f"{cfg['sshUser']}@{cfg['sshServer']}", "uname -s"]
-    if cfg['sshUseKey'] == 0:
-        cmd = ['sshpass', '-p', cfg.get('sshPass', '')] + cmd
 
-    logging.debug("check_darwin cmd: %s", redact_command(cmd))
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        with sshpass_command(cmd, cfg) as cmd:
+            logging.debug("check_darwin cmd: %s", ' '.join(cmd))
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
-    except subprocess.SubprocessError as exc:
+    except (subprocess.SubprocessError, OSError) as exc:
         logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(exc))
         return False
+
+
+@contextmanager
+def smb_credentials_file(cfg):
+    """Write a transfer's SMB username and password to a temporary credentials file.
+
+    ``mount.cifs`` (``credentials=``) and ``smbclient`` (``-A``) read the
+    login from the file, which keeps the password off the command line: a
+    failed command's error text, and ``ps``, would show it there (#424). The
+    file is readable by its owner only and deleted on exit.
+
+    Args:
+        cfg: Transfer configuration with ``smbUser`` and ``smbPass``.
+
+    Yields:
+        str: Path of the credentials file.
+    """
+    with _secret_file(f"username={cfg['smbUser']}\npassword={cfg.get('smbPass') or ''}\n",
+                      'openvdm_smb_') as path:
+        yield path
+
+
+@contextmanager
+def ssh_password_file(password):
+    """Write an SSH password to a temporary file for ``sshpass -f``.
+
+    Keeps the password off the command line, where ``ps`` and a failed
+    command's error text would show it (#426). The file is readable by its
+    owner only and deleted on exit.
+
+    Args:
+        password: The SSH password; ``None`` is written as an empty password.
+
+    Yields:
+        str: Path of the password file.
+    """
+    with _secret_file(f"{password or ''}\n", 'openvdm_ssh_') as path:
+        yield path
+
+
+@contextmanager
+def sshpass_command(cmd, cfg):
+    """Prefix a command with ``sshpass -f`` when a transfer logs in to SSH with a password.
+
+    Use as ``with sshpass_command(cmd, cfg) as cmd:`` and run the command
+    inside the block; the password file is deleted when it ends.
+
+    Args:
+        cmd: The command (``ssh``, or ``rsync -e ssh``) as an argument list.
+        cfg: Transfer configuration with ``sshUseKey`` and ``sshPass``.
+
+    Yields:
+        list[str]: *cmd* prefixed with ``sshpass -f <file>`` if ``sshUseKey``
+        is 0, otherwise *cmd* unchanged.
+    """
+    if normalize_transfer_config(cfg).get('sshUseKey') != 0:
+        yield cmd
+        return
+    with ssh_password_file(cfg.get('sshPass')) as path:
+        yield ['sshpass', '-f', path] + cmd
+
+
+@contextmanager
+def _secret_file(content, prefix):
+    """Write *content* to a temporary file readable by its owner only, deleted on exit.
+
+    Args:
+        content: The text to write.
+        prefix: The file name's prefix.
+
+    Yields:
+        str: Path of the file.
+    """
+    fd, path = tempfile.mkstemp(prefix=prefix)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+        yield path
+    finally:
+        os.remove(path)
 
 
 def detect_smb_version(cfg):
@@ -174,7 +253,8 @@ def detect_smb_version(cfg):
 
     Lists the server's shares with ``smbclient`` (as guest if ``smbUser`` is
     ``'guest'``). Windows XP-era servers (``OS=[Windows 5.1]``) get ``'1.0'``;
-    all others get ``'2.1'``.
+    all others get ``'2.1'``. The login is passed in a credentials file
+    (:func:`smb_credentials_file`), not on the command line.
 
     Args:
         cfg: Transfer configuration with ``smbServer``, ``smbDomain``,
@@ -186,21 +266,14 @@ def detect_smb_version(cfg):
         authentication fails.
     """
 
-    if cfg.get('smbUser') == 'guest':
-        cmd = [
-            'smbclient', '-L', cfg['smbServer'],
-            '-W', cfg['smbDomain'], '-m', 'SMB2', '-g', '-N'
-        ]
-    else:
-        cmd = [
-            'smbclient', '-L', cfg['smbServer'],
-            '-W', cfg['smbDomain'], '-m', 'SMB2', '-g',
-            '-U', f"{cfg['smbUser']}%{cfg.get('smbPass', '')}"
-        ]
+    cmd = ['smbclient', '-L', cfg['smbServer'], '-W', cfg['smbDomain'], '-m', 'SMB2', '-g']
 
-    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd).replace(f'%{cfg.get("smbPass", "")}', '%****'))
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if cfg.get('smbUser') == 'guest':
+            proc = _run_smbclient(cmd + ['-N'])
+        else:
+            with smb_credentials_file(cfg) as credentials:
+                proc = _run_smbclient(cmd + ['-A', credentials])
 
         if proc.returncode != 0 or "NT_STATUS" in proc.stderr or "failed" in proc.stderr.lower():
             detail = proc.stderr.strip()
@@ -212,17 +285,25 @@ def detect_smb_version(cfg):
                 return '1.0', ""
         return '2.1', ""
 
-    except subprocess.SubprocessError as exc:
+    except (subprocess.SubprocessError, OSError) as exc:
         detail = str(exc)
         logging.error("SMB version detection failed: %s", detail)
         return None, detail
+
+
+def _run_smbclient(cmd):
+    """Run an ``smbclient`` command with a 10 s timeout and return the completed process."""
+    logging.debug("detect_smb_version cmd: %s", ' '.join(cmd))
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
 
 def mount_smb_share(cfg, mntpoint, smb_version):
     """Mount a transfer's SMB share (CIFS) on a local directory.
 
     The share is mounted read-write if the transfer removes source files
-    (``removeSourceFiles``), otherwise read-only. On failure the mount point is
+    (``removeSourceFiles``), otherwise read-only. The login is passed in a
+    credentials file (:func:`smb_credentials_file`), not on the command line,
+    which also lets a password contain commas. On failure the mount point is
     unmounted again. Requires root.
 
     Args:
@@ -242,25 +323,36 @@ def mount_smb_share(cfg, mntpoint, smb_version):
 
     opts = f"{read_write},domain={cfg['smbDomain']},vers={smb_version}"
 
-    if cfg['smbUser'] == 'guest':
-        opts += ",guest"
-    else:
-        opts += f",username={cfg['smbUser']},password={cfg.get('smbPass', '')}"
-
-    cmd = ['mount', '-t', 'cifs', cfg['smbServer'], mntpoint, '-o', opts]
-
-    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd).replace(f'password={cfg.get("smbPass", "")}', 'password=****'))
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        if cfg['smbUser'] == 'guest':
+            _run_mount(cfg, mntpoint, opts + ",guest")
+        else:
+            # The login goes in a credentials file, off the command line (#424)
+            with smb_credentials_file(cfg) as credentials:
+                _run_mount(cfg, mntpoint, opts + f",credentials={credentials}")
         logging.info("Successfully mounted %s to %s", cfg['smbServer'], mntpoint)
         return True, ""
     except subprocess.CalledProcessError as exc:
-        detail = exc.stderr.strip() if exc.stderr else str(exc)
-        logging.error("Failed to mount SMB share: %s.  Are you running as root?", detail)
+        detail = (exc.stderr or exc.stdout or '').strip() or str(exc)
+    except OSError as exc:
+        detail = str(exc)
 
-        # Try to unmount in case of partial mount
-        subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return False, detail
+    logging.error("Failed to mount SMB share: %s.  Are you running as root?", detail)
+
+    # Try to unmount in case of partial mount
+    subprocess.run(['umount', mntpoint], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return False, detail
+
+
+def _run_mount(cfg, mntpoint, opts):
+    """Run ``mount -t cifs`` for a transfer's share.
+
+    Raises:
+        subprocess.CalledProcessError: If ``mount`` fails.
+    """
+    cmd = ['mount', '-t', 'cifs', cfg['smbServer'], mntpoint, '-o', opts]
+    logging.debug("mount_smb_share cmd: %s", ' '.join(cmd))
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
 def build_rsync_command(flags, extra_args, source_dir, dest_dir, include_filepath,
@@ -457,19 +549,20 @@ def test_rsync_write_access(server, user, tmpdir, password_file=None):
     return True, ""
 
 
-def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
+def build_ssh_command(flags, user, server, post_cmd, passwd_file, use_pubkey):
     """Build an ssh command line as an argument list for ``subprocess``.
 
     Both forms use a 5 s connection timeout and skip host key checking. With a
     key the command runs in batch mode; with a password it's prefixed with
-    ``sshpass`` and public-key authentication is disabled.
+    ``sshpass -f`` and public-key authentication is disabled.
 
     Args:
         flags: Extra ssh options, or ``None``.
         user: SSH username.
         server: SSH server hostname or address.
         post_cmd: Command to run on the server.
-        passwd: SSH password; ignored when *use_pubkey* is true.
+        passwd_file: File holding the SSH password, from
+            :func:`ssh_password_file`; ignored when *use_pubkey* is true.
         use_pubkey: Authenticate with the local user's SSH key instead of a
             password.
 
@@ -477,17 +570,58 @@ def build_ssh_command(flags, user, server, post_cmd, passwd, use_pubkey):
         list[str]: The command.
 
     Raises:
-        ValueError: If there's no password and *use_pubkey* is false.
+        ValueError: If there's no password file and *use_pubkey* is false.
     """
 
-    passwd = passwd or ''
-    if (len(passwd) == 0) and use_pubkey is False:
-        raise ValueError("Must specify either a passwd or use_pubkey")
+    if not passwd_file and use_pubkey is False:
+        raise ValueError("Must specify either a passwd_file or use_pubkey")
 
-    cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5'] if use_pubkey else ['sshpass', '-p', f'{passwd}', 'ssh', '-o', 'PubkeyAuthentication=no','-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=5']
+    cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5'] if use_pubkey else ['sshpass', '-f', passwd_file, 'ssh', '-o', 'PubkeyAuthentication=no','-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=5']
     cmd += flags or []
     cmd += [f'{user}@{server}', post_cmd]
     return cmd
+
+
+def _run_ssh_test(post_cmd, user, server, passwd, use_pubkey, label):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Run a command on an SSH server for a connection test.
+
+    The password, if used, is passed to ``sshpass`` in a file
+    (:func:`ssh_password_file`), not on the command line (#426).
+
+    Args:
+        post_cmd: Command to run on the server.
+        user: SSH username.
+        server: SSH server hostname or address.
+        passwd: SSH password; ignored when *use_pubkey* is true.
+        use_pubkey: Authenticate with the local user's SSH key instead of a
+            password.
+        label: The test's name for log messages, e.g. ``"SSH connection test"``.
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``
+        with the error output.
+
+    Raises:
+        ValueError: If there's no password and *use_pubkey* is false.
+    """
+
+    if not passwd and use_pubkey is False:
+        raise ValueError("Must specify either a passwd or use_pubkey")
+
+    try:
+        with nullcontext() if use_pubkey else ssh_password_file(passwd) as passwd_file:
+            cmd = build_ssh_command(None, user, server, post_cmd, passwd_file, use_pubkey)
+            logging.debug("%s cmd: %s", label, ' '.join(cmd))
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            detail = proc.stderr.strip()
+            logging.error("%s failed (exit %s): %s", label, proc.returncode, detail)
+            return False, detail
+    except Exception as exc:
+        detail = str(exc)
+        logging.error("%s failed: %s", label, detail)
+        return False, detail
+    return True, ""
 
 
 def test_ssh_connection(server, user, passwd, use_pubkey):
@@ -505,24 +639,7 @@ def test_ssh_connection(server, user, passwd, use_pubkey):
         with the error output.
     """
 
-    cmd = build_ssh_command(None, user, server, 'ls', passwd, use_pubkey)
-
-    cmd_str = ' '.join(cmd)
-    if passwd and len(passwd) > 0:
-        cmd_str = cmd_str.replace(f'{passwd}', '****')
-
-    logging.debug("test_ssh_connection cmd: %s", cmd_str)
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            detail = proc.stderr.strip()
-            logging.error("SSH connection test failed (exit %s): %s", proc.returncode, detail)
-            return False, detail
-    except Exception as exc:
-        detail = str(exc)
-        logging.error("SSH connection test failed: %s", detail)
-        return False, detail
-    return True, ""
+    return _run_ssh_test('ls', user, server, passwd, use_pubkey, "SSH connection test")
 
 
 def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
@@ -541,25 +658,8 @@ def test_ssh_remote_directory(server, user, remote_dir, passwd, use_pubkey):
         with the error output.
     """
 
-    passwd = passwd or ''
-    cmd = build_ssh_command(None, user, server, f'ls "{remote_dir}"', passwd, use_pubkey)
-
-    cmd_str = ' '.join(cmd)
-    if passwd and len(passwd) > 0:
-        cmd_str = cmd_str.replace(f'{passwd}', '****')
-
-    logging.debug("test_ssh_destination cmd: %s", cmd_str)
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            detail = proc.stderr.strip()
-            logging.error("SSH destination test failed (exit %s): %s", proc.returncode, detail)
-            return False, detail
-    except Exception as exc:
-        detail = str(exc)
-        logging.error("SSH destination test failed: %s", detail)
-        return False, detail
-    return True, ""
+    return _run_ssh_test(f'ls "{remote_dir}"', user, server, passwd, use_pubkey,
+                         "SSH destination test")
 
 
 def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
@@ -578,44 +678,13 @@ def test_ssh_write_access(server, user, dest_dir, passwd, use_pubkey):
         with the error output.
     """
 
-    passwd = passwd or ''
-    cmd = build_ssh_command(None, user, server, f"touch {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
-
-    cmd_str = ' '.join(cmd)
-    if passwd and len(passwd) > 0:
-        cmd_str = cmd_str.replace(f'{passwd}', '****')
-
-    logging.debug("test_ssh_write_access cmd: %s", cmd_str)
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            detail = proc.stderr.strip()
-            logging.error("SSH write test failed (exit %s): %s", proc.returncode, detail)
-            return False, detail
-    except Exception as exc:
-        detail = str(exc)
-        logging.error("SSH write test failed: %s", detail)
+    test_file = os.path.join(dest_dir, 'writeTest.txt')
+    success, detail = _run_ssh_test(f"touch {test_file}", user, server, passwd, use_pubkey,
+                                    "SSH write test")
+    if not success:
         return False, detail
-
-    cmd = build_ssh_command(None, user, server, f"rm {os.path.join(dest_dir, 'writeTest.txt')}", passwd, use_pubkey)
-
-    cmd_str = ' '.join(cmd)
-    if passwd and len(passwd) > 0:
-        cmd_str = cmd_str.replace(f'{passwd}', '****')
-
-    logging.debug("test_ssh_write_access cmd: %s", cmd_str)
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            detail = proc.stderr.strip()
-            logging.error("SSH write test cleanup failed (exit %s): %s", proc.returncode, detail)
-            return False, detail
-    except Exception as exc:
-        detail = str(exc)
-        logging.error("SSH write test failed: %s", detail)
-        return False, detail
-
-    return True, ""
+    return _run_ssh_test(f"rm {test_file}", user, server, passwd, use_pubkey,
+                         "SSH write test cleanup")
 
 
 # OpenSSH's default private keys in ~/.ssh, in the order ssh tries them
@@ -731,8 +800,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
     # If password provided, obscure it; otherwise use key file
     if cfg["sshUseKey"] == 0:
         try:
+            # Read from stdin: on the command line, a failure's error text
+            # would show the password (#424)
             result = subprocess.run(
-                ["rclone", "obscure", cfg["sshPass"]],
+                ["rclone", "obscure", "-"],
+                input=cfg["sshPass"],
                 capture_output=True,
                 text=True,
                 check=True,

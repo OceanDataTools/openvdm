@@ -66,10 +66,10 @@ from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-posi
 # ----------------------------------------------------------------------
 
 # Position sources used when no --position-sources is given; edit to match this ship.
-# Add "extent: true" to the source the cruise's bounding box should come from
-# (default: the first).
+# They apply to the collection system the hook names; add
+# "CollectionSystem: <name>" to tie them to one. Add "extent: true" to the
+# source the cruise's bounding box should come from (default: the first).
 DEFAULT_POSITION_SOURCES_YAML = """
-CollectionSystem: OpenRVDAS
 PositionSources:
   - device: POSMV
     type: gga

@@ -2,15 +2,11 @@
 """Create directories and seed files on remote data-acquisition workstations.
 
 Designed to be called from the ``postSetupNewCruise`` hook when a new cruise
-is created.  For each active collection system transfer whose name matches a
-top-level subdirectory in the template directory, the script connects to the
-remote workstation (using the transfer's configured credentials) and replicates
-the subdirectory tree beneath it, substituting ``{cruiseID}`` tokens in path
-names with the current cruise identifier.
-
-Only active collection system transfers are processed.  Optionally, the script
-can also create the collection system's configured source directory on the
-remote host before copying the template.
+is created (``postSetupNewLowering`` with ``-l``).  For each active collection
+system transfer whose name matches a top-level subdirectory in the template
+directory, the script copies the tree beneath that subdirectory into the
+transfer's source directory, using the transfer's configured credentials, and
+replaces ``{cruiseID}`` and ``{loweringID}`` in every directory and file name.
 
 Example template layout for cruise ``RV1001``::
 
@@ -20,22 +16,28 @@ Example template layout for cruise ``RV1001``::
                 raw_data/
                 {cruiseID}_XBT_log.csv   ← empty seed file
 
-    → remote host creates:
+    → the XBT transfer's source host gets:
         <source_dir>/RV1001/
         <source_dir>/RV1001/raw_data/
         <source_dir>/RV1001/RV1001_XBT_log.csv
 
+Local directory, SMB share and SSH server transfers are supported. SMB shares
+are mounted read-write (which needs root, as the workers run); SSH servers
+need ``rsync``, as for the transfer itself. Files that already exist are never
+overwritten, so the script can be run again safely. The source directory must
+exist unless ``-s`` is given. The script exits with status 1 if any collection
+system failed (#428).
+
 Usage::
 
-    build_remote_directory.py [-h] [-v ...] [-s] [-t TEMPLATE_DIR]
+    build_remote_directory.py [-h] [-v ...] [-s] [-l] [-t TEMPLATE_DIR]
                               [-c COLLECTION_SYSTEM]
 """
 
 import os
 import sys
-import json
+import shlex
 import shutil
-import pathlib
 import logging
 import argparse
 import subprocess
@@ -43,47 +45,324 @@ import subprocess
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
-from server.lib.file_utils import set_owner_group_permissions
+from server.lib.connection_utils import (check_darwin, detect_smb_version, has_wildcard,
+                                         mount_smb_share, normalize_transfer_config,
+                                         sshpass_command)
+from server.lib.file_utils import set_owner_group_permissions, temporary_directory
 from server.lib.openvdm import OpenVDM
 
 # Default template directory to recreate on each collection system; override with -t.
 TEMPLATE_DIRECTORY = '/opt/openvdm/template_directory'
 
-def make_system_call(command):
-    """Run a command, logging its stdout (debug) and stderr (error).
+# Transfer types (OVDM_TransferTypes) the script can build on
+LOCAL, SMB, SSH = 1, 3, 4
 
-    Failures aren't raised or returned; check the log.
 
-    Args:
-        command: The command as an argument list, e.g. ``['smbclient', ...]``.
-    """
-
-    logging.debug("Command: %s", ' '.join(command))
-    proc = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = proc.communicate()
-
-    if len(out) > 0:
-        logging.debug("stdout:\n%s",out)
-
-    if len(err) > 0:
-        logging.error("stderr:\n%s",err)
-
-def make_local_directory(directory, create_source_dir=False):
-    """Create a local directory (``mkdir -p`` style when *create_source_dir* is set).
-
-    Does nothing if the directory already exists.
+def replace_tokens(name, tokens):
+    """Return *name* with each ``{token}`` in *tokens* replaced.
 
     Args:
-        directory: Path of the directory to create.
-        create_source_dir: Also create missing parent directories.
-    """
-    logging.debug("Create directory: %s, Create Source: %s", directory, "Yes" if create_source_dir else "No")
-    pathlib.Path(directory).mkdir(mode=0o755, parents=create_source_dir, exist_ok=True)
+        name: A path or path component.
+        tokens: Map of placeholder (e.g. ``'{cruiseID}'``) to value.
 
-# -------------------------------------------------------------------------------------
-# Required python code for running the script as a stand-alone utility
-# -------------------------------------------------------------------------------------
-if __name__ == "__main__":
+    Returns:
+        str: The name with the placeholders replaced.
+    """
+    for token, value in tokens.items():
+        name = name.replace(token, value)
+    return name
+
+
+def render_template(template_dir, dest_dir, tokens):
+    """Copy a template tree, replacing the tokens in every directory and file name.
+
+    Args:
+        template_dir: The collection system's template directory.
+        dest_dir: Empty local directory to copy the tree into.
+        tokens: Map of placeholder to value, from :func:`replace_tokens`.
+    """
+    for root, dirs, files in os.walk(template_dir):
+        rel = os.path.relpath(root, template_dir)
+        dest_root = dest_dir if rel == '.' else os.path.join(dest_dir, replace_tokens(rel, tokens))
+        for name in dirs:
+            os.makedirs(os.path.join(dest_root, replace_tokens(name, tokens)), exist_ok=True)
+        for name in files:
+            shutil.copyfile(os.path.join(root, name), os.path.join(dest_root, replace_tokens(name, tokens)))
+
+
+def copy_missing(src_dir, dest_dir):
+    """Copy a directory tree into *dest_dir*, skipping anything that already exists.
+
+    Args:
+        src_dir: The rendered template tree.
+        dest_dir: Existing directory to copy into.
+
+    Returns:
+        tuple[list[str], list[str]]: The directories and files created, and
+        the errors.
+    """
+    created, errors = [], []
+    for root, dirs, files in os.walk(src_dir):
+        rel = os.path.relpath(root, src_dir)
+        dest_root = dest_dir if rel == '.' else os.path.join(dest_dir, rel)
+        for name in dirs:
+            path = os.path.join(dest_root, name)
+            if os.path.isdir(path):
+                continue
+            try:
+                os.mkdir(path, 0o755)
+                created.append(path)
+                logging.info("  - Created directory: %s", path)
+            except OSError as exc:
+                errors.append(f"Unable to create directory {path}: {exc}")
+        for name in files:
+            path = os.path.join(dest_root, name)
+            if os.path.lexists(path):
+                logging.info("  - File exists, not overwritten: %s", path)
+                continue
+            try:
+                shutil.copyfile(os.path.join(root, name), path)
+                created.append(path)
+                logging.info("  - Created file:      %s", path)
+            except OSError as exc:
+                errors.append(f"Unable to create file {path}: {exc}")
+    return created, errors
+
+
+def prepare_dest_dir(dest_dir, create_source, label=None):
+    """Check that a source directory exists, creating it if asked.
+
+    Args:
+        dest_dir: The local (or mounted) source directory.
+        create_source: Create it, with any missing parents, if it doesn't exist.
+        label: How to name the directory in error messages; *dest_dir* if
+            ``None``.
+
+    Returns:
+        tuple[list[str], list[str]]: The directory if it was created, and the
+        errors.
+    """
+    label = label or dest_dir
+    if os.path.isdir(dest_dir):
+        return [], []
+    if not create_source:
+        return [], [f"Source directory {label} doesn't exist (use -s to create it)"]
+    try:
+        os.makedirs(dest_dir, 0o755)
+        logging.info("  - Created source directory: %s", label)
+        return [dest_dir], []
+    except OSError as exc:
+        return [], [f"Unable to create source directory {label}: {exc}"]
+
+
+def build_local(rendered, source_dir, create_source, warehouse_user):
+    """Copy the rendered template into a local source directory.
+
+    What's created is owned by the shipboard data warehouse user (#164).
+
+    Args:
+        rendered: The rendered template tree.
+        source_dir: The transfer's source directory.
+        create_source: Create the source directory if it doesn't exist.
+        warehouse_user: The shipboard data warehouse user.
+
+    Returns:
+        list[str]: The errors.
+    """
+    created, errors = prepare_dest_dir(source_dir, create_source)
+    if errors:
+        return errors
+    more_created, errors = copy_missing(rendered, source_dir)
+    for path in created + more_created:
+        result = set_owner_group_permissions(warehouse_user, path)
+        if not result['verdict']:
+            errors.append(result['reason'])
+    return errors
+
+
+def build_smb(cfg, rendered, source_dir, create_source):
+    """Copy the rendered template into a source directory on an SMB share.
+
+    The share is mounted read-write in a temporary directory, which unmounts
+    it again.
+
+    Args:
+        cfg: The collection system transfer.
+        rendered: The rendered template tree.
+        source_dir: The transfer's source directory, within the share.
+        create_source: Create the source directory if it doesn't exist.
+
+    Returns:
+        list[str]: The errors.
+    """
+    with temporary_directory() as tmpdir:
+        mntpoint = os.path.join(tmpdir, 'mntpoint')
+        os.mkdir(mntpoint, 0o755)
+        smb_version, detail = detect_smb_version(cfg)
+        if not smb_version:
+            return [f"Unable to connect to SMB server {cfg['smbServer']}: {detail}"]
+        # Mount read-write; mount_smb_share() only does for removeSourceFiles
+        success, detail = mount_smb_share({**cfg, 'removeSourceFiles': 1}, mntpoint, smb_version)
+        if not success:
+            return [f"Unable to mount SMB share {cfg['smbServer']}: {detail}"]
+
+        dest_dir = os.path.join(mntpoint, source_dir.lstrip('/'))
+        _, errors = prepare_dest_dir(dest_dir, create_source,
+                                     f"{source_dir} on {cfg['smbServer']}")
+        if errors:
+            return errors
+        _, errors = copy_missing(rendered, dest_dir)
+        return errors
+
+
+def run_ssh_command(cfg, cmd):
+    """Run a command that connects to a transfer's SSH server.
+
+    Args:
+        cfg: The collection system transfer.
+        cmd: The ``ssh`` or ``rsync`` command; ``sshpass`` is added for
+            password logins (:func:`sshpass_command`).
+
+    Returns:
+        tuple[bool, str]: ``(True, "")`` on success, or ``(False, detail)``.
+    """
+    try:
+        with sshpass_command(cmd, cfg) as full_cmd:
+            logging.debug("Command: %s", ' '.join(full_cmd))
+            proc = subprocess.run(full_cmd, capture_output=True, text=True, timeout=600, check=False)
+    except (subprocess.SubprocessError, OSError) as exc:
+        return False, str(exc)
+    if proc.returncode != 0:
+        return False, proc.stderr.strip() or f"exit code {proc.returncode}"
+    return True, ""
+
+
+def build_ssh(cfg, rendered, source_dir, create_source):
+    """Copy the rendered template into a source directory on an SSH server.
+
+    Uses ``ssh`` to check or create the source directory, then ``rsync
+    --ignore-existing``.
+
+    Args:
+        cfg: The collection system transfer.
+        rendered: The rendered template tree.
+        source_dir: The transfer's source directory on the server.
+        create_source: Create the source directory if it doesn't exist.
+
+    Returns:
+        list[str]: The errors.
+    """
+    ssh_opts = ['-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=5']
+    ssh_opts += ['-o', 'BatchMode=yes'] if cfg['sshUseKey'] == 1 else ['-o', 'PubkeyAuthentication=no']
+    host = f"{cfg['sshUser']}@{cfg['sshServer']}"
+    quoted = shlex.quote(source_dir)
+
+    remote_cmd = f"mkdir -p {quoted}" if create_source else f"test -d {quoted}"
+    success, detail = run_ssh_command(cfg, ['ssh'] + ssh_opts + [host, remote_cmd])
+    if not success:
+        if create_source:
+            return [f"Unable to create source directory {source_dir} on {cfg['sshServer']}: {detail}"]
+        return [f"Source directory {source_dir} doesn't exist on {cfg['sshServer']} "
+                f"(use -s to create it): {detail}"]
+
+    cmd = ['rsync', '-r', '-i', '--ignore-existing', '--chmod=D755,F644',
+           '-e', ' '.join(['ssh'] + ssh_opts), f"{rendered}/", f"{host}:{source_dir}/"]
+    # macOS rsync doesn't support --protect-args, which keeps the remote
+    # shell from splitting the path on spaces
+    if not check_darwin(cfg):
+        cmd.insert(1, '--protect-args')
+    success, detail = run_ssh_command(cfg, cmd)
+    if not success:
+        return [f"Unable to copy the template to {source_dir} on {cfg['sshServer']}: {detail}"]
+    return []
+
+
+def build_collection_system(cfg, template_directory, tokens, create_source, warehouse_config):
+    """Copy a collection system's template into its source directory.
+
+    Args:
+        cfg: The collection system transfer (normalized).
+        template_directory: The template directory.
+        tokens: Map of placeholder to value.
+        create_source: Create the source directory if it doesn't exist.
+        warehouse_config: The shipboard data warehouse configuration.
+
+    Returns:
+        list[str] | None: The errors, or ``None`` if the collection system
+        was skipped.
+    """
+    if cfg['transferType'] not in (LOCAL, SMB, SSH):
+        logging.info("Skipping Collection System: %s. Transfer type is not Local Directory, "
+                     "SMB Share or SSH Server.", cfg['name'])
+        return None
+
+    template_dir = os.path.join(template_directory, cfg['name'])
+    if not os.path.isdir(template_dir):
+        logging.info("Skipping Collection System: %s. Corresponding template structure does not exist.",
+                     cfg['name'])
+        return None
+
+    source_dir = replace_tokens(cfg['sourceDir'], {
+        **tokens, '{loweringDataBaseDir}': warehouse_config['loweringDataBaseDir']})
+    if has_wildcard(source_dir):
+        return [f"Source directory {source_dir} has a wildcard; can't create the template there"]
+
+    logging.info("Collection System: %s, source directory: %s", cfg['name'], source_dir)
+
+    with temporary_directory() as tmpdir:
+        rendered = os.path.join(tmpdir, 'template')
+        os.mkdir(rendered)
+        render_template(template_dir, rendered, tokens)
+
+        if cfg['transferType'] == LOCAL:
+            return build_local(rendered, source_dir, create_source,
+                               warehouse_config['shipboardDataWarehouseUsername'])
+        if cfg['transferType'] == SMB:
+            return build_smb(cfg, rendered, source_dir, create_source)
+        return build_ssh(cfg, rendered, source_dir, create_source)
+
+
+def get_collection_systems(openvdm, parsed_args, lowering_id):
+    """Return the collection system transfers to build on.
+
+    The ones named with ``-c``, or else the active cruise (or, with ``-l``,
+    lowering) transfers. Exits if a named transfer doesn't exist, isn't a
+    supported type, or is lowering-level with no current lowering.
+
+    Args:
+        openvdm: The ``OpenVDM`` API object.
+        parsed_args: The parsed command line.
+        lowering_id: The current lowering ID, or ``None``.
+
+    Returns:
+        list[dict]: The collection system transfers.
+    """
+    if not parsed_args.collection_system:
+        return openvdm.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openvdm.get_active_collection_system_transfers(cruise=False)
+
+    collection_systems = []
+    for cs in parsed_args.collection_system:
+
+        collection_system = openvdm.get_collection_system_transfer_by_name(cs)
+        if not collection_system:
+            logging.error("Collection System: %s not found in OpenVDM configuration.", cs)
+            sys.exit(1)
+
+        collection_system = normalize_transfer_config(collection_system)
+        if collection_system['transferType'] not in (LOCAL, SMB, SSH):
+            logging.error("Collection System: %s is not a Local Directory, SMB Share or SSH Server Transfer!", cs)
+            sys.exit(1)
+
+        if collection_system['cruiseOrLowering'] == 1 and lowering_id is None:
+            logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
+            sys.exit(1)
+
+        collection_systems.append(collection_system)
+    return collection_systems
+
+
+def main():
+    """Parse the command line and build the template on each collection system."""
 
     # Define the command-line structure
     parser = argparse.ArgumentParser(description='build remote directory structure based on template')
@@ -104,12 +383,11 @@ if __name__ == "__main__":
     # Set up logging before we do any other argument parsing (so that we
     # can log problems with argument parsing).
 
-    LOGGING_FORMAT = '%(asctime)-15s %(levelname)s - %(message)s'
-    logging.basicConfig(format=LOGGING_FORMAT)
+    logging.basicConfig(format='%(asctime)-15s %(levelname)s - %(message)s')
 
-    LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
-    parsed_args.verbosity = min(parsed_args.verbosity, max(LOG_LEVELS))
-    logging.getLogger().setLevel(LOG_LEVELS[parsed_args.verbosity])
+    log_levels = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+    parsed_args.verbosity = min(parsed_args.verbosity, max(log_levels))
+    logging.getLogger().setLevel(log_levels[parsed_args.verbosity])
 
     template_directory = parsed_args.template_directory or TEMPLATE_DIRECTORY
 
@@ -134,91 +412,29 @@ if __name__ == "__main__":
         logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
         sys.exit(1)
 
-    collection_systems = []
+    collection_systems = get_collection_systems(openvdm, parsed_args, lowering_id)
 
-    # Retrieve the information for the collection system defined in the command-line argument
-    if parsed_args.collection_system:
+    tokens = {'{cruiseID}': cruise_id}
+    if lowering_id is not None:
+        tokens['{loweringID}'] = lowering_id
 
-        for cs in parsed_args.collection_system:
-
-            collection_system = openvdm.get_collection_system_transfer_by_name(cs)
-            if not collection_system:
-                logging.error("Collection System: %s not found in OpenVDM configuration.", cs)
-                sys.exit(1)
-
-            if collection_system['transferType'] not in ["1","3", "4"]:
-                logging.info("Collection System: %s is not a Local Directory, SSH or Samba Server Transfer!", cs)
-                sys.exit(1)
-
-            if collection_system['cruiseOrLowering'] == "1" and lowering_id is None:
-                logging.error("No lowering ID has been defined within OpenVDM for the current cruise.  Cannot cruise remote directories for lowering-focused collection system transfers.")
-                sys.exit(1)
-
-            collection_systems.append(collection_system)
-    else:
-        collection_systems = openvdm.get_active_collection_system_transfers(lowering=False) if parsed_args.lowering is not True else openvdm.get_active_collection_system_transfers(cruise=False)
-
+    failed = []
     for collection_system in collection_systems:
+        collection_system = normalize_transfer_config(collection_system)
+        errors = build_collection_system(collection_system, template_directory, tokens,
+                                         parsed_args.create_source, warehouse_config)
+        for error in errors or []:
+            logging.error("%s: %s", collection_system['name'], error)
+        if errors:
+            failed.append(collection_system['name'])
 
-        logging.debug(json.dumps(collection_system, indent=2))
-        if collection_system['transferType'] not in ["1","3", "4"]:
-            logging.info("Skipping Collection System: %s. Transfer type is not Local Directory SSH or Samba Server.", collection_system['name'])
-            continue
+    if failed:
+        logging.error("Failed for: %s", ', '.join(failed))
+        sys.exit(1)
 
-        if not os.path.isdir(os.path.join(template_directory, collection_system['name'])):
-            logging.info("Skipping Collection System: %s. Corresponding template structure does not exist.", collection_system['name'])
-            continue
 
-        logging.info("Collection System: %s", collection_system['name'])
-        source_dir = collection_system['sourceDir'].replace("{cruiseID}", cruise_id)
-        if lowering_id is not None:
-            source_dir = source_dir.replace("{loweringID}", lowering_id)
-
-        if parsed_args.create_source is True:
-            logging.info("  - Creating source directory: %s", source_dir)
-            if collection_system['transferType'] == "1":
-                make_local_directory(source_dir, True)
-                set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir))
-
-            if collection_system['transferType'] == "3":
-                make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + "%" + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + source_dir + "\"'"])
-
-            if collection_system['transferType'] == "4":
-                # ssh remote-host-ip '. ~/your_profile; test -d your_directory || mkdir your_directory'
-                make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "test", "-d", "mkdir \"" + source_dir + "\"", "||", "mkdir \"" + source_dir + "\""])
-
-        for root, dirs, files in os.walk(os.path.join(template_directory, collection_system['name'])):
-            root = root.replace(template_directory, '').lstrip('/')
-            for name in dirs:
-                name = name.replace("{cruiseID}", cruise_id)
-                if lowering_id is not None:
-                    name = name.replace("{loweringID}", lowering_id)
-
-                logging.info("  - Creating directory: %s", os.path.join(source_dir, root, name))
-                if collection_system['transferType'] == "1":
-                    logging.info("make_local_dir")
-                    make_local_directory(os.path.join(source_dir, root, name), parsed_args.create_source)
-
-                if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'mkdir \"" + os.path.join(source_dir, root, name) + "\"'"])
-
-                if collection_system['transferType'] == "4":
-                    # ssh remote-host-ip '. ~/your_profile; mkdir your_directory'
-                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "ssh", collection_system['sshUser'] + '@' + collection_system['sshServer'] + ';', "mkdir \"" + os.path.join(source_dir, root, name) + "\""])
-
-            for name in files:
-                new_name = name.replace("{cruiseID}", cruise_id)
-                if lowering_id is not None:
-                    new_name = new_name.replace("{loweringID}", lowering_id)
-
-                logging.info("  - Creating file:      %s", os.path.join(source_dir, root, new_name))
-                if collection_system['transferType'] == "1":
-                    shutil.copyfile(os.path.join(source_dir, root, name), os.path.join(source_dir, root, new_name))
-                    set_owner_group_permissions(warehouse_config['shipboardDataWarehouseUsername'], os.path.join(source_dir, root, new_name))
-
-                if collection_system['transferType'] == "3":
-                    make_system_call(["smbclient", collection_system['smbServer'], "-W", collection_system['smbDomain'], "-U", collection_system['smbUser'] + '%' + collection_system['smbPass'], "-m", "SMB2", "-c 'put \"" + os.path.join(source_dir, root, name) + "\";rename \"" + os.path.join(source_dir, root, name) + "\", \"" + os.path.join(source_dir, root, new_name) + "\"'"])
-
-                if collection_system['transferType'] == "4":
-                    make_system_call(['sshpass', '-p', collection_system['sshPass'], "scp",  os.path.join(source_dir, root, name), collection_system['sshUser'] + '@' + collection_system['sshServer'] + ':' + os.path.join(source_dir, root, new_name)])
-
+# -------------------------------------------------------------------------------------
+# Required python code for running the script as a stand-alone utility
+# -------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    main()
