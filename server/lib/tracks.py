@@ -42,18 +42,21 @@ def load_position_sources_from_yaml(
     """Parse and validate a position sources YAML definition.
 
     Exactly one of *yaml_str* or *yaml_path* must be provided.  The YAML must
-    describe a mapping with ``CollectionSystem`` and ``PositionSources`` keys
-    (``GPSSources``, the old name, is also accepted); the
-    ``CollectionSystem`` value must match *collection_system*.  Duplicate device
-    names or reused data types raise ``RuntimeError``.
+    describe a mapping with a ``PositionSources`` key (``GPSSources``, the old
+    name, is also accepted). An optional ``CollectionSystem`` key ties the
+    sources to one collection system: when it's present it must match
+    *collection_system*; without it the sources apply to any collection
+    system.  Duplicate device names or reused data types raise
+    ``RuntimeError``.
 
     Args:
         yaml_str: Raw YAML string to parse (mutually exclusive with
             *yaml_path*).
         yaml_path: Path to a YAML file to load (mutually exclusive with
             *yaml_str*).
-        collection_system: Expected value of the ``CollectionSystem`` key;
-            used to guard against loading a config for the wrong system.
+        collection_system: The collection system the sources are for; checked
+            against the ``CollectionSystem`` key when the YAML has one, to
+            guard against loading a config for the wrong system.
 
     Returns:
         List of position source dicts, each containing ``device`` and ``type``
@@ -80,7 +83,7 @@ def load_position_sources_from_yaml(
     if not isinstance(data, dict):
         raise RuntimeError("position sources YAML must be a mapping")
 
-    if data.get("CollectionSystem") != collection_system:
+    if "CollectionSystem" in data and data["CollectionSystem"] != collection_system:
         raise RuntimeError(
             f"position sources CollectionSystem mismatch: "
             f"{data.get('CollectionSystem')} != {collection_system}"

@@ -32,16 +32,31 @@ ROUNDING = {
 }
 
 
-class DBTParser(OpenVDMCSVParser):
+class DPTParser(OpenVDMCSVParser):
     """Parser for NMEA DPT depth log files."""
 
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
-    MIN_DBT = 0
-    MAX_DBT = 12000
+    MIN_DPT = 0
+    MAX_DPT = 12000
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, no_mag=False):
+                 skip_header=False, use_openvdm_api=False, no_mag=False,
+                 require_checksum=True):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            no_mag: Not used.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row.
+        """
+        self.require_checksum = require_checksum
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -52,16 +67,17 @@ class DBTParser(OpenVDMCSVParser):
         errors = []
 
         # -------------------------
-        # Read and parse DBT lines
+        # Read and parse DPT lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='DBT'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='DPT'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
-                # Map fields to DBT_FIELDS
+                # Map fields to FIELDS
                 field_data = dict(zip(FIELDS, fields))
 
                 try:
+                    self.check_nmea_sentence(remainder, fields, (3, 4), self.require_checksum)
                     dpt_m = float(field_data['dpt_m']) if field_data['dpt_m'] else None
 
                     raw_data['date_time'].append(timestamp_str)
@@ -76,7 +92,7 @@ class DBTParser(OpenVDMCSVParser):
             return None
 
         if not raw_data['date_time']:
-            logging.warning("No valid DBT data in file: %s", filepath)
+            logging.warning("No valid DPT data in file: %s", filepath)
             return None
 
         # -------------------------
@@ -113,8 +129,8 @@ class DBTParser(OpenVDMCSVParser):
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
         self.add_bounds_stat([round(df['dpt_m'].min(), ROUNDING['dpt_m']),
                               round(df['dpt_m'].max(), ROUNDING['dpt_m'])], "Depth Bounds", "m")
-        self.add_value_validity_stat([len(df[(df['dpt_m'] >= self.MIN_DBT) & (df['dpt_m'] <= self.MAX_DBT)]),
-                                      len(df[(df['dpt_m'] < self.MIN_DBT) | (df['dpt_m'] > self.MAX_DBT)])], "Depth Validity")
+        self.add_value_validity_stat([len(df[(df['dpt_m'] >= self.MIN_DPT) & (df['dpt_m'] <= self.MAX_DPT)]),
+                                      len(df[(df['dpt_m'] < self.MIN_DPT) | (df['dpt_m'] > self.MAX_DPT)])], "Depth Validity")
 
         # -------------------------
         # Quality tests
@@ -123,7 +139,7 @@ class DBTParser(OpenVDMCSVParser):
         quality_checks = [
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
-            ('Depth', len(df), len(df[(df['dpt_m'] < self.MIN_DBT) | (df['dpt_m'] > self.MAX_DBT)]))
+            ('Depth', len(df), len(df[(df['dpt_m'] < self.MIN_DPT) | (df['dpt_m'] > self.MAX_DPT)]))
         ]
 
         for col, total, bad in quality_checks:
@@ -165,8 +181,23 @@ class DBTParser(OpenVDMCSVParser):
         # -------------------------
         self.send_error_msg(errors, filepath)
 
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add the parser's command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {'require_checksum': getattr(args, 'require_checksum', True)}
+
 # -------------------------------------------------------------------------------------
 # Standalone CLI
 # -------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    DBTParser.run_cli()
+    DPTParser.run_cli()
