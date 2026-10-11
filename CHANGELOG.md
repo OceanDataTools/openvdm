@@ -4,9 +4,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [Unreleased]
+## [2.16.2] – Unreleased
 
-**Upgrading:** copy the updated `.dist` files of the parsers you use over your copies (`met`, `metpakpro`, `twind`, `mwv`, `wind_gill_wo75`, `mwd`, `hdt`, `vtg`, `gnss`, `hpr`, `pashr`, `psxn23`), then rebuild the data dashboard so existing cruises' direction charts are replotted (#410). If you use `bin/build_remote_directory.py`, copy its updated `.dist` file over your copy (#426, #428). In your copies of `build_cruise_tracks.py` and `build_lowering_tracks.py`, remove the `CollectionSystem:` line from `DEFAULT_POSITION_SOURCES_YAML` so the built-in position sources work for any collection system (#412). Copy the updated `gga_parser.py.dist` over your `gga_parser.py` (#416). If you use `dpt_parser.py`, copy its updated `.dist` file over your copy, and in your plugin change `DBTParser` to `DPTParser` (#419). Copy the updated `.dist` files of the NMEA parsers you use too (`hdt`, `vtg`, `mwd`, `mwv`, `dbs`, `dpt`, `xdr`, `psxn23`, `psxn24`, `pashr`, `gnss`, `hpr`); they now reject sentences without a checksum, so for an instrument that doesn't send one, add `'require_checksum': False` to that parser's `parser_options` in your plugin (#418).
+**Upgrading:** follow "Upgrading from 2.16.1" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:
+- re-copy the `.dist` version of the parsers you use over your copies (`git pull` doesn't update them): `gga`, `dpt`, the other NMEA parsers, and the parsers with direction charts (#410, #416, #418, #419);
+- in your plugins, change `DBTParser` to `DPTParser` (#419), and add `'require_checksum': False` to the `parser_options` of any NMEA parser whose instrument doesn't send a checksum (#418);
+- copy the updated `bin/build_remote_directory.py.dist` if you use it (#426, #428), and remove the `CollectionSystem:` line from `DEFAULT_POSITION_SOURCES_YAML` in your trackline scripts (#412);
+- set `SITETITLE` in `Config.php` to v2.16.2, restart the workers (`supervisorctl restart openvdm:*`) so transfers stop putting SMB and SSH passwords on the command line (#424, #426), and rebuild the data dashboard.
 
 ### Added
 - **Scripps MetAcq `$WICOR` parser** (`wicor_parser.py.dist`), for SIO's ships, which log MetAcq's underway data with OpenRVDAS (R/V Robert Gordon Sproul and R/V Sally Ride). It reads OpenRVDAS log files of `$WICOR` lines; MetAcq's own `.COR` files aren't supported. It reads the `value,TAGn` pairs by tag, since each ship's MetAcq setup decides which values are written and in what order. A second sensor with the same tag is `<tag>_2`, e.g. `WS_2`. Values flagged out of range, emulated or invalid (digit 7, 8 or 9), and the `-99` and `99999999` markers, are left out and counted in that value's Validity stat. Lines with a bad checksum are rejected.
