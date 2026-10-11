@@ -64,6 +64,15 @@ cruiseReadme:
     filename: README.md
     template: server/etc/cruise_readme.md.j2
 
+# The lowering README: the same for each lowering's directory, rebuilt
+# whenever the lowering config is exported (Setup New Lowering, Finalize
+# Lowering and Export Lowering Config). Its template is
+# server/etc/lowering_readme.md.j2, copied from its .dist like the cruise one.
+loweringReadme:
+    enable: True
+    filename: README.md
+    template: server/etc/lowering_readme.md.j2
+
 # maximum age of transfer log files to retain. String must conform with the python
 # datetime.timedelta standard
 # logfilePurgeTimedelta: "12 hours"

@@ -344,7 +344,8 @@ VALUES
   (9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
   (10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),
   (11,'exportLoweringConfig','Re-export the {lowering_name} Configuration',1,2,1,0),
-  (12,'rebuildCruiseReadme','Rebuild the {cruise_name} README',0,2,1,0);
+  (12,'rebuildCruiseReadme','Rebuild the {cruise_name} README',0,2,1,0),
+  (13,'rebuildLoweringReadme','Rebuild the {lowering_name} README',1,2,1,0);
 
 /*!40000 ALTER TABLE `OVDM_Tasks` ENABLE KEYS */;
 UNLOCK TABLES;

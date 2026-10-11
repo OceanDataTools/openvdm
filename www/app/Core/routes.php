@@ -30,6 +30,7 @@ Router::any('config/rebuildCruiseDirectory', '\Controllers\Config\Main@rebuildCr
 Router::any('config/rebuildLoweringDirectory', '\Controllers\Config\Main@rebuildLoweringDirectory');
 Router::any('config/rebuildDataDashboard', '\Controllers\Config\Main@rebuildDataDashboard');
 Router::any('config/rebuildCruiseReadme', '\Controllers\Config\Main@rebuildCruiseReadme');
+Router::any('config/rebuildLoweringReadme', '\Controllers\Config\Main@rebuildLoweringReadme');
 Router::any('config/editCruise', '\Controllers\Config\Main@editCruise');
 Router::any('config/editLowering', '\Controllers\Config\Main@editLowering');
 Router::any('config/editShipboardDataWarehouse', '\Controllers\Config\Main@editShipboardDataWarehouse');
