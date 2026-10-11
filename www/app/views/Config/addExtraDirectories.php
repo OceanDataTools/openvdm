@@ -2,6 +2,7 @@
 
 use Core\Error;
 use Helpers\Form;
+use Helpers\DescriptionTemplates;
 use Helpers\FormCustom;
 
 $_POST += ['name' => '', 'longName' => '', 'description' => '', 'destDir' => '', 'cruiseOrLowering' => ''];
@@ -36,7 +37,7 @@ $_POST += ['name' => '', 'longName' => '', 'description' => '', 'destDir' => '',
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'name', 'value'=>$_POST['name'])); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'longName', 'value'=>$_POST['longName'])); ?></div>
-                                <div class="form-group"><label>Description</label><?php echo Form::textBox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'description', 'value'=> $_POST['description'])); ?></div>
+                                <?php echo DescriptionTemplates::formGroup(DescriptionTemplates::extraDirectory(), ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? $_POST['description'] : DescriptionTemplates::extraDirectory()); ?>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input(array('class'=>'form-control', 'name'=>'destDir', 'value'=>$_POST['destDir'])); ?></div>
 <?php
   if ( $data['showLoweringComponents']) {

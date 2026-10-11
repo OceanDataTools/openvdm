@@ -2,6 +2,7 @@
 
 use Core\Error;
 use Helpers\Form;
+use Helpers\DescriptionTemplates;
 
 ?>
 
@@ -34,7 +35,7 @@ use Helpers\Form;
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=>$data['row'][0]->name, 'disabled'=>'disabled')); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=>$data['row'][0]->longName)); ?></div>
-                                <div class="form-group"><label>Description</label><?php echo Form::textBox( array('class'=>'form-control', 'rows'=>'3', 'name'=>'description', 'value'=> $data['row'][0]->description ?? '')); ?></div>
+                                <?php echo DescriptionTemplates::formGroup(DescriptionTemplates::extraDirectory(), $data['row'][0]->description ?? ''); ?>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=>$data['row'][0]->destDir)); ?></div>
                             </div>
                         </div>

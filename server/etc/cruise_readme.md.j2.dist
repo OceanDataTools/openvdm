@@ -48,11 +48,13 @@ This directory holds the data collected during cruise {{ cruise.cruiseID }}{% if
 ## Directory layout
 
 Paths are relative to this directory.
+{# Each line of a description ends in two spaces, a Markdown line break, so
+   its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
 {% macro folder(d) %}
 - `{{ d.destDir }}/`: **{{ d.longName or d.name }}**
 {% if d.description %}
 
-  {{ d.description | indent(2) }}
+  {{ d.description | replace("\r\n", "\n") | indent(2) | replace("\n", "  \n") }}
 
 {% endif %}
 {% endmacro %}

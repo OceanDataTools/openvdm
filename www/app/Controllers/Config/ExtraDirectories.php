@@ -5,6 +5,7 @@ use Core\Controller;
 use Core\View;
 use Helpers\Url;
 use Helpers\Session;
+use Helpers\DescriptionTemplates;
 
 class ExtraDirectories extends Controller {
 
@@ -78,7 +79,7 @@ class ExtraDirectories extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::extraDirectory());
             $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
             $destDir = $_POST['destDir'] ?? '';
             $enable = 0;
@@ -131,7 +132,7 @@ class ExtraDirectories extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
-            $description = trim($_POST['description'] ?? '');
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::extraDirectory());
             $cruiseOrLowering = $_POST['cruiseOrLowering'] ?? '0';
             $destDir = $_POST['destDir'] ?? '';
 
