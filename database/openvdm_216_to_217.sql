@@ -1,11 +1,12 @@
 -- Migration: OpenVDM 2.16 -> 2.17
 --
--- Add the cruise description (#367) and the cruise's bounding box,
--- cruiseExtent (#366). CoreVars values were tinytext (255 bytes), too short
--- for a description, so the column becomes text. Add a description to
--- collection system transfers and extra directories (#432), and the Rebuild
--- Cruise README task (#431). Safe to run more than once: rows and columns are
--- only added if they're missing.
+-- Add the cruise description (#367) and the bounding boxes of the cruise
+-- and the current lowering, cruiseExtent (#366) and loweringExtent (#399).
+-- CoreVars values were tinytext (255 bytes), too short for a description, so
+-- the column becomes text. Add a description to collection system transfers
+-- and extra directories (#432), and the Rebuild Cruise README task (#431).
+-- Safe to run more than once: rows and columns are only added if they're
+-- missing.
 
 ALTER TABLE `OVDM_CoreVars` MODIFY `value` text;
 
@@ -18,6 +19,11 @@ INSERT INTO `OVDM_CoreVars` (`name`, `value`)
 SELECT 'cruiseExtent', ''
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `OVDM_CoreVars` WHERE `name` = 'cruiseExtent');
+
+INSERT INTO `OVDM_CoreVars` (`name`, `value`)
+SELECT 'loweringExtent', ''
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `OVDM_CoreVars` WHERE `name` = 'loweringExtent');
 
 -- Collection system transfer and extra directory descriptions (#432).
 -- MySQL has no ADD COLUMN IF NOT EXISTS, so each column is only added when

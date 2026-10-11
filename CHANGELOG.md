@@ -9,7 +9,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 **Upgrading:** the step-by-step instructions will be in INSTALL.md.
 - **Database:** update it with `database/openvdm_216_to_217.sql`. From 2.16.0, run `database/openvdm_2160_to_2161.sql` first.
 - **Trackline hooks:** in your `openvdm.yaml`, remove `-u` from the `build_cruise_tracks.py` and `build_lowering_tracks.py` hooks, and change any 2.16.0 option names that 2.16.1 and 2.16.2 warned about: `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file` and `--gps-sources` (#388, #392).
-- **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366).
+- **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366, #399).
 - **Vessel settings:** re-run the installer, which asks for them, or copy the `vessel` block from `openvdm.yaml.dist` into your `openvdm.yaml` (#365).
 - **Python packages:** 2.17 needs Jinja2 for the cruise README. Re-running the installer installs it, or run `pip install -r requirements.txt` in OpenVDM's venv as the OpenVDM user. Then restart the workers (#431).
 
@@ -33,6 +33,11 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - **New cruises and switching:** Setup New Cruise clears it, and switching cruises in Edit Cruise loads that cruise's extent.
   - **Setting it:** only workers can, through `api/warehouse/setCruiseExtent` with the worker key. `--no-extent` skips it. If nav-qa-processing's OpenVDM hook sets the extent from its quality-checked fixes, add `--no-extent` to the `build_cruise_tracks.py` hook.
   - **Failures:** if setting the extent fails, the script reports it and exits 1, as it does for a failed MD5 update, so the hook's OpenVDM message says why (#366, #388).
+- **Lowering extent:** `bin/build_lowering_tracks.py` sets the current lowering's bounding box (`loweringExtent`) the way `build_cruise_tracks.py` sets the cruise's, for tools that need a dive's area.
+  - **Source:** the position source marked `extent: true`, else the first. Across the antimeridian, westernmost > easternmost. `--no-extent` skips it, and with `-l` it's only set for OpenVDM's current lowering. If setting it fails, the script exits 1.
+  - **Where it's available:** `getLoweringConfig` (and `api/warehouse/getLoweringExtent`), and so each lowering's `loweringConfig.json`, which is where earlier lowerings' extents are kept. Only workers can set it, through `api/warehouse/setLoweringExtent` with the worker key.
+  - **Setup and switching:** Setup New Lowering and Setup New Cruise clear it. Switching to another lowering (in Edit Lowering, or the latest lowering Edit Cruise selects) loads that lowering's extent from its `loweringConfig.json`.
+  - The code that picks the source and computes the extent is shared by both scripts in `server/lib/tracks.py` (#399).
 - **`openvdm.yaml.dist` trackline hook examples:** commented-out `postDataDashboard` blocks for `build_cruise_tracks.py` and `build_lowering_tracks.py`. Each uses the `{collectionSystemTransferName}` token for the collection system, and shows `--position-sources`, `--extra-directory` and `--no-extent` commented out (#396).
 
 ### Changed

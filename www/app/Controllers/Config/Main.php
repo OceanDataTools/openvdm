@@ -161,6 +161,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
                 $this->_warehouseModel->setCruiseEndPort(array('value' => $cruiseEndPort));
 
+                $previousLoweringID = $this->_warehouseModel->getLoweringID();
                 $loweringID = $this->_warehouseModel->getLatestLowering();
 
                 if ($loweringID) {
@@ -170,10 +171,18 @@ class Main extends Controller {
 
                     $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringDates['loweringStartDate'] ?? ''));
                     $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringDates['loweringEndDate'] ?? ''));
+                    if ($setLatestLowering || strcmp($loweringID, $previousLoweringID) != 0) {
+                        # Another lowering: its extent, from its loweringConfig.json.
+                        # The same lowering keeps the extent build_lowering_tracks set,
+                        # which can be newer than its loweringConfig.json
+                        $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
+                        $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
+                    }
                 } else {
                     $this->_warehouseModel->setLoweringID(array('value' => ''));
                     $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
                     $this->_warehouseModel->setLoweringEndDate(array('value' => ''));
+                    $this->_warehouseModel->setLoweringExtent(array('value' => ''));
                 }
 
                 //$_warehouseModel = new \models\warehouse();
@@ -305,6 +314,11 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => $loweringID));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringStartDate));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringEndDate));
+                if ($setLatestLowering) {
+                    # Switching to another lowering: its extent, from its loweringConfig.json
+                    $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
+                    $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
+                }
 
                 //$_warehouseModel = new \models\warehouse();
                 $gmData['loweringID'] = $this->_warehouseModel->getLoweringID();
@@ -530,6 +544,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => ''));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => ''));
+                $this->_warehouseModel->setLoweringExtent(array('value' => ''));
 
                 $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
 
@@ -681,6 +696,8 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => $loweringID));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringStartDate));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringEndDate));
+                # A new lowering has no track yet; build_lowering_tracks sets the extent
+                $this->_warehouseModel->setLoweringExtent(array('value' => ''));
                 $gmData['loweringID'] = $this->_warehouseModel->getLoweringID();
 
                 # create the gearman client

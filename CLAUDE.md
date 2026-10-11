@@ -46,7 +46,7 @@ OpenVDM is a 3-tier distributed system:
 - Web config: `www/app/Core/Config.php` (copy from `Config.php.dist`)
 - Hooks in `openvdm.yaml` map Gearman task names to downstream tasks; `postHookCommands` run shell commands after task completion
 - `openvdm.yaml`'s `vessel` block (name, contact, optional `r2r` IDs) is set by the installer and read with `OpenVDM.get_vessel_config()`; the cruise worker copies it into each `ovdmConfig.json` (#365)
-- `cruiseExtent` (CoreVar, JSON with westernmost/easternmost/southernmost/northernmost; westernmost > easternmost across the antimeridian) is set by `bin/build_cruise_tracks.py` through the worker-only `api/warehouse/setCruiseExtent` (`OpenVDM.set_cruise_extent()`, `geojson_utils.geojson_extent()`) and returned by `getCruiseConfig` (#366)
+- `cruiseExtent` (CoreVar, JSON with westernmost/easternmost/southernmost/northernmost; westernmost > easternmost across the antimeridian) is set by `bin/build_cruise_tracks.py` through the worker-only `api/warehouse/setCruiseExtent` (`OpenVDM.set_cruise_extent()`, `geojson_utils.geojson_extent()`) and returned by `getCruiseConfig` (#366). `loweringExtent` is the same for the current lowering: set by `bin/build_lowering_tracks.py` through `api/warehouse/setLoweringExtent` (`OpenVDM.set_lowering_extent()`), returned by `getLoweringConfig` and so kept in each `loweringConfig.json`; `Config/Main.php` reloads it from there when the current lowering changes. Both scripts use `extent_position_source()`/`track_extent()` in `server/lib/tracks.py` (#399)
 
 ## Development Setup
 
