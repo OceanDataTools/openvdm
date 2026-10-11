@@ -35,15 +35,8 @@ Paths are relative to this directory.
 {# Each line of a description ends in two spaces, a Markdown line break, so
    its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
 
-This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruise.cruiseID %} of {{ cruise.cruiseID }}{% endif %}. These files there also cover it:
-
-- `{{ files.md5_summary }}`: the MD5 checksum of every file in the cruise directory, this lowering's included.
-{% if files.data_dashboard_manifest %}
-- `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard for this lowering.
-{% endif %}
-
 {% macro entry(d) %}
-### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
+#### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
 {% if d.description %}
 
 {{ d.description | replace("\r\n", "\n") | replace("\n", "  \n") }}

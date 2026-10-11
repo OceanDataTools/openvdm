@@ -48,7 +48,7 @@ Paths are relative to this directory.
    its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
 
 {% macro entry(d) %}
-### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
+#### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
 {% if d.description %}
 
 {{ d.description | replace("\r\n", "\n") | replace("\n", "  \n") }}
