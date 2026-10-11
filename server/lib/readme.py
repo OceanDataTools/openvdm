@@ -191,7 +191,8 @@ def _extent(value) -> Optional[dict]:
 def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                                 extra_directories: list, vessel: dict,
                                 readme_fn: str, finalized_on: Optional[str] = None,
-                                show_lowerings: bool = False) -> dict:
+                                show_lowerings: bool = False,
+                                lowering_readme_fn: Optional[str] = None) -> dict:
     """Return the variables a cruise README template is rendered with.
 
     Only enabled collection systems and extra directories are listed, and
@@ -207,6 +208,9 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
         readme_fn: The README's file name.
         finalized_on: When the cruise was finalized, if it has been.
         show_lowerings: Whether lowerings are used (``showLoweringComponents``).
+        lowering_readme_fn: The lowering README's file name, with
+            ``<loweringID>`` in place of the lowering's ID; ``None`` when the
+            lowering README is turned off.
 
     Returns:
         dict: The template variables:
@@ -225,7 +229,9 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
           ``base_dir`` (relative to the cruise directory),
           ``collection_systems`` and ``extra_directories`` (``destDir``
           relative to a lowering's directory, ``<base_dir>/<loweringID>``)
-          and ``config`` (the lowering config file's name).
+          ``config`` (the lowering config file's name) and ``readme`` (the
+          lowering README's name, e.g. ``<loweringID>_README.md``, or ``None``
+          when it's turned off).
         - ``files``: the cruise directory's OpenVDM files: ``readme``,
           ``cruise_config``, ``md5_summary``, ``md5_summary_md5`` and
           ``data_dashboard_manifest`` (``None`` without a ``Dashboard_Data``
@@ -263,6 +269,7 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
             'collection_systems': _directories(collection_systems, 1, cruise_id, lowering_data_base_dir),
             'extra_directories': _directories(extra_directories, 1, cruise_id, lowering_data_base_dir),
             'config': warehouse.get('loweringConfigFn') or '',
+            'readme': lowering_readme_fn or None,
         }
 
     return {

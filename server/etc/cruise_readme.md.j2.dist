@@ -81,6 +81,10 @@ Paths are relative to this directory.
 
 Each lowering (vehicle dive or deployment) has its own directory, `{{ lowerings.base_dir }}/<loweringID>/`, with its configuration in `{{ lowerings.base_dir }}/<loweringID>/{{ lowerings.config }}` and these directories:
 
+### `{{ lowerings.base_dir }}/<loweringID>/{{ lowerings.config }}`: the lowering's OpenVDM configuration (JSON)
+{% if lowerings.readme %}
+### `{{ lowerings.base_dir }}/<loweringID>/{{ lowerings.readme }}`: the lowering's README.md file (md)
+{% endif %}
 {% for d in lowerings.collection_systems + lowerings.extra_directories %}
 {{ folder(d,lowerings.base_dir ~ "/<loweringID>/") }}
 {%- endfor %}
