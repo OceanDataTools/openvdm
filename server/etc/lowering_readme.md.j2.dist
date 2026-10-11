@@ -35,9 +35,6 @@ Paths are relative to this directory.
 {# Each line of a description ends in two spaces, a Markdown line break, so
    its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
 
-### `{{ files.readme }}`: this file.
-### `{{ files.lowering_config }}`: the lowering's OpenVDM configuration (JSON): the lowering details above and the directory layout.
-
 This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruise.cruiseID %} of {{ cruise.cruiseID }}{% endif %}. These files there also cover it:
 
 - `{{ files.md5_summary }}`: the MD5 checksum of every file in the cruise directory, this lowering's included.
@@ -45,16 +42,20 @@ This directory is `{{ files.lowering_dir }}/` in the cruise directory{% if cruis
 - `{{ files.data_dashboard_manifest }}`: the list of the files behind OpenVDM's Data Dashboard for this lowering.
 {% endif %}
 
-{% macro folder(d) %}
-### `{{ d.destDir }}/`: {{ d.longName or d.name }}
+{% macro entry(d) %}
+### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}
 {% if d.description %}
 
 {{ d.description | replace("\r\n", "\n") | replace("\n", "  \n") }}
 
 {% endif %}
 {% endmacro %}
-{% for d in (collection_systems + extra_directories) | sort(attribute="destDir") %}
-{{ folder(d) }}
+{% set entries = [
+    {"destDir": files.readme, "longName": "this file", "file": true},
+    {"destDir": files.lowering_config, "longName": "the lowering's OpenVDM configuration (JSON): the lowering details above and the directory layout", "file": true},
+] + collection_systems + extra_directories %}
+{% for d in entries | sort(attribute="destDir") %}
+{{ entry(d) }}
 {%- endfor %}
 
 ---
