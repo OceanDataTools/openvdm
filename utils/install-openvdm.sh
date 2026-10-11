@@ -2110,6 +2110,14 @@ EOF
         fi
     fi
 
+    # The cruise README template (#431). A copy that's already there is the
+    # site's own, so it's kept
+    if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2 ] ; then
+        echo "Building cruise README template"
+        cp ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2.dist ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2
+        chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/cruise_readme.md.j2
+    fi
+
     echo "Setting the vessel in ${_YAML}"
     write_vessel_config "${_YAML}"
 
