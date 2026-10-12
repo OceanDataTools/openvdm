@@ -1840,6 +1840,96 @@ function _vessel_yaml_get {
         }' "$1" 2>/dev/null
 }
 
+# R2R's list of vessels, offered by the Vessel questions (#462)
+R2R_VESSEL_API=https://service.rvdata.us/api/vessel/
+
+# Print one line per vessel in R2R's vessel list file $1, sorted by name,
+# with these fields separated by \x1f: active (1 or 0), name, ICES code,
+# operator ID, operator name and UNOLS ID.
+_R2R_PARSE_VESSELS='
+import json, sys
+FIELDS = ("name", "ices_code", "operator_id", "operator_name", "unols_id")
+def clean(value):
+    return "" if value is None else " ".join(str(value).split())
+with open(sys.argv[1], encoding="utf-8") as f:
+    vessels = [v for v in json.load(f)["data"] if isinstance(v, dict) and clean(v.get("name"))]
+for v in sorted(vessels, key=lambda v: clean(v["name"]).lower()):
+    print("\x1f".join(["1" if v.get("is_active") else "0"] + [clean(v.get(f)) for f in FIELDS]))
+'
+
+function _r2r_fetch_vessels {
+    # Fill R2R_VESSELS with R2R's vessel list, one _R2R_PARSE_VESSELS line
+    # per vessel. Returns 1, saying why, if it can't be fetched or read
+    # (e.g. no network on the ship).
+    R2R_VESSELS=()
+    if ! command -v curl > /dev/null 2>&1 || ! command -v python3 > /dev/null 2>&1; then
+        echo "Can't fetch R2R's vessel list: it needs curl and python3."
+        return 1
+    fi
+    local tmp_dir lines=
+    tmp_dir=$(mktemp -d)
+    echo "Fetching R2R's vessel list from ${R2R_VESSEL_API}"
+    if curl -fsS --connect-timeout 10 --max-time 30 -o "${tmp_dir}/vessels.json" "$R2R_VESSEL_API"; then
+        lines=$(python3 -I -c "$_R2R_PARSE_VESSELS" "${tmp_dir}/vessels.json" 2>/dev/null)
+    fi
+    rm -rf "$tmp_dir"
+    if [ -z "$lines" ]; then
+        echo "Couldn't fetch R2R's vessel list."
+        return 1
+    fi
+    local line
+    while IFS= read -r line; do
+        R2R_VESSELS+=("$line")
+    done <<< "$lines"
+}
+
+function _r2r_choose_vessel {
+    # Ask which vessel in R2R_VESSELS this is, offering the one whose ICES
+    # code is $1 as the default. Sets R2R_RECORD to its fields, or to ()
+    # when it's not listed.
+    local show_all=no default choice n i detail
+    local -a shown fields
+    R2R_RECORD=()
+
+    # Start with the inactive vessels shown if the default is one of them
+    for i in "${!R2R_VESSELS[@]}"; do
+        IFS=$'\x1f' read -r -a fields <<< "${R2R_VESSELS[$i]}"
+        [ -n "$1" ] && [ "${fields[2]}" = "$1" ] && [ "${fields[0]}" != 1 ] && show_all=yes
+    done
+
+    while true; do
+        shown=()
+        default=m
+        echo
+        for i in "${!R2R_VESSELS[@]}"; do
+            IFS=$'\x1f' read -r -a fields <<< "${R2R_VESSELS[$i]}"
+            [ "$show_all" = yes ] || [ "${fields[0]}" = 1 ] || continue
+            shown+=("$i")
+            n=${#shown[@]}
+            [ -n "$1" ] && [ "${fields[2]}" = "$1" ] && default=$n
+            detail=${fields[2]}
+            [ -n "${fields[4]}" ] && detail="${detail:+$detail, }${fields[4]}"
+            printf '%4s) %s%s\n' "$n" "${fields[1]}" "${detail:+ ($detail)}"
+        done
+        [ "$show_all" = yes ] || echo "   a) Show all vessels, including ones no longer active"
+        echo "   m) Not listed: enter the vessel's details by hand"
+        read -r -p "Which vessel? ($default) " choice
+        choice=${choice:-$default}
+        case $choice in
+            [Aa] )
+                show_all=yes;;
+            [Mm] )
+                return;;
+            * )
+                if [[ $choice =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#shown[@]}" ]; then
+                    IFS=$'\x1f' read -r -a R2R_RECORD <<< "${R2R_VESSELS[${shown[$((choice - 1))]}]}"
+                    return
+                fi
+                echo "Please enter a number from the list, a or m.";;
+        esac
+    done
+}
+
 function _yaml_quote {
     # Print $1 as a double-quoted YAML string
     local value=${1//\\/\\\\}
@@ -2707,6 +2797,44 @@ if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
     fi
 fi
 
+yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEFAULT_VESSEL_R2R
+VESSEL_R2R=$YES_NO_RESULT
+
+# An R2R vessel can be picked from R2R's vessel list, whose record gives the
+# defaults for the questions below (#462)
+R2R_RECORD=()
+if [ "$VESSEL_R2R" = "yes" ]; then
+    if _r2r_fetch_vessels; then
+        _r2r_choose_vessel "$DEFAULT_R2R_VESSEL_ID"
+    else
+        echo "Enter the vessel's details by hand instead."
+    fi
+fi
+
+if [ ${#R2R_RECORD[@]} -gt 0 ]; then
+    # A different vessel from the one in openvdm.yaml: its record replaces
+    # the defaults. The same one: the record only fills in blanks, so edits
+    # made to openvdm.yaml are kept.
+    if [ "${R2R_RECORD[2]}" != "$DEFAULT_R2R_VESSEL_ID" ]; then
+        DEFAULT_VESSEL_NAME=
+        DEFAULT_VESSEL_CONTACT_INSTITUTION=
+        DEFAULT_R2R_VESSEL_ID=
+        DEFAULT_R2R_OPERATOR_ID=
+        DEFAULT_R2R_SCHEDULER_ID=
+    fi
+    DEFAULT_VESSEL_NAME=${DEFAULT_VESSEL_NAME:-${R2R_RECORD[1]}}
+    DEFAULT_VESSEL_CONTACT_INSTITUTION=${DEFAULT_VESSEL_CONTACT_INSTITUTION:-${R2R_RECORD[4]}}
+    DEFAULT_R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID:-${R2R_RECORD[2]}}
+    DEFAULT_R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID:-${R2R_RECORD[3]}}
+    # R2R's record has no scheduler ID; UNOLS vessels are scheduled by UNOLS
+    if [ -z "$DEFAULT_R2R_SCHEDULER_ID" ] && [ -n "${R2R_RECORD[5]}" ]; then
+        DEFAULT_R2R_SCHEDULER_ID=org.unols
+    fi
+    echo
+    echo "Press Enter to keep R2R's value for each of these, or type a new one."
+fi
+
+echo
 read -r -p "Vessel name? ($DEFAULT_VESSEL_NAME) " VESSEL_NAME
 VESSEL_NAME=${VESSEL_NAME:-$DEFAULT_VESSEL_NAME}
 
@@ -2716,11 +2844,8 @@ VESSEL_CONTACT_INSTITUTION=${VESSEL_CONTACT_INSTITUTION:-$DEFAULT_VESSEL_CONTACT
 read -r -p "Contact email? ($DEFAULT_VESSEL_CONTACT_EMAIL) " VESSEL_CONTACT_EMAIL
 VESSEL_CONTACT_EMAIL=${VESSEL_CONTACT_EMAIL:-$DEFAULT_VESSEL_CONTACT_EMAIL}
 
-echo
-yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEFAULT_VESSEL_R2R
-VESSEL_R2R=$YES_NO_RESULT
-
 if [ "$VESSEL_R2R" = "yes" ]; then
+    echo
     echo "Leave any of the R2R IDs blank to add them later in openvdm.yaml."
     read -r -p "R2R vessel ID (ICES code, e.g. 33RR)? ($DEFAULT_R2R_VESSEL_ID) " R2R_VESSEL_ID
     R2R_VESSEL_ID=${R2R_VESSEL_ID:-$DEFAULT_R2R_VESSEL_ID}
