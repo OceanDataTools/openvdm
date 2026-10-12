@@ -209,8 +209,6 @@ function set_default_variables {
     DEFAULT_R2R_VESSEL_ID=
     DEFAULT_R2R_OPERATOR_ID=
     DEFAULT_R2R_SCHEDULER_ID=
-    # Optional vessel fields, in VESSEL_EXTRA_KEYS order (#462)
-    DEFAULT_VESSEL_EXTRA_VALUES=()
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
@@ -263,7 +261,6 @@ DEFAULT_VESSEL_R2R=$VESSEL_R2R
 DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
 DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
 DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
-DEFAULT_VESSEL_EXTRA_VALUES=($(printf '%q ' "${VESSEL_EXTRA_VALUES[@]}"))
 EOF
     chmod 600 "$PREFERENCES_FILE"
 }
@@ -1846,22 +1843,12 @@ function _vessel_yaml_get {
 # R2R's list of vessels, offered by the Vessel questions (#462)
 R2R_VESSEL_API=https://service.rvdata.us/api/vessel/
 
-# Optional vessel fields that can be added from the chosen R2R vessel's
-# record: their openvdm.yaml keys (institutionAcronym goes under contact) and
-# labels. Field i is at index R2R_EXTRA_OFFSET + i of an R2R_VESSELS record.
-VESSEL_EXTRA_KEYS=(shortName callSign imoNumber mmsiNumber unolsID length url institutionAcronym owner)
-VESSEL_EXTRA_LABELS=("Short name" "Call sign" "IMO number" "MMSI number" "UNOLS ID" "Length (m)"
-                     "Web page" "Operator acronym" "Owner")
-R2R_EXTRA_OFFSET=5
-
 # Print one line per vessel in R2R's vessel list file $1, sorted by name,
 # with these fields separated by \x1f: active (1 or 0), name, ICES code,
-# operator ID, operator name, then the R2R fields of VESSEL_EXTRA_KEYS.
+# operator ID, operator name and UNOLS ID.
 _R2R_PARSE_VESSELS='
 import json, sys
-FIELDS = ("name", "ices_code", "operator_id", "operator_name", "short_name", "call_sign",
-          "imo_number", "mmsi_number", "unols_id", "length", "url", "operator_acronym",
-          "owner_name")
+FIELDS = ("name", "ices_code", "operator_id", "operator_name", "unols_id")
 def clean(value):
     return "" if value is None else " ".join(str(value).split())
 with open(sys.argv[1], encoding="utf-8") as f:
@@ -1943,82 +1930,6 @@ function _r2r_choose_vessel {
     done
 }
 
-function _choose_vessel_extras {
-    # Ask which of the optional vessel fields to add from R2R_RECORD, and set
-    # VESSEL_EXTRA_VALUES. The fields set in DEFAULT_VESSEL_EXTRA_VALUES are
-    # the default choice; ones the record doesn't have keep their value.
-    local i n choice default= item ok
-    local -a offered picked
-    _default_vessel_extras
-
-    for i in "${!VESSEL_EXTRA_KEYS[@]}"; do
-        [ -n "${R2R_RECORD[$((R2R_EXTRA_OFFSET + i))]}" ] && offered+=("$i")
-    done
-    [ ${#offered[@]} -gt 0 ] || return 0
-
-    echo
-    echo "R2R also has these details of the vessel. Any you choose are added to"
-    echo "the vessel section of openvdm.yaml and saved with each cruise."
-    for n in "${!offered[@]}"; do
-        i=${offered[$n]}
-        printf '%4s) %-17s %s\n' "$((n + 1))" "${VESSEL_EXTRA_LABELS[$i]}:" \
-            "${R2R_RECORD[$((R2R_EXTRA_OFFSET + i))]}"
-        [ -n "${DEFAULT_VESSEL_EXTRA_VALUES[$i]}" ] && default="${default:+$default,}$((n + 1))"
-    done
-    default=${default:-none}
-
-    while true; do
-        read -r -p "Add which? all, none, or numbers, e.g. 1,3,4 ($default) " choice
-        choice=${choice:-$default}
-        picked=()
-        ok=yes
-        case $choice in
-            [Aa][Ll][Ll] )
-                picked=("${offered[@]}");;
-            [Nn][Oo][Nn][Ee] )
-                ;;
-            * )
-                for item in ${choice//,/ }; do
-                    if [[ $item =~ ^[0-9]+$ ]] && [ "$item" -ge 1 ] && [ "$item" -le "${#offered[@]}" ]; then
-                        picked+=("${offered[$((item - 1))]}")
-                    else
-                        ok=no
-                    fi
-                done;;
-        esac
-        [ "$ok" = yes ] && break
-        echo "Please answer all, none, or numbers from the list."
-    done
-
-    for i in "${offered[@]}"; do
-        VESSEL_EXTRA_VALUES[$i]=
-    done
-    for i in "${picked[@]}"; do
-        VESSEL_EXTRA_VALUES[$i]=${R2R_RECORD[$((R2R_EXTRA_OFFSET + i))]}
-    done
-}
-
-function _default_vessel_extras {
-    # Set VESSEL_EXTRA_VALUES to DEFAULT_VESSEL_EXTRA_VALUES, with an entry
-    # (blank if unset) for every key, so their order is kept when saved
-    local i
-    VESSEL_EXTRA_VALUES=()
-    for i in "${!VESSEL_EXTRA_KEYS[@]}"; do
-        VESSEL_EXTRA_VALUES[$i]=${DEFAULT_VESSEL_EXTRA_VALUES[$i]}
-    done
-}
-
-function _vessel_extra_yaml {
-    # Print the "<indent>key: value" line of optional vessel field $1 (a
-    # VESSEL_EXTRA_KEYS key), if it's set
-    local i
-    for i in "${!VESSEL_EXTRA_KEYS[@]}"; do
-        if [ "${VESSEL_EXTRA_KEYS[$i]}" = "$1" ] && [ -n "${VESSEL_EXTRA_VALUES[$i]}" ]; then
-            echo "${2}${1}: $(_yaml_quote "${VESSEL_EXTRA_VALUES[$i]}")"
-        fi
-    done
-}
-
 function _yaml_quote {
     # Print $1 as a double-quoted YAML string
     local value=${1//\\/\\\\}
@@ -2027,22 +1938,18 @@ function _yaml_quote {
 
 function write_vessel_config {
     # Write the "vessel:" block of the openvdm.yaml file $1 from the VESSEL_*
-    # and R2R_* answers (and the optional fields in VESSEL_EXTRA_VALUES), in place of the existing block, or at the end of
+    # and R2R_* answers, in place of the existing block, or at the end of
     # the file if it has none (files from before 2.17). The rest of the file
     # is left as it is.
     local yaml_file=$1
-    local block_file key
+    local block_file
     block_file=$(mktemp)
 
     {
         echo "vessel:"
         echo "    name: $(_yaml_quote "$VESSEL_NAME")"
-        for key in shortName callSign imoNumber mmsiNumber unolsID length url owner; do
-            _vessel_extra_yaml "$key" "    "
-        done
         echo "    contact:"
         echo "        institution: $(_yaml_quote "$VESSEL_CONTACT_INSTITUTION")"
-        _vessel_extra_yaml institutionAcronym "        "
         echo "        email: $(_yaml_quote "$VESSEL_CONTACT_EMAIL")"
         echo "    # Only for vessels that submit data to R2R (Rolling Deck to Repository)"
         if [ "$VESSEL_R2R" = "yes" ]; then
@@ -2884,10 +2791,6 @@ if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
     DEFAULT_R2R_VESSEL_ID=$(_vessel_yaml_get "$_EXISTING_YAML" vesselID)
     DEFAULT_R2R_OPERATOR_ID=$(_vessel_yaml_get "$_EXISTING_YAML" operatorID)
     DEFAULT_R2R_SCHEDULER_ID=$(_vessel_yaml_get "$_EXISTING_YAML" schedulerID)
-    DEFAULT_VESSEL_EXTRA_VALUES=()
-    for _I in "${!VESSEL_EXTRA_KEYS[@]}"; do
-        DEFAULT_VESSEL_EXTRA_VALUES[$_I]=$(_vessel_yaml_get "$_EXISTING_YAML" "${VESSEL_EXTRA_KEYS[$_I]}")
-    done
     DEFAULT_VESSEL_R2R=no
     if [ -n "$DEFAULT_R2R_VESSEL_ID$DEFAULT_R2R_OPERATOR_ID$DEFAULT_R2R_SCHEDULER_ID" ]; then
         DEFAULT_VESSEL_R2R=yes
@@ -2898,7 +2801,7 @@ yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEF
 VESSEL_R2R=$YES_NO_RESULT
 
 # An R2R vessel can be picked from R2R's vessel list, whose record gives the
-# defaults for the questions below and the optional vessel fields (#462)
+# defaults for the questions below (#462)
 R2R_RECORD=()
 if [ "$VESSEL_R2R" = "yes" ]; then
     if _r2r_fetch_vessels; then
@@ -2910,23 +2813,21 @@ fi
 
 if [ ${#R2R_RECORD[@]} -gt 0 ]; then
     # A different vessel from the one in openvdm.yaml: its record replaces
-    # the defaults, and the old vessel's optional fields are dropped. The
-    # same one: the record only fills in blanks, so edits made to
-    # openvdm.yaml are kept.
+    # the defaults. The same one: the record only fills in blanks, so edits
+    # made to openvdm.yaml are kept.
     if [ "${R2R_RECORD[2]}" != "$DEFAULT_R2R_VESSEL_ID" ]; then
         DEFAULT_VESSEL_NAME=
         DEFAULT_VESSEL_CONTACT_INSTITUTION=
         DEFAULT_R2R_VESSEL_ID=
         DEFAULT_R2R_OPERATOR_ID=
         DEFAULT_R2R_SCHEDULER_ID=
-        DEFAULT_VESSEL_EXTRA_VALUES=()
     fi
     DEFAULT_VESSEL_NAME=${DEFAULT_VESSEL_NAME:-${R2R_RECORD[1]}}
     DEFAULT_VESSEL_CONTACT_INSTITUTION=${DEFAULT_VESSEL_CONTACT_INSTITUTION:-${R2R_RECORD[4]}}
     DEFAULT_R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID:-${R2R_RECORD[2]}}
     DEFAULT_R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID:-${R2R_RECORD[3]}}
     # R2R's record has no scheduler ID; UNOLS vessels are scheduled by UNOLS
-    if [ -z "$DEFAULT_R2R_SCHEDULER_ID" ] && [ -n "${R2R_RECORD[$((R2R_EXTRA_OFFSET + 4))]}" ]; then
+    if [ -z "$DEFAULT_R2R_SCHEDULER_ID" ] && [ -n "${R2R_RECORD[5]}" ]; then
         DEFAULT_R2R_SCHEDULER_ID=org.unols
     fi
     echo
@@ -2958,14 +2859,6 @@ else
     R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID}
     R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID}
     R2R_SCHEDULER_ID=${DEFAULT_R2R_SCHEDULER_ID}
-fi
-
-# The optional vessel fields are only offered from an R2R record; otherwise
-# the ones already set are kept
-if [ ${#R2R_RECORD[@]} -gt 0 ]; then
-    _choose_vessel_extras
-else
-    _default_vessel_extras
 fi
 echo
 

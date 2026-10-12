@@ -26,19 +26,8 @@ workerApiKey: "change-me-to-a-strong-random-value"
 # and read by QA tools (e.g. sbe-qa-processing). All fields are optional.
 vessel:
     name: ""
-    # Optional details of the vessel. The installer offers them from R2R's
-    # vessel list for vessels in it (#462).
-    #shortName: ""   # e.g. Revelle
-    #callSign: ""    # e.g. KAOU
-    #imoNumber: ""
-    #mmsiNumber: ""
-    #unolsID: ""     # e.g. RR
-    #length: ""      # meters
-    #url: ""         # the vessel's web page
-    #owner: ""
     contact:
         institution: ""
-        #institutionAcronym: ""  # e.g. SIO
         email: ""
     # Only for vessels that submit data to R2R (Rolling Deck to Repository)
     #r2r:
