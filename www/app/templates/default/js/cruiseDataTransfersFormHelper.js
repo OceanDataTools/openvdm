@@ -177,6 +177,17 @@ $(function () {
         } else {
             $('input[name=localDirIsMountPoint]').closest('.form-group').hide();
         }
+        setMountpointWarning(destDirVal);
+    }
+
+    // A local destination in /mnt, /media or /net must be mounted even when
+    // it isn't marked as a mount point (MOUNT_PARENT_DIRS in
+    // connection_utils.py), so say so when it isn't marked (#464)
+    function setMountpointWarning(destDirVal) {
+        var inMountParent = /^\/(mnt|media|net)\/[^/]/.test(destDirVal.trim());
+        var markedMountPoint = $('input[name=localDirIsMountPoint]:checked').val() === '1';
+        $('.mountpointWarning').toggle(currentTransferType() === '1' && !isRcloneDest(destDirVal) &&
+                                       inMountParent && !markedMountPoint);
     }
 
     setTransferTypeFields(currentTransferType());
@@ -190,6 +201,14 @@ $(function () {
 
     $('input[name=sshUseKey]').change(function () {
         setSSHUseKeyField($(this).val());
+    });
+
+    $('input[name=localDirIsMountPoint]').change(function () {
+        setMountpointWarning($('input[name=destDir]').val());
+    });
+
+    $('input[name=destDir]').on('input', function () {
+        setMountpointWarning($(this).val());
     });
 
     $('#selectAllCS').change(function() {
