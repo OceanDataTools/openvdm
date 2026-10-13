@@ -359,7 +359,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 else:
                     self.make_cruise_dir(dest_dir, rclone_args)
 
-                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                    copy_sync, flags = build_rclone_options(
+                        cdt_cfg, mode='real',
+                        concurrency=self.ovdm.config.get('rcloneConcurrency') or {})
                     cmd = build_rclone_command(copy_sync, flags, rclone_args, self.cruise_dir,
                                                os.path.join(dest_dir, self.cruise_id),
                                                exclude_filepath=exclude_file)

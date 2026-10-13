@@ -4,6 +4,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Cruise-data rclone concurrency:** configure `transfers`, `checkers` and `multiThreadStreams` under `rcloneConcurrency` in `server/etc/openvdm.yaml`. Defaults are 1/2/0 per rclone process, also used when settings are omitted. Restart the cruise-data workers after changing the values; see [INSTALL.md](INSTALL.md#cruise-data-rclone-concurrency) (#465).
+
+---
+
 ## [2.16.2] – 2026-10-11
 
 **Upgrading:** follow "Upgrading from 2.16.1" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:

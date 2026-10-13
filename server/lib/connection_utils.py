@@ -1280,7 +1280,9 @@ def prepare_ftp_mount(cfg: dict, tmpdir: str, rclone_config: str, mount_base: st
     return (True, mntpoint) if success else (False, detail)
 
 
-def build_rclone_options(cfg, mode='dry-run'):
+def build_rclone_options(
+        cfg: dict, mode: str = 'dry-run', concurrency: Optional[dict] = None
+) -> tuple[str, list[str]]:
     """Return the rclone subcommand and options for a cruise data transfer.
 
     Uses ``sync`` if the transfer mirrors deletions (``syncToDest``), otherwise
@@ -1293,6 +1295,8 @@ def build_rclone_options(cfg, mode='dry-run'):
         cfg: Cruise data transfer configuration.
         mode: ``'dry-run'`` to only list what would be transferred; any other
             value for a real transfer.
+        concurrency: Server YAML limits; missing keys default to 1 transfer,
+            2 checkers and 0 multithread streams. ``None`` adds no limits.
 
     Returns:
         tuple[str, list[str]]: ``('copy' | 'sync', flags)``.
@@ -1322,6 +1326,13 @@ def build_rclone_options(cfg, mode='dry-run'):
 
     if cfg.get('bandwidthLimit') not in (None, 0):
         flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
+
+    if concurrency is not None:
+        flags.extend([
+            '--transfers', str(concurrency.get('transfers', 1)),
+            '--checkers', str(concurrency.get('checkers', 2)),
+            '--multi-thread-streams', str(concurrency.get('multiThreadStreams', 0)),
+        ])
 
     return copy_sync, flags
 

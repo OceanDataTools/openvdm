@@ -204,6 +204,26 @@ At this point there should be a working installation of OpenVDM however the vess
 
 To access the OpenVDM web-application go to address specified in the completetion message.
 
+### Cruise-data rclone concurrency
+
+Set the per-process limits in `server/etc/openvdm.yaml`:
+
+```yaml
+rcloneConcurrency:
+    transfers: 1
+    checkers: 2
+    multiThreadStreams: 0
+```
+
+Missing settings use these defaults, including in older configuration files.
+`transfers` and `checkers` must be positive integers; `multiThreadStreams: 0`
+disables multithread transfers. The limits apply to each scheduled or manual
+cruise-data rclone job, so five active jobs allow five file copies and ten checkers.
+Other worker families and rsync transfers keep their existing settings.
+
+To tune an existing installation, add this block to your YAML, adjust the values,
+and restart the cruise-data workers after current jobs finish.
+
 ### An error has been reported ###
 If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.
 

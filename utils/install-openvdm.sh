@@ -978,7 +978,6 @@ numprocs=2
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/run_cruise_data_transfer.log
 user=root
-environment=RCLONE_TRANSFERS="2",RCLONE_CHECKERS="2",RCLONE_MULTI_THREAD_STREAMS="0"
 autostart=true
 autorestart=true
 stopsignal=INT
