@@ -1280,6 +1280,71 @@ def prepare_ftp_mount(cfg: dict, tmpdir: str, rclone_config: str, mount_base: st
     return (True, mntpoint) if success else (False, detail)
 
 
+# rclone limits for copies to local and mounted destinations when the
+# rcloneConcurrency block of openvdm.yaml doesn't set them. Many jobs copying
+# to the same disks or NAS at rclone's defaults (4 transfers, 8 checkers)
+# mostly contend with each other; these are close to the one file at a time
+# of rsync, which these transfers used before 2.12 (#465).
+RCLONE_LOCAL_CONCURRENCY = {'transfers': 1, 'checkers': 2, 'multiThreadStreams': 0}
+
+# rclone option for each rcloneConcurrency setting
+_RCLONE_CONCURRENCY_FLAGS = {
+    'transfers': '--transfers',
+    'checkers': '--checkers',
+    'multiThreadStreams': '--multi-thread-streams',
+}
+
+
+def rclone_destination(transfer_type: str, dest_dir: str) -> str:
+    """Return which ``rcloneConcurrency`` section applies to an rclone copy.
+
+    SMB shares (copied to their mount point) and local directories without a
+    ``:`` are ``'local'``; rclone remotes (SSH and FTP destinations, and
+    ``remote:path`` local directories) are ``'remote'`` (#465).
+
+    Args:
+        transfer_type: The transfer type, from :func:`get_transfer_type`.
+        dest_dir: The directory rclone copies to: a path, or ``remote:path``.
+
+    Returns:
+        str: ``'local'`` or ``'remote'``.
+    """
+
+    if transfer_type == 'smb' or (transfer_type == 'local' and ':' not in dest_dir):
+        return 'local'
+    return 'remote'
+
+
+def rclone_concurrency(config: dict, destination: str) -> Optional[dict]:
+    """Return the rclone limits from ``openvdm.yaml`` for a kind of destination.
+
+    The ``rcloneConcurrency`` block has a ``local`` section, for local
+    directories and mounted SMB shares, and a ``remote`` section, for rclone
+    remotes (SSH, FTP and ``remote:path`` destinations). Unset ``local``
+    settings default to ``RCLONE_LOCAL_CONCURRENCY``; ``remote`` has no
+    defaults, so rclone's own are used (#465).
+
+    Args:
+        config: The ``openvdm.yaml`` settings, e.g. ``OpenVDM.config``.
+        destination: ``'local'`` or ``'remote'``.
+
+    Returns:
+        dict | None: The settings for :func:`build_rclone_options`, or
+        ``None`` if there are none (``remote`` with nothing set).
+    """
+
+    block = config.get('rcloneConcurrency')
+    section = block.get(destination) if isinstance(block, dict) else None
+    if not isinstance(section, dict):
+        section = {}
+    settings = {key: value for key, value in section.items()
+                if key in _RCLONE_CONCURRENCY_FLAGS and value not in (None, '')}
+
+    if destination == 'local':
+        return {**RCLONE_LOCAL_CONCURRENCY, **settings}
+    return settings or None
+
+
 def build_rclone_options(
         cfg: dict, mode: str = 'dry-run', concurrency: Optional[dict] = None
 ) -> tuple[str, list[str]]:
@@ -1295,8 +1360,9 @@ def build_rclone_options(
         cfg: Cruise data transfer configuration.
         mode: ``'dry-run'`` to only list what would be transferred; any other
             value for a real transfer.
-        concurrency: Server YAML limits; missing keys default to 1 transfer,
-            2 checkers and 0 multithread streams. ``None`` adds no limits.
+        concurrency: rclone limits from :func:`rclone_concurrency`
+            (``transfers``, ``checkers``, ``multiThreadStreams``); a setting
+            that's missing or blank adds no option. ``None`` adds none.
 
     Returns:
         tuple[str, list[str]]: ``('copy' | 'sync', flags)``.
@@ -1327,12 +1393,10 @@ def build_rclone_options(
     if cfg.get('bandwidthLimit') not in (None, 0):
         flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
 
-    if concurrency is not None:
-        flags.extend([
-            '--transfers', str(concurrency.get('transfers', 1)),
-            '--checkers', str(concurrency.get('checkers', 2)),
-            '--multi-thread-streams', str(concurrency.get('multiThreadStreams', 0)),
-        ])
+    for key, flag in _RCLONE_CONCURRENCY_FLAGS.items():
+        value = (concurrency or {}).get(key)
+        if value not in (None, ''):
+            flags.extend([flag, str(value)])
 
     return copy_sync, flags
 

@@ -6,8 +6,8 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [Unreleased]
 
-### Added
-- **Rclone concurrency:** configure `transfers`, `checkers` and `multiThreadStreams` under `rcloneConcurrency` in `server/etc/openvdm.yaml` for cruise-data and ship-to-shore copies. Defaults are 1/2/0 per rclone process, also used when settings are omitted. Restart the cruise-data and ship-to-shore workers after changing the values; see [INSTALL.md](INSTALL.md#rclone-concurrency) (#465).
+### Changed
+- **Fewer simultaneous rclone copies to local directories and SMB shares:** since 2.12, these cruise data transfers copy with rclone, whose defaults (4 files copying and 8 checks at once, for each job) made several jobs writing to the same disks or NAS contend for them, where rsync had copied one file at a time. They now copy 1 file and check 2 at once by default. The new `rcloneConcurrency` block in `openvdm.yaml` sets the limits: `local` for local directories (mounted or not) and SMB shares, and `remote` for rclone remotes (SSH and FTP destinations, `remote:path` destinations and ship-to-shore transfers), which keep rclone's defaults unless set. An `openvdm.yaml` without the block gets these defaults. See "Rclone concurrency" in [INSTALL.md](INSTALL.md#rclone-concurrency) (#465, thanks to @KaarelRaeis-SOI).
 
 ---
 

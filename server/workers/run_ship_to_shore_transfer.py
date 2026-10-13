@@ -34,7 +34,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
-from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, rclone_concurrency, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -326,9 +326,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             use_sshpass = False
             if ':' in self.cruise_data_transfer['destDir']:
 
+                # Only rclone remotes are copied with rclone here (#465)
                 copy_sync, flags = build_rclone_options(
-                    cdt_cfg, mode='real',
-                    concurrency=self.ovdm.config.get('rcloneConcurrency') or {})
+                    cdt_cfg, mode='real', concurrency=rclone_concurrency(self.ovdm.config, 'remote'))
 
                 cmd = build_rclone_command(copy_sync, flags, None, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_data_transfer['destDir'], include_file)
 
