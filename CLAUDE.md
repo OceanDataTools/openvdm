@@ -44,6 +44,7 @@ OpenVDM is a 3-tier distributed system:
 - Server config: `server/etc/openvdm.yaml` (copy from `openvdm.yaml.dist`)
 - Web config: `www/app/Core/Config.php` (copy from `Config.php.dist`)
 - Hooks in `openvdm.yaml` map Gearman task names to downstream tasks; `postHookCommands` run shell commands after task completion
+- `rcloneConcurrency` in `openvdm.yaml` limits each rclone copy job of the cruise data and ship-to-shore workers: `local` (local directories and SMB mounts; defaults `RCLONE_LOCAL_CONCURRENCY`, 1/2/0) and `remote` (SSH, FTP and `remote:path` destinations, ship-to-shore; rclone's defaults unless set). The workers pick the section with `rclone_destination()` and read it with `rclone_concurrency()` in `connection_utils.py` (#465)
 
 ## Development Setup
 

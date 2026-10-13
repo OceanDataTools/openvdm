@@ -204,6 +204,24 @@ At this point there should be a working installation of OpenVDM however the vess
 
 To access the OpenVDM web-application go to address specified in the completetion message.
 
+### Rclone concurrency
+
+Cruise data transfers, other than to an rsync server, and ship-to-shore transfers to an rclone remote copy with rclone. The `rcloneConcurrency` block in `server/etc/openvdm.yaml` limits how many files each job copies (`transfers`) and checks (`checkers`) at once, and whether large files are copied in several streams (`multiThreadStreams`, 0 for off):
+
+```yaml
+rcloneConcurrency:
+    local:
+        transfers: 1
+        checkers: 2
+        multiThreadStreams: 0
+    remote: {}
+```
+
+- **`local`** is for local directories (mounted or not) and SMB shares. Unset values, or no block at all as in an `openvdm.yaml` from before this setting, use the values above. Many jobs copying to the same disks or NAS at rclone's defaults mostly contend with each other.
+- **`remote`** is for rclone remotes: SSH and FTP destinations, `remote:path` destinations and ship-to-shore transfers. Unset values use rclone's defaults (4 transfers, 8 checkers, 4 streams), since parallel copies help over slow or high-latency links. Set limits here to share a link, e.g. with other traffic.
+
+The limits are for each job: with five jobs running, `local`'s allow five files copying at once. Scheduled and manual transfers use the same limits. After a change, restart the workers when no transfers are running (`sudo supervisorctl restart openvdm:*`).
+
 ### An error has been reported ###
 If at anypoint you see this message in the OpenVDM web-interface you can see what the error was by going to: `<http://<hostname>/errorlog.html>`.  That should hopefully provide you with enough information as to what's gone wrong.
 

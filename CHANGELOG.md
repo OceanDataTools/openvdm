@@ -4,6 +4,13 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Fewer simultaneous rclone copies to local directories and SMB shares:** since 2.12, these cruise data transfers copy with rclone, whose defaults (4 files copying and 8 checks at once, for each job) made several jobs writing to the same disks or NAS contend for them, where rsync had copied one file at a time. They now copy 1 file and check 2 at once by default. The new `rcloneConcurrency` block in `openvdm.yaml` sets the limits: `local` for local directories (mounted or not) and SMB shares, and `remote` for rclone remotes (SSH and FTP destinations, `remote:path` destinations and ship-to-shore transfers), which keep rclone's defaults unless set. An `openvdm.yaml` without the block gets these defaults. See "Rclone concurrency" in [INSTALL.md](INSTALL.md#rclone-concurrency) (#465, thanks to @KaarelRaeis-SOI).
+
+---
+
 ## [2.16.2] – 2026-10-11
 
 **Upgrading:** follow "Upgrading from 2.16.1" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:

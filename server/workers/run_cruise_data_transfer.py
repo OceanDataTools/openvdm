@@ -33,7 +33,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, set_owner_group_permissions, transfer_exclude_patterns, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError, error_detail
-from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
+from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rclone_concurrency, rclone_destination, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
 
@@ -359,7 +359,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 else:
                     self.make_cruise_dir(dest_dir, rclone_args)
 
-                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                    # Local directories and SMB mounts get the local limits,
+                    # rclone remotes the remote ones (#465)
+                    concurrency = rclone_concurrency(self.ovdm.config,
+                                                     rclone_destination(transfer_type, dest_dir))
+                    copy_sync, flags = build_rclone_options(cdt_cfg, mode='real', concurrency=concurrency)
                     cmd = build_rclone_command(copy_sync, flags, rclone_args, self.cruise_dir,
                                                os.path.join(dest_dir, self.cruise_id),
                                                exclude_filepath=exclude_file)
