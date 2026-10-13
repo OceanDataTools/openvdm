@@ -326,7 +326,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             use_sshpass = False
             if ':' in self.cruise_data_transfer['destDir']:
 
-                copy_sync, flags = build_rclone_options(cdt_cfg, mode='real')
+                copy_sync, flags = build_rclone_options(
+                    cdt_cfg, mode='real',
+                    concurrency=self.ovdm.config.get('rcloneConcurrency') or {})
 
                 cmd = build_rclone_command(copy_sync, flags, None, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'], self.cruise_data_transfer['destDir'], include_file)
 

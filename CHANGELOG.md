@@ -7,7 +7,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 ## [Unreleased]
 
 ### Added
-- **Cruise-data rclone concurrency:** configure `transfers`, `checkers` and `multiThreadStreams` under `rcloneConcurrency` in `server/etc/openvdm.yaml`. Defaults are 1/2/0 per rclone process, also used when settings are omitted. Restart the cruise-data workers after changing the values; see [INSTALL.md](INSTALL.md#cruise-data-rclone-concurrency) (#465).
+- **Rclone concurrency:** configure `transfers`, `checkers` and `multiThreadStreams` under `rcloneConcurrency` in `server/etc/openvdm.yaml` for cruise-data and ship-to-shore copies. Defaults are 1/2/0 per rclone process, also used when settings are omitted. Restart the cruise-data and ship-to-shore workers after changing the values; see [INSTALL.md](INSTALL.md#rclone-concurrency) (#465).
 
 ---
 

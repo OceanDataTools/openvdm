@@ -26,9 +26,9 @@ workerApiKey: "change-me-to-a-strong-random-value"
 # The unit is in minutes.
 transferInterval: 5
 
-# Per-process rclone limits for cruise data transfers (scheduled and manual).
-# Each simultaneous cruise-data job has these limits.
-# Missing settings use these defaults. Restart cruise-data workers after edits.
+# Per-process rclone limits for cruise-data and ship-to-shore copies.
+# Each simultaneous copy/sync job has these limits.
+# Missing settings use these defaults. Restart affected transfer workers after edits.
 # transfers/checkers must be integers >= 1; multiThreadStreams >= 0 (0 disables it).
 rcloneConcurrency:
     transfers: 1
