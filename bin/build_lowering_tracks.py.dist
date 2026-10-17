@@ -36,7 +36,7 @@ It also sets the current lowering's bounding box in OpenVDM
 source's combined track: the one marked ``extent: true`` in the position
 sources, else the first. The whole track is used on every run, so the extent
 is recomputed, not merged with the last one. It's only set when the lowering
-is OpenVDM's current lowering, and not with ``--no-extent``.
+is OpenVDM's current lowering, and not with ``--no-set-extent``.
 
 The shared trackline code, including picking the extent's position source
 and computing the extent, is in ``server/lib/tracks.py``; this script adds the
@@ -47,7 +47,7 @@ Usage::
 
     build_lowering_tracks.py [-h] [-v ...] [-n] [-k | -g] [-l LOWERINGID]
                              [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
-                             [--position-sources FILE] [--no-extent]
+                             [--position-sources FILE] [--no-set-extent]
                              collectionSystem
 """
 
@@ -195,7 +195,7 @@ def main() -> None:  # pylint: disable=too-many-locals
     parser.add_argument("-l", dest="loweringID")
     add_output_arguments(parser)
     parser.add_argument("--position-sources", dest="position_sources_file")
-    parser.add_argument("--no-extent", action="store_true",
+    parser.add_argument("--no-set-extent", action="store_true",
                         help="don't set the lowering's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
 
@@ -230,7 +230,7 @@ def main() -> None:  # pylint: disable=too-many-locals
             extent_track = combined
 
     failures = []
-    if not args.no_extent:
+    if not args.no_set_extent:
         try:
             update_lowering_extent(openvdm, extent_source, extent_track, manifest, cruise_base_dir, lowering_id)
         except Exception as err:  # pylint: disable=broad-exception-caught
