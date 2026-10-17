@@ -30,8 +30,8 @@ read by QA tools) from one position source's combined track: the one marked
 ``extent: true`` in the position sources, else the first. The whole track is used
 on every run, so the extent is recomputed, not merged with the last one. It's
 only set when the cruise is OpenVDM's current cruise, and not with
-``--no-extent``. If nav-qa-processing's OpenVDM hook sets the extent from its
-quality-checked fixes, add ``--no-extent`` to this script's hook so the
+``--no-set-extent``. If nav-qa-processing's OpenVDM hook sets the extent from
+its quality-checked fixes, add ``--no-set-extent`` to this script's hook so the
 quick-look extent doesn't overwrite it.
 
 The shared trackline code, including picking the extent's position source
@@ -43,7 +43,7 @@ Usage::
 
     build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
                            [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
-                           [--position-sources FILE] [--no-extent]
+                           [--position-sources FILE] [--no-set-extent]
                            collectionSystem
 """
 
@@ -175,7 +175,7 @@ def main():  # pylint: disable=too-many-locals
     parser.add_argument("-c", dest="cruiseID")
     add_output_arguments(parser)
     parser.add_argument("--position-sources", dest="position_sources_file")
-    parser.add_argument("--no-extent", action="store_true",
+    parser.add_argument("--no-set-extent", action="store_true",
                         help="don't set the cruise's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
 
@@ -206,7 +206,7 @@ def main():  # pylint: disable=too-many-locals
             extent_track = combined
 
     failures = []
-    if not args.no_extent:
+    if not args.no_set_extent:
         try:
             update_cruise_extent(openvdm, extent_source, extent_track, manifest, cruise_base_dir, cruise_id)
         except Exception as err:  # pylint: disable=broad-exception-caught
