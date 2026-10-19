@@ -91,7 +91,8 @@ def classify_file(filepath: str, size: int, mod_time: float, filters: dict,
     return ("exclude", filepath, None)
 
 
-def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float) -> list:
+def process_batch(batch: list, filters: dict, data_start_time: float, data_end_time: float,
+                  should_stop=None) -> list:
     """Filter a batch of local file paths against transfer criteria.
 
     Each file is ``stat``ed and evaluated with :func:`classify_file`.
@@ -105,6 +106,8 @@ def process_batch(batch: list, filters: dict, data_start_time: float, data_end_t
             float (inclusive).
         data_end_time: Latest allowed modification time as a Unix epoch float
             (inclusive).
+        should_stop: Polled before each file; when it returns ``True`` the
+            rest of the batch is skipped (#473).
 
     Returns:
         List of ``(action, filepath, size_str)`` tuples where *action* is
@@ -115,6 +118,8 @@ def process_batch(batch: list, filters: dict, data_start_time: float, data_end_t
     results = []
 
     for filepath in batch:
+        if should_stop and should_stop():
+            break
         try:
             if os.path.islink(filepath):
                 continue
@@ -577,7 +582,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         Returns:
             dict: ``{'verdict': True, 'files': {'include', 'exclude', 'new',
             'updated', 'filesize'}}``, or ``{'verdict': False, 'reason':
-            ...}``.
+            ...}``. When the job is stopped while the source is listed,
+            ``{'verdict': True, 'stopped': True}`` with no files (#473).
         """
 
         def _build_filters(cst_cfg, cruise_id, lowering_id):
@@ -619,6 +625,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
             verified = []
             for filepath, old_size in paths_sizes:
+                if self.stop:
+                    break
                 try:
                     if os.stat(filepath).st_size == int(old_size):
                         verified.append((filepath, old_size))
@@ -638,6 +646,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         data_end_time = calendar.timegm(time.strptime(self.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
+        # Stopped while listing: no files, so nothing is copied or deleted (#473)
+        stopped = {'verdict': True, 'stopped': True,
+                   'files': {'include': [], 'exclude': [], 'new': [], 'updated': []}}
 
         # Ignored folders aren't listed: they may be unreadable, which fails
         # the listing (#264), or large, such as snapshots (#265)
@@ -664,6 +675,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             walk_errors = []
             filepaths = []
             for root, dirnames, filenames in os.walk(source_dir, onerror=walk_errors.append):
+                if self.stop:
+                    return stopped
                 dirnames[:] = [d for d in dirnames if not is_default_ignore_dir(os.path.join(root, d))]
                 for filename in filenames:
                     filepaths.append(os.path.join(root, filename))
@@ -722,7 +735,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 futures = [executor.submit(process_listed_batch, batch, filters, data_start_time, data_end_time)
                            for batch in batches]
             elif transfer_type in ['local', 'smb']:
-                futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time)
+                futures = [executor.submit(process_batch, batch, filters, data_start_time, data_end_time,
+                                           lambda: self.stop)
                            for batch in batches]
             else:
                 futures = [executor.submit(process_rsync_batch, batch, filters, data_start_time, data_end_time, epoch)
@@ -737,6 +751,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             return_files['filesize'].append(item[2])
                         elif item[0] == 'exclude':
                             return_files['exclude'].append(item[1])
+
+        if self.stop:
+            return stopped
 
         # Optional staleness check
         staleness = cst_cfg.get('staleness')
@@ -766,6 +783,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                         for filepath, size in future.result():
                             verified_paths.append(filepath)
                             verified_sizes.append(size)
+                if self.stop:
+                    return stopped
                 return_files['include'] = verified_paths
                 return_files['filesize'] = verified_sizes
             else:
@@ -837,7 +856,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             dict: ``{'verdict': True, 'files': ...}`` with the ``new``,
             ``updated`` and ``exclude`` files (and ``deleted``, when the
             transfer syncs deletions), or ``{'verdict': False, 'reason':
-            ...}``.
+            ...}``. Stopped while listing, ``'stopped': True`` with no files:
+            nothing is copied or deleted (#473).
         """
 
         cst_cfg = self.collection_system_transfer
@@ -942,6 +962,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     reason = filelist_result.get('reason', 'Unknown error')
                     logging.error("Filelist build failed for %s: %s", src_dir, reason)
                     return {'verdict': False, 'reason': f"Unable to list source files: {reason}", 'files': []}
+
+                if filelist_result.get('stopped'):
+                    logging.warning("Stopped while listing %s; nothing was copied", src_dir)
+                    return {'verdict': True, 'stopped': True, 'files': all_files}
 
                 file_lists.append((src_dir, dest_name, filelist_result['files']))
 
@@ -1346,6 +1370,11 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
                     logging.error("Error setting destination directory file/directory ownership/permissions: %s",
                                   worker.dest_dir)
         job_results['parts'].append({"partName": "Transfer Files", "result": "Fail", "reason": results['reason']})
+        return json.dumps(job_results)
+
+    if results.get('stopped'):
+        # Leave the transfer and exclude logs from the last full run (#473)
+        job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
         return json.dumps(job_results)
 
     job_results['files'] = results['files']
