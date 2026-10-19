@@ -125,11 +125,12 @@ class CollectionSystemTransfers extends Model {
     }
 
     public function disableCollectionSystemTransfer($id){
-        $data = array('enable' => 0, 'status' => 4);
-        // $row = $this->getCollectionSystemTransfer($id);
-        // if (strcmp($row[0]->status,'2') === 0) {
-        //     $data['status'] = '4';
-        // }
+        $data = array('enable' => 0);
+        $row = $this->getCollectionSystemTransfer($id);
+        // A running transfer keeps its status until the run ends
+        if ((int)$row[0]->status !== 1) {
+            $data['status'] = '4';
+        }
         $where = array('collectionSystemTransferID' => $id);
         $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
     }
