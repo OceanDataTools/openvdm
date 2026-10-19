@@ -173,7 +173,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         The outcome is the last entry in the result's ``parts``: ``Fail`` sets
         the cruise data transfer's test status to error, with that part's
-        reason; anything else sets it to idle.
+        reason; anything else sets it to idle. A running transfer keeps its
+        status.
 
         Args:
             current_job: The Gearman job.
@@ -199,8 +200,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.ovdm.set_error_cruise_data_transfer_test(cdt_id, reason)
             return super().send_job_complete(current_job, job_result)
 
-        # Always set idle at the end if not failed
-        self.ovdm.set_idle_cruise_data_transfer(cdt_id)
+        # Always set idle at the end if not failed, unless the transfer is running
+        if self.ovdm.get_cruise_data_transfer(cdt_id).get('status') != 1:
+            self.ovdm.set_idle_cruise_data_transfer(cdt_id)
 
         return super().send_job_complete(current_job, job_result)
 

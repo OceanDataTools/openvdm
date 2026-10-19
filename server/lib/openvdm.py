@@ -1495,7 +1495,8 @@ class OpenVDM():
     def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason=''):
         """Set the collection system transfer's status to error and post a message to OpenVDM.
 
-        The message is titled "<name> Connection test failed".
+        The message is titled "<name> Connection test failed". A running transfer
+        keeps its status.
 
         Args:
             collection_system_transfer_id: The collection system transfer's ID.
@@ -1515,7 +1516,9 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            # A running transfer keeps its status, or the scheduler starts it again
+            if collection_system_transfer.get('status') != 1:
+                requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set test status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1555,7 +1558,8 @@ class OpenVDM():
     def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason=''):
         """Set the cruise data transfer's status to error and post a message to OpenVDM.
 
-        The message is titled "<name> Connection test failed".
+        The message is titled "<name> Connection test failed". A running transfer
+        keeps its status.
 
         Args:
             cruise_data_transfer_id: The cruise data transfer's ID.
@@ -1575,7 +1579,9 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            # A running transfer keeps its status, or the scheduler starts it again
+            if cruise_data_transfer.get('status') != 1:
+                requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
