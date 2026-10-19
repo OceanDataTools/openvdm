@@ -591,7 +591,11 @@ def task_run_ship_to_shore_transfer(worker, current_job): # pylint: disable=too-
 
     logging.debug("Setting transfer status to 'Running'")
     worker.send_job_status(current_job, 1, 100)
-    worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
+    if not worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle):
+        # Another job claimed it since on_job_execute() checked the status
+        logging.info("Transfer already in-progress for %s", cdt_cfg['name'])
+        job_results['parts'] = [{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}]
+        return json.dumps(job_results)
 
     logging.info("Testing configuration")
     worker.send_job_status(current_job, 2, 100)

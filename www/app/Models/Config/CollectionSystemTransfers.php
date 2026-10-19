@@ -87,9 +87,10 @@ class CollectionSystemTransfers extends Model {
     }
 
     public function setRunningCollectionSystemTransfer($id,$pid){
-        $data = array('status' => '1', 'pid' => $pid);
-        $where = array('collectionSystemTransferID' => $id);
-        $this->db->update(PREFIX."CollectionSystemTransfers",$data, $where);
+        // One statement, so two workers can't both claim the transfer
+        $stmt = $this->db->prepare("UPDATE ".PREFIX."CollectionSystemTransfers SET status = '1', pid = :pid WHERE collectionSystemTransferID = :id AND status <> '1'");
+        $stmt->execute(array(':pid' => $pid, ':id' => $id));
+        return $stmt->rowCount() === 1;
     }
 
     public function setIdleCollectionSystemTransfer($id){

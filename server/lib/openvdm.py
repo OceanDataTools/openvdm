@@ -1678,10 +1678,17 @@ class OpenVDM():
     def set_running_collection_system_transfer(self, collection_system_transfer_id, job_pid, job_handle):
         """Set the collection system transfer's status to running and track its Gearman job.
 
+        Only one job can do this at a time: it fails while the collection system transfer
+        is already running.
+
         Args:
             collection_system_transfer_id: The collection system transfer's ID.
             job_pid: Process ID of the worker running the job.
             job_handle: The Gearman job handle.
+
+        Returns:
+            bool: ``True`` if the status was set, ``False`` if the collection system transfer
+            was already running.
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
@@ -1698,13 +1705,17 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            req = requests.post(url, data=payload, timeout=TIMEOUT)
+            if json.loads(req.text).get('status') != 'success':
+                return False
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
         except Exception as exc:
             logging.error("Unable to set collection system transfer: %s to running with OpenVDM API", collection_system_transfer.get('name'))
             raise exc
+
+        return True
 
 
     def set_running_collection_system_transfer_test(self, collection_system_transfer_id, job_pid, job_handle):
@@ -1737,10 +1748,17 @@ class OpenVDM():
     def set_running_cruise_data_transfer(self, cruise_data_transfer_id, job_pid, job_handle):
         """Set the cruise data transfer's status to running and track its Gearman job.
 
+        Only one job can do this at a time: it fails while the cruise data transfer
+        is already running.
+
         Args:
             cruise_data_transfer_id: The cruise data transfer's ID.
             job_pid: Process ID of the worker running the job.
             job_handle: The Gearman job handle.
+
+        Returns:
+            bool: ``True`` if the status was set, ``False`` if the cruise data transfer
+            was already running.
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
@@ -1757,13 +1775,17 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            req = requests.post(url, data=payload, timeout=TIMEOUT)
+            if json.loads(req.text).get('status') != 'success':
+                return False
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
         except Exception as exc:
             logging.error("Unable to set cruise data transfer: %s to running with OpenVDM API", cruise_data_transfer.get('name'))
             raise exc
+
+        return True
 
 
     def set_running_cruise_data_transfer_test(self, cruise_data_transfer_id, job_pid, job_handle):

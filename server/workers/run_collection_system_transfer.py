@@ -1301,7 +1301,11 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    worker.ovdm.set_running_collection_system_transfer(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle)
+    if not worker.ovdm.set_running_collection_system_transfer(cst_cfg['collectionSystemTransferID'], os.getpid(), current_job.handle):
+        # Another job claimed it since on_job_execute() checked the status
+        logging.info("Transfer already in-progress")
+        job_results['parts'] = [{"partName": "Transfer in-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}]
+        return json.dumps(job_results)
 
     logging.info("Testing source")
     worker.send_job_status(current_job, 1, 100)

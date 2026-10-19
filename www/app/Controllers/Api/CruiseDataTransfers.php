@@ -68,8 +68,12 @@ class CruiseDataTransfers extends Controller {
 	public function setRunningCruiseDataTransfer($id) {
         $return = array();
         if(isset($_POST['jobPid'])){
-            $this->_cruiseDataTransfersModel->setRunningCruiseDataTransfer($id, $_POST['jobPid']);
-            $return['status'] = 'success';
+            if ($this->_cruiseDataTransfersModel->setRunningCruiseDataTransfer($id, $_POST['jobPid'])) {
+                $return['status'] = 'success';
+            } else {
+                $return['status'] = 'error';
+                $return['message'] = 'transfer is already running';
+            }
         } else {
             $return['status'] = 'error';
             $return['message'] = 'missing POST data';

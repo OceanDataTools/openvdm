@@ -113,9 +113,10 @@ class CruiseDataTransfers extends Model {
 
 
     public function setRunningCruiseDataTransfer($id, $pid){
-        $data = array('status' => '1', 'pid' => $pid);
-        $where = array('cruiseDataTransferID' => $id);
-        $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
+        // One statement, so two workers can't both claim the transfer
+        $stmt = $this->db->prepare("UPDATE ".PREFIX."CruiseDataTransfers SET status = '1', pid = :pid WHERE cruiseDataTransferID = :id AND status <> '1'");
+        $stmt->execute(array(':pid' => $pid, ':id' => $id));
+        return $stmt->rowCount() === 1;
     }
 
     public function setIdleCruiseDataTransfer($id){

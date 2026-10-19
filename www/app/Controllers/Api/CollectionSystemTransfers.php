@@ -91,8 +91,12 @@ class CollectionSystemTransfers extends Controller {
 	public function setRunningCollectionSystemTransfer($id) {
         $return = array();
         if(isset($_POST['jobPid'])){
-            $this->_collectionSystemTransfersModel->setRunningCollectionSystemTransfer($id, $_POST['jobPid']);
-            $return['status'] = 'success';
+            if ($this->_collectionSystemTransfersModel->setRunningCollectionSystemTransfer($id, $_POST['jobPid'])) {
+                $return['status'] = 'success';
+            } else {
+                $return['status'] = 'error';
+                $return['message'] = 'transfer is already running';
+            }
         } else {
             $return['status'] = 'error';
             $return['message'] = 'missing POST data';

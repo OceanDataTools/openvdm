@@ -600,7 +600,11 @@ def task_run_cruise_data_transfer(worker, current_job):
     }
 
     logging.debug("Setting transfer status to 'Running'")
-    worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle)
+    if not worker.ovdm.set_running_cruise_data_transfer(cdt_cfg['cruiseDataTransferID'], os.getpid(), current_job.handle):
+        # Another job claimed it since on_job_execute() checked the status
+        logging.info("Transfer already in-progress for %s", cdt_cfg['name'])
+        job_results['parts'] = [{"partName": "Transfer In-Progress", "result": "Ignore", "reason": "Transfer is already in-progress"}]
+        return json.dumps(job_results)
 
     logging.info("Testing destination")
     worker.send_job_status(current_job, 1, 100)
