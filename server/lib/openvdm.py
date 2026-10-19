@@ -1517,7 +1517,7 @@ class OpenVDM():
 
         try:
             # A running transfer keeps its status, or the scheduler starts it again
-            if collection_system_transfer.get('status') != 1:
+            if collection_system_transfer.get('status') not in (1, 5):
                 requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:
@@ -1580,7 +1580,7 @@ class OpenVDM():
 
         try:
             # A running transfer keeps its status, or the scheduler starts it again
-            if cruise_data_transfer.get('status') != 1:
+            if cruise_data_transfer.get('status') not in (1, 5):
                 requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:

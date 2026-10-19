@@ -89,7 +89,7 @@ def scheduler(interval: int = None) -> None:
         collection_system_transfers = ovdm.get_active_collection_system_transfers('longName')
         for collection_system_transfer in collection_system_transfers:
 
-            if collection_system_transfer['status'] == 1:
+            if collection_system_transfer['status'] in (1, 5):
                 continue
 
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -107,7 +107,7 @@ def scheduler(interval: int = None) -> None:
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
 
-            if cruise_data_transfer['status'] == 1:
+            if cruise_data_transfer['status'] in (1, 5):
                 continue
 
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])

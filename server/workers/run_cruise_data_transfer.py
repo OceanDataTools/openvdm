@@ -431,7 +431,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.cruise_data_transfer['status'] == 1:
+        if self.cruise_data_transfer['status'] in (1, 5):
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 

@@ -280,7 +280,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return super().send_job_complete(current_job, job_result)
 
         # Always set idle at the end if not failed, unless the transfer is running
-        if self.ovdm.get_collection_system_transfer(cst_id).get('status') != 1:
+        if self.ovdm.get_collection_system_transfer(cst_id).get('status') not in (1, 5):
             self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)

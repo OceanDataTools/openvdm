@@ -194,11 +194,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
 def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
-    """Gearman task handler: send SIGQUIT to a running job and mark it idle.
+    """Gearman task handler: send SIGQUIT to a running job.
 
     Reads ``worker.job_info`` (populated by :py:meth:`OVDMGearmanWorker.on_job_execute`)
-    to determine the target PID and job type, signals the process, then resets
-    the corresponding OpenVDM record to idle via the API.
+    to determine the target PID and job type, and signals the process. A
+    transfer whose job was signalled keeps its status until that job ends and
+    sets it; a transfer whose process is gone, or a task, is reset to idle via
+    the API.
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -225,11 +227,13 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
 
     job_results['parts'].append({"partName": "Verify OpenVDM Job", "result": "Pass"})
 
+    process_gone = False
     try:
         os.kill(int(job_pid), signal.SIGQUIT)
     except OSError as exc:
         if exc.errno == 3:
             logging.warning("Process does not exist: PID %s", job_pid)
+            process_gone = True
         else:
             reason = f"Error killing PID: {job_pid} --> {exc}"
             logging.error(reason)
@@ -243,7 +247,10 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
         }
 
         if job_type in actions:
-            actions[job_type](job_id)
+            # A transfer job that got the signal sets its own status when it
+            # ends: setting it idle now lets the scheduler start another copy (#472)
+            if process_gone or job_type == 'task':
+                actions[job_type](job_id)
             worker.ovdm.send_msg("Manual Stop of transfer" if 'Transfer' in job_type else "Manual Stop of task", job_name)
 
         job_results['parts'].append({"partName": "Stopped Job", "result": "Pass"})

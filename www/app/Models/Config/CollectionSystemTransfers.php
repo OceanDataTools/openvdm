@@ -88,7 +88,7 @@ class CollectionSystemTransfers extends Model {
 
     public function setRunningCollectionSystemTransfer($id,$pid){
         // One statement, so two workers can't both claim the transfer
-        $stmt = $this->db->prepare("UPDATE ".PREFIX."CollectionSystemTransfers SET status = '1', pid = :pid WHERE collectionSystemTransferID = :id AND status <> '1'");
+        $stmt = $this->db->prepare("UPDATE ".PREFIX."CollectionSystemTransfers SET status = '1', pid = :pid WHERE collectionSystemTransferID = :id AND status NOT IN ('1', '5')");
         $stmt->execute(array(':pid' => $pid, ':id' => $id));
         return $stmt->rowCount() === 1;
     }
@@ -118,7 +118,7 @@ class CollectionSystemTransfers extends Model {
     public function enableCollectionSystemTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCollectionSystemTransfer($id);
-        if ((int)$row[0]->status !== 1) {
+        if (!in_array((int)$row[0]->status, array(1, 5), true)) {
             $data['status'] = '2';
         }
         $where = array('collectionSystemTransferID' => $id);
@@ -129,7 +129,7 @@ class CollectionSystemTransfers extends Model {
         $data = array('enable' => 0);
         $row = $this->getCollectionSystemTransfer($id);
         // A running transfer keeps its status until the run ends
-        if ((int)$row[0]->status !== 1) {
+        if (!in_array((int)$row[0]->status, array(1, 5), true)) {
             $data['status'] = '4';
         }
         $where = array('collectionSystemTransferID' => $id);

@@ -20,7 +20,7 @@ WORKERS = [
 
 
 @pytest.mark.parametrize('module, attr, id_key, get_name, set_idle_name', WORKERS)
-@pytest.mark.parametrize('status, sets_idle', [(1, False), (2, True), (3, True)])
+@pytest.mark.parametrize('status, sets_idle', [(1, False), (5, False), (2, True), (3, True)])
 def test_passed_test_sets_idle_unless_running(
         monkeypatch: pytest.MonkeyPatch, module, attr: str, id_key: str, get_name: str,
         set_idle_name: str, status: int, sets_idle: bool) -> None:
@@ -41,7 +41,7 @@ def test_passed_test_sets_idle_unless_running(
     ('set_error_cruise_data_transfer_test', 'get_cruise_data_transfer',
      'setErrorCruiseDataTransfer'),
 ])
-@pytest.mark.parametrize('status, sets_error', [(1, False), (2, True)])
+@pytest.mark.parametrize('status, sets_error', [(1, False), (5, False), (2, True)])
 def test_failed_test_sets_error_unless_running(
         monkeypatch: pytest.MonkeyPatch, method: str, get_name: str, api: str,
         status: int, sets_error: bool) -> None:

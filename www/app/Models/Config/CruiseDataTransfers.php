@@ -99,8 +99,10 @@ class CruiseDataTransfers extends Model {
     }
 
     public function setStoppingCruiseDataTransfer($id){
+        // Only a running transfer: its job sets the status when it ends, and
+        // Stopping without a job would block the transfer
         $data = array('status' => '5');
-        $where = array('cruiseDataTransferID' => $id);
+        $where = array('cruiseDataTransferID' => $id, 'status' => '1');
         $this->db->update(PREFIX."CruiseDataTransfers",$data, $where);
     }
 
@@ -114,7 +116,7 @@ class CruiseDataTransfers extends Model {
 
     public function setRunningCruiseDataTransfer($id, $pid){
         // One statement, so two workers can't both claim the transfer
-        $stmt = $this->db->prepare("UPDATE ".PREFIX."CruiseDataTransfers SET status = '1', pid = :pid WHERE cruiseDataTransferID = :id AND status <> '1'");
+        $stmt = $this->db->prepare("UPDATE ".PREFIX."CruiseDataTransfers SET status = '1', pid = :pid WHERE cruiseDataTransferID = :id AND status NOT IN ('1', '5')");
         $stmt->execute(array(':pid' => $pid, ':id' => $id));
         return $stmt->rowCount() === 1;
     }
@@ -146,7 +148,7 @@ class CruiseDataTransfers extends Model {
     public function enableCruiseDataTransfer($id){
         $data = array('enable' => 1);
         $row = $this->getCruiseDataTransfer($id);
-        if ((int)$row[0]->status !== 1) {
+        if (!in_array((int)$row[0]->status, array(1, 5), true)) {
             $data['status'] = '2';
         }
         $where = array('cruiseDataTransferID' => $id);
@@ -157,7 +159,7 @@ class CruiseDataTransfers extends Model {
         $data = array('enable' => 0);
         $row = $this->getCruiseDataTransfer($id);
         // A running transfer keeps its status until the run ends
-        if ((int)$row[0]->status !== 1) {
+        if (!in_array((int)$row[0]->status, array(1, 5), true)) {
             $data['status'] = '4';
         }
         $where = array('cruiseDataTransferID' => $id);

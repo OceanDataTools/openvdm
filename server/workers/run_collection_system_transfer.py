@@ -1051,7 +1051,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         ))
 
         # verify the transfer is NOT already in-progress
-        if self.collection_system_transfer['status'] == 1:
+        if self.collection_system_transfer['status'] in (1, 5):
             logging.info("Transfer already in-progress")
             return self._ignore_job(current_job, "Transfer in-Progress", "Transfer is already in-progress")
 
