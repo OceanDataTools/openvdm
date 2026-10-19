@@ -15,6 +15,7 @@ from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
+from server.lib.file_utils import cleanup_orphaned_temporary_directories
 from server.lib.openvdm import OpenVDM
 
 def reboot_reset():
@@ -81,3 +82,6 @@ if __name__ == "__main__":
     time.sleep(5)
 
     reboot_reset()
+
+    # Mounts and files of workers killed before they could clean up (#474)
+    cleanup_orphaned_temporary_directories()
