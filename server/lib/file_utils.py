@@ -14,6 +14,7 @@ import tempfile
 import shutil
 import logging
 import errno
+import re
 import subprocess
 import numpy as np
 from contextlib import contextmanager
@@ -554,6 +555,87 @@ def set_owner_group_permissions(user: str, path: str) -> dict:
     return {'verdict': True}
 
 
+TEMP_DIR_PREFIX = 'openvdm-'
+
+
+def _cleanup_temp_dir(tmpdir, mntpoint_path):
+    """Unmount and delete a temporary directory safely.
+
+    Args:
+        tmpdir: The temporary directory.
+        mntpoint_path: Its ``mntpoint`` subdirectory, unmounted first if mounted.
+    """
+    if os.path.ismount(mntpoint_path):
+        for cmd in (['umount', mntpoint_path], ['umount', '-l', mntpoint_path]):
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if proc.returncode == 0 and not os.path.ismount(mntpoint_path):
+                logging.info("Unmounted %s before cleanup (%s).", mntpoint_path, ' '.join(cmd[:-1]))
+                break
+            logging.warning("Failed to unmount %s with %s: %s", mntpoint_path,
+                            ' '.join(cmd[:-1]), proc.stderr.strip())
+
+        # Never rmtree through a mount: it would delete the mounted files
+        if os.path.ismount(mntpoint_path):
+            logging.error("%s is still mounted; leaving temporary directory %s in place",
+                          mntpoint_path, tmpdir)
+            return
+
+    try:
+        shutil.rmtree(tmpdir)
+        logging.debug("Deleted temporary directory: %s", tmpdir)
+    except Exception as exc:
+        logging.error("Could not delete temp dir %s: %s", tmpdir, str(exc))
+
+
+def _process_alive(pid: int) -> bool:
+    """Return whether a process with *pid* exists.
+
+    Args:
+        pid: Process ID.
+
+    Returns:
+        bool: ``False`` only if there's no such process.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def cleanup_orphaned_temporary_directories(tmp_root: Optional[str] = None) -> List[str]:
+    """Clean up the temporary directories of OpenVDM processes that have gone.
+
+    A worker killed during a job (e.g. by Supervisor after ``stopwaitsecs``)
+    never runs its cleanup, so its directory, and any share or FTP server
+    mounted on its ``mntpoint``, stays behind (#474). Each directory made by
+    :func:`temporary_directory` has its process's PID in its name; those whose
+    process no longer exists are unmounted and deleted, with the same safety
+    as :func:`temporary_directory`: a mount that won't unmount is left alone.
+
+    Args:
+        tmp_root: Directory to look in; defaults to ``tempfile.gettempdir()``.
+
+    Returns:
+        List of the directories cleaned up (or left, if still mounted).
+    """
+    tmp_root = tmp_root or tempfile.gettempdir()
+    cleaned = []
+    for name in sorted(os.listdir(tmp_root)):
+        match = re.fullmatch(rf'{re.escape(TEMP_DIR_PREFIX)}(\d+)-\w+', name)
+        path = os.path.join(tmp_root, name)
+        if not match or os.path.islink(path) or not os.path.isdir(path):
+            continue
+        if _process_alive(int(match.group(1))):
+            continue
+        logging.warning("Cleaning up temporary directory left by a process that has gone: %s", path)
+        _cleanup_temp_dir(path, os.path.join(path, 'mntpoint'))
+        cleaned.append(path)
+    return cleaned
+
+
 @contextmanager
 def temporary_directory(preserve_on_error: bool = False):
     """Context manager that creates a temporary directory and cleans it up on exit.
@@ -575,31 +657,10 @@ def temporary_directory(preserve_on_error: bool = False):
         Exception: Re-raises any exception that occurs inside the ``with`` block.
     """
 
-    tmpdir = tempfile.mkdtemp()
+    # The PID in the name lets cleanup_orphaned_temporary_directories() find
+    # the ones whose process was killed before it could clean up (#474)
+    tmpdir = tempfile.mkdtemp(prefix=f'{TEMP_DIR_PREFIX}{os.getpid()}-')
     mntpoint_path = os.path.join(tmpdir, 'mntpoint')
-
-    def _cleanup_temp_dir(tmpdir, mntpoint_path):
-        """Helper to unmount and delete a temporary directory safely."""
-        if os.path.ismount(mntpoint_path):
-            for cmd in (['umount', mntpoint_path], ['umount', '-l', mntpoint_path]):
-                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-                if proc.returncode == 0 and not os.path.ismount(mntpoint_path):
-                    logging.info("Unmounted %s before cleanup (%s).", mntpoint_path, ' '.join(cmd[:-1]))
-                    break
-                logging.warning("Failed to unmount %s with %s: %s", mntpoint_path,
-                                ' '.join(cmd[:-1]), proc.stderr.strip())
-
-            # Never rmtree through a mount: it would delete the mounted files
-            if os.path.ismount(mntpoint_path):
-                logging.error("%s is still mounted; leaving temporary directory %s in place",
-                              mntpoint_path, tmpdir)
-                return
-
-        try:
-            shutil.rmtree(tmpdir)
-            logging.debug("Deleted temporary directory: %s", tmpdir)
-        except Exception as exc:
-            logging.error("Could not delete temp dir %s: %s", tmpdir, str(exc))
 
     try:
         yield tmpdir
