@@ -4,7 +4,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [2.16.3] – Unreleased
+## [2.16.3] – 2026-10-21
 
 **Upgrading:** follow "Upgrading from 2.16.2" in [INSTALL.md](INSTALL.md). There's no database update, and the installer doesn't need to be re-run:
 - add `killasgroup=true` to the transfer and Test Setup worker programs in the Supervisor config (#474);
