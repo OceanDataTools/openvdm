@@ -17,16 +17,20 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import cleanup_orphaned_temporary_directories
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_lock import CDT, CST, transfer_locked
 
 def reboot_reset():
     """Reset all OpenVDM tasks and transfers to idle and clear stale Gearman jobs.
 
-    Connects to the OpenVDM API, marks every task and every non-disabled
-    collection system and cruise data transfer as idle, then removes any
-    lingering Gearman job entries from the database.
+    Connects to the OpenVDM API, marks every task and every collection system
+    and cruise data transfer that isn't in error as idle, then removes any
+    lingering Gearman job entries from the database. A transfer whose lock is
+    held is still being run by a job, so it's left alone, and the job list is
+    kept while any are (finished jobs drop out of it by themselves) (#478).
     """
 
     openVDM = OpenVDM()
+    running = []
 
     logging.info("Setting all tasks to idle.")
     tasks = openVDM.get_tasks()
@@ -36,22 +40,34 @@ def reboot_reset():
     logging.info("Setting all Collection System Transfers to idle.")
     collection_system_transfers = openVDM.get_collection_system_transfers()
     for collection_system_transfer in collection_system_transfers:
+        if transfer_locked(CST, collection_system_transfer['collectionSystemTransferID']):
+            running.append(collection_system_transfer['name'])
+            continue
         if not collection_system_transfer['status'] == 3:
             openVDM.set_idle_collection_system_transfer(collection_system_transfer['collectionSystemTransferID'])
 
     logging.info("Setting all Cruise Data Transfers to idle.")
     cruise_data_transfers = openVDM.get_cruise_data_transfers()
     for cruise_data_transfer in cruise_data_transfers:
+        if transfer_locked(CDT, cruise_data_transfer['cruiseDataTransferID']):
+            running.append(cruise_data_transfer['name'])
+            continue
         if not cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(cruise_data_transfer['cruiseDataTransferID'])
 
     required_cruise_data_transfers = openVDM.get_required_cruise_data_transfers()
     for required_cruise_data_transfer in required_cruise_data_transfers:
+        if transfer_locked(CDT, required_cruise_data_transfer['cruiseDataTransferID']):
+            running.append(required_cruise_data_transfer['name'])
+            continue
         if not required_cruise_data_transfer['status'] == 3:
             openVDM.set_idle_cruise_data_transfer(required_cruise_data_transfer['cruiseDataTransferID'])
 
-    logging.info("Clearing all jobs from Gearman.")
-    openVDM.clear_gearman_jobs_from_db()
+    if running:
+        logging.warning("Left alone, still running: %s", ', '.join(running))
+    else:
+        logging.info("Clearing all jobs from Gearman.")
+        openVDM.clear_gearman_jobs_from_db()
 
     logging.info("Done!")
 

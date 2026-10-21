@@ -34,6 +34,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, rclone_concurrency, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
@@ -117,6 +118,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.transfer_start_date = None
         self.cruise_data_transfer = None
         self.shipboard_data_warehouse_config = None
+        self.transfer_lock = None
 
         self.cruise_dir = None
 
@@ -353,7 +355,26 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
+        """Run a job for this worker's task, then release the transfer's lock.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result from :meth:`_run_job`.
+        """
+        try:
+            return self._run_job(current_job)
+        finally:
+            release_transfer_lock(self.transfer_lock)
+            self.transfer_lock = None
+
+
+    def _run_job(self, current_job):
         """Set up and run a job for this worker's task.
+
+        The job only runs if it can take the transfer's lock: another job
+        holding it is running the transfer, so this one is ignored (#478).
 
         Reads the job's JSON payload (``cruiseDataTransfer``, ``cruiseID``,
         ``systemStatus``, ``bandwidthLimitStatus``; any it omits default to the
@@ -400,8 +421,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             f"%(asctime)-15s %(levelname)s - {self.cruise_data_transfer['name']}: %(message)s"
         ))
 
-        # verify the transfer is NOT already in-progress
-        if self.cruise_data_transfer['status'] == 1:
+        # verify the transfer is NOT already in-progress: the job running it
+        # holds its lock, whatever the transfer's status says (#478)
+        try:
+            self.transfer_lock = acquire_transfer_lock(CDT, self.cruise_data_transfer['cruiseDataTransferID'])
+        except OSError as exc:
+            logging.exception("Unable to lock the transfer")
+            return self._fail_job(current_job, "Lock transfer", f"Unable to lock the transfer: {exc}")
+
+        if self.transfer_lock is None:
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
             return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
 
