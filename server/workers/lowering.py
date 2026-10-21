@@ -509,7 +509,14 @@ def task_finalize_current_lowering(worker, current_job):
     # A transfer another job is running gets its final pass once that job
     # ends (#480)
     missed = run_transfer_jobs(gm_client, RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], CST,
-                               collection_system_transfer_jobs)
+                               collection_system_transfer_jobs,
+                               should_stop=lambda: worker.stop)
+
+    if worker.stop:
+        # Stopped during the transfers' final pass: end here, so the task
+        # goes back to Idle without going on to the next steps (#487)
+        job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Ignore", "reason": "Stopped"})
+        return json.dumps(job_results)
 
     if missed:
         report_missed(worker.ovdm, job_results, f"Finalizing {worker.lowering_id}: collection system transfers still running",

@@ -45,17 +45,19 @@ def _lock_path(kind: str, transfer_id) -> str:
     return os.path.join(LOCK_DIR, f'{kind}-{int(transfer_id)}.lock')
 
 
-def _try_lock(lock_file: IO) -> bool:
-    """Try to take an exclusive lock on *lock_file* without waiting.
+def _try_lock(lock_file: IO, operation: int = fcntl.LOCK_EX) -> bool:
+    """Try to lock *lock_file* without waiting.
 
     Args:
         lock_file: An open lock file.
+        operation: ``fcntl.LOCK_EX`` (a job) or ``fcntl.LOCK_SH`` (a check).
 
     Returns:
-        bool: ``True`` if the lock was taken, ``False`` if another process holds it.
+        bool: ``True`` if the lock was taken, ``False`` if another process
+        holds a conflicting lock.
     """
     try:
-        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock_file, operation | fcntl.LOCK_NB)
     except OSError as exc:
         if exc.errno in (errno.EAGAIN, errno.EACCES):
             return False
@@ -118,12 +120,14 @@ def transfer_locked(kind: str, transfer_id) -> bool:
         transfer_id: The transfer's ID.
 
     Returns:
-        bool: ``True`` if another process holds the transfer's lock. ``False``
-        if it's free, if there's no lock file, or if the lock can't be checked.
+        bool: ``True`` if a job holds the transfer's lock. ``False`` if it's
+        free, if there's no lock file, or if the lock can't be checked.
     """
     try:
         with open(_lock_path(kind, transfer_id), 'r', encoding='utf-8') as lock_file:
-            if not _try_lock(lock_file):
+            # A shared lock conflicts with a job's exclusive lock, but not with
+            # another check made at the same moment (#487)
+            if not _try_lock(lock_file, fcntl.LOCK_SH):
                 return True
             fcntl.flock(lock_file, fcntl.LOCK_UN)
     except FileNotFoundError:

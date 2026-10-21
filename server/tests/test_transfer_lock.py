@@ -1,5 +1,6 @@
 """Tests for the per-transfer lock files that let only one job run a transfer (#478)."""
 
+import fcntl
 import json
 import logging
 import os
@@ -90,6 +91,15 @@ def test_transfer_locked() -> None:
     lock = acquire_transfer_lock(CST, 1)   # the check left it free
     assert lock is not None
     release_transfer_lock(lock)
+
+
+def test_checks_at_the_same_moment_dont_see_each_other(lock_dir) -> None:
+    """A check in progress (a shared lock) isn't taken for a running job (#487)."""
+    release_transfer_lock(acquire_transfer_lock(CST, 1))   # create the file
+    with open(lock_dir / 'cst-1.lock', 'r', encoding='utf-8') as other_check:
+        fcntl.flock(other_check, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        assert not transfer_locked(CST, 1)
+        fcntl.flock(other_check, fcntl.LOCK_UN)
 
 
 def test_released_when_the_holder_is_killed(held_elsewhere) -> None:

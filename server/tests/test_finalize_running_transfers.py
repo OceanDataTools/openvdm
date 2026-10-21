@@ -122,7 +122,7 @@ def test_ignored_as_in_progress(result, expected) -> None:
 def test_lowering_finalize_warns_and_completes(monkeypatch, tmp_path) -> None:
     """A transfer that never got its final pass is reported, and finalize still exports."""
     (tmp_path / 'L1').mkdir()
-    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1')
+    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False)
     worker.ovdm.get_active_collection_system_transfers.return_value = [
         {'collectionSystemTransferID': 1, 'name': 'SCS'},
         {'collectionSystemTransferID': 2, 'name': 'Sonar'}]
@@ -148,7 +148,7 @@ def test_lowering_finalize_warns_and_completes(monkeypatch, tmp_path) -> None:
 
 def test_cruise_finalize_runs_both_kinds_and_completes(monkeypatch, tmp_path) -> None:
     """Collection system and cruise data transfers each get the wait; finalize still completes."""
-    worker = Mock(cruise_dir=str(tmp_path), cruise_id='C1')
+    worker = Mock(cruise_dir=str(tmp_path), cruise_id='C1', stop=False)
     worker.ovdm.get_active_collection_system_transfers.return_value = [
         {'collectionSystemTransferID': 1, 'name': 'SCS'}]
     worker.ovdm.get_active_cruise_data_transfers.return_value = [
@@ -172,3 +172,42 @@ def test_cruise_finalize_runs_both_kinds_and_completes(monkeypatch, tmp_path) ->
     assert results['parts'][-2]['partName'] == 'Final pass of cruise data transfers'
     assert results['parts'][-1] == {'partName': 'Run cruise data transfers jobs', 'result': 'Pass'}
     worker.ovdm.send_msg.assert_called_once()
+
+
+def test_stop_ends_the_wait(monkeypatch, clock) -> None:
+    """Stopping finalize ends its wait for running jobs without waiting out the limit (#487)."""
+    client = FakeClient({1: [PASS], 2: [IGNORED]})
+    monkeypatch.setattr(transfer_jobs, 'transfer_locked', _locked_until(clock, {2: 10 ** 6}))
+    stop = {'now': False}
+
+    def sleep(seconds):
+        clock['now'] += seconds
+        stop['now'] = clock['now'] >= 30
+
+    monkeypatch.setattr(transfer_jobs.time, 'sleep', sleep)
+    assert run_transfer_jobs(client, 'run', 'cst', _payloads(1, 2), should_stop=lambda: stop['now']) == [2]
+    assert clock['now'] < 60
+    assert len(client.rounds) == 1
+
+
+def test_stopped_lowering_finalize_ends_before_exporting(monkeypatch, tmp_path) -> None:
+    """A finalize stopped during the final pass ends there, with an Ignore, so the task goes Idle."""
+    (tmp_path / 'L1').mkdir()
+    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False)
+    worker.ovdm.get_active_collection_system_transfers.return_value = [
+        {'collectionSystemTransferID': 1, 'name': 'SCS'}]
+
+    def run(*args, **kwargs):
+        worker.stop = True
+        assert kwargs['should_stop']()
+        return [1]
+
+    monkeypatch.setattr(lowering, 'run_transfer_jobs', run)
+    monkeypatch.setattr(lowering.python3_gearman, 'GearmanClient', Mock())
+
+    results = json.loads(lowering.task_finalize_current_lowering(worker, Mock()))
+
+    assert results['parts'][-1] == {'partName': 'Run collection system transfers jobs',
+                                    'result': 'Ignore', 'reason': 'Stopped'}
+    worker.export_lowering_config.assert_not_called()
+    worker.ovdm.send_msg.assert_not_called()
