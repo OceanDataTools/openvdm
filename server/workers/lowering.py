@@ -21,7 +21,6 @@ import os
 import signal
 import sys
 import subprocess
-import time
 import traceback
 from os.path import dirname, realpath
 import jinja2
@@ -36,6 +35,8 @@ from server.lib.openvdm import OpenVDM
 from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_lowering_readme_context, readme_filename,
                                readme_settings, render_readme, write_readme)
 from server.lib.transfer_utils import redact_payload
+from server.lib.transfer_jobs import report_missed, run_transfer_jobs
+from server.lib.transfer_lock import CST
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -566,7 +567,9 @@ def task_finalize_current_lowering(worker, current_job):
 
     Checks the lowering directory exists, runs the lowering's collection system
     transfers one last time, exports the finalized lowering config, and writes
-    the lowering README.
+    the lowering README. A transfer that another job is running gets its last
+    run once that job ends; one still running after an hour is reported in an
+    OpenVDM message and skipped (#480).
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -605,22 +608,33 @@ def task_finalize_current_lowering(worker, current_job):
         'collectionSystemTransfer': {}
     }
 
-    collection_system_transfer_jobs = []
+    collection_system_transfer_jobs = {}
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers(cruise=False)
 
     for collection_system_transfer in collection_system_transfers:
         logging.debug("Queuing %s job for %s", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
-        gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
-
-        collection_system_transfer_jobs.append( {"task": RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
+        cst_id = collection_system_transfer['collectionSystemTransferID']
+        collection_system_transfer_jobs[cst_id] = {**gm_data, 'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}}
 
     logging.info("Submitting %s jobs", RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     worker.send_job_status(current_job, 3, 10)
 
-    submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
+    # A transfer another job is running gets its final pass once that job
+    # ends (#480)
+    missed = run_transfer_jobs(gm_client, RUN_CDT_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], CST,
+                               collection_system_transfer_jobs,
+                               should_stop=lambda: worker.stop)
 
-    time.sleep(1)
-    gm_client.wait_until_jobs_completed(submitted_job_request)
+    if worker.stop:
+        # Stopped during the transfers' final pass: end here, so the task
+        # goes back to Idle without going on to the next steps (#487)
+        job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Ignore", "reason": "Stopped"})
+        return json.dumps(job_results)
+
+    if missed:
+        report_missed(worker.ovdm, job_results, f"Finalizing {worker.lowering_id}: collection system transfers still running",
+                      "Final pass of collection system transfers",
+                      [cst['name'] for cst in collection_system_transfers if cst['collectionSystemTransferID'] in missed])
 
     job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Pass"})
 
