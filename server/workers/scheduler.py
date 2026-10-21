@@ -18,7 +18,6 @@ import time
 import json
 import logging
 import argparse
-from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from python3_gearman import GearmanClient
 
@@ -30,6 +29,10 @@ from server.lib.transfer_lock import CDT, CST, transfer_locked
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASKS_NAMES
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASKS_NAMES
 from server.workers.run_ship_to_shore_transfer import TASK_NAMES as S2ST_TASKS_NAMES
+
+# A ship-to-shore run is stopped and started again after this many seconds,
+# so it picks up files written since it started (#488)
+S2S_RESTART_AFTER = 60 * 60
 
 # Seconds to wait for a ship-to-shore job stopped for its hourly restart to end
 S2S_STOP_WAIT = 60
@@ -87,7 +90,8 @@ def scheduler(interval: int = None) -> None:
     time.sleep(10)
 
     logfile_purge_timedelta = ovdm.get_logfile_purge_timedelta()
-    last_s2s_xfer = datetime.now(timezone.utc)
+    # When the current ship-to-shore run started, for its hourly restart
+    s2s_started = None
 
     if logfile_purge_timedelta:
         logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
@@ -162,9 +166,16 @@ def scheduler(interval: int = None) -> None:
             logging.error("SSDW transfer does not exists???")
 
         else:
-            now_utc = datetime.now(timezone.utc)
-            delta = now_utc - last_s2s_xfer
-            if transfer_locked(CDT, ssdw_transfer['cruiseDataTransferID']) and delta > timedelta(hours=1):
+            ssdw_id = ssdw_transfer['cruiseDataTransferID']
+            running = transfer_locked(CDT, ssdw_id)
+            if not running:
+                s2s_started = None
+            elif s2s_started is None:
+                # A run the scheduler didn't start (a manual Run, or one going
+                # when the scheduler started): time it from now
+                s2s_started = time.monotonic()
+
+            if running and time.monotonic() - s2s_started > S2S_RESTART_AFTER:
                 logging.info("S2S tranfer has run for an hour, time to restart")
                 gmData = {'pid': ssdw_transfer['pid']}
                 gm_client.submit_job("stopJob", json.dumps(gmData))
@@ -172,20 +183,23 @@ def scheduler(interval: int = None) -> None:
                 # The stopped job holds the lock until it ends; a new run
                 # submitted before then would be ignored
                 for _ in range(S2S_STOP_WAIT):
-                    if not transfer_locked(CDT, ssdw_transfer['cruiseDataTransferID']):
+                    running = transfer_locked(CDT, ssdw_id)
+                    if not running:
                         break
                     time.sleep(1)
 
-            if ssdw_transfer['enable'] == 1:
+            # While a run is going, a submission would only merge into it
+            # (#479), so the next one starts once it has ended or been
+            # restarted (#488)
+            if ssdw_transfer['enable'] == 1 and not running:
                 logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
-                last_s2s_xfer = datetime.now(timezone.utc)
+                s2s_started = time.monotonic()
 
                 gmData = {
                 }
 
-                # While the last run is still going, this merges into it
                 gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData),
-                                     unique=scheduler_job_key(CDT, ssdw_transfer['cruiseDataTransferID']),
+                                     unique=scheduler_job_key(CDT, ssdw_id),
                                      background=True)
                 time.sleep(2)
 
