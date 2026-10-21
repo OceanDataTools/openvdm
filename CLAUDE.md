@@ -26,6 +26,7 @@ OpenVDM is a 3-tier distributed system:
 - Plugin base classes: `server/lib/openvdm_plugin.py` — `OpenVDMPlugin` and `OpenVDMParserQualityTest`
 - File utilities: `server/lib/file_utils.py`, `server/lib/geojson_utils.py`
 - Transfer commands: `server/lib/transfer_utils.py` — `run_transfer_command()` runs rsync/rclone for all transfer workers, collects new/updated/deleted files (rsync `-i`, rclone `-v`) and raises `TransferCommandError` on failure (rsync codes 24, and 23 for vanished listed files, count as success); callers must turn that into a failed transfer (#230)
+- Transfer locks: `server/lib/transfer_lock.py` — a transfer job holds an `flock()` on `/run/openvdm/<cst|cdt>-<id>.lock` (ship-to-shore shares the `cdt` lock) for as long as it runs; the kernel drops it when the worker exits or is killed. Whether a transfer is running is whether its lock is held: the transfer workers ignore a job they can't lock, and the scheduler, Stop, Test Setup and `reboot_reset` check `transfer_locked()`. A transfer's `status` only drives the UI, so don't use it to decide whether a job may run. Assumes all transfer workers run on one host (#478). The scheduler submits transfer jobs with `scheduler_job_key()` as their Gearman unique key, so gearmand merges one still queued or running with the next cycle's (#479). Don't use those keys for a manual Run or finalize: a merged job keeps the first payload, and theirs differ. Finalize runs its transfers with `run_transfer_jobs()` (`server/lib/transfer_jobs.py`), which reruns a job ignored as in progress (`IN_PROGRESS_REASON`, shared with the workers) once the transfer's lock is free, giving up after an hour (#480)
 - Trackline building: `server/lib/tracks.py` holds the code shared by `bin/build_cruise_tracks.py` and `bin/build_lowering_tracks.py` (position sources, manifest, combining, GeoJSON/KML output, ownership, MD5 update, extra directory resolution). The scripts keep only their ID, manifest location and default position sources (#394, #401)
 
 **Tier 3 — Gearman Workers (async task queue)**
@@ -44,6 +45,7 @@ OpenVDM is a 3-tier distributed system:
 - Server config: `server/etc/openvdm.yaml` (copy from `openvdm.yaml.dist`)
 - Web config: `www/app/Core/Config.php` (copy from `Config.php.dist`)
 - Hooks in `openvdm.yaml` map Gearman task names to downstream tasks; `postHookCommands` run shell commands after task completion
+- `rcloneConcurrency` in `openvdm.yaml` limits each rclone copy job of the cruise data and ship-to-shore workers: `local` (local directories and SMB mounts; defaults `RCLONE_LOCAL_CONCURRENCY`, 1/2/0) and `remote` (SSH, FTP and `remote:path` destinations, ship-to-shore; rclone's defaults unless set). The workers pick the section with `rclone_destination()` and read it with `rclone_concurrency()` in `connection_utils.py` (#465)
 
 ## Development Setup
 
@@ -160,6 +162,10 @@ FTP **destinations** (cruise data transfers, #199) work like SSH destinations: t
 FTP **sources** (collection system transfers):
 
 FTP sources (#17) are mounted with `rclone mount` (FUSE, `fuse3`) in the transfer's temporary directory, and rsync copies from the mount point. Only the source directory (or a wildcard source's parent, `ftp_mount_base()`) is mounted, not the server root, which some accounts can't list; `mount_path()` maps a server path into the mount (#209). SMB shares are still mounted at their root, with `sourceDir` relative to the share. The FTP Server field is `host[:port]` (default 21; `[ipv6]:port`); there's no separate port column. `split_ftp_server()` parses it, and the CST controller's `_checkFtpFields()` validates it with the same rules (#224). Test Setup and the transfer share the setup steps `prepare_ftp_config()` (password available, rclone config written) and `prepare_ftp_mount()` (#214). `build_rclone_config_for_ftp()` writes the remote to a config file in the temporary directory (password obscured via stdin, never on the command line). The file list (and the staleness re-check) comes from one `rclone lsjson -R` call (`list_ftp_source()`), not from walking the mount: that avoids a `stat` per file over FTP, and `lsjson` fails on directories the server refuses to list, which the mount shows as empty (#208). `mount_ftp_source()` waits until the mount point is really mounted (older rclone returns early, #206), and must not read the daemonized rclone's output through a pipe (the daemon holds it open while mounted). Test functions for FTP stay in the `(bool, str)` style; `list_ftp_source()` returns `(bool, list | str)`.
+
+### Local destination mount checks
+
+`test_local_destination()` runs in Test Setup and before every cruise data transfer. With `localDirIsMountPoint` = 1, the first two parts of `destDir` (e.g. `/mnt/usb`) must be a mount point. Otherwise a destination inside `MOUNT_PARENT_DIRS` (`/mnt`, `/media`, `/net`) must not be on the root filesystem (`under_mount_parent_dir()`, `_on_root_filesystem()`), so an unmounted drive or share fails the transfer instead of filling `/` (#464). The CDT form's warning (`cruiseDataTransfersFormHelper.js`) uses the same directories.
 
 ### connection_utils.py return conventions
 

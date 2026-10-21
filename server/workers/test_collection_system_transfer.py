@@ -21,6 +21,8 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.file_utils import start_orphan_cleanup
+from server.lib.transfer_lock import CST, transfer_locked
 from server.lib.connection_utils import normalize_transfer_config, test_cst_source
 
 # Gearman task names this worker registers.
@@ -242,7 +244,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}')
+            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
+                                                                set_status=not transfer_locked(CST, cst_id))
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -252,7 +255,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         The outcome is the last entry in the result's ``parts``: ``Fail`` sets
         the collection system transfer's test status to error, with that part's
-        reason; anything else sets it to idle.
+        reason; anything else sets it to idle. The status of a transfer that
+        a job is running (holds its lock) is left alone.
 
         Args:
             current_job: The Gearman job.
@@ -273,13 +277,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         if not cst_id:
             return super().send_job_complete(current_job, job_result)
 
+        # A job running the transfer sets its status when it ends; changing
+        # it now would show the transfer as not running (#478)
+        running = transfer_locked(CST, cst_id)
+
         if final_verdict and final_verdict.get('result') == "Fail":
             reason = final_verdict.get('reason', "undefined")
-            self.ovdm.set_error_collection_system_transfer_test(cst_id, reason)
+            self.ovdm.set_error_collection_system_transfer_test(cst_id, reason, set_status=not running)
             return super().send_job_complete(current_job, job_result)
 
         # Always set idle at the end if not failed
-        self.ovdm.set_idle_collection_system_transfer(cst_id)
+        if not running:
+            self.ovdm.set_idle_collection_system_transfer(cst_id)
 
         return super().send_job_complete(current_job, job_result)
 
@@ -426,6 +435,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['TEST_COLLECTION_SYSTEM_TRANSFER'])
     new_worker.register_task(TASK_NAMES['TEST_COLLECTION_SYSTEM_TRANSFER'], task_test_collection_system_transfer)
+
+    # Mounts and directories of a killed predecessor (#490)
+    start_orphan_cleanup()
 
     logging.info("Waiting for jobs...")
     new_worker.work()
