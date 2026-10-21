@@ -41,7 +41,7 @@ from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.transfer_lock import CST, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
-from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory, start_orphan_cleanup
 from server.lib.connection_utils import FTP_REMOTE, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, ftp_mount_base, get_transfer_type, has_wildcard, list_ftp_source, mount_path, mount_smb_share, prepare_ftp_config, prepare_ftp_mount, sshpass_command, test_cst_source
 from server.lib.openvdm import OpenVDM
 
@@ -1544,6 +1544,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     new_worker.register_task(TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], task_run_collection_system_transfer)
+
+    # Mounts and directories of a killed predecessor (#490)
+    start_orphan_cleanup()
 
     logging.info("Waiting for jobs...")
     new_worker.work()

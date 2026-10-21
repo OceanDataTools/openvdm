@@ -31,7 +31,7 @@ from random import randint
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
-from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file
+from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file, start_orphan_cleanup
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
@@ -767,6 +767,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'])
     new_worker.register_task(TASK_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], task_run_ship_to_shore_transfer)
+
+    # Mounts and directories of a killed predecessor (#490)
+    start_orphan_cleanup()
 
     logging.info("Waiting for jobs...")
     new_worker.work()

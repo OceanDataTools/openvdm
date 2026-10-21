@@ -97,7 +97,9 @@ if __name__ == "__main__":
     # Wait a period of time to allow processes to settle out
     time.sleep(5)
 
-    reboot_reset()
-
-    # Mounts and files of workers killed before they could clean up (#474)
-    cleanup_orphaned_temporary_directories()
+    try:
+        reboot_reset()
+    finally:
+        # Mounts and files of workers killed before they could clean up
+        # (#474), even if the reset failed (#490)
+        cleanup_orphaned_temporary_directories()
