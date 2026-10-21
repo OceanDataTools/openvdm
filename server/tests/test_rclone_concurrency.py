@@ -102,3 +102,18 @@ def test_ship_to_shore_uses_remote_limits(
     assert '--files-from' in command
     assert '-v' in command
     assert file_count == 1
+
+
+@pytest.mark.parametrize('value', ['4x', -1, 0, True, 2.5, 'two'])
+def test_invalid_transfers_use_the_default(value, caplog):
+    """An invalid setting is logged and treated as unset (#487)."""
+    config = {'rcloneConcurrency': {'local': {'transfers': value}, 'remote': {'transfers': value}}}
+    assert rclone_concurrency(config, 'local') == RCLONE_LOCAL_CONCURRENCY
+    assert rclone_concurrency(config, 'remote') is None
+    assert 'Ignoring rcloneConcurrency' in caplog.text
+
+
+def test_valid_settings_become_ints():
+    """Whole numbers, also written as strings, are kept; multiThreadStreams may be 0."""
+    config = {'rcloneConcurrency': {'remote': {'transfers': '3', 'checkers': 6, 'multiThreadStreams': 0}}}
+    assert rclone_concurrency(config, 'remote') == {'transfers': 3, 'checkers': 6, 'multiThreadStreams': 0}

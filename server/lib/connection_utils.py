@@ -1294,6 +1294,35 @@ _RCLONE_CONCURRENCY_FLAGS = {
     'multiThreadStreams': '--multi-thread-streams',
 }
 
+# Smallest valid value of each rcloneConcurrency setting
+_RCLONE_CONCURRENCY_MINIMUMS = {'transfers': 1, 'checkers': 1, 'multiThreadStreams': 0}
+
+
+def _rclone_concurrency_value(destination: str, key: str, value) -> Optional[int]:
+    """Return an ``rcloneConcurrency`` setting as an int, or ``None`` if it's invalid.
+
+    An invalid value is logged, and its default is then used (#487).
+
+    Args:
+        destination: ``'local'`` or ``'remote'``, for the log message.
+        key: The setting's name.
+        value: The setting's value from ``openvdm.yaml``.
+
+    Returns:
+        int | None: The value, or ``None`` if it isn't a whole number at
+        least the setting's minimum.
+    """
+    minimum = _RCLONE_CONCURRENCY_MINIMUMS[key]
+    try:
+        number = None if isinstance(value, bool) else int(str(value).strip())
+    except ValueError:
+        number = None
+    if number is None or number < minimum:
+        logging.warning("Ignoring rcloneConcurrency %s %s: %r isn't a whole number >= %d",
+                        destination, key, value, minimum)
+        return None
+    return number
+
 
 def rclone_destination(transfer_type: str, dest_dir: str) -> str:
     """Return which ``rcloneConcurrency`` section applies to an rclone copy.
@@ -1322,7 +1351,8 @@ def rclone_concurrency(config: dict, destination: str) -> Optional[dict]:
     directories and mounted SMB shares, and a ``remote`` section, for rclone
     remotes (SSH, FTP and ``remote:path`` destinations). Unset ``local``
     settings default to ``RCLONE_LOCAL_CONCURRENCY``; ``remote`` has no
-    defaults, so rclone's own are used (#465).
+    defaults, so rclone's own are used (#465). An invalid setting is logged
+    and treated as unset (#487).
 
     Args:
         config: The ``openvdm.yaml`` settings, e.g. ``OpenVDM.config``.
@@ -1337,8 +1367,12 @@ def rclone_concurrency(config: dict, destination: str) -> Optional[dict]:
     section = block.get(destination) if isinstance(block, dict) else None
     if not isinstance(section, dict):
         section = {}
-    settings = {key: value for key, value in section.items()
-                if key in _RCLONE_CONCURRENCY_FLAGS and value not in (None, '')}
+    settings = {}
+    for key, value in section.items():
+        if key in _RCLONE_CONCURRENCY_FLAGS and value not in (None, ''):
+            number = _rclone_concurrency_value(destination, key, value)
+            if number is not None:
+                settings[key] = number
 
     if destination == 'local':
         return {**RCLONE_LOCAL_CONCURRENCY, **settings}

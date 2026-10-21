@@ -711,7 +711,14 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     # A transfer another job is running gets its final pass once that job
     # ends (#480)
     missed = run_transfer_jobs(gm_client, CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], CST,
-                               collection_system_transfer_jobs)
+                               collection_system_transfer_jobs,
+                               should_stop=lambda: worker.stop)
+
+    if worker.stop:
+        # Stopped during the transfers' final pass: end here, so the task
+        # goes back to Idle without going on to the next steps (#487)
+        job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Ignore", "reason": "Stopped"})
+        return json.dumps(job_results)
 
     if missed:
         report_missed(worker.ovdm, job_results, f"Finalizing {worker.cruise_id}: collection system transfers still running",
@@ -781,7 +788,14 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     worker.send_job_status(current_job, 8, 10)
 
     missed = run_transfer_jobs(gm_client, CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], CDT,
-                               cruise_data_transfer_jobs)
+                               cruise_data_transfer_jobs,
+                               should_stop=lambda: worker.stop)
+
+    if worker.stop:
+        # Stopped during the transfers' final pass: end here, so the task
+        # goes back to Idle without going on to the next steps (#487)
+        job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Ignore", "reason": "Stopped"})
+        return json.dumps(job_results)
 
     # Before the Pass part: the last part decides the job's outcome
     if missed:

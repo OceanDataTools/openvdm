@@ -11,7 +11,7 @@ transfer's job again, so each transfer gets its own run with its own payload
 import json
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from server.lib.transfer_lock import transfer_locked
 
@@ -44,7 +44,8 @@ def ignored_as_in_progress(result: Optional[str]) -> bool:
 
 
 def run_transfer_jobs(gm_client, task: str, kind: str, payloads: Dict[int, dict],
-                      wait: float = RUNNING_JOB_WAIT) -> List[int]:
+                      wait: float = RUNNING_JOB_WAIT,
+                      should_stop: Optional[Callable[[], bool]] = None) -> List[int]:
     """Run a job for each transfer, waiting for any already running to end first.
 
     Submits every job and waits for them to complete. A job ignored because
@@ -59,10 +60,13 @@ def run_transfer_jobs(gm_client, task: str, kind: str, payloads: Dict[int, dict]
         kind: The transfers' lock kind (``CST`` or ``CDT``).
         payloads: Each transfer's job payload, by transfer ID.
         wait: Longest time, in seconds, to wait for running jobs to end.
+        should_stop: Polled while waiting; when it returns ``True``, the wait
+            ends (#487).
 
     Returns:
         list[int]: The IDs of the transfers whose job never ran, because
-        another job was still running them after *wait* seconds.
+        another job was still running them after *wait* seconds or the wait
+        was stopped.
     """
     deadline = None
     to_run = list(payloads)
@@ -87,6 +91,9 @@ def run_transfer_jobs(gm_client, task: str, kind: str, payloads: Dict[int, dict]
 
         # Run the transfers whose job has ended; keep waiting for the rest
         while True:
+            if should_stop and should_stop():
+                logging.warning("Stopped while waiting for running jobs: %s %s", kind, waiting)
+                return waiting
             to_run = [transfer_id for transfer_id in waiting if not transfer_locked(kind, transfer_id)]
             if to_run:
                 break
