@@ -34,6 +34,27 @@ from server.workers.run_ship_to_shore_transfer import TASK_NAMES as S2ST_TASKS_N
 # Seconds to wait for a ship-to-shore job stopped for its hourly restart to end
 S2S_STOP_WAIT = 60
 
+
+def scheduler_job_key(kind: str, transfer_id) -> str:
+    """Return the Gearman unique key of the scheduler's jobs for a transfer.
+
+    gearmand merges a job submitted with the same task and key as one that's
+    still queued or running, so the queue holds at most one scheduler job per
+    transfer, however long the workers are busy (#479). Only the scheduler
+    uses these keys: a manual Run or a cruise/lowering finalize sends its own
+    payload, which a merge would drop, so those jobs get Gearman's random keys
+    and are never merged.
+
+    Args:
+        kind: ``CST`` or ``CDT``, as for the transfer's lock.
+        transfer_id: The transfer's ID.
+
+    Returns:
+        str: ``scheduler-<kind>-<id>``.
+    """
+    return f'scheduler-{kind}-{transfer_id}'
+
+
 def scheduler(interval: int = None) -> None:
     """Submit Gearman transfer jobs on a recurring interval.
 
@@ -50,7 +71,8 @@ def scheduler(interval: int = None) -> None:
        running for more than one hour, and starts a new run if enabled.
 
     A transfer is running while a job holds its lock (#478), whatever its
-    status says.
+    status says. Jobs are submitted with :func:`scheduler_job_key`, so a
+    transfer's job still waiting in the queue isn't queued again (#479).
     7. Sleeps until the next interval boundary.
 
     Args:
@@ -108,7 +130,9 @@ def scheduler(interval: int = None) -> None:
                 }
             }
 
-            gm_client.submit_job(CST_TASKS_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], json.dumps(gmData), background=True)
+            gm_client.submit_job(CST_TASKS_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], json.dumps(gmData),
+                                 unique=scheduler_job_key(CST, collection_system_transfer['collectionSystemTransferID']),
+                                 background=True)
             time.sleep(2)
 
         # schedule cruise_data_transfers
@@ -126,7 +150,9 @@ def scheduler(interval: int = None) -> None:
                 }
             }
 
-            gm_client.submit_job(CDT_TASKS_NAMES['RUN_CRUISE_DATA_TRANSFER'], json.dumps(gmData), background=True)
+            gm_client.submit_job(CDT_TASKS_NAMES['RUN_CRUISE_DATA_TRANSFER'], json.dumps(gmData),
+                                 unique=scheduler_job_key(CDT, cruise_data_transfer['cruiseDataTransferID']),
+                                 background=True)
             time.sleep(2)
 
         # schedule ship-to-shore transfer
@@ -157,7 +183,10 @@ def scheduler(interval: int = None) -> None:
                 gmData = {
                 }
 
-                gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData), background=True)
+                # While the last run is still going, this merges into it
+                gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData),
+                                     unique=scheduler_job_key(CDT, ssdw_transfer['cruiseDataTransferID']),
+                                     background=True)
                 time.sleep(2)
 
         delay = interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
