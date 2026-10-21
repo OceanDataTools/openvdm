@@ -599,9 +599,9 @@ sudo supervisorctl restart openvdm:*
 
 ## Upgrading from 2.16.2.
 
-*This section is a draft for the next release and is completed at release prep.*
+OpenVDM v2.16.3 fixes transfers that run at the same time: a transfer no longer runs as several copies at once, Stop works while a transfer lists its source, killed workers no longer leave mounts and copies running, and finalize no longer skips the last run of a transfer that's already running. Cruise data transfers to unmounted drives and shares in `/mnt`, `/media` and `/net` now fail instead of filling the root disk, and rclone copies to local directories and SMB shares are limited. See the 2.16.3 entry in [CHANGELOG.md](CHANGELOG.md) for the details. There's no database update, and no PHP, JavaScript or Python dependencies changed, so the installer doesn't need to be re-run.
 
-The next release fixes several problems with transfers running at the same time: a transfer running as several copies, Stop having no effect while a transfer lists its source, killed workers leaving mounts and copies running, and finalize skipping the last run of a transfer that's already running. See the Unreleased entry in [CHANGELOG.md](CHANGELOG.md) for the details.
+If you're upgrading from 2.16.1 or 2.16.0, do the steps of "Upgrading from 2.16.1" (and from 2.16.0, if needed) first.
 
 1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
 2. Update the code, as the OpenVDM user (git refuses to work in a checkout owned by another user):
@@ -625,8 +625,11 @@ killasgroup=true
 sudo supervisorctl reread
 sudo supervisorctl update
 ```
-4. Restart the OpenVDM workers so they load the updated code:
+4. Optionally, set rclone's limits for cruise data and ship-to-shore transfers. Without changes, copies to local directories and SMB shares now copy 1 file and check 2 at once for each job, and copies to rclone remotes (SSH, FTP, `remote:path` and ship-to-shore) keep rclone's defaults (#465). To change them, copy the `rcloneConcurrency` block from `server/etc/openvdm.yaml.dist` into your `server/etc/openvdm.yaml`; see [Rclone concurrency](#rclone-concurrency).
+5. In `www/app/Core/Config.php`, change `SITETITLE` to `Open Vessel Data Management v2.16.3`.
+6. Restart the OpenVDM workers so they load the updated code. The transfer fixes only take effect once they're restarted:
 ```
 sudo supervisorctl restart openvdm:*
 ```
-5. Set OpenVDM back to On.
+7. Before setting OpenVDM back to On, run **Test Setup** on each cruise data transfer whose destination is a Local Directory in `/mnt`, `/media` or `/net`. Such a destination must now be on a mounted filesystem even when **Destination Directory is mountpoint** is No: one on the root disk fails Test Setup and every transfer (#464). Mount the drive or share, or move a destination that deliberately copies to the root disk out of these directories. The edit form also warns about such a destination.
+8. Set OpenVDM back to On.
