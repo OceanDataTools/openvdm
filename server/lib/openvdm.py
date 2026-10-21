@@ -1516,7 +1516,7 @@ class OpenVDM():
             raise exc
 
 
-    def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason=''):
+    def set_error_collection_system_transfer_test(self, collection_system_transfer_id, reason='', set_status=True):
         """Set the collection system transfer's status to error and post a message to OpenVDM.
 
         The message is titled "<name> Connection test failed".
@@ -1524,6 +1524,8 @@ class OpenVDM():
         Args:
             collection_system_transfer_id: The collection system transfer's ID.
             reason: Body of the message, describing the failure.
+            set_status: ``False`` posts the message only, e.g. while a job is
+                running the transfer and its status is the job's to set (#478).
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
@@ -1539,7 +1541,8 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            if set_status:
+                requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set test status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1576,7 +1579,7 @@ class OpenVDM():
             raise exc
 
 
-    def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason=''):
+    def set_error_cruise_data_transfer_test(self, cruise_data_transfer_id, reason='', set_status=True):
         """Set the cruise data transfer's status to error and post a message to OpenVDM.
 
         The message is titled "<name> Connection test failed".
@@ -1584,6 +1587,8 @@ class OpenVDM():
         Args:
             cruise_data_transfer_id: The cruise data transfer's ID.
             reason: Body of the message, describing the failure.
+            set_status: ``False`` posts the message only, e.g. while a job is
+                running the transfer and its status is the job's to set (#478).
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
@@ -1599,7 +1604,8 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            if set_status:
+                requests.get(url, timeout=TIMEOUT)
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)

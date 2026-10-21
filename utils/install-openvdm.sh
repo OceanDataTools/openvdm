@@ -985,6 +985,7 @@ user=root
 autostart=true
 autorestart=true
 stopsignal=INT
+killasgroup=true
 
 [program:run_cruise_data_transfer]
 command=${VENV_BIN}/python server/workers/run_cruise_data_transfer.py
@@ -997,6 +998,7 @@ user=root
 autostart=true
 autorestart=true
 stopsignal=INT
+killasgroup=true
 
 [program:run_ship_to_shore_transfer]
 command=${VENV_BIN}/python server/workers/run_ship_to_shore_transfer.py
@@ -1009,6 +1011,7 @@ user=root
 autostart=true
 autorestart=true
 stopsignal=INT
+killasgroup=true
 
 [program:scheduler]
 command=${VENV_BIN}/python server/workers/scheduler.py
@@ -1049,6 +1052,7 @@ user=root
 autostart=true
 autorestart=true
 stopsignal=INT
+killasgroup=true
 
 [program:test_cruise_data_transfer]
 command=${VENV_BIN}/python server/workers/test_cruise_data_transfer.py
@@ -1059,6 +1063,7 @@ user=root
 autostart=true
 autorestart=true
 stopsignal=INT
+killasgroup=true
 
 [group:openvdm]
 programs=cruise,cruise_directory,data_dashboard,lowering,lowering_directory,md5_summary,post_hooks,reboot_reset,run_collection_system_transfer,run_cruise_data_transfer,run_ship_to_shore_transfer,scheduler,size_cacher,stop_job,test_collection_system_transfer,test_cruise_data_transfer

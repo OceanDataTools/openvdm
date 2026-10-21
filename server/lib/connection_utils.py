@@ -1281,7 +1281,108 @@ def prepare_ftp_mount(cfg: dict, tmpdir: str, rclone_config: str, mount_base: st
     return (True, mntpoint) if success else (False, detail)
 
 
-def build_rclone_options(cfg, mode='dry-run'):
+# rclone limits for copies to local and mounted destinations when the
+# rcloneConcurrency block of openvdm.yaml doesn't set them. Many jobs copying
+# to the same disks or NAS at rclone's defaults (4 transfers, 8 checkers)
+# mostly contend with each other; these are close to the one file at a time
+# of rsync, which these transfers used before 2.12 (#465).
+RCLONE_LOCAL_CONCURRENCY = {'transfers': 1, 'checkers': 2, 'multiThreadStreams': 0}
+
+# rclone option for each rcloneConcurrency setting
+_RCLONE_CONCURRENCY_FLAGS = {
+    'transfers': '--transfers',
+    'checkers': '--checkers',
+    'multiThreadStreams': '--multi-thread-streams',
+}
+
+# Smallest valid value of each rcloneConcurrency setting
+_RCLONE_CONCURRENCY_MINIMUMS = {'transfers': 1, 'checkers': 1, 'multiThreadStreams': 0}
+
+
+def _rclone_concurrency_value(destination: str, key: str, value) -> Optional[int]:
+    """Return an ``rcloneConcurrency`` setting as an int, or ``None`` if it's invalid.
+
+    An invalid value is logged, and its default is then used (#487).
+
+    Args:
+        destination: ``'local'`` or ``'remote'``, for the log message.
+        key: The setting's name.
+        value: The setting's value from ``openvdm.yaml``.
+
+    Returns:
+        int | None: The value, or ``None`` if it isn't a whole number at
+        least the setting's minimum.
+    """
+    minimum = _RCLONE_CONCURRENCY_MINIMUMS[key]
+    try:
+        number = None if isinstance(value, bool) else int(str(value).strip())
+    except ValueError:
+        number = None
+    if number is None or number < minimum:
+        logging.warning("Ignoring rcloneConcurrency %s %s: %r isn't a whole number >= %d",
+                        destination, key, value, minimum)
+        return None
+    return number
+
+
+def rclone_destination(transfer_type: str, dest_dir: str) -> str:
+    """Return which ``rcloneConcurrency`` section applies to an rclone copy.
+
+    SMB shares (copied to their mount point) and local directories without a
+    ``:`` are ``'local'``; rclone remotes (SSH and FTP destinations, and
+    ``remote:path`` local directories) are ``'remote'`` (#465).
+
+    Args:
+        transfer_type: The transfer type, from :func:`get_transfer_type`.
+        dest_dir: The directory rclone copies to: a path, or ``remote:path``.
+
+    Returns:
+        str: ``'local'`` or ``'remote'``.
+    """
+
+    if transfer_type == 'smb' or (transfer_type == 'local' and ':' not in dest_dir):
+        return 'local'
+    return 'remote'
+
+
+def rclone_concurrency(config: dict, destination: str) -> Optional[dict]:
+    """Return the rclone limits from ``openvdm.yaml`` for a kind of destination.
+
+    The ``rcloneConcurrency`` block has a ``local`` section, for local
+    directories and mounted SMB shares, and a ``remote`` section, for rclone
+    remotes (SSH, FTP and ``remote:path`` destinations). Unset ``local``
+    settings default to ``RCLONE_LOCAL_CONCURRENCY``; ``remote`` has no
+    defaults, so rclone's own are used (#465). An invalid setting is logged
+    and treated as unset (#487).
+
+    Args:
+        config: The ``openvdm.yaml`` settings, e.g. ``OpenVDM.config``.
+        destination: ``'local'`` or ``'remote'``.
+
+    Returns:
+        dict | None: The settings for :func:`build_rclone_options`, or
+        ``None`` if there are none (``remote`` with nothing set).
+    """
+
+    block = config.get('rcloneConcurrency')
+    section = block.get(destination) if isinstance(block, dict) else None
+    if not isinstance(section, dict):
+        section = {}
+    settings = {}
+    for key, value in section.items():
+        if key in _RCLONE_CONCURRENCY_FLAGS and value not in (None, ''):
+            number = _rclone_concurrency_value(destination, key, value)
+            if number is not None:
+                settings[key] = number
+
+    if destination == 'local':
+        return {**RCLONE_LOCAL_CONCURRENCY, **settings}
+    return settings or None
+
+
+def build_rclone_options(
+        cfg: dict, mode: str = 'dry-run', concurrency: Optional[dict] = None
+) -> tuple[str, list[str]]:
     """Return the rclone subcommand and options for a cruise data transfer.
 
     Uses ``sync`` if the transfer mirrors deletions (``syncToDest``), otherwise
@@ -1294,6 +1395,9 @@ def build_rclone_options(cfg, mode='dry-run'):
         cfg: Cruise data transfer configuration.
         mode: ``'dry-run'`` to only list what would be transferred; any other
             value for a real transfer.
+        concurrency: rclone limits from :func:`rclone_concurrency`
+            (``transfers``, ``checkers``, ``multiThreadStreams``); a setting
+            that's missing or blank adds no option. ``None`` adds none.
 
     Returns:
         tuple[str, list[str]]: ``('copy' | 'sync', flags)``.
@@ -1323,6 +1427,11 @@ def build_rclone_options(cfg, mode='dry-run'):
 
     if cfg.get('bandwidthLimit') not in (None, 0):
         flags.extend(["--bwlimit", f"{cfg['bandwidthLimit']}k" ])
+
+    for key, flag in _RCLONE_CONCURRENCY_FLAGS.items():
+        value = (concurrency or {}).get(key)
+        if value not in (None, ''):
+            flags.extend([flag, str(value)])
 
     return copy_sync, flags
 
@@ -1383,12 +1492,42 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     return flags
 
 
+# Directories where drives and network shares are usually mounted. A local
+# destination under one of them must be on a mounted filesystem even if it
+# isn't marked as a mount point, so that a drive or share that isn't mounted
+# fails the transfer instead of filling the root disk (#464).
+MOUNT_PARENT_DIRS = ('/mnt', '/media', '/net')
+
+
+def under_mount_parent_dir(dest_dir: str) -> bool:
+    """Return whether a directory is inside one of ``MOUNT_PARENT_DIRS``.
+
+    Args:
+        dest_dir: Absolute path of the directory.
+
+    Returns:
+        bool: ``True`` for e.g. ``/mnt/backup``; ``False`` for ``/mnt`` itself
+        or a directory elsewhere.
+    """
+
+    path = os.path.normpath(dest_dir)
+    return any(path.startswith(parent.rstrip(os.sep) + os.sep) for parent in MOUNT_PARENT_DIRS)
+
+
+def _on_root_filesystem(path: str) -> bool:
+    """Return whether ``path`` is on the same filesystem as ``/``."""
+
+    return os.stat(path).st_dev == os.stat(os.sep).st_dev
+
+
 def test_local_destination(dest_dir, is_mountpoint=0):
     """Test a local destination directory for a cruise data transfer.
 
-    Checks that the directory exists, optionally that its top-level mount point
-    (the first two path components, e.g. ``/mnt/usb``) is mounted, and that it's
-    writable.
+    Checks that the directory exists, that it's mounted, and that it's
+    writable. If it's marked as a mount point, its top-level mount point (the
+    first two path components, e.g. ``/mnt/usb``) must be mounted. Otherwise,
+    a directory inside ``MOUNT_PARENT_DIRS`` must not be on the root
+    filesystem (#464).
 
     Args:
         dest_dir: Absolute path of the destination directory.
@@ -1398,6 +1537,7 @@ def test_local_destination(dest_dir, is_mountpoint=0):
         list[dict]: Test parts with ``partName``/``result``/``reason`` keys.
     """
     results = []
+    check_mounted = is_mountpoint != 1 and under_mount_parent_dir(dest_dir)
 
     dest_dir_exists = os.path.isdir(dest_dir)
 
@@ -1407,6 +1547,8 @@ def test_local_destination(dest_dir, is_mountpoint=0):
 
         if is_mountpoint == 1:
             results.extend([{"partName": "Destination directory is a mount point", "result": "Fail", "reason": reason}])
+        elif check_mounted:
+            results.extend([{"partName": "Destination directory is mounted", "result": "Fail", "reason": reason}])
 
         results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
 
@@ -1428,6 +1570,17 @@ def test_local_destination(dest_dir, is_mountpoint=0):
             return results
 
         results.extend([{"partName": "Destination directory is a mount point", "result": "Pass"}])
+
+    elif check_mounted:
+        if _on_root_filesystem(dest_dir):
+            reason = (f"{dest_dir} is on the root filesystem: is its drive or share mounted? "
+                      f"Destinations in {', '.join(MOUNT_PARENT_DIRS)} must be mounted")
+            results.extend([{"partName": "Destination directory is mounted", "result": "Fail", "reason": reason}])
+            results.extend([{"partName": "Write test", "result": "Fail", "reason": reason}])
+
+            return results
+
+        results.extend([{"partName": "Destination directory is mounted", "result": "Pass"}])
 
     if not test_write_access(dest_dir):
         reason = f"Unable to write to destination directory: {dest_dir}"

@@ -21,6 +21,14 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
 from server.lib.transfer_utils import redact_payload
+from server.lib.transfer_lock import CDT, CST, transfer_locked
+
+# Lock kind of each transfer job type (#478)
+TRANSFER_LOCKS = {
+    'collectionSystemTransfer': CST,
+    'cruiseDataTransfer': CDT,
+}
+
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """Gearman worker that handles manual job termination.
@@ -199,7 +207,10 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
 
     Reads ``worker.job_info`` (populated by :py:meth:`OVDMGearmanWorker.on_job_execute`)
     to determine the target PID and job type, signals the process, then resets
-    the corresponding OpenVDM record to idle via the API.
+    the corresponding OpenVDM record to idle via the API. A transfer job
+    that's running (holds the transfer's lock, #478) sets its own status when
+    it ends; a transfer with no running job is set idle without signalling
+    its stored PID, which may belong to another process by now.
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -226,8 +237,15 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
 
     job_results['parts'].append({"partName": "Verify OpenVDM Job", "result": "Pass"})
 
+    # A transfer is only running while a job holds its lock; without one,
+    # the stored PID is stale and may be another process's by now
+    transfer_running = job_type in TRANSFER_LOCKS and transfer_locked(TRANSFER_LOCKS[job_type], job_id)
+
     try:
-        os.kill(int(job_pid), signal.SIGQUIT)
+        if job_type in TRANSFER_LOCKS and not transfer_running:
+            logging.warning("No job is running %s; not signalling PID %s", job_name, job_pid)
+        else:
+            os.kill(int(job_pid), signal.SIGQUIT)
     except OSError as exc:
         if exc.errno == 3:
             logging.warning("Process does not exist: PID %s", job_pid)
@@ -244,7 +262,10 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
         }
 
         if job_type in actions:
-            actions[job_type](job_id)
+            # A signalled transfer job sets the status when it ends; idle now
+            # would show it as not running while it winds down
+            if not transfer_running:
+                actions[job_type](job_id)
             worker.ovdm.send_msg("Manual Stop of transfer" if 'Transfer' in job_type else "Manual Stop of task", job_name)
 
         job_results['parts'].append({"partName": "Stopped Job", "result": "Pass"})

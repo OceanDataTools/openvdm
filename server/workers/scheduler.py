@@ -18,7 +18,6 @@ import time
 import json
 import logging
 import argparse
-from datetime import datetime, timedelta, timezone
 from os.path import dirname, realpath
 from python3_gearman import GearmanClient
 
@@ -26,9 +25,38 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import purge_old_files
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_lock import CDT, CST, transfer_locked
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASKS_NAMES
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASKS_NAMES
 from server.workers.run_ship_to_shore_transfer import TASK_NAMES as S2ST_TASKS_NAMES
+
+# A ship-to-shore run is stopped and started again after this many seconds,
+# so it picks up files written since it started (#488)
+S2S_RESTART_AFTER = 60 * 60
+
+# Seconds to wait for a ship-to-shore job stopped for its hourly restart to end
+S2S_STOP_WAIT = 60
+
+
+def scheduler_job_key(kind: str, transfer_id) -> str:
+    """Return the Gearman unique key of the scheduler's jobs for a transfer.
+
+    gearmand merges a job submitted with the same task and key as one that's
+    still queued or running, so the queue holds at most one scheduler job per
+    transfer, however long the workers are busy (#479). Only the scheduler
+    uses these keys: a manual Run or a cruise/lowering finalize sends its own
+    payload, which a merge would drop, so those jobs get Gearman's random keys
+    and are never merged.
+
+    Args:
+        kind: ``CST`` or ``CDT``, as for the transfer's lock.
+        transfer_id: The transfer's ID.
+
+    Returns:
+        str: ``scheduler-<kind>-<id>``.
+    """
+    return f'scheduler-{kind}-{transfer_id}'
+
 
 def scheduler(interval: int = None) -> None:
     """Submit Gearman transfer jobs on a recurring interval.
@@ -44,6 +72,10 @@ def scheduler(interval: int = None) -> None:
        non-running cruise data transfer.
     6. Manages the ship-to-shore (SSDW) transfer: stops it if it has been
        running for more than one hour, and starts a new run if enabled.
+
+    A transfer is running while a job holds its lock (#478), whatever its
+    status says. Jobs are submitted with :func:`scheduler_job_key`, so a
+    transfer's job still waiting in the queue isn't queued again (#479).
     7. Sleeps until the next interval boundary.
 
     Args:
@@ -58,7 +90,8 @@ def scheduler(interval: int = None) -> None:
     time.sleep(10)
 
     logfile_purge_timedelta = ovdm.get_logfile_purge_timedelta()
-    last_s2s_xfer = datetime.now(timezone.utc)
+    # When the current ship-to-shore run started, for its hourly restart
+    s2s_started = None
 
     if logfile_purge_timedelta:
         logging.info("Logfile purge age set to: %s", logfile_purge_timedelta)
@@ -89,7 +122,8 @@ def scheduler(interval: int = None) -> None:
         collection_system_transfers = ovdm.get_active_collection_system_transfers('longName')
         for collection_system_transfer in collection_system_transfers:
 
-            if collection_system_transfer['status'] == 1:
+            # A job holding the transfer's lock is running it (#478)
+            if transfer_locked(CST, collection_system_transfer['collectionSystemTransferID']):
                 continue
 
             logging.info("Submitting collection system transfer job for: %s", collection_system_transfer['longName'])
@@ -100,14 +134,16 @@ def scheduler(interval: int = None) -> None:
                 }
             }
 
-            gm_client.submit_job(CST_TASKS_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], json.dumps(gmData), background=True)
+            gm_client.submit_job(CST_TASKS_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], json.dumps(gmData),
+                                 unique=scheduler_job_key(CST, collection_system_transfer['collectionSystemTransferID']),
+                                 background=True)
             time.sleep(2)
 
         # schedule cruise_data_transfers
         cruise_data_transfers = ovdm.get_cruise_data_transfers()
         for cruise_data_transfer in cruise_data_transfers:
 
-            if cruise_data_transfer['status'] == 1:
+            if transfer_locked(CDT, cruise_data_transfer['cruiseDataTransferID']):
                 continue
 
             logging.info("Submitting cruise data transfer job for: %s", cruise_data_transfer['longName'])
@@ -118,7 +154,9 @@ def scheduler(interval: int = None) -> None:
                 }
             }
 
-            gm_client.submit_job(CDT_TASKS_NAMES['RUN_CRUISE_DATA_TRANSFER'], json.dumps(gmData), background=True)
+            gm_client.submit_job(CDT_TASKS_NAMES['RUN_CRUISE_DATA_TRANSFER'], json.dumps(gmData),
+                                 unique=scheduler_job_key(CDT, cruise_data_transfer['cruiseDataTransferID']),
+                                 background=True)
             time.sleep(2)
 
         # schedule ship-to-shore transfer
@@ -128,21 +166,41 @@ def scheduler(interval: int = None) -> None:
             logging.error("SSDW transfer does not exists???")
 
         else:
-            now_utc = datetime.now(timezone.utc)
-            delta = now_utc - last_s2s_xfer
-            if ssdw_transfer['status'] == 1 and delta > timedelta(hours=1):
+            ssdw_id = ssdw_transfer['cruiseDataTransferID']
+            running = transfer_locked(CDT, ssdw_id)
+            if not running:
+                s2s_started = None
+            elif s2s_started is None:
+                # A run the scheduler didn't start (a manual Run, or one going
+                # when the scheduler started): time it from now
+                s2s_started = time.monotonic()
+
+            if running and time.monotonic() - s2s_started > S2S_RESTART_AFTER:
                 logging.info("S2S tranfer has run for an hour, time to restart")
                 gmData = {'pid': ssdw_transfer['pid']}
                 gm_client.submit_job("stopJob", json.dumps(gmData))
 
-            if ssdw_transfer['enable'] == 1:
+                # The stopped job holds the lock until it ends; a new run
+                # submitted before then would be ignored
+                for _ in range(S2S_STOP_WAIT):
+                    running = transfer_locked(CDT, ssdw_id)
+                    if not running:
+                        break
+                    time.sleep(1)
+
+            # While a run is going, a submission would only merge into it
+            # (#479), so the next one starts once it has ended or been
+            # restarted (#488)
+            if ssdw_transfer['enable'] == 1 and not running:
                 logging.info("Submitting cruise data transfer job for: %s", ssdw_transfer['longName'])
-                last_s2s_xfer = datetime.now(timezone.utc)
+                s2s_started = time.monotonic()
 
                 gmData = {
                 }
 
-                gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData), background=True)
+                gm_client.submit_job(S2ST_TASKS_NAMES['RUN_SHIP_TO_SHORE_TRANSFER'], json.dumps(gmData),
+                                     unique=scheduler_job_key(CDT, ssdw_id),
+                                     background=True)
                 time.sleep(2)
 
         delay = interval * 60 - len(collection_system_transfers) * 2 - len(cruise_data_transfers) * 2 - 2
