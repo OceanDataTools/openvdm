@@ -560,6 +560,50 @@ def set_owner_group_permissions(user: str, path: str) -> dict:
 TEMP_DIR_PREFIX = 'openvdm-'
 
 
+def _mount_targets() -> set:
+    """Return the mount points listed in ``/proc/self/mounts``.
+
+    Returns:
+        set[str]: The mount points, or an empty set where there's no
+        ``/proc/self/mounts`` (e.g. macOS).
+    """
+    try:
+        with open('/proc/self/mounts', encoding='utf-8') as mounts:
+            lines = mounts.read().splitlines()
+    except OSError:
+        return set()
+
+    def _unescape(field):
+        # Spaces, tabs, newlines and backslashes are written as octal escapes
+        return re.sub(r'\\([0-7]{3})', lambda match: chr(int(match.group(1), 8)), field)
+
+    return {_unescape(line.split()[1]) for line in lines if len(line.split()) > 1}
+
+
+def _is_mounted(path: str) -> bool:
+    """Return whether *path* is a mount point, including a dead one.
+
+    ``os.path.ismount()`` returns ``False`` when ``lstat`` fails, which it
+    does on a FUSE mount whose daemon has died (e.g. a killed worker's
+    ``rclone mount``): "Transport endpoint is not connected" (#489). Such a
+    mount is still listed in ``/proc/self/mounts``.
+
+    Args:
+        path: The path to check.
+
+    Returns:
+        bool: ``True`` if *path* is mounted, listed as a mount point, or fails
+        with ENOTCONN.
+    """
+    if os.path.ismount(path) or os.path.normpath(path) in _mount_targets():
+        return True
+    try:
+        os.lstat(path)
+    except OSError as exc:
+        return exc.errno == errno.ENOTCONN
+    return False
+
+
 def _cleanup_temp_dir(tmpdir, mntpoint_path):
     """Unmount and delete a temporary directory safely.
 
@@ -567,17 +611,18 @@ def _cleanup_temp_dir(tmpdir, mntpoint_path):
         tmpdir: The temporary directory.
         mntpoint_path: Its ``mntpoint`` subdirectory, unmounted first if mounted.
     """
-    if os.path.ismount(mntpoint_path):
+    # A dead FUSE mount counts too, or rmtree fails on it and both stay (#489)
+    if _is_mounted(mntpoint_path):
         for cmd in (['umount', mntpoint_path], ['umount', '-l', mntpoint_path]):
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            if proc.returncode == 0 and not os.path.ismount(mntpoint_path):
+            if proc.returncode == 0 and not _is_mounted(mntpoint_path):
                 logging.info("Unmounted %s before cleanup (%s).", mntpoint_path, ' '.join(cmd[:-1]))
                 break
             logging.warning("Failed to unmount %s with %s: %s", mntpoint_path,
                             ' '.join(cmd[:-1]), proc.stderr.strip())
 
         # Never rmtree through a mount: it would delete the mounted files
-        if os.path.ismount(mntpoint_path):
+        if _is_mounted(mntpoint_path):
             logging.error("%s is still mounted; leaving temporary directory %s in place",
                           mntpoint_path, tmpdir)
             return
