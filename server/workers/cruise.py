@@ -32,6 +32,8 @@ from server.lib.connection_utils import build_rsync_command
 from server.lib.file_utils import build_filelist, write_list_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
 from server.workers.run_collection_system_transfer import run_transfer_command
 from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_jobs import report_missed, run_transfer_jobs
+from server.lib.transfer_lock import CDT, CST
 from server.workers.run_collection_system_transfer import TASK_NAMES as CST_TASK_NAMES
 from server.workers.run_cruise_data_transfer import TASK_NAMES as CDT_TASK_NAMES
 from server.workers.cruise_directory import TASK_NAMES as CRUISE_DIR_TASK_NAMES
@@ -657,7 +659,9 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     Runs the collection system transfers one last time, copies PublicData into
     the cruise, exports the finalized cruise config, runs the post-finalize
     hook tasks, then runs the cruise data transfers. (The pre-finalize hook
-    tasks run in ``on_job_execute()``.)
+    tasks run in ``on_job_execute()``.) A transfer that another job is
+    running gets its last run once that job ends; one still running after an
+    hour is reported in an OpenVDM message and skipped (#480).
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -693,22 +697,26 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         'collectionSystemTransfer': {}
     }
 
-    collection_system_transfer_jobs = []
+    collection_system_transfer_jobs = {}
     collection_system_transfers = worker.ovdm.get_active_collection_system_transfers(lowering=False)
 
     for collection_system_transfer in collection_system_transfers:
         logging.debug("Queuing %s job for %s", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], collection_system_transfer['name'])
-        gm_data['collectionSystemTransfer']['collectionSystemTransferID'] = collection_system_transfer['collectionSystemTransferID']
-
-        collection_system_transfer_jobs.append( {"task": CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], "data": json.dumps(gm_data)} )
+        cst_id = collection_system_transfer['collectionSystemTransferID']
+        collection_system_transfer_jobs[cst_id] = {**gm_data, 'collectionSystemTransfer': {'collectionSystemTransferID': cst_id}}
 
     logging.info("Submitting %s jobs", CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'])
     worker.send_job_status(current_job, 3, 10)
 
-    submitted_job_request = gm_client.submit_multiple_jobs(collection_system_transfer_jobs, background=False, wait_until_complete=False)
+    # A transfer another job is running gets its final pass once that job
+    # ends (#480)
+    missed = run_transfer_jobs(gm_client, CST_TASK_NAMES['RUN_COLLECTION_SYSTEM_TRANSFER'], CST,
+                               collection_system_transfer_jobs)
 
-    time.sleep(1)
-    gm_client.wait_until_jobs_completed(submitted_job_request)
+    if missed:
+        report_missed(worker.ovdm, job_results, f"Finalizing {worker.cruise_id}: collection system transfers still running",
+                      "Final pass of collection system transfers",
+                      [cst['name'] for cst in collection_system_transfers if cst['collectionSystemTransferID'] in missed])
 
     job_results['parts'].append({"partName": "Run collection system transfers jobs", "result": "Pass"})
 
@@ -761,22 +769,25 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
         'cruiseDataTransfer': {}
     }
 
-    cruise_data_transfer_jobs = []
+    cruise_data_transfer_jobs = {}
     cruise_data_transfers = worker.ovdm.get_active_cruise_data_transfers()
 
     for cruise_data_transfer in cruise_data_transfers:
         logging.debug("Queuing %s job for %s", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], cruise_data_transfer['name'])
-        gm_data['cruiseDataTransfer']['cruiseDataTransferID'] = cruise_data_transfer['cruiseDataTransferID']
-
-        cruise_data_transfer_jobs.append( {"task": CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], "data": json.dumps(gm_data)} )
+        cdt_id = cruise_data_transfer['cruiseDataTransferID']
+        cruise_data_transfer_jobs[cdt_id] = {**gm_data, 'cruiseDataTransfer': {'cruiseDataTransferID': cdt_id}}
 
     logging.info("Submitting %s jobs", CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'])
     worker.send_job_status(current_job, 8, 10)
 
-    submitted_job_request = gm_client.submit_multiple_jobs(cruise_data_transfer_jobs, background=False, wait_until_complete=False)
+    missed = run_transfer_jobs(gm_client, CDT_TASK_NAMES['RUN_CRUISE_DATA_TRANSFER'], CDT,
+                               cruise_data_transfer_jobs)
 
-    time.sleep(1)
-    gm_client.wait_until_jobs_completed(submitted_job_request)
+    # Before the Pass part: the last part decides the job's outcome
+    if missed:
+        report_missed(worker.ovdm, job_results, f"Finalizing {worker.cruise_id}: cruise data transfers still running",
+                      "Final pass of cruise data transfers",
+                      [cdt['name'] for cdt in cruise_data_transfers if cdt['cruiseDataTransferID'] in missed])
 
     job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Pass"})
 

@@ -35,6 +35,7 @@ from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_
 from server.lib import transfer_utils
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
+from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, rclone_concurrency, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
 
@@ -431,7 +432,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         if self.transfer_lock is None:
             logging.info("Transfer already in-progress for %s", self.cruise_data_transfer['name'])
-            return self._ignore_job(current_job, "Transfer In-Progress", "Transfer is already in-progress")
+            return self._ignore_job(current_job, "Transfer In-Progress", IN_PROGRESS_REASON)
 
         start_time = time.gmtime()
         self.transfer_start_date = time.strftime("%Y%m%dT%H%M%SZ", start_time)
