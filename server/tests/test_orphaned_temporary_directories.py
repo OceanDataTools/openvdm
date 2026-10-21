@@ -1,6 +1,8 @@
 """Tests for cleaning up temporary directories left by killed workers."""
 
+import errno
 import fcntl
+import io
 import os
 import subprocess
 import sys
@@ -135,3 +137,54 @@ def test_start_orphan_cleanup_logs_a_failure(monkeypatch, caplog) -> None:
     monkeypatch.setattr(file_utils, 'cleanup_orphaned_temporary_directories', fail)
     file_utils.start_orphan_cleanup().join(5)
     assert 'Cleaning up orphaned temporary directories failed' in caplog.text
+
+
+def test_a_dead_fuse_mount_counts_as_mounted(monkeypatch, tmp_path: Path) -> None:
+    """A mount point failing with ENOTCONN (its FUSE daemon died) is mounted (#489)."""
+    mntpoint = tmp_path / 'mntpoint'
+    mntpoint.mkdir()
+    monkeypatch.setattr(file_utils, '_mount_targets', set)
+    real_lstat = os.lstat
+
+    def lstat(path, *args, **kwargs):
+        if os.fspath(path) == str(mntpoint):
+            raise OSError(errno.ENOTCONN, 'Transport endpoint is not connected')
+        return real_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(file_utils.os, 'lstat', lstat)
+    assert file_utils._is_mounted(str(mntpoint))
+
+
+def test_a_listed_mount_point_counts_as_mounted(monkeypatch, tmp_path: Path) -> None:
+    """A path in /proc/self/mounts is mounted even when ismount() says it isn't (#489)."""
+    mntpoint = tmp_path / 'mntpoint'
+    mntpoint.mkdir()
+    monkeypatch.setattr(file_utils, '_mount_targets', lambda: {str(mntpoint)})
+    assert file_utils._is_mounted(str(mntpoint) + '/')
+    monkeypatch.setattr(file_utils, '_mount_targets', set)
+    assert not file_utils._is_mounted(str(mntpoint))
+
+
+def test_mount_targets_unescapes_paths(monkeypatch) -> None:
+    """Spaces and other characters escaped in /proc/self/mounts are decoded."""
+    mounts = ("rclone:/data /tmp/openvdm-1-x/mntpoint fuse.rclone rw 0 0\n"
+              "//nas/share /mnt/my\\040share cifs rw 0 0\n")
+    monkeypatch.setattr(file_utils, 'open', lambda *a, **k: io.StringIO(mounts), raising=False)
+    assert file_utils._mount_targets() == {'/tmp/openvdm-1-x/mntpoint', '/mnt/my share'}
+
+
+def test_a_dead_mount_is_unmounted_before_deleting(monkeypatch, tmp_path: Path, dead_pid: int) -> None:
+    """The cleanup unmounts a dead mount instead of failing to delete through it (#489)."""
+    orphan = tmp_path / f'openvdm-{dead_pid}-dead01'
+    mntpoint = orphan / 'mntpoint'
+    mntpoint.mkdir(parents=True)
+    state = {'mounted': True}
+    monkeypatch.setattr(file_utils, '_is_mounted', lambda path: state['mounted'])
+
+    def umount(cmd, **kwargs):
+        state['mounted'] = False
+        return Mock(returncode=0, stderr='')
+
+    monkeypatch.setattr(file_utils.subprocess, 'run', umount)
+    assert file_utils.cleanup_orphaned_temporary_directories(str(tmp_path)) == [str(orphan)]
+    assert not orphan.exists()
