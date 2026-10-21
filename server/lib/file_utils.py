@@ -14,8 +14,10 @@ import tempfile
 import shutil
 import logging
 import errno
+import fcntl
 import re
 import subprocess
+import threading
 import numpy as np
 from contextlib import contextmanager
 from pwd import getpwnam
@@ -615,6 +617,10 @@ def cleanup_orphaned_temporary_directories(tmp_root: Optional[str] = None) -> Li
     process no longer exists are unmounted and deleted, with the same safety
     as :func:`temporary_directory`: a mount that won't unmount is left alone.
 
+    Several processes can run this at once (``reboot_reset`` and the workers
+    all start together, #490). Each locks a directory before cleaning it and
+    skips one that another process has locked or already deleted.
+
     Args:
         tmp_root: Directory to look in; defaults to ``tempfile.gettempdir()``.
 
@@ -630,10 +636,48 @@ def cleanup_orphaned_temporary_directories(tmp_root: Optional[str] = None) -> Li
             continue
         if _process_alive(int(match.group(1))):
             continue
-        logging.warning("Cleaning up temporary directory left by a process that has gone: %s", path)
-        _cleanup_temp_dir(path, os.path.join(path, 'mntpoint'))
-        cleaned.append(path)
+
+        try:
+            dir_fd = os.open(path, os.O_RDONLY)
+        except FileNotFoundError:
+            continue    # another process has just deleted it
+        try:
+            try:
+                fcntl.flock(dir_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                continue    # another process is cleaning it up
+            if not os.path.isdir(path):
+                continue    # deleted while we waited to open it
+            logging.warning("Cleaning up temporary directory left by a process that has gone: %s", path)
+            _cleanup_temp_dir(path, os.path.join(path, 'mntpoint'))
+            cleaned.append(path)
+        finally:
+            os.close(dir_fd)
     return cleaned
+
+
+def start_orphan_cleanup() -> threading.Thread:
+    """Run :func:`cleanup_orphaned_temporary_directories` in the background.
+
+    Called when a worker that makes temporary directories starts, so the
+    mounts and directories of a worker killed before it could clean up are
+    removed when Supervisor restarts it, not only at the next ``reboot_reset``
+    (#490). It runs in a daemon thread because ``umount``, or checking a
+    mount, can block on an unresponsive server, and that mustn't keep the
+    worker from starting.
+
+    Returns:
+        threading.Thread: The started thread.
+    """
+    def _cleanup():
+        try:
+            cleanup_orphaned_temporary_directories()
+        except Exception:   # pylint: disable=broad-exception-caught
+            logging.exception("Cleaning up orphaned temporary directories failed")
+
+    thread = threading.Thread(target=_cleanup, name='orphan-cleanup', daemon=True)
+    thread.start()
+    return thread
 
 
 @contextmanager

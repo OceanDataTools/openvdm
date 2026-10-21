@@ -29,7 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.connection_utils import build_rsync_command
-from server.lib.file_utils import build_filelist, write_list_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory
+from server.lib.file_utils import build_filelist, write_list_file, clear_directory, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory, start_orphan_cleanup
 from server.workers.run_collection_system_transfer import run_transfer_command
 from server.lib.transfer_utils import TransferCommandError
 from server.lib.transfer_jobs import report_missed, run_transfer_jobs
@@ -940,6 +940,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES.get('SYNC_PUBLICDATA'))
     new_worker.register_task(TASK_NAMES.get('SYNC_PUBLICDATA'), task_rsync_publicdata_to_cruise_data)
+
+    # Mounts and directories of a killed predecessor (#490)
+    start_orphan_cleanup()
 
     logging.info("Waiting for jobs...")
     new_worker.work()

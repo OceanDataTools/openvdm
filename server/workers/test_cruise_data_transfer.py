@@ -21,6 +21,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.file_utils import start_orphan_cleanup
 from server.lib.transfer_lock import CDT, transfer_locked
 from server.lib.connection_utils import get_transfer_type, normalize_transfer_config, test_cdt_destination, test_cdt_rclone_destination
 
@@ -359,6 +360,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['TEST_CRUISE_DATA_TRANSFER'])
     new_worker.register_task(TASK_NAMES['TEST_CRUISE_DATA_TRANSFER'], task_test_cruise_data_transfer)
+
+    # Mounts and directories of a killed predecessor (#490)
+    start_orphan_cleanup()
 
     logging.info("Waiting for jobs...")
     new_worker.work()
