@@ -596,3 +596,37 @@ sudo supervisorctl restart openvdm:*
 ```
 8. Set OpenVDM back to On.
 9. Rebuild the data dashboard so existing files are re-parsed with the fixed parsers: direction charts are replotted, and corrupt NMEA sentences become bad rows. Run **Rebuild Data Dashboard** under **Maintenance Tasks** on the **Configuration** page. This rebuilds the current cruise only.
+
+## Upgrading from 2.16.2.
+
+*This section is a draft for the next release and is completed at release prep.*
+
+The next release fixes several problems with transfers running at the same time: a transfer running as several copies, Stop having no effect while a transfer lists its source, killed workers leaving mounts and copies running, and finalize skipping the last run of a transfer that's already running. See the Unreleased entry in [CHANGELOG.md](CHANGELOG.md) for the details.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Update the code, as the OpenVDM user (git refuses to work in a checkout owned by another user):
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> git pull --ff-only
+```
+3. Add `killasgroup=true` to the Supervisor programs of the transfer and Test Setup workers, so that when Supervisor has to kill one that didn't stop in time, its rsync, rclone and mount processes are killed too (#474). The installer adds it to new installs. Edit the OpenVDM Supervisor config:
+   - Ubuntu/Debian: `/etc/supervisor/conf.d/openvdm.conf`
+   - Rocky Linux/AlmaLinux: `/etc/supervisord.d/openvdm.ini`
+
+   Add the line after `stopsignal=INT` in each of these five programs: `[program:run_collection_system_transfer]`, `[program:run_cruise_data_transfer]`, `[program:run_ship_to_shore_transfer]`, `[program:test_collection_system_transfer]` and `[program:test_cruise_data_transfer]`. For example:
+```
+[program:run_collection_system_transfer]
+...
+stopsignal=INT
+killasgroup=true
+```
+   Then load the change. This restarts the changed programs, and may restart all the OpenVDM workers, since they're one Supervisor group:
+```
+sudo supervisorctl reread
+sudo supervisorctl update
+```
+4. Restart the OpenVDM workers so they load the updated code:
+```
+sudo supervisorctl restart openvdm:*
+```
+5. Set OpenVDM back to On.
