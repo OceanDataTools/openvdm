@@ -27,9 +27,9 @@ jobs:
         # on supported distributions (Debian trixie)
         python: ['3.11', '3.13']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -46,15 +46,17 @@ jobs:
     name: ruff, ESLint, php -l, PHPStan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - uses: actions/setup-node@v4
+      # No npm cache: nothing here installs from www/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          package-manager-cache: false
 
       # PHP 8.3 matches production; mbstring is needed by league/commonmark
       - uses: shivammathur/setup-php@v2
@@ -76,7 +78,7 @@ jobs:
       - name: ruff (including the .py.dist templates)
         run: ruff check server/
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
