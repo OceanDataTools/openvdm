@@ -62,6 +62,8 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 ### Changed
 - **Setup New Cruise deletes all OpenVDM messages,** so the Messages page and the navbar's new-message count only show messages about the current cruise. They're deleted once the form passes its checks, before the new cruise is set up, so a message the setup posts (e.g. that it failed) is kept. A rejected form deletes nothing, and Edit Cruise, Finalize and switching cruises don't delete messages (#403).
 
+- **Development:** the Python tests run in GitHub Actions on every pull request, with ruff and the pre-commit hooks; `requirements-dev.txt` installs pytest and pytest-cov; coverage can't drop below `.coveragerc`'s floor; shared test fixtures; and pytest no longer reports the Test Setup workers' functions as errors. Unused imports are removed from the parser templates. No effect on running installs (#506).
+
 ### Removed
 - **Trackline scripts' 2.16.0 options:** `build_cruise_tracks.py` and `build_lowering_tracks.py` no longer accept the names that 2.16.1 deprecated:
   - `--no_combine`, `--kml_only` and `--geojson_only`; use `--no-combine`, `--kml-only` and `--geojson-only`;

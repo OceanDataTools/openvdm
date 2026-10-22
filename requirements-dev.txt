@@ -1,0 +1,6 @@
+# Packages for running OpenVDM's tests, on top of the runtime requirements
+# (#506): pip install -r requirements-dev.txt
+-r requirements.txt
+coverage==7.16.2
+pytest==9.0.2
+pytest-cov==7.1.0

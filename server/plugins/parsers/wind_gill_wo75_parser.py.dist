@@ -8,11 +8,8 @@ OpenVDM's Data Dashboard.
 
 import sys
 import logging
-from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
-import numpy as np
-import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
