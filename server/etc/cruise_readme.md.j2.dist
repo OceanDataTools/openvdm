@@ -1,12 +1,13 @@
 {#-
   OpenVDM cruise README template (Jinja2, https://jinja.palletsprojects.com/).
 
-  To change it, copy this file to server/etc/cruise_readme.md.j2 (or set
-  cruiseReadme.template in openvdm.yaml) and edit the copy; OpenVDM uses this
-  .dist file while there's no copy. The variables are described in
-  build_cruise_readme_context() in server/lib/readme.py. The README is
-  rebuilt whenever the cruise config is exported: Setup New Cruise, Edit
-  Cruise, Finalize Cruise and Export OpenVDM Config.
+  The installer copies this file to server/etc/cruise_readme.md.j2 when
+  that doesn't exist yet; edit the copy (or set cruiseReadme.template in
+  openvdm.yaml) to change the README. OpenVDM doesn't use this .dist file
+  itself: without the copy, the README isn't written. The variables are
+  described in build_cruise_readme_context() in server/lib/readme.py. The
+  README is rebuilt whenever the cruise config is exported: Setup New
+  Cruise, Edit Cruise, Finalize Cruise and Export OpenVDM Config.
 -#}
 # Cruise {{ cruise.cruiseID }}{% if cruise.cruiseName %}: {{ cruise.cruiseName }}{% endif %}
 
