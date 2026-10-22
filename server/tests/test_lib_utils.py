@@ -402,10 +402,8 @@ def test_clear_directory_unlistable(tmp_path, monkeypatch) -> None:
     assert fu.clear_directory(str(tmp_path))['reason'][0].startswith('Failed to list contents')
 
 
-@pytest.mark.xfail(strict=True, raises=KeyError,
-                   reason="#539: clear_directory() reads result['reasons'] from its recursion; the key is 'reason'")
 def test_clear_directory_reports_failures_in_subdirectories(tmp_path, monkeypatch) -> None:
-    """A file inside a subdirectory that can't be deleted is reported too."""
+    """A file inside a subdirectory that can't be deleted is reported too (#539)."""
     _tree(tmp_path, ['sub/a.txt'])
     monkeypatch.setattr(fu.os, 'remove', lambda path: (_ for _ in ()).throw(PermissionError('denied')))
     result = fu.clear_directory(str(tmp_path))
@@ -521,13 +519,16 @@ def test_output_json_data_to_file_errors(tmp_path, monkeypatch) -> None:
         fu.output_json_data_to_file(str(tmp_path / 'x' / 'd.json'), {})
 
 
-@pytest.mark.xfail(strict=True, raises=OSError,
-                   reason="#541: output_json_data_to_file() opens the file outside its try, so it raises instead of "
-                          "returning verdict False")
 def test_output_json_data_to_file_that_cant_be_opened(tmp_path) -> None:
-    """A file that can't be opened (e.g. a folder in its place) is a failed verdict, not an exception."""
+    """A file that can't be opened (e.g. a folder in its place) is a failed verdict, not an exception (#541)."""
     (tmp_path / 'data.json').mkdir()
-    assert fu.output_json_data_to_file(str(tmp_path / 'data.json'), {})['verdict'] is False
+    assert fu.output_json_data_to_file(str(tmp_path / 'data.json'), {}) == {
+        'verdict': False, 'reason': f"Unable to create data file: {tmp_path / 'data.json'}"}
+
+
+def test_output_json_data_that_cant_be_serialized(tmp_path) -> None:
+    """Data JSON can't hold is a failed verdict too."""
+    assert fu.output_json_data_to_file(str(tmp_path / 'd.json'), {'s': {1, 2}})['verdict'] is False
 
 
 def test_np_encoder_rejects_other_types() -> None:

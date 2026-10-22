@@ -270,7 +270,7 @@ def clear_directory(target_dir: str, delete_self: bool = False) -> dict:
                     # Recurse into subdirectory
                     result = clear_directory(path, delete_self=True)
                     if not result['verdict']:
-                        reasons.extend(result['reasons'])
+                        reasons.extend(result['reason'])    # (#539)
             except OSError as exc:
                 reason = f'Failed to delete {path}: {exc}'
                 logging.error(reason)
@@ -473,15 +473,16 @@ def output_json_data_to_file(file_path: str, contents) -> dict:
     except Exception as exc:
         raise exc
 
-    with open(file_path, mode='w', encoding="utf-8") as json_file:
-        logging.debug("Saving JSON file: %s", file_path)
-        try:
+    # Opening the file can fail too (e.g. a folder the worker can't write to):
+    # report it, as for the parent folder, rather than raising (#541)
+    try:
+        with open(file_path, mode='w', encoding="utf-8") as json_file:
+            logging.debug("Saving JSON file: %s", file_path)
             json.dump(contents, json_file, cls=NpEncoder)
-
-        except IOError:
-            reason = f'Unable to create data file: {file_path}'
-            logging.error(reason)
-            return {'verdict': False, 'reason': reason}
+    except (OSError, TypeError, ValueError) as exc:
+        reason = f'Unable to create data file: {file_path}'
+        logging.error("%s: %s", reason, exc)
+        return {'verdict': False, 'reason': reason}
 
     return {'verdict': True}
 
