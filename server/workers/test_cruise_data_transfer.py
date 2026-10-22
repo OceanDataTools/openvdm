@@ -42,6 +42,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.cruise_id = None
         self.cruise_data_transfer = None
         self.shipboard_data_warehouse_config = None
+        self.cruise_dir = None
 
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
@@ -62,6 +63,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         self.stop = False
+        # Not the previous job's transfer: a job that fails before its own is
+        # known must not change another transfer's status (#528)
+        self.cruise_data_transfer = {}
 
         try:
             payload_obj = json.loads(current_job.data)
@@ -75,12 +79,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_id = cdt_cfg.get('cruiseDataTransferID')
 
         if cdt_id:
-            self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)
+            cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)
 
-            if self.cruise_data_transfer is None:
+            if cruise_data_transfer is None:
                 return self._fail_job(current_job, "Locate Cruise Data Transfer Data",
                                       "Could not find cruise data transfer config to use for connection test")
 
+            self.cruise_data_transfer = cruise_data_transfer
             self.cruise_data_transfer.update(cdt_cfg)
 
         elif not cdt_cfg:
@@ -108,27 +113,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return super().on_job_execute(current_job)
 
 
-    def test_cruise_dir(self, current_job):
+    def test_cruise_dir(self):
         """Check that the cruise directory exists.
 
-        Args:
-            current_job: The Gearman job.
-
         Returns:
-            list[dict] | str: The passing test part, or a failed-job result if
-            the directory doesn't exist.
+            list[dict]: The test part, ``Pass`` or ``Fail`` with the reason. A
+            failure is reported by the task's Final Verdict, like the other
+            checks' (#529).
         """
 
-        results = []
+        if not os.path.isdir(self.cruise_dir):
+            return [{"partName": "Verify cruise data directory exists", "result": "Fail",
+                     "reason": f"Unable to find cruise data directory: {self.cruise_dir}"}]
 
-        cruise_dir_exists = os.path.isdir(self.cruise_dir)
-        if not cruise_dir_exists:
-            return self._fail_job(current_job, "Verify cruise data directory exists",
-                                  f"Unable to find cruise data directory: {self.cruise_dir}")
-
-        results.extend([{"partName": "Verify cruise data directory exists", "result": "Pass"}])
-
-        return results
+        return [{"partName": "Verify cruise data directory exists", "result": "Pass"}]
 
 
     def on_job_exception(self, current_job, exc_info):
@@ -163,11 +161,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
-        cst_id = self.cruise_data_transfer.get('cruiseDataTransferID')
+        cdt_id = (self.cruise_data_transfer or {}).get('cruiseDataTransferID')
 
-        if cst_id:
-            self.ovdm.set_error_cruise_data_transfer_test(cst_id, f'Worker crashed: {reason}',
-                                                          set_status=not transfer_locked(CDT, cst_id))
+        if cdt_id:
+            self.ovdm.set_error_cruise_data_transfer_test(cdt_id, f'Worker crashed: {reason}',
+                                                          set_status=not transfer_locked(CDT, cdt_id))
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -191,7 +189,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
         parts = results.get('parts', [])
         final_verdict = parts[-1] if len(parts) else None
-        cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
+        cdt_id = (self.cruise_data_transfer or {}).get('cruiseDataTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s", current_job.handle)
@@ -282,7 +280,7 @@ def task_test_cruise_data_transfer(worker, current_job):
     logging.info("Test cruise directory")
     worker.send_job_status(current_job, 33, 100)
 
-    job_results['parts'] = worker.test_cruise_dir(current_job)
+    job_results['parts'] = worker.test_cruise_dir()
 
     logging.info("Test destination")
     worker.send_job_status(current_job, 66, 100)

@@ -153,6 +153,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         self.stop = False
+        # Not the previous job's transfer: a job that fails before its own is
+        # known must not change another transfer's status (#528)
+        self.collection_system_transfer = {}
 
         try:
             payload_obj = json.loads(current_job.data)
@@ -166,12 +169,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cst_id = cst_cfg.get('collectionSystemTransferID')
 
         if cst_id:
-            self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
+            collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
-            if self.collection_system_transfer is None:
+            if collection_system_transfer is None:
                 return self._fail_job(current_job, "Locate collection system transfer Data",
                                       "Could not find collection system transfer config to use for connection test")
 
+            self.collection_system_transfer = collection_system_transfer
             self.collection_system_transfer.update(cst_cfg)
 
         elif not cst_cfg:
@@ -242,7 +246,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
-        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
+        cst_id = (self.collection_system_transfer or {}).get('collectionSystemTransferID')
 
         if cst_id:
             self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
@@ -270,7 +274,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
         parts = results.get('parts', [])
         final_verdict = parts[-1] if len(parts) else None
-        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
+        cst_id = (self.collection_system_transfer or {}).get('collectionSystemTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s ", current_job.handle)

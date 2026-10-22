@@ -76,6 +76,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Test Setup's message for an SMB share that won't mount:** for a collection system transfer it said *Could not connect to SMB server*, although the server check had passed; it now says *Could not connect to SMB share*, as the cruise data transfer check does. The log message when checking for a macOS SSH server fails no longer says "Dawin" (#520, #521).
 - **Cruise data transfers without rclone or an rsync password fail instead of crashing:** a missing rclone, or an rsync destination whose password the web app didn't send (worker API token), crashed the job (*Worker crashed: …*). The transfer now fails with *rclone is not installed* or *rsyncPass not available* (#524).
 - **Ship-to-shore worker stopped before its first job:** it crashed (`AttributeError`) when Supervisor stopped or restarted it before it had run a job, e.g. on a reboot or upgrade. It now shuts down cleanly, and shutting it down also stops a copy in progress (#526).
+- **Test Setup crashes:** Test Setup showed *Worker crashed: AttributeError …* instead of the reason for a transfer the web app couldn't find (e.g. deleted while its form was open), for a malformed job, and, for cruise data transfers, when the cruise directory doesn't exist. Each is now reported as a failed test with its reason, and a malformed job no longer sets an error on the previous transfer tested (#528, #529).
 
 ---
 
