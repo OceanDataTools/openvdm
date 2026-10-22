@@ -373,7 +373,8 @@ def test_no_combine_legacy_files(tmp_path, chown) -> None:
     base.mkdir()
     _legacy_file(base / 'gga_1.json', [[1, 2]], ['t'])
     (base / 'broken.json').write_text('{}')
-    manifest = [{'type': 'gga', 'dd_json': 'gga_1.json'}, {'type': 'gga', 'dd_json': 'broken.json'}]
+    (base / 'unreadable.json').write_text('{not json')
+    manifest = [{'type': 'gga', 'dd_json': name} for name in ('gga_1.json', 'broken.json', 'unreadable.json')]
 
     assert tracks.process_position_source({'device': 'gps', 'type': 'gga'}, manifest, str(base), 'P',
                                           str(tmp_path), _args(no_combine=True), None) is None
@@ -381,10 +382,8 @@ def test_no_combine_legacy_files(tmp_path, chown) -> None:
         'P_gga_1_Trackline.json', 'P_gga_1_Trackline.kml']
 
 
-@pytest.mark.xfail(strict=True, reason="#536: --no-combine reads only the old top-level visualizerData, not "
-                                       "the per-data-type files the data dashboard writes")
 def test_no_combine_current_files(cruise, tmp_path, chown) -> None:
-    """--no-combine writes one trackline per dashboard file in today's per-data-type format."""
+    """--no-combine writes one trackline per dashboard file in today's per-data-type format (#536)."""
     tracks.process_position_source({'device': 'gps', 'type': 'gga'}, cruise.manifest, cruise.base, 'TEST001',
                                    str(tmp_path), _args(no_combine=True), None)
     assert sorted(name for name in os.listdir(tmp_path) if name.endswith('.json')) == [
@@ -473,3 +472,27 @@ def test_setup_logging(verbosity, level) -> None:
     """WARNING, INFO with -v, DEBUG with -vv or more."""
     tracks.setup_logging(verbosity)
     assert logging.getLogger().level == level
+
+
+def test_source_geojson() -> None:
+    """The source's data type, or the old top-level format; the first FeatureCollection (#536)."""
+    track = _track([[1, 2]], ['t'])
+    chart = {'type': 'chart', 'data': []}
+    assert tracks.source_geojson({'gga': {'visualizerData': [chart, track]}, 'hdt': {}}, 'gga') is track
+    assert tracks.source_geojson({'visualizerData': [track]}, 'gga') is track
+    assert tracks.source_geojson({'hdt': {'visualizerData': [track]}}, 'gga') is None
+    assert tracks.source_geojson({'gga': {'visualizerData': 'bad'}}, 'gga') is None
+    assert tracks.source_geojson([], 'gga') is None
+
+
+def test_no_combine_skips_files_without_the_sources_track(tmp_path, chown, caplog) -> None:
+    """A file with no GeoJSON for the source's data type is skipped with a message."""
+    base = tmp_path / 'base'
+    base.mkdir()
+    _file(base / 'hdt_1.json', [[1, 2]], ['t'], data_type='hdt')
+    manifest = [{'type': 'gga', 'dd_json': 'hdt_1.json'}]
+    tracks.process_position_source({'device': 'gps', 'type': 'gga'}, manifest, str(base), 'P', str(tmp_path),
+                                   _args(no_combine=True), None)
+    assert not [name for name in os.listdir(tmp_path) if 'Trackline' in name]
+    assert 'No GeoJSON track for gga in dashboard file' in caplog.text
+

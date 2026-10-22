@@ -402,10 +402,8 @@ def test_clear_directory_unlistable(tmp_path, monkeypatch) -> None:
     assert fu.clear_directory(str(tmp_path))['reason'][0].startswith('Failed to list contents')
 
 
-@pytest.mark.xfail(strict=True, raises=KeyError,
-                   reason="#539: clear_directory() reads result['reasons'] from its recursion; the key is 'reason'")
 def test_clear_directory_reports_failures_in_subdirectories(tmp_path, monkeypatch) -> None:
-    """A file inside a subdirectory that can't be deleted is reported too."""
+    """A file inside a subdirectory that can't be deleted is reported too (#539)."""
     _tree(tmp_path, ['sub/a.txt'])
     monkeypatch.setattr(fu.os, 'remove', lambda path: (_ for _ in ()).throw(PermissionError('denied')))
     result = fu.clear_directory(str(tmp_path))
@@ -482,15 +480,40 @@ def test_purge_errors(tmp_path, monkeypatch, caplog, error, message) -> None:
     assert message in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=(IndexError, ValueError),
-                   reason="#540: purge_old_files() raises on an age it can't parse, crashing the scheduler")
-@pytest.mark.parametrize('value', ['12', '1 weeks', 'twelve hours'])
-def test_purge_with_an_unusable_age_doesnt_raise(tmp_path, value, caplog) -> None:
-    """A logfilePurgeTimedelta purge_old_files can't use is logged, not raised: the scheduler
-    calls it every cycle without catching errors."""
+@pytest.mark.parametrize('value, message', [
+    ('12', 'expected pairs of a number and a unit'),
+    ('1 fortnight', "unknown unit 'fortnight'"),
+    ('twelve hours', "'twelve' isn't a number"),
+])
+def test_purge_with_an_unusable_age_doesnt_raise(tmp_path, value, message, caplog) -> None:
+    """An age it can't parse is logged and nothing purged, instead of raising into the
+    scheduler, which calls it every cycle (#540)."""
     _aged(tmp_path / 'old.log', 48)
     fu.purge_old_files(str(tmp_path), timedelta_str=value)
     assert (tmp_path / 'old.log').exists()
+    assert 'unusable logfilePurgeTimedelta' in caplog.text and message in caplog.text
+
+
+@pytest.mark.parametrize('value, purged', [('1 week', False), ('1 weeks', False), ('1.5 days', True),
+                                           ('1 Day 12 HOURS', True)])
+def test_purge_weeks_and_decimals(tmp_path, value, purged) -> None:
+    """Weeks, as datetime.timedelta takes, decimals and any case (#540)."""
+    _aged(tmp_path / 'old.log', 48)
+    fu.purge_old_files(str(tmp_path), timedelta_str=value)
+    assert (tmp_path / 'old.log').exists() is not purged
+
+
+def test_purge_missing_directory(tmp_path, caplog) -> None:
+    """A log directory that doesn't exist yet is skipped with a warning (#540)."""
+    fu.purge_old_files(str(tmp_path / 'missing'))
+    assert "isn't a directory" in caplog.text
+
+
+def test_purge_listing_error(tmp_path, monkeypatch, caplog) -> None:
+    """An error listing the directory is logged, not raised (#540)."""
+    monkeypatch.setattr(fu.os, 'listdir', lambda path: (_ for _ in ()).throw(PermissionError('denied')))
+    fu.purge_old_files(str(tmp_path))
+    assert 'Error purging old files' in caplog.text
 
 
 # --- Files: JSON, ownership, directories --------------------------------------
@@ -521,13 +544,16 @@ def test_output_json_data_to_file_errors(tmp_path, monkeypatch) -> None:
         fu.output_json_data_to_file(str(tmp_path / 'x' / 'd.json'), {})
 
 
-@pytest.mark.xfail(strict=True, raises=OSError,
-                   reason="#541: output_json_data_to_file() opens the file outside its try, so it raises instead of "
-                          "returning verdict False")
 def test_output_json_data_to_file_that_cant_be_opened(tmp_path) -> None:
-    """A file that can't be opened (e.g. a folder in its place) is a failed verdict, not an exception."""
+    """A file that can't be opened (e.g. a folder in its place) is a failed verdict, not an exception (#541)."""
     (tmp_path / 'data.json').mkdir()
-    assert fu.output_json_data_to_file(str(tmp_path / 'data.json'), {})['verdict'] is False
+    assert fu.output_json_data_to_file(str(tmp_path / 'data.json'), {}) == {
+        'verdict': False, 'reason': f"Unable to create data file: {tmp_path / 'data.json'}"}
+
+
+def test_output_json_data_that_cant_be_serialized(tmp_path) -> None:
+    """Data JSON can't hold is a failed verdict too."""
+    assert fu.output_json_data_to_file(str(tmp_path / 'd.json'), {'s': {1, 2}})['verdict'] is False
 
 
 def test_np_encoder_rejects_other_types() -> None:
