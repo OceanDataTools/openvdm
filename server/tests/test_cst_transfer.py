@@ -8,7 +8,6 @@ on local directories and need GNU rsync 3 (not macOS's openrsync).
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,6 +18,7 @@ import pytest
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.transfer_utils import TransferCommandError
 from server.tests.cst_helpers import CST_DEFAULTS, make_worker
+from server.tests.helpers import gnu_rsync
 from server.workers import run_collection_system_transfer as cst_run
 
 
@@ -562,16 +562,7 @@ def test_task_log_write_failures(task_worker, fake_copy, tmp_path, monkeypatch, 
 
 # --- End to end, with real rsync ----------------------------------------------
 
-def _gnu_rsync() -> bool:
-    """Whether rsync is GNU rsync 3, which the end-to-end tests need."""
-    try:
-        output = subprocess.run(['rsync', '--version'], capture_output=True, text=True, check=False).stdout
-    except OSError:
-        return False
-    return output.startswith('rsync  version 3')
-
-
-needs_gnu_rsync = pytest.mark.skipif(not _gnu_rsync(), reason='needs GNU rsync 3 (macOS has openrsync)')
+needs_gnu_rsync = pytest.mark.skipif(not gnu_rsync(), reason='needs GNU rsync 3 (macOS has openrsync)')
 
 
 @needs_gnu_rsync
