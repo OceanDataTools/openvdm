@@ -8,10 +8,13 @@
   real class, configured from ``openvdm.yaml.dist`` and the warehouse.
 - :func:`fake_gearman`: a Gearman client that records submitted jobs and
   returns scripted results.
+- :func:`fake_run`: a ``subprocess.run`` that records commands and returns
+  scripted results (#508).
 
 The code behind them is in :mod:`server.tests.helpers`, which tests import.
 """
 
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -22,7 +25,7 @@ import pytest
 import yaml
 
 from server.lib.openvdm import OpenVDM
-from server.tests.helpers import CONFIG_METHODS, ROOT, FakeGearmanClient, load_dist_file
+from server.tests.helpers import CONFIG_METHODS, ROOT, FakeGearmanClient, FakeRun, load_dist_file
 
 
 @pytest.fixture
@@ -115,3 +118,16 @@ def fake_gearman(monkeypatch) -> FakeGearmanClient:
     client = FakeGearmanClient()
     monkeypatch.setattr('python3_gearman.GearmanClient', lambda *args, **kwargs: client)
     return client
+
+
+@pytest.fixture
+def fake_run(monkeypatch) -> FakeRun:
+    """A :class:`~server.tests.helpers.FakeRun` in place of ``subprocess.run``.
+
+    Script results with ``fake_run.on('rclone', 'lsjson', stdout=...)``; check
+    commands with ``fake_run.commands()`` and ``fake_run.calls``.
+    """
+    run = FakeRun()
+    monkeypatch.setattr(subprocess, 'run', run)
+    return run
+
