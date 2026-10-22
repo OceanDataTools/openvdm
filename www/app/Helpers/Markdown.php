@@ -9,8 +9,7 @@
  *
  * Descriptions are user input: HTML in them is escaped rather than passed
  * through, and links with unsafe schemes (javascript: etc.) are dropped. A
- * single line break stays a line break, as in the READMEs (#449), so a
- * description's labelled lines stay apart.
+ * single line break stays a line break, as in the READMEs (#449, #499).
  */
 
 namespace Helpers;
