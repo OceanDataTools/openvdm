@@ -19,4 +19,4 @@ exclude_also =
 # The coverage when this was set; CI fails below it. Raise it as tests are
 # added, never lower it. coverage.py only finds .py files that no test ran,
 # so a .py.dist parser, plugin or bin/ script counts once a test loads it.
-fail_under = 43
+fail_under = 46
