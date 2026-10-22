@@ -543,8 +543,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             The result of ``GearmanWorker.shutdown()``.
         """
         logging.info("Shutdown requested: signaling current job to stop...")
-        self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer.get('cruiseDataTransferID'))
-        self._stop_requested = True
+        # Before its first job the worker has no transfer to mark idle (#526)
+        cdt_id = (self.cruise_data_transfer or {}).get('cruiseDataTransferID')
+        if cdt_id:
+            self.ovdm.set_idle_cruise_data_transfer(cdt_id)
+        # run_transfer_command() polls this to stop the copy
+        self.stop = True
         return super().shutdown(*args, **kwargs)
 
 
