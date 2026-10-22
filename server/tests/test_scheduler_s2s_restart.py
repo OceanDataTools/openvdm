@@ -54,6 +54,10 @@ def _run(monkeypatch, s2s, cycles, enable=1):
     monkeypatch.setattr(scheduler, 'purge_old_files', Mock())
     monkeypatch.setattr(scheduler, 'transfer_locked', s2s.locked)
     monkeypatch.setattr(scheduler.time, 'monotonic', lambda: s2s.clock['now'])
+    # The scheduler waits for the start of a minute by gmtime(): from the same
+    # clock, or each cycle would be longer by a real-time-dependent amount
+    real_gmtime = scheduler.time.gmtime
+    monkeypatch.setattr(scheduler.time, 'gmtime', lambda *args: real_gmtime(s2s.clock['now']))
 
     end_of_cycle = INTERVAL * 60 - 2
     passes = {'done': 0}

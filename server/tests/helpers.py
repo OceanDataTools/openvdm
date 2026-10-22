@@ -201,3 +201,16 @@ class FakeRun:
         """Fail if *secret* (e.g. a password) is part of any recorded command."""
         for call in self.calls:
             assert not any(secret in arg for arg in call.cmd), f"{secret!r} in {call.cmd}"
+
+
+def gnu_rsync() -> bool:
+    """Whether ``rsync`` is GNU rsync 3, which end-to-end transfer tests need.
+
+    macOS ships openrsync, whose options and output differ; CI and the
+    ships' servers have GNU rsync (#510).
+    """
+    try:
+        output = subprocess.run(['rsync', '--version'], capture_output=True, text=True, check=False).stdout
+    except OSError:
+        return False
+    return output.startswith('rsync  version 3')
