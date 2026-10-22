@@ -149,8 +149,10 @@ def test_smb_source_mount_fails(monkeypatch) -> None:
     """The server answered, but the share would not mount."""
     _replace(monkeypatch, detect_smb_version=lambda cfg: ('2.1', ''),
              mount_smb_share=lambda cfg, mnt, version: (False, 'mount error(13)'))
-    assert parts(cu.test_cst_source(_cst(3), '/data')) == [
-        ('SMB server', 'Pass'), ('SMB share', 'Fail'), ('Source directory', 'Fail')]
+    results = cu.test_cst_source(_cst(3), '/data')
+    assert parts(results) == [('SMB server', 'Pass'), ('SMB share', 'Fail'), ('Source directory', 'Fail')]
+    # The share, not the server, as in the destination test (#520)
+    assert reasons(results)[1] == 'Could not connect to SMB share: //nas/share as survey — mount error(13)'
 
 
 def test_smb_source_directory_missing(monkeypatch) -> None:
