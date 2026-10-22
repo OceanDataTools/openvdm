@@ -9,6 +9,9 @@ import importlib.machinery
 import importlib.util
 import inspect
 import json
+import os
+import re
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -115,3 +118,86 @@ class FakeGearmanClient:
     def tasks(self) -> List[str]:
         """Return the task names of the submitted jobs, in order."""
         return [task for task, _ in self.jobs]
+
+
+class FakeRun:
+    """A ``subprocess.run`` that runs nothing, for code that shells out (#508).
+
+    Each call is recorded in :attr:`calls` with its command, its keyword
+    arguments and the contents of any file the command names (a path
+    argument, or one after ``=``, e.g. ``--password-file=``,
+    ``credentials=``), read when the command runs: the credentials and
+    password files OpenVDM writes are deleted right after.
+
+    Results come from rules added with :meth:`on`, matched on the
+    command's first arguments, the most recently added first; a command no
+    rule matches succeeds with no output. As ``subprocess.run`` does, a
+    failing result raises ``CalledProcessError`` when the call passed
+    ``check=True``.
+
+    Attributes:
+        calls: The recorded calls (``cmd``, ``kwargs``, ``files``), in order.
+    """
+
+    def __init__(self) -> None:
+        self.calls: List[SimpleNamespace] = []
+        self._rules: List[tuple] = []
+
+    def on(self, *prefix: str, returncode: int = 0, stdout: str = '', stderr: str = '',  # pylint: disable=too-many-arguments
+           raises: Optional[BaseException] = None,
+           effect: Optional[Callable[[list, dict], None]] = None) -> 'FakeRun':
+        """Script the result of commands starting with *prefix*.
+
+        Args:
+            prefix: The command's first arguments, e.g. ``'rclone', 'lsjson'``.
+            returncode: The exit status.
+            stdout: Its output.
+            stderr: Its error output.
+            raises: An exception to raise instead, e.g. ``FileNotFoundError()``
+                for a command that isn't installed.
+            effect: Called with the command and keyword arguments before the
+                result is returned, e.g. to write to a file the command was
+                given.
+
+        Returns:
+            FakeRun: This object, so calls can be chained.
+        """
+        self._rules.append((list(prefix), SimpleNamespace(
+            returncode=returncode, stdout=stdout, stderr=stderr, raises=raises, effect=effect)))
+        return self
+
+    @staticmethod
+    def _files(cmd: list) -> Dict[str, str]:
+        """Read the small files a command names."""
+        files = {}
+        for path in re.findall(r'(/[^\s,=]+)', ' '.join(str(arg) for arg in cmd)):
+            if os.path.isfile(path) and os.path.getsize(path) < 65536:
+                with open(path, encoding='utf-8', errors='replace') as file:
+                    files[path] = file.read()
+        return files
+
+    def __call__(self, cmd, **kwargs) -> subprocess.CompletedProcess:
+        cmd = [str(arg) for arg in cmd]
+        self.calls.append(SimpleNamespace(cmd=cmd, kwargs=kwargs, files=self._files(cmd)))
+        result = SimpleNamespace(returncode=0, stdout='', stderr='', raises=None, effect=None)
+        for prefix, scripted in reversed(self._rules):
+            if cmd[:len(prefix)] == prefix:
+                result = scripted
+                break
+        if result.effect:
+            result.effect(cmd, kwargs)
+        if result.raises is not None:
+            raise result.raises
+        if kwargs.get('check') and result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout,
+                                                stderr=result.stderr)
+        return subprocess.CompletedProcess(cmd, result.returncode, result.stdout, result.stderr)
+
+    def commands(self, *prefix: str) -> List[list]:
+        """Return the recorded commands, or only those starting with *prefix*."""
+        return [call.cmd for call in self.calls if call.cmd[:len(prefix)] == list(prefix)]
+
+    def assert_not_in_commands(self, secret: str) -> None:
+        """Fail if *secret* (e.g. a password) is part of any recorded command."""
+        for call in self.calls:
+            assert not any(secret in arg for arg in call.cmd), f"{secret!r} in {call.cmd}"
