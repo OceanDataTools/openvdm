@@ -70,9 +70,9 @@ transferPublicData: True
 # The cruise README: a description of the cruise and its directory layout, at
 # the top of the cruise directory. It's rebuilt whenever the cruise config is
 # exported (Setup New Cruise, Edit Cruise, Finalize and Export OpenVDM
-# Config). The template is a Jinja2 file; to change it, copy
-# server/etc/cruise_readme.md.j2.dist to server/etc/cruise_readme.md.j2 and
-# edit the copy (the .dist is used while there's no copy). A relative template
+# Config). The template is a Jinja2 file, server/etc/cruise_readme.md.j2,
+# which the installer copies from its .dist; edit the copy to change the
+# README. Without it, the README isn't written. A relative template
 # path is relative to the OpenVDM directory. The filename may use {cruiseID},
 # e.g. "{cruiseID}_README.md"; keep the quotes, since a name starting with "{"
 # is a YAML error without them. OpenVDM won't replace a file of that name that

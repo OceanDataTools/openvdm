@@ -48,9 +48,9 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
 
     Without the block (``openvdm.yaml`` files from before 2.17), the README
     is written as ``README.md`` from the default template. A relative
-    template path is relative to the OpenVDM directory. When the template
-    doesn't exist but its ``.dist`` does, the ``.dist`` is used, so the
-    default template works before a site makes its own copy.
+    template path is relative to the OpenVDM directory. The template must
+    exist: its ``.dist`` isn't used in its place, so a site always builds its
+    README from its own copy, which the installer makes (#501).
 
     Args:
         config: The parsed ``openvdm.yaml`` (``OpenVDM.config``).
@@ -65,8 +65,8 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
 
     Raises:
         ValueError: If the file name isn't text (e.g. an unquoted
-            ``{cruiseID}``) or a plain file name, or neither the template nor
-            its ``.dist`` exists.
+            ``{cruiseID}``) or a plain file name, or the template doesn't
+            exist.
     """
     block = config.get(block_name)
     block = block if isinstance(block, dict) else {}
@@ -87,10 +87,11 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
     if not os.path.isabs(template):
         template = os.path.join(OPENVDM_ROOT, template)
     if not os.path.isfile(template):
+        reason = f"README template not found: {template}"
         if os.path.isfile(template + '.dist'):
-            template += '.dist'
-        else:
-            raise ValueError(f"README template not found: {template}")
+            reason += (f". Copy {os.path.basename(template)}.dist to it, or re-run the installer, "
+                       "which makes the copy.")
+        raise ValueError(reason)
 
     return {'enable': enable, 'filename': filename, 'template': template}
 

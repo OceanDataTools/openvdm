@@ -3,12 +3,12 @@
 
   The installer copies this file to server/etc/lowering_readme.md.j2 when
   that doesn't exist yet; edit the copy (or set loweringReadme.template in
-  openvdm.yaml) to change the README. OpenVDM uses this .dist file while
-  there's no copy. The variables are described in
-  build_lowering_readme_context() in server/lib/readme.py. The README is
-  rebuilt whenever the lowering config is exported: Setup New Lowering,
-  Finalize Lowering and Export Lowering Config, and by the Rebuild the
-  Lowering README task.
+  openvdm.yaml) to change the README. OpenVDM doesn't use this .dist file
+  itself: without the copy, the README isn't written. The variables are
+  described in build_lowering_readme_context() in server/lib/readme.py. The
+  README is rebuilt whenever the lowering config is exported: Setup New
+  Lowering, Finalize Lowering and Export Lowering Config, and by the Rebuild
+  the Lowering README task.
 -#}
 # Lowering {{ lowering.loweringID }}{% if cruise.cruiseID %} (cruise {{ cruise.cruiseID }}){% endif %}
 
