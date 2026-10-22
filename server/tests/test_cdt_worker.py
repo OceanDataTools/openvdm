@@ -147,8 +147,29 @@ def test_make_cruise_dir(worker, fake_run, caplog) -> None:
     assert fake_run.calls[0].cmd == ['rclone', 'mkdir', 'remote:backup/TEST001', '--config', '/tmp/c']
 
     fake_run.on('rclone', 'mkdir', returncode=1, stderr='permission denied')
-    w.make_cruise_dir('remote:backup')
+    assert w.make_cruise_dir('remote:backup') is True
     assert 'Error creating cruise directory: permission denied' in caplog.text
+
+
+def test_transfer_without_rclone(worker, fake_run, copy) -> None:
+    """A missing rclone fails the transfer with that reason instead of crashing (#524)."""
+    _dry_run(fake_run)
+    fake_run.on('rclone', 'mkdir', raises=FileNotFoundError('rclone'))
+    assert worker().transfer_to_destination(None) == {'verdict': False, 'reason': 'rclone is not installed'}
+    assert copy.calls == []
+
+
+def test_rsync_destination_without_a_password(worker) -> None:
+    """No password from the web app (worker token) fails the transfer instead of crashing (#524)."""
+    result = worker(transferType=2, rsyncPass=None).transfer_to_destination(None)
+    assert result['verdict'] is False and result['reason'].startswith('rsyncPass not available')
+
+
+def test_rsync_password_file_cant_be_written(worker, monkeypatch) -> None:
+    """A password file that can't be written fails the transfer."""
+    monkeypatch.setattr(cdt_run.os, 'chmod', Mock(side_effect=PermissionError('denied')))
+    assert worker(transferType=2).transfer_to_destination(None) == {
+        'verdict': False, 'reason': 'Error writing rsync password file'}
 
 
 def test_run_transfer_command_reports_progress(worker, monkeypatch) -> None:
@@ -359,7 +380,7 @@ def test_real_dry_run_counts_only_what_isnt_excluded(worker, fake_ovdm, warehous
     fake_ovdm.get_collection_system_transfer.return_value = {'cruiseOrLowering': 0, 'destDir': 'Video'}
     monkeypatch.setattr(cdt_run, 'set_owner_group_permissions', Mock(return_value={'verdict': True}))
     # Only the dry run is real: rclone (mkdir and the copy) isn't installed in CI
-    monkeypatch.setattr(cdt_run.OVDMGearmanWorker, 'make_cruise_dir', lambda self, dest, args=None: None)
+    monkeypatch.setattr(cdt_run.OVDMGearmanWorker, 'make_cruise_dir', lambda self, dest, args=None: True)
     (tmp_path / 'backup').mkdir()
 
     worker(destDir=str(tmp_path / 'backup'), includeOVDMFiles=0,

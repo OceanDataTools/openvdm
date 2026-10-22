@@ -186,12 +186,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def make_cruise_dir(self, dest_dir, extra_args=None):
         """Create the cruise directory on an rclone destination (``rclone mkdir``).
 
-        Failures are logged, not raised.
+        A failed ``mkdir`` is only logged: ``rclone copy`` creates the
+        directory too.
 
         Args:
             dest_dir: rclone destination (``remote:path``).
             extra_args: Extra rclone arguments (e.g. ``['--config', path]``),
                 or ``None``.
+
+        Returns:
+            bool: ``False`` if rclone isn't installed, so the copy can't run
+            either (#524); ``True`` otherwise.
         """
 
         # Build rclone command
@@ -209,6 +214,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         except subprocess.CalledProcessError as e:
             logging.error("Error creating cruise directory: %s", e.stderr)
+        except FileNotFoundError:
+            logging.error("Error creating cruise directory: rclone is not installed")
+            return False
+
+        return True
 
 
     def run_transfer_command(self, current_job, command, file_count):
@@ -286,11 +296,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
 
             elif transfer_type == 'rsync':
+                # Without the password (the worker API token), writing it
+                # would raise (#524)
+                if cdt_cfg.get('rsyncPass') is None:
+                    return {'verdict': False,
+                            'reason': 'rsyncPass not available — worker API token may be '
+                                      'misconfigured or password not set for this transfer'}
                 # Write rsync password file
                 password_file = os.path.join(tmpdir, 'rsyncPass')
-                with open(password_file, 'w', encoding='utf-8') as f:
-                    f.write(cdt_cfg['rsyncPass'])
-                os.chmod(password_file, 0o600)
+                try:
+                    with open(password_file, 'w', encoding='utf-8') as f:
+                        f.write(cdt_cfg['rsyncPass'])
+                    os.chmod(password_file, 0o600)
+                except OSError:
+                    return {'verdict': False, 'reason': 'Error writing rsync password file'}
                 dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir'])}/"
 
             elif transfer_type == 'ssh':
@@ -360,7 +379,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # === USING RCLONE === (local directories and SMB mounts, and
                 # rclone remotes for SSH and FTP destinations)
                 else:
-                    self.make_cruise_dir(dest_dir, rclone_args)
+                    if not self.make_cruise_dir(dest_dir, rclone_args):
+                        return {'verdict': False, 'reason': 'rclone is not installed'}
 
                     # Local directories and SMB mounts get the local limits,
                     # rclone remotes the remote ones (#465)
