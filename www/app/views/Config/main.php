@@ -10,6 +10,7 @@ $_warehouseModel = new \Models\Warehouse();
     <div class="row">
         <div class="col-lg-12">
             <?php echo Error::display(Session::pull('message'), 'alert alert-success'); ?>
+            <div id="workerStatus"><?php echo \Helpers\GearmanStatus::alert(\Helpers\GearmanStatus::missingWorkers()); ?></div>
         </div>
     </div>
 

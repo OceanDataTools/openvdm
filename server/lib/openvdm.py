@@ -18,7 +18,8 @@ import requests
 try:
     from yaml import load, YAMLError, FullLoader
 except ModuleNotFoundError:
-    pass
+    class YAMLError(Exception):
+        """Stands in for PyYAML's, so read_config() reports PyYAML missing (#503)."""
 
 # OpenVDM server config file (server/etc/openvdm.yaml).
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
@@ -49,7 +50,9 @@ class OpenVDM():
                 repository root.
 
         Raises:
+            FileNotFoundError: If the configuration file doesn't exist.
             IOError: If the configuration file cannot be opened.
+            ValueError: If the file is empty or isn't a mapping of settings.
             yaml.YAMLError: If the file content is not valid YAML.
             ImportError: If PyYAML is not installed.
         """
@@ -67,7 +70,11 @@ class OpenVDM():
             Parsed configuration as a nested dict.
 
         Raises:
+            FileNotFoundError: If the file doesn't exist; the message says
+                to copy its ``.dist`` when there is one (#503).
             IOError: If the file cannot be opened.
+            ValueError: If the file is empty or isn't a mapping of settings
+                (#503).
             yaml.YAMLError: If the file content is not valid YAML.
             ImportError: If PyYAML is not installed.
         """
@@ -83,9 +90,6 @@ class OpenVDM():
                 raise ImportError('No YAML module available. Please ensure that '
                                   'PyYAML or equivalent is installed (e.g. via '
                                   '"pip3 install PyYAML"') from name_error
-            except YAMLError as exc:
-                logging.error("Unable to parse configuration file: %s", source)
-                raise exc
             except Exception as exc: # handle other exceptions such as attribute errors
                 raise exc
 
@@ -93,12 +97,28 @@ class OpenVDM():
 
         try:
             with open(filename, mode='r', encoding="utf-8") as file:
-                return _parse_yaml(file)
+                config = _parse_yaml(file)
+        except YAMLError as exc:
+            logging.error("Unable to parse configuration file %s: %s", filename, exc)
+            raise exc
+        except FileNotFoundError as exc:
+            reason = f"OpenVDM configuration file not found: {filename}"
+            if os.path.isfile(filename + '.dist'):
+                reason += f". Copy {os.path.basename(filename)}.dist to it, or re-run the installer."
+            logging.error(reason)
+            raise FileNotFoundError(reason) from exc
         except IOError as exc:
             logging.error("Unable to open configuration file: %s", filename)
             raise exc
-        except Exception as exc: # handle other exceptions such as attribute errors
-            raise exc
+
+        # An empty file is parsed as None, which would fail later with a
+        # TypeError far from the cause
+        if not isinstance(config, dict):
+            problem = "is empty" if config is None else "isn't a mapping of settings"
+            reason = f"OpenVDM configuration file {problem}: {filename}"
+            logging.error(reason)
+            raise ValueError(reason)
+        return config
 
 
     def _worker_headers(self) -> dict:

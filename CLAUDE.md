@@ -34,7 +34,8 @@ OpenVDM is a 3-tier distributed system:
 - Location: `server/workers/`
 - Each worker registers one or more Gearman task handlers (e.g. `runCollectionSystemTransfer`, `updateDataDashboard`, `setupNewCruise`)
 - Key workers: `run_collection_system_transfer.py`, `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, `data_dashboard.py`, `md5_summary.py`, `cruise.py`, `lowering.py`, `scheduler.py`
-- Workers are managed by Supervisor in production
+- Workers are managed by Supervisor in production, started through `server/lib/worker_launcher.py` (`python -m server.lib.worker_launcher server/workers/<worker>.py`), which runs the worker as `__main__` and posts an OpenVDM message when it raises, at most once an hour per failure (#503)
+- `Helpers\GearmanStatus::WORKERS` lists the Gearman functions each worker registers, by Supervisor program, for the Configuration page's warning about workers that aren't running (gearmand's `status`). Update it when adding a worker or a `register_task()` call; `server/tests/test_gearman_worker_list.py` fails until it matches (#503)
 
 **Plugin System**
 - Location: `server/plugins/`

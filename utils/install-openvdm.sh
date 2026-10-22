@@ -895,7 +895,7 @@ EOF
 
     cat > "${SUPERVISOR_CONF_D}/openvdm.${SUPERVISOR_PROG_EXT}" << EOF
 [program:cruise]
-command=${VENV_BIN}/python server/workers/cruise.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/cruise.log
@@ -905,7 +905,7 @@ autorestart=true
 stopsignal=INT
 
 [program:cruise_directory]
-command=${VENV_BIN}/python server/workers/cruise_directory.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/cruise_directory.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/cruiseDirectory.log
@@ -915,7 +915,7 @@ autorestart=true
 stopsignal=INT
 
 [program:data_dashboard]
-command=${VENV_BIN}/python server/workers/data_dashboard.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/data_dashboard.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/dataDashboard.log
@@ -925,7 +925,7 @@ autorestart=true
 stopsignal=INT
 
 [program:lowering]
-command=${VENV_BIN}/python server/workers/lowering.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/lowering.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/lowering.log
@@ -935,7 +935,7 @@ autorestart=true
 stopsignal=INT
 
 [program:lowering_directory]
-command=${VENV_BIN}/python server/workers/lowering_directory.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/lowering_directory.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/lowering_directory.log
@@ -945,7 +945,7 @@ autorestart=true
 stopsignal=INT
 
 [program:md5_summary]
-command=${VENV_BIN}/python server/workers/md5_summary.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/md5_summary.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/md5_summary.log
@@ -955,7 +955,7 @@ autorestart=true
 stopsignal=INT
 
 [program:post_hooks]
-command=${VENV_BIN}/python server/workers/post_hooks.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/post_hooks.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/post_hooks.log
@@ -965,7 +965,7 @@ autorestart=true
 stopsignal=INT
 
 [program:reboot_reset]
-command=${VENV_BIN}/python server/workers/reboot_reset.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/reboot_reset.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/reboot_reset.log
@@ -975,7 +975,7 @@ autorestart=false
 stopsignal=INT
 
 [program:run_collection_system_transfer]
-command=${VENV_BIN}/python server/workers/run_collection_system_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_collection_system_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -988,7 +988,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:run_cruise_data_transfer]
-command=${VENV_BIN}/python server/workers/run_cruise_data_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_cruise_data_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -1001,7 +1001,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:run_ship_to_shore_transfer]
-command=${VENV_BIN}/python server/workers/run_ship_to_shore_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_ship_to_shore_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -1014,7 +1014,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:scheduler]
-command=${VENV_BIN}/python server/workers/scheduler.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/scheduler.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/scheduler.log
@@ -1024,7 +1024,7 @@ autorestart=true
 stopsignal=INT
 
 [program:size_cacher]
-command=${VENV_BIN}/python server/workers/size_cacher.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/size_cacher.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/size_cacher.log
@@ -1034,7 +1034,7 @@ autorestart=true
 stopsignal=INT
 
 [program:stop_job]
-command=${VENV_BIN}/python server/workers/stop_job.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/stop_job.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/stop_job.log
@@ -1044,7 +1044,7 @@ autorestart=true
 stopsignal=INT
 
 [program:test_collection_system_transfer]
-command=${VENV_BIN}/python server/workers/test_collection_system_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/test_collection_system_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/test_collection_system_transfer.log
@@ -1055,7 +1055,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:test_cruise_data_transfer]
-command=${VENV_BIN}/python server/workers/test_cruise_data_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/test_cruise_data_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/test_cruise_data_transfer.log

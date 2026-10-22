@@ -51,4 +51,21 @@ class Gearman extends Controller {
 
         echo json_encode($this->_model->clearAllJobsFromDB());
     }
+
+    /**
+     * The OpenVDM workers with no worker process registered with gearmand (#503).
+     *
+     * Echoes JSON: reachable (whether gearmand answered), missing (Supervisor
+     * program => its functions with no worker) and alert (the Configuration
+     * page's warning as HTML, empty when every worker is running).
+     */
+    public function getWorkerStatus(){
+
+        $missing = \Helpers\GearmanStatus::missingWorkers();
+        echo json_encode(array(
+            'reachable' => $missing !== null,
+            'missing' => (object) ($missing ?? array()),
+            'alert' => \Helpers\GearmanStatus::alert($missing),
+        ));
+    }
 }

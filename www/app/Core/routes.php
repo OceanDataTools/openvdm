@@ -234,6 +234,7 @@ Router::any('api/gearman/newJob/(:any)', 'Controllers\Api\Gearman@newJob');
 Router::any('api/gearman/getJobs', 'Controllers\Api\Gearman@getJobs');
 Router::any('api/gearman/getJob/(:num)', 'Controllers\Api\Gearman@getJob');
 Router::any('api/gearman/clearAllJobsFromDB', 'Controllers\Api\Gearman@clearAllJobsFromDB');
+Router::any('api/gearman/getWorkerStatus', 'Controllers\Api\Gearman@getWorkerStatus');
 
 Router::any('', 'Controllers\Welcome@index');
 /* Module routes. */
