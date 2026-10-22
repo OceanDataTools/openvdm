@@ -9,7 +9,6 @@ plugin data used by OpenVDM's Data Dashboard.
 import re
 import sys
 import logging
-from datetime import datetime
 from os.path import dirname, realpath
 from geopy import Point
 from geopy.distance import great_circle
@@ -133,7 +132,7 @@ class GGAParser(OpenVDMCSVParser):
         try:
             for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='GGA'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
-            
+
                 # Map fields to FIELDS
                 field_data = dict(zip(FIELDS, fields))
 

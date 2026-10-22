@@ -76,15 +76,16 @@ npm install
 
 ## Common Commands
 
-**Checks to run before submitting a PR:**
+**Checks to run before submitting a PR** (CI runs the same on PRs to `dev`, `2.17` and `master`, `.github/workflows/checks.yml`):
 ```bash
 source ./venv/bin/activate
-python -m pytest server                  # only the known false-positive errors are expected (see Testing)
+pip install -r requirements-dev.txt      # once: pytest and pytest-cov
+python -m pytest --cov                   # fails below .coveragerc's fail_under (see Testing)
 ruff check server/
 pre-commit run --all-files               # ruff, ESLint, php -l and PHPStan
 ```
 
-There is no automated test suite for the PHP or JavaScript. Changes to the web UI need a manual check in a browser.
+There is no automated test suite for the PHP or JavaScript yet (#515, #516). Changes to the web UI need a manual check in a browser.
 
 **Lint Python code:**
 ```bash
@@ -144,9 +145,15 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 
 ## Testing
 
-### Known false-positive pytest errors
+Tests live in `server/tests/` (`pytest.ini`'s `testpaths`; the repository root is on the import path, so they run from any directory). The root `conftest.py` keeps the Test Setup workers (`server/workers/test_*.py`) and the connection-testing functions they import (`test_cst_source`, `test_cdt_destination`, `test_cdt_rclone_destination`) out of collection: their names match pytest's but they aren't tests (#506). The unit-test plan is #505.
 
-`test_cst_source`, `test_cdt_destination`, and `test_cdt_rclone_destination` in `server/lib/connection_utils.py` are **not pytest tests** — they are OpenVDM connection-testing functions whose names happen to match pytest's default collection pattern. pytest will report them as errors (missing fixture) when running the full suite. These errors are pre-existing and expected; they do not indicate a regression.
+**Shared fixtures** (`server/tests/conftest.py`; the code is in `server/tests/helpers.py`, which tests import instead of conftest.py):
+- `load_dist`: import a `.py.dist` parser, plugin or `bin/` script by path (removed from `sys.modules` after the test)
+- `warehouse`: a temporary warehouse with a cruise directory, and the shipboard data warehouse config for it
+- `fake_ovdm`: an autospecced `OpenVDM` (unknown methods and wrong arguments fail) with `openvdm.yaml.dist` as its `config`; the methods that only read `config` run for real (`CONFIG_METHODS`), the rest record calls
+- `fake_gearman`: a Gearman client that records jobs (`jobs`, `tasks()`) and returns scripted `results` (default `PASS`); also what `python3_gearman.GearmanClient()` returns during the test
+
+**Coverage:** `.coveragerc` measures `server/` and `bin/`, excluding the tests and a site's own copies of `.dist` files. `fail_under` is the floor: raise it when tests add coverage, never lower it. coverage.py only finds `.py` files no test ran, so a `.py.dist` file counts once a test loads it.
 
 ## Git Workflow
 

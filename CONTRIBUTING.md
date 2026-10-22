@@ -136,6 +136,7 @@ Prior to submitting any pull request, please run the checks below and make sure 
 cd <openvdm_root>
 source ./venv/bin/activate
 pre-commit install
+pip install -r requirements-dev.txt     # pytest and pytest-cov
 cd www && composer install && cd ..     # installs PHPStan (a dev dependency)
 ```
 
@@ -143,13 +144,14 @@ Then, before opening a pull request:
 
 ```
 source ./venv/bin/activate
-python -m pytest server        # see CLAUDE.md for the three expected false-positive errors
+python -m pytest --cov         # fails if coverage drops below .coveragerc's fail_under
+ruff check server/
 pre-commit run --all-files     # ruff, ESLint, php -l and PHPStan
 ```
 
-The PHP checks use your locally installed PHP (8.3 matches production) and are skipped with a message if PHP or PHPStan isn't installed.
+The PHP checks use your locally installed PHP (8.3 matches production) and are skipped with a message if PHP or PHPStan isn't installed. GitHub Actions runs the same checks on every pull request to `dev`, `2.17` and `master`.
 
-There is no automated test suite for the PHP or JavaScript, so changes to the web UI also need a manual check in a browser. New Python functionality should, if at all possible, be accompanied by a new unit test.
+There is no automated test suite for the PHP or JavaScript yet, so changes to the web UI also need a manual check in a browser. New Python functionality should, if at all possible, be accompanied by a new unit test in `server/tests/`; CLAUDE.md describes the shared fixtures. When your tests raise the coverage, raise `fail_under` in `.coveragerc` to match.
 
 Always write a clear log message for your commits. One-line messages are fine for small changes, but bigger changes
 should look like this:

@@ -1,0 +1,19 @@
+# Coverage settings for the tests (#506): python -m pytest --cov
+[run]
+source =
+    server
+    bin
+omit =
+    server/tests/*
+    # A site's own copies of the .dist files (ignored by git), so local
+    # coverage matches CI's
+    bin/*.py
+    server/plugins/*.py
+    server/plugins/parsers/*.py
+
+[report]
+skip_empty = true
+# The coverage when this was set; CI fails below it. Raise it as tests are
+# added, never lower it. coverage.py only finds .py files that no test ran,
+# so a .py.dist parser, plugin or bin/ script counts once a test loads it.
+fail_under = 21

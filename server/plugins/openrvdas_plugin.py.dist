@@ -11,14 +11,13 @@ for only the sentences it understands.
 
 import sys
 import os
-import json
 import fnmatch
 import logging
 from os.path import dirname, realpath
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
-from server.lib.openvdm_plugin import OpenVDMPlugin, NpEncoder
+from server.lib.openvdm_plugin import OpenVDMPlugin
 from server.plugins.parsers.gga_parser   import GGAParser
 # from server.plugins.parsers.hdt_parser   import HDTParser
 from server.plugins.parsers.met_parser   import MetParser
