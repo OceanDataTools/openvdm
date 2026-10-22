@@ -345,45 +345,45 @@ def purge_old_files(directory_path: str, excludes: Optional[str] = None,
                     timedelta_str: Optional[str] = None, recursive: bool = False) -> None:
     """Delete files in *directory_path* that are older than *timedelta_str*.
 
+    Problems are logged, not raised: the scheduler calls this every cycle, and
+    an exception would stop it, and with it every scheduled transfer (#540).
+    An age that can't be parsed, or a directory that doesn't exist, purges
+    nothing.
+
     Args:
         directory_path: Directory to scan for old files.
         excludes: Comma-separated list of glob patterns for files to skip.
-        timedelta_str: Human-readable age threshold such as ``"12 hours"`` or
-            ``"3 days"``.  Defaults to ``"12 hours"``.
+        timedelta_str: Age threshold as number-and-unit pairs, such as
+            ``"12 hours"``, ``"3 days"`` or ``"1 week 2 days"`` (weeks, days,
+            hours, minutes and seconds, as ``datetime.timedelta`` takes).
+            Defaults to ``"12 hours"``.
         recursive: If ``True``, also purge files in subdirectories.
-
-    Raises:
-        ValueError: If *timedelta_str* cannot be parsed.
     """
 
     timedelta_str = timedelta_str or "12 hours"
 
     def _parse_timedelta(timedelta_str):
-        """
-        parse a timedelta-style string and return a timedelta object
+        """Parse number-and-unit pairs into a timedelta.
+
+        Raises:
+            ValueError: If the string isn't pairs of a number and a known unit.
         """
 
-        time_parts = timedelta_str.split()
+        time_parts = str(timedelta_str).split()
+        units = ('weeks', 'days', 'hours', 'minutes', 'seconds')
         time_args = {}
 
-        i = 0
-        while i < len(time_parts):
-            value = int(time_parts[i])
-            unit = time_parts[i + 1].lower()
+        if not time_parts or len(time_parts) % 2:
+            raise ValueError(f"expected pairs of a number and a unit, e.g. '12 hours': {timedelta_str!r}")
 
-            if 'day' in unit:
-                time_args['days'] = value
-            elif 'hour' in unit:
-                time_args['hours'] = value
-            elif 'minute' in unit:
-                time_args['minutes'] = value
-            elif 'second' in unit:
-                time_args['seconds'] = value
-
-            i += 2
-
-        if not time_args:
-            raise ValueError('Invalid timedelta string specified: %s', timedelta_str)
+        for value, unit in zip(time_parts[::2], time_parts[1::2]):
+            name = next((u for u in units if unit.lower() in (u, u[:-1])), None)
+            if name is None:
+                raise ValueError(f"unknown unit {unit!r} in {timedelta_str!r}: use {', '.join(units)}")
+            try:
+                time_args[name] = float(value)
+            except ValueError as exc:
+                raise ValueError(f"{value!r} isn't a number in {timedelta_str!r}") from exc
 
         return timedelta(**time_args)
 
@@ -433,18 +433,23 @@ def purge_old_files(directory_path: str, excludes: Optional[str] = None,
 
                 _purge_files(filepath, excludes, total_seconds, recursive)
 
-    # Parse the time delta string into a timedelta object
     try:
-        # Convert the time delta string to a timedelta object
         time_delta = _parse_timedelta(timedelta_str)
     except ValueError as exc:
-        logging.error("Error parsing time delta string: %s", str(exc))
-        raise exc
+        logging.error("Not purging old files: unusable logfilePurgeTimedelta: %s", exc)
+        return
+
+    if not os.path.isdir(directory_path):
+        logging.warning("Not purging old files: %s isn't a directory", directory_path)
+        return
 
     # Get the current time
     current_time = time.time()
 
-    _purge_files(directory_path, excludes, time_delta.total_seconds(), recursive)
+    try:
+        _purge_files(directory_path, excludes, time_delta.total_seconds(), recursive)
+    except OSError as exc:
+        logging.error("Error purging old files in %s: %s", directory_path, exc)
 
 
 def output_json_data_to_file(file_path: str, contents) -> dict:

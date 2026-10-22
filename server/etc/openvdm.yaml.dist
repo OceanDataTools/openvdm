@@ -93,8 +93,10 @@ loweringReadme:
     filename: README.md
     template: server/etc/lowering_readme.md.j2
 
-# maximum age of transfer log files to retain. String must conform with the python
-# datetime.timedelta standard
+# maximum age of transfer log files to retain (default 12 hours): pairs of a
+# number and a unit (weeks, days, hours, minutes or seconds), e.g. "12 hours",
+# "3 days" or "1 week 2 days". A value that can't be read is logged and no logs
+# are purged.
 # logfilePurgeTimedelta: "12 hours"
 
 # The plugins section defines where the plugins processing scripts reside

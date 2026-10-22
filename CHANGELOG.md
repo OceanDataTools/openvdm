@@ -79,6 +79,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Test Setup crashes:** Test Setup showed *Worker crashed: AttributeError …* instead of the reason for a transfer the web app couldn't find (e.g. deleted while its form was open), for a malformed job, and, for cruise data transfers, when the cruise directory doesn't exist. Each is now reported as a failed test with its reason, and a malformed job no longer sets an error on the previous transfer tested (#528, #529).
 - **Setup New Cruise with a PublicData file it can't delete:** a file it couldn't delete in a PublicData subfolder crashed the job (`KeyError`) instead of failing *Clear out PublicData directory* with the reason (#539).
 - **JSON files that can't be written fail their step instead of crashing the worker:** when a transfer log, dashboard file or config couldn't be opened (e.g. a folder the worker can't write to), the worker crashed; the step now fails with *Unable to create data file* (#541).
+- **A `logfilePurgeTimedelta` the scheduler can't read no longer stops it:** a value without a unit (`"12"`), with weeks (`"1 week"`, which `openvdm.yaml.dist` said was allowed) or otherwise unreadable stopped the scheduler on every cycle, so no transfers ran. Weeks and decimals (`"1.5 days"`) now work; an unreadable value, or a missing log directory, is logged and purges nothing, and a problem purging logs no longer stops the scheduling of transfers (#540).
 
 ---
 

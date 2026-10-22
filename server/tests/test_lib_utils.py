@@ -480,15 +480,40 @@ def test_purge_errors(tmp_path, monkeypatch, caplog, error, message) -> None:
     assert message in caplog.text
 
 
-@pytest.mark.xfail(strict=True, raises=(IndexError, ValueError),
-                   reason="#540: purge_old_files() raises on an age it can't parse, crashing the scheduler")
-@pytest.mark.parametrize('value', ['12', '1 weeks', 'twelve hours'])
-def test_purge_with_an_unusable_age_doesnt_raise(tmp_path, value, caplog) -> None:
-    """A logfilePurgeTimedelta purge_old_files can't use is logged, not raised: the scheduler
-    calls it every cycle without catching errors."""
+@pytest.mark.parametrize('value, message', [
+    ('12', 'expected pairs of a number and a unit'),
+    ('1 fortnight', "unknown unit 'fortnight'"),
+    ('twelve hours', "'twelve' isn't a number"),
+])
+def test_purge_with_an_unusable_age_doesnt_raise(tmp_path, value, message, caplog) -> None:
+    """An age it can't parse is logged and nothing purged, instead of raising into the
+    scheduler, which calls it every cycle (#540)."""
     _aged(tmp_path / 'old.log', 48)
     fu.purge_old_files(str(tmp_path), timedelta_str=value)
     assert (tmp_path / 'old.log').exists()
+    assert 'unusable logfilePurgeTimedelta' in caplog.text and message in caplog.text
+
+
+@pytest.mark.parametrize('value, purged', [('1 week', False), ('1 weeks', False), ('1.5 days', True),
+                                           ('1 Day 12 HOURS', True)])
+def test_purge_weeks_and_decimals(tmp_path, value, purged) -> None:
+    """Weeks, as datetime.timedelta takes, decimals and any case (#540)."""
+    _aged(tmp_path / 'old.log', 48)
+    fu.purge_old_files(str(tmp_path), timedelta_str=value)
+    assert (tmp_path / 'old.log').exists() is not purged
+
+
+def test_purge_missing_directory(tmp_path, caplog) -> None:
+    """A log directory that doesn't exist yet is skipped with a warning (#540)."""
+    fu.purge_old_files(str(tmp_path / 'missing'))
+    assert "isn't a directory" in caplog.text
+
+
+def test_purge_listing_error(tmp_path, monkeypatch, caplog) -> None:
+    """An error listing the directory is logged, not raised (#540)."""
+    monkeypatch.setattr(fu.os, 'listdir', lambda path: (_ for _ in ()).throw(PermissionError('denied')))
+    fu.purge_old_files(str(tmp_path))
+    assert 'Error purging old files' in caplog.text
 
 
 # --- Files: JSON, ownership, directories --------------------------------------

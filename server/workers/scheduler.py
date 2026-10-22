@@ -98,10 +98,14 @@ def scheduler(interval: int = None) -> None:
 
     while True:
 
-        # purge old transfer logs:
+        # purge old transfer logs; a problem there mustn't stop the
+        # scheduling of transfers (#540)
         logging.info("Purging old transfer logs")
-        transfer_log_dir = ovdm.get_transfer_log_dir()
-        purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
+        try:
+            transfer_log_dir = ovdm.get_transfer_log_dir()
+            purge_old_files(transfer_log_dir, excludes="*Exclude.log", timedelta_str=logfile_purge_timedelta)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logging.error("Unable to purge old transfer logs: %s", exc)
 
         # Run on the minute
         CURRENT_SEC = 0
