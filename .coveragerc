@@ -13,7 +13,10 @@ omit =
 
 [report]
 skip_empty = true
+# How Supervisor starts a worker or script; tests import the module instead
+exclude_also =
+    if __name__ == .__main__.:
 # The coverage when this was set; CI fails below it. Raise it as tests are
 # added, never lower it. coverage.py only finds .py files that no test ran,
 # so a .py.dist parser, plugin or bin/ script counts once a test loads it.
-fail_under = 31
+fail_under = 40
