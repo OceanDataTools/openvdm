@@ -44,8 +44,10 @@ This directory holds the data collected during cruise {{ cruise.cruiseID }}{% if
 
 ## Directory layout
 Paths are relative to this directory.
-{# Each line of a description ends in two spaces, a Markdown line break, so
-   its Source/Contents, Files and Sub-directories lines (#449) stay apart #}
+{# A description is Markdown that goes under its folder's heading: a
+   paragraph, a **Files:** list and an optional **Sub-directories:** list
+   (#499). Each line ends in two spaces, a Markdown line break, so a single
+   line break stays one, as on OpenVDM's pages (#460) #}
 
 {% macro entry(d) %}
 #### `{{ d.destDir }}{{ "" if d.file else "/" }}`: {{ d.longName or d.name }}

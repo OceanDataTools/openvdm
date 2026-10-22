@@ -117,20 +117,32 @@ class Config
 
         /*
          * Templates for a new collection system transfer's or extra
-         * directory's Description, shown in the cruise and lowering READMEs.
-         * The add forms start with them, and the edit forms' "Use template"
-         * button fills an empty Description with them. A line still showing
-         * its <...> prompt when the form is saved is left out. Set one to ''
-         * to turn its template off.
+         * directory's Description, shown in the cruise and lowering READMEs
+         * under the folder's heading. A description is Markdown: a paragraph
+         * about the source (or what's put in the directory), a **Files:**
+         * list with one item per file type, and an optional
+         * **Sub-directories:** list. The add forms start with them, and the
+         * edit forms' "Use template" button fills an empty Description with
+         * them. When the form is saved, a line still showing its <...> prompt
+         * is left out, and so is a section label with nothing left under it.
+         * Set one to '' to turn its template off.
          */
         define('CST_DESCRIPTION_TEMPLATE',
-            "Source: <instrument or acquisition system, and what it records>\n" .
-            "Files: <file types and extensions, naming, how often new files appear>\n" .
-            "Sub-directories: <each sub-directory and what it holds, or \"none\">");
+            "<The instrument or acquisition system, and what it records>\n" .
+            "\n" .
+            "**Files:**\n" .
+            "- `<file name pattern, e.g. *.raw>`: <what each file holds, and how often new ones appear>\n" .
+            "\n" .
+            "**Sub-directories:**\n" .
+            "- `<name>/`: <what it holds>");
         define('EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE',
-            "Contents: <what's put here, and by whom or what>\n" .
-            "Files: <file types and extensions>\n" .
-            "Sub-directories: <each sub-directory and what it holds, or \"none\">");
+            "<What's put here, and by whom or what>\n" .
+            "\n" .
+            "**Files:**\n" .
+            "- `<file name pattern, e.g. *.pdf>`: <what each file holds>\n" .
+            "\n" .
+            "**Sub-directories:**\n" .
+            "- `<name>/`: <what it holds>");
 
         /*
          * Set default controller and method for legacy calls.
