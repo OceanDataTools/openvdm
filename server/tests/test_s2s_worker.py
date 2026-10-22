@@ -336,6 +336,23 @@ def test_crashed_job_reports_where(job_worker, fake_ovdm, monkeypatch) -> None:
     assert fake_ovdm.set_error_cruise_data_transfer.call_args.args[1].endswith('(unknown, line ?)')
 
 
+def test_quit_before_the_first_job(worker, fake_ovdm, monkeypatch) -> None:
+    """A worker stopped before its first job shuts down without error (#526)."""
+    monkeypatch.setattr(s2s_run.python3_gearman.GearmanWorker, 'shutdown', lambda self: 'shut down')
+    fresh = worker()
+    fresh.cruise_data_transfer = None
+    fresh.quit_worker()
+    assert fresh.stop is True
+    fake_ovdm.set_idle_cruise_data_transfer.assert_not_called()
+
+
+def test_shutdown_stops_the_running_job(job_worker, monkeypatch) -> None:
+    """Shutting down (e.g. from Supervisor) also stops a copy in progress."""
+    monkeypatch.setattr(s2s_run.python3_gearman.GearmanWorker, 'shutdown', lambda self: 'shut down')
+    job_worker.stop = False
+    assert job_worker.shutdown() == 'shut down' and job_worker.stop is True
+
+
 def test_quit_marks_the_transfer_idle(job_worker, fake_ovdm, monkeypatch) -> None:
     """Quitting sets the transfer idle and asks the job to stop."""
     monkeypatch.setattr(s2s_run.python3_gearman.GearmanWorker, 'shutdown', lambda self: 'shut down')

@@ -4,10 +4,6 @@ These OpenVDM workers (``test_collection_system_transfer.py`` and
 ``test_cruise_data_transfer.py``) run the connection checks behind the Test
 Setup button. The checks themselves (``test_cst_source()`` and the
 destination tests) have their own tests (#508), so they're replaced here.
-
-Tests marked ``xfail`` describe the right behavior for bugs that aren't fixed
-yet; ``strict`` makes them fail once the bug is fixed, so the marker is
-removed then.
 """
 
 import json
@@ -110,31 +106,27 @@ def test_cst_lowering_transfer_needs_a_lowering(cst_worker, fake_ovdm) -> None:
                                                                                  set_status=True)
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError,
-                   reason="#528: a transfer the API doesn't return is set to None, then _fail_job reads None.get()")
 def test_cst_unknown_transfer(cst_worker, fake_ovdm) -> None:
-    """A transfer ID the API doesn't know (e.g. deleted) fails the test instead of crashing."""
+    """A transfer ID the API doesn't know (e.g. deleted) fails the test instead of crashing (#528)."""
     fake_ovdm.get_collection_system_transfer.side_effect = lambda cst_id: None
-    cst_worker.collection_system_transfer = {}
     result = cst_worker.on_job_execute(_job('testCollectionSystemTransfer',
                                             collectionSystemTransfer={'collectionSystemTransferID': 9}))
     assert json.loads(result)['parts'][-1]['partName'] == 'Locate collection system transfer Data'
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError,
-                   reason="#528: _fail_job before the first job's transfer is set reads None.get()")
 @pytest.mark.parametrize('data', ['not json', json.dumps({})])
 def test_cst_bad_payload_on_a_fresh_worker(cst_worker, data) -> None:
-    """A payload that isn't JSON, or has no transfer, fails the test instead of crashing."""
+    """A payload that isn't JSON, or has no transfer, fails the test instead of crashing (#528)."""
     job = SimpleNamespace(data=data, handle='H:1', task='testCollectionSystemTransfer')
     assert json.loads(cst_worker.on_job_execute(job))['parts'][-1]['result'] == 'Fail'
 
 
-def test_cst_bad_payload_after_a_job(cst_worker) -> None:
-    """After a job, a bad payload fails (the previous transfer's status isn't changed)."""
-    cst_worker.collection_system_transfer = {}
+def test_cst_bad_payload_after_a_job(cst_worker, fake_ovdm) -> None:
+    """After a job, a bad payload fails without changing the previous job's transfer (#528)."""
+    cst_worker.collection_system_transfer = dict(CST)
     job = SimpleNamespace(data='not json', handle='H:1', task='testCollectionSystemTransfer')
     assert json.loads(cst_worker.on_job_execute(job))['parts'][-1]['reason'] == 'Failed to parse current job payload'
+    fake_ovdm.set_error_collection_system_transfer_test.assert_not_called()
 
 
 def test_cst_destination_check(cst_worker, warehouse) -> None:
@@ -271,31 +263,27 @@ def test_cdt_job_for_an_unsaved_transfer(cdt_worker, fake_ovdm) -> None:
     assert cdt_worker.cruise_data_transfer['destDir'] == '/n'
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError,
-                   reason="#528: a transfer the API doesn't return is set to None, then _fail_job reads None.get()")
 def test_cdt_unknown_transfer(cdt_worker, fake_ovdm) -> None:
-    """A transfer ID the API doesn't know (e.g. deleted) fails the test instead of crashing."""
+    """A transfer ID the API doesn't know (e.g. deleted) fails the test instead of crashing (#528)."""
     fake_ovdm.get_cruise_data_transfer.side_effect = lambda cdt_id: None
-    cdt_worker.cruise_data_transfer = {}
     result = cdt_worker.on_job_execute(_job('testCruiseDataTransfer', cruiseDataTransfer={'cruiseDataTransferID': 9}))
     assert json.loads(result)['parts'][-1]['partName'] == 'Locate Cruise Data Transfer Data'
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError,
-                   reason="#528: _fail_job before the first job's transfer is set reads None.get()")
 @pytest.mark.parametrize('data', ['not json', json.dumps({})])
 def test_cdt_bad_payload_on_a_fresh_worker(cdt_worker, data) -> None:
-    """A payload that isn't JSON, or has no transfer, fails the test instead of crashing."""
+    """A payload that isn't JSON, or has no transfer, fails the test instead of crashing (#528)."""
     job = SimpleNamespace(data=data, handle='H:1', task='testCruiseDataTransfer')
     assert json.loads(cdt_worker.on_job_execute(job))['parts'][-1]['result'] == 'Fail'
 
 
-def test_cdt_bad_payload_after_a_job(cdt_worker) -> None:
-    """After a job, a payload that is not JSON, or has no transfer, fails the test."""
-    cdt_worker.cruise_data_transfer = {}
+def test_cdt_bad_payload_after_a_job(cdt_worker, fake_ovdm) -> None:
+    """After a job, a bad payload fails without changing the previous job's transfer (#528)."""
     for data in ('not json', json.dumps({})):
+        cdt_worker.cruise_data_transfer = dict(CDT)
         job = SimpleNamespace(data=data, handle='H:1', task='testCruiseDataTransfer')
         assert json.loads(cdt_worker.on_job_execute(job))['parts'][-1]['result'] == 'Fail'
+    fake_ovdm.set_error_cruise_data_transfer_test.assert_not_called()
 
 
 def _cdt_ready(cdt_worker, warehouse, **cfg):
@@ -334,26 +322,24 @@ def test_cdt_task_failure_is_the_verdict(cdt_worker, warehouse, fake_ovdm, monke
     fake_ovdm.set_running_cruise_data_transfer_test.assert_called_once()
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError,
-                   reason="#529: test_cruise_dir() returns _fail_job()'s completion instead of a part")
 def test_cdt_task_without_a_cruise_directory(cdt_worker, warehouse, monkeypatch) -> None:
-    """A missing cruise directory fails the test instead of crashing the worker."""
+    """A missing cruise directory fails the test, in the Final Verdict, instead of crashing (#529)."""
     monkeypatch.setattr(cdt_test, 'test_cdt_destination', lambda c: list(PASS))
     _cdt_ready(cdt_worker, warehouse)
     cdt_worker.cruise_dir = str(warehouse.base_dir / 'missing')
     result = json.loads(cdt_test.task_test_cruise_data_transfer(cdt_worker, _job('t')))
-    assert result['parts'][-1]['result'] == 'Fail'
+    assert [part['result'] for part in result['parts']] == ['Fail', 'Pass', 'Fail']
+    assert result['parts'][-1] == {'partName': 'Final Verdict', 'result': 'Fail',
+                                   'reason': f"Unable to find cruise data directory: {warehouse.base_dir / 'missing'}"}
 
 
 def test_cdt_cruise_dir_check(cdt_worker, warehouse, fake_ovdm) -> None:
-    """Today a missing cruise directory completes the job as failed from inside the check (#529)."""
+    """The check returns its part; it doesn't complete the job itself (#529)."""
     _cdt_ready(cdt_worker, warehouse)
-    assert cdt_worker.test_cruise_dir(_job('t')) == [{'partName': 'Verify cruise data directory exists',
-                                                      'result': 'Pass'}]
+    assert cdt_worker.test_cruise_dir() == [{'partName': 'Verify cruise data directory exists', 'result': 'Pass'}]
     cdt_worker.cruise_dir = str(warehouse.base_dir / 'missing')
-    cdt_worker.test_cruise_dir(_job('t'))
-    assert fake_ovdm.set_error_cruise_data_transfer_test.call_args.args[1].startswith(
-        'Unable to find cruise data directory')
+    assert cdt_worker.test_cruise_dir()[0]['result'] == 'Fail'
+    fake_ovdm.set_error_cruise_data_transfer_test.assert_not_called()
 
 
 @pytest.mark.parametrize('verdict, running', [('Pass', False), ('Pass', True), ('Fail', False), ('Fail', True)])

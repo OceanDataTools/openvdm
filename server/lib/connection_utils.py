@@ -164,7 +164,7 @@ def check_darwin(cfg):
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
     except (subprocess.SubprocessError, OSError) as exc:
-        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(exc))
+        logging.error("SSH command to check for Darwin (macOS) failed: %s", str(exc))
         return False
 
 
@@ -1864,7 +1864,8 @@ def test_cst_source(cst_cfg, source_dir):
 
             mnt_success, mnt_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
             if not mnt_success:
-                reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                # The server answered: it's the share that failed (#520)
+                reason = f"Could not connect to SMB share: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
                 if mnt_detail:
                     reason += f" — {mnt_detail}"
                 results.extend([

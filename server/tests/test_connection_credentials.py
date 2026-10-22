@@ -240,10 +240,11 @@ def test_check_darwin(fake_run, stdout, expected) -> None:
     fake_run.assert_not_in_commands(SECRET)
 
 
-def test_check_darwin_on_ssh_failure(fake_run) -> None:
-    """A failed SSH command counts as not macOS."""
+def test_check_darwin_on_ssh_failure(fake_run, caplog) -> None:
+    """A failed SSH command counts as not macOS, and is logged (#521)."""
     fake_run.on('ssh', raises=subprocess.TimeoutExpired('ssh', 10))
     assert cu.check_darwin({'sshServer': 'host', 'sshUser': 'survey', 'sshUseKey': '1'}) is False
+    assert 'SSH command to check for Darwin (macOS) failed' in caplog.text
 
 
 # --- rclone configs -----------------------------------------------------------
