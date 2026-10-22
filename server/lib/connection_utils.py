@@ -164,7 +164,7 @@ def check_darwin(cfg):
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
     except (subprocess.SubprocessError, OSError) as exc:
-        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(exc))
+        logging.error("SSH command to check for Darwin (macOS) failed: %s", str(exc))
         return False
 
 
