@@ -286,6 +286,29 @@ def write_outputs(geojson_obj: dict, base_name: str, prefix: str,  # pylint: dis
             set_owner_group_permissions(output_user, kml_path)
 
 
+def source_geojson(data: dict, data_type: str) -> dict | None:
+    """Return a position source's GeoJSON track from one dashboard file.
+
+    The data dashboard writes a plugin's output as it is: today one entry per
+    data type (``{"gga": {"visualizerData": [...]}}``), formerly
+    ``visualizerData`` at the top level. Both are read (#536).
+
+    Args:
+        data: The dashboard file's contents.
+        data_type: The position source's data type (its ``type``).
+
+    Returns:
+        dict | None: The first GeoJSON ``FeatureCollection`` in the data type's
+        ``visualizerData``, or ``None`` if there isn't one.
+    """
+    section = data.get(data_type) if isinstance(data, dict) and isinstance(data.get(data_type), dict) else data
+    entries = section.get("visualizerData") if isinstance(section, dict) else None
+    for entry in entries if isinstance(entries, list) else []:
+        if isinstance(entry, dict) and entry.get("type") == "FeatureCollection":
+            return entry
+    return None
+
+
 def process_position_source(position_source: dict, manifest: list, cruise_base_dir: str,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                             prefix: str, trackline_dir: str, args: argparse.Namespace,
                             output_user: str | None, written: list | None = None) -> dict | None:
@@ -330,9 +353,13 @@ def process_position_source(position_source: dict, manifest: list, cruise_base_d
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            geojson_obj = data["visualizerData"][0]
-        except (OSError, KeyError, IndexError, json.JSONDecodeError) as err:
+        except (OSError, json.JSONDecodeError) as err:
             logging.error("Invalid dashboard file %s: %s", file, err)
+            continue
+
+        geojson_obj = source_geojson(data, position_source["type"])
+        if geojson_obj is None:
+            logging.error("No GeoJSON track for %s in dashboard file %s", position_source["type"], file)
             continue
 
         base_name = os.path.basename(file).split(".")[0]

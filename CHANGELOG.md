@@ -80,6 +80,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Setup New Cruise with a PublicData file it can't delete:** a file it couldn't delete in a PublicData subfolder crashed the job (`KeyError`) instead of failing *Clear out PublicData directory* with the reason (#539).
 - **JSON files that can't be written fail their step instead of crashing the worker:** when a transfer log, dashboard file or config couldn't be opened (e.g. a folder the worker can't write to), the worker crashed; the step now fails with *Unable to create data file* (#541).
 - **A `logfilePurgeTimedelta` the scheduler can't read no longer stops it:** a value without a unit (`"12"`), with weeks (`"1 week"`, which `openvdm.yaml.dist` said was allowed) or otherwise unreadable stopped the scheduler on every cycle, so no transfers ran. Weeks and decimals (`"1.5 days"`) now work; an unreadable value, or a missing log directory, is logged and purges nothing, and a problem purging logs no longer stops the scheduling of transfers (#540).
+- **`--no-combine` trackline files:** `build_cruise_tracks.py` and `build_lowering_tracks.py` with `--no-combine` wrote no tracklines: they read only the old dashboard file format, while the data dashboard writes one entry per data type (as the OpenRVDAS plugin returns it), so every file was logged as invalid. They now read the position source's data type from either format (#536).
 
 ---
 
