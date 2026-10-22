@@ -154,7 +154,9 @@ Tests live in `server/tests/` (`pytest.ini`'s `testpaths`; the repository root i
 - `fake_gearman`: a Gearman client that records jobs (`jobs`, `tasks()`) and returns scripted `results` (default `PASS`); also what `python3_gearman.GearmanClient()` returns during the test
 - `fake_run`: replaces `subprocess.run`; script results with `on(*prefix, returncode=, stdout=, stderr=, raises=, effect=)`, matched on the command's first arguments (raises `CalledProcessError` under `check=True`, as the real one does). Each call records `cmd`, `kwargs` and `files`, the contents of files the command names (e.g. a credentials or password file) read when it runs; `assert_not_in_commands(secret)` checks a password never reaches a command line (#508)
 
-**Coverage:** `.coveragerc` measures `server/` and `bin/`, excluding the tests and a site's own copies of `.dist` files. `fail_under` is the floor: raise it when tests add coverage, never lower it. coverage.py only finds `.py` files no test ran, so a `.py.dist` file counts once a test loads it.
+**Worker tests:** `server/tests/cst_helpers.py` builds a real `OVDMGearmanWorker` for the collection system transfer worker with `fake_ovdm` and `warehouse`, set up as `_run_job()` leaves it (#510); other workers' tests follow the same pattern. Tests that need real rsync are marked to skip without GNU rsync 3 (macOS has openrsync), so they run in CI.
+
+**Coverage:** `.coveragerc` measures `server/` and `bin/`, excluding the tests, a site's own copies of `.dist` files, and `if __name__ == "__main__":` blocks (how Supervisor starts a worker). `fail_under` is the floor: raise it when tests add coverage, never lower it. coverage.py only finds `.py` files no test ran, so a `.py.dist` file counts once a test loads it.
 
 ## Git Workflow
 
