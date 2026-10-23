@@ -104,6 +104,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Rebuild Data Dashboard's progress past 100%:** each transfer's share of the progress was shifted by one, so a rebuild of one transfer showed 90% to 170%, and of three, up to 116%. The transfers now share 10–90% in order (#584).
 - **Stopped Update MD5 Summary reported success:** if Stop arrived while files were being hashed, the hashes done so far were saved and the job passed, leaving the other files with old hashes or none, and nothing to say so. A stopped update now fails "Calculate Hashes" with "Job was stopped by user" and leaves the summary as it was, as a stopped rebuild does. Run Rebuild MD5 Summary to add the files it didn't (#579).
 - **Stop reported success when it couldn't signal the job:** if the job's process couldn't be signalled, e.g. it was run by another user, Stop added a failed part but then a passed one, set the transfer or task idle and posted "Manual Stop of ...", while the process was still running. Stop now fails and leaves the transfer or task as it is (#589).
+- **Size cacher crashes:** without a current cruise (e.g. a new install), or when the API failed while it stored the sizes, the size cacher crashed and Supervisor kept restarting it, with the worker launcher's crash message each time. Without a cruise it now stores no sizes, and an API error is logged; both wait for the next pass (#588).
 
 ---
 
