@@ -387,13 +387,10 @@ class OpenVDMParser():
                 nor ``process_file()``.
         """
 
-        # Preferred: new-style parsers override parse()
-        if self.__class__.parse is not OpenVDMCSVParser.parse:
-            result = self.__class__.parse(self, filepath)
-            return result
-
-        # Legacy-style parsers: process_file()
-        if hasattr(self, 'process_file'):
+        # New-style parsers override parse(), so they only get here through
+        # super().parse(). Legacy-style parsers override process_file(); the
+        # base one calls parse(), so it's only used when overridden (#533).
+        if type(self).process_file is not OpenVDMParser.process_file:
             result = self.process_file(filepath)
 
             # Legacy parsers usually return None but populate self.plugin_data

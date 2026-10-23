@@ -92,11 +92,18 @@ def load_position_sources_from_yaml(
     position_sources = data.get("PositionSources", data.get("GPSSources"))
     if not isinstance(position_sources, list):
         raise RuntimeError("PositionSources must be a list")
+    if not position_sources:
+        raise RuntimeError("PositionSources must list at least one source")
 
     seen_devices: set = set()
     seen_types: set = set()
 
     for src in position_sources:
+        # e.g. a bare name instead of a device and type (#537)
+        if not isinstance(src, dict):
+            raise RuntimeError(
+                "Each position source must define exactly one 'device' and one 'type'"
+            )
         device = src.get("device")
         dtype = src.get("type")
 
