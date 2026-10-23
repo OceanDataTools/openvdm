@@ -23,18 +23,6 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMParser
 
-
-def _run_gdal_command(command):
-    """Run a GDAL command, logging stderr and raising when it fails."""
-    logging.debug("Command: %s", ' '.join(command))
-    result = subprocess.run(command, capture_output=True, check=False, text=True)
-    if result.returncode:
-        logging.error("GDAL command failed (%s): %s",
-                      result.returncode, result.stderr.strip())
-        raise subprocess.CalledProcessError(
-            result.returncode, command, output=result.stdout, stderr=result.stderr)
-
-
 class GeoTIFFParser(OpenVDMParser):
     """Parser for GeoTIFF files that writes a GDAL tile pyramid."""
 
@@ -79,38 +67,38 @@ class GeoTIFFParser(OpenVDMParser):
         # Create temp directory
         tmpdir = tempfile.mkdtemp()
 
-        try:
-            ll_filepath = os.path.join(tmpdir, f'{label}_LL.tif')
-            vrt_filepath = os.path.join(tmpdir, 'temp.vrt')
+        ll_filepath = os.path.join(tmpdir, f'{label}_LL.tif')
+        vrt_filepath = os.path.join(tmpdir, 'temp.vrt')
 
-            t_srs_options = "+proj=latlong +datum=WGS84"
+        t_srs_options = "+proj=latlong +datum=WGS84"
 
-            command = ['gdalwarp', '-t_srs', t_srs_options, filepath, ll_filepath]
-            _run_gdal_command(command)
+        command = ['gdalwarp', '-t_srs', t_srs_options, filepath, ll_filepath]
+        logging.debug("Command: %s", ' '.join(command))
+        subprocess.run(command, capture_output=True, check=False)
 
-            # Open the reprojected GeoTIFF and fail clearly if GDAL produced no dataset.
-            ll_tiff = gdal.Open(ll_filepath)
-            if ll_tiff is None:
-                raise RuntimeError(f"GDAL could not open reprojected GeoTIFF: {filepath}")
+        # open the ll geoTiff
+        ll_tiff = gdal.Open(ll_filepath)
 
-            width = ll_tiff.RasterXSize
-            height = ll_tiff.RasterYSize
-            gt_tiff = ll_tiff.GetGeoTransform()
+        # process the geoTiff
+        width = ll_tiff.RasterXSize
+        height = ll_tiff.RasterYSize
+        gt_tiff = ll_tiff.GetGeoTransform()
 
-            # Calculate the bounds of the GeoTIFF.
-            minx = gt_tiff[0]
-            miny = gt_tiff[3] + width*gt_tiff[4] + height*gt_tiff[5]
-            maxx = gt_tiff[0] + width*gt_tiff[1] + height*gt_tiff[2]
-            maxy = gt_tiff[3]
+        # calculate the bounds of the geoTiff
+        minx = gt_tiff[0]
+        miny = gt_tiff[3] + width*gt_tiff[4] + height*gt_tiff[5]
+        maxx = gt_tiff[0] + width*gt_tiff[1] + height*gt_tiff[2]
+        maxy = gt_tiff[3]
 
-            command = ['gdal_translate', '-of', 'vrt', ll_filepath, vrt_filepath]
-            _run_gdal_command(command)
+        command = ['gdal_translate', '-of', 'vrt', ll_filepath, vrt_filepath]
+        logging.debug("Command: %s", ' '.join(command))
+        subprocess.run(command, capture_output=True, check=False)
 
-            command = ['gdal2tiles.py', '-v', '--profile=mercator', '--zoom=5-12',
-                       '--webviewer=none', vrt_filepath, tilepath]
-            _run_gdal_command(command)
-        finally:
-            shutil.rmtree(tmpdir)
+        command = ['gdal2tiles.py', '-v', '--profile=mercator', '--zoom=5-12', '--webviewer=none', vrt_filepath, tilepath]
+        logging.debug("Command: %s", ' '.join(command))
+        subprocess.run(command, capture_output=True, check=False)
+
+        shutil.rmtree(tmpdir)
 
         logging.debug("Finished parsing data file")
 
