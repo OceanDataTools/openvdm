@@ -240,16 +240,12 @@ GETTERS = [
     ('get_lowerings', (), 'api/warehouse/getLowerings', ['DIVE01'], ['DIVE01']),
     ('get_extra_directory', (4,), 'api/extraDirectories/getExtraDirectory/4', [{'name': 'Docs'}], {'name': 'Docs'}),
     ('get_extra_directories', (), 'api/extraDirectories/getExtraDirectories', [{'name': 'Docs'}], [{'name': 'Docs'}]),
-    ('get_required_extra_directory', (2,), 'api/extraDirectories/getRequiredExtraDirectory/2',
-     [{'name': 'Dashboard_Data'}], {'name': 'Dashboard_Data'}),
     ('get_required_extra_directories', (), 'api/extraDirectories/getRequiredExtraDirectories', [{'name': 'a'}],
      [{'name': 'a'}]),
     ('get_shipboard_data_warehouse_config', (), 'api/warehouse/getShipboardDataWarehouseConfig',
      {'shipboardDataWarehouseBaseDir': '/data'}, {'shipboardDataWarehouseBaseDir': '/data'}),
     ('get_ship_to_shore_bw_limit_status', (), 'api/warehouse/getShipToShoreBWLimitStatus',
      {'shipToShoreBWLimitStatus': 'On'}, True),
-    ('get_ship_to_shore_transfer', (3,), 'api/shipToShoreTransfers/getShipToShoreTransfer/3', [{'name': 'Nav'}],
-     {'name': 'Nav'}),
     ('get_ship_to_shore_transfers', (), 'api/shipToShoreTransfers/getShipToShoreTransfers', [{'name': 'Nav'}],
      [{'name': 'Nav'}]),
     ('get_required_ship_to_shore_transfers', (), 'api/shipToShoreTransfers/getRequiredShipToShoreTransfers',
@@ -390,6 +386,25 @@ def test_by_name(ovdm, api, method, path, name, found) -> None:
     api.responses[path] = [{'name': 'first'}, {'name': 'rebuildMD5Summary', 'id': 2}]
     result = getattr(ovdm, method)(name)
     assert result == ({'name': 'rebuildMD5Summary', 'id': 2} if found else None)
+
+
+@pytest.mark.parametrize('extra_directory_id, found', [(2, 'Dashboard_Data'), ('2', 'Dashboard_Data'), (9, None)])
+def test_required_extra_directory_by_id(ovdm, api, extra_directory_id, found) -> None:
+    """A required extra directory is found by its ID (a number or a string) in the required ones (#592)."""
+    api.responses['api/extraDirectories/getRequiredExtraDirectories'] = [
+        {'extraDirectoryID': 1, 'name': 'Transfer_Logs'}, {'extraDirectoryID': 2, 'name': 'Dashboard_Data'}]
+    result = ovdm.get_required_extra_directory(extra_directory_id)
+    assert (result and result['name']) == found
+
+
+@pytest.mark.parametrize('ship_to_shore_transfer_id, found', [(3, 'Nav'), ('1', 'Logs'), (9, None)])
+def test_ship_to_shore_transfer_by_id(ovdm, api, ship_to_shore_transfer_id, found) -> None:
+    """A ship-to-shore transfer is found by its ID among the optional and required ones (#592)."""
+    api.responses['api/shipToShoreTransfers/getShipToShoreTransfers'] = [{'shipToShoreTransferID': 3, 'name': 'Nav'}]
+    api.responses['api/shipToShoreTransfers/getRequiredShipToShoreTransfers'] = [
+        {'shipToShoreTransferID': 1, 'name': 'Logs'}]
+    result = ovdm.get_ship_to_shore_transfer(ship_to_shore_transfer_id)
+    assert (result and result['name']) == found
 
 
 # --- Setters --------------------------------------------------------------------
@@ -634,11 +649,6 @@ def _routes():
     return routes
 
 
-# URLs openvdm.py requests that have no route (#592)
-KNOWN_UNROUTED = {'GET api/extraDirectories/getRequiredExtraDirectory/2',
-                  'GET api/shipToShoreTransfers/getShipToShoreTransfer/3'}
-
-
 def _unrouted(calls):
     routes = _routes()
     return {f'{call.method} {call.path}' for call in calls
@@ -658,21 +668,14 @@ def _call_everything(ovdm, api):
 def test_every_api_url_has_a_route(ovdm, api, warehouse_api, fake_gearman) -> None:
     """Every URL openvdm.py requests matches a route in routes.php, for its HTTP method."""
     _call_everything(ovdm, api)
-    assert sorted(_unrouted(api.calls) - KNOWN_UNROUTED) == []
+    assert sorted(_unrouted(api.calls)) == []
     # and every URL openvdm.py builds was requested, so none goes unchecked
     source = (ROOT / 'server' / 'lib' / 'openvdm.py').read_text()
     templates = set(re.findall(r'siteRoot\'\]\}(api/[^"]+)"', source))
     missed = [template for template in templates
               if not any(re.fullmatch(re.sub(r'\\\{\w+\\\}', '[^/]+', re.escape(template)), call.path)
                          for call in api.calls)]
-    assert len(templates) >= 60 and missed == []
-
-
-@pytest.mark.xfail(strict=True, reason="two methods call endpoints that don't exist (#592)")
-def test_known_unrouted_urls(ovdm, api) -> None:
-    """get_required_extra_directory() and get_ship_to_shore_transfer() have routes."""
-    _call_everything(ovdm, api)
-    assert not _unrouted(api.calls) & KNOWN_UNROUTED
+    assert len(templates) >= 55 and missed == []
 
 
 def test_route_check_catches_a_missing_route(ovdm, api) -> None:
