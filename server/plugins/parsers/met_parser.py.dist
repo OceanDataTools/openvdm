@@ -38,10 +38,27 @@ ROUNDING = {
 class MetParser(OpenVDMCSVParser):
     """Parser for meteorological sensor log files."""
 
-    MAX_DELTA_T = pd.Timedelta('10 seconds')
-
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False):
+                 skip_header=False, use_openvdm_api=False,
+                 require_checksum=True, max_delta_t=15):
+        """Initialise the parser.
+
+        Args:
+            start_dt: Optional crop start datetime.
+            stop_dt: Optional crop stop datetime.
+            time_format: ``strptime`` format for timestamps.
+            skip_header: Skip the first line of each data file when ``True``.
+            use_openvdm_api: Enable OpenVDM API message posting.
+            require_checksum: Treat a sentence without a checksum as a bad row
+                (the default). Set it to ``False`` for instruments that don't
+                send one. A checksum that doesn't match is always a bad row
+                (#563).
+            max_delta_t: Longest expected time between lines, in seconds. The
+                default allows for logger jitter on a sentence every 10 s
+                (#564).
+        """
+        self.require_checksum = require_checksum
+        self.max_delta_t = pd.Timedelta(seconds=float(max_delta_t))
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
                          use_openvdm_api=use_openvdm_api)
@@ -54,6 +71,7 @@ class MetParser(OpenVDMCSVParser):
             for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 field_data = dict(zip(FIELDS, fields))
                 try:
+                    self.check_nmea_sentence(remainder, fields, len(FIELDS), self.require_checksum)
                     air_pres = float(field_data['air_pres'])
                     air_temp = float(field_data['air_temp'])
                     humidity = float(field_data['humidity'])
@@ -96,8 +114,8 @@ class MetParser(OpenVDMCSVParser):
         self.add_time_bounds_stat([df.index.min().to_pydatetime(), df.index.max().to_pydatetime()])
         self.add_bounds_stat([round(df['deltaT'].min().total_seconds(), 3),
                               round(df['deltaT'].max().total_seconds(), 3)], 'DeltaT Bounds', 'seconds')
-        self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
-                                      len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
+        self.add_value_validity_stat([len(df[df['deltaT'] <= self.max_delta_t]),
+                                      len(df[df['deltaT'] > self.max_delta_t])], 'DeltaT Validity')
         self.add_bounds_stat([round(df['vector_wind_spd'].min(), ROUNDING['vector_wind_spd']),
                               round(df['vector_wind_spd'].max(), ROUNDING['vector_wind_spd'])], 'Wind Speed Bounds', 'm/s')
         self.add_bounds_stat([round(df['air_temp'].min(), ROUNDING['air_temp']),
@@ -109,7 +127,7 @@ class MetParser(OpenVDMCSVParser):
 
         for name, total, bad in [
             ('Rows', len(df) + len(errors), len(errors)),
-            ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
+            ('DeltaT', len(df), len(df[df['deltaT'] > self.max_delta_t])),
         ]:
             rate = bad / total
             if rate > 0.25:
@@ -142,6 +160,26 @@ class MetParser(OpenVDMCSVParser):
         self.send_error_msg(errors, filepath)
         self.plugin_data = self._sanitize_for_json(self.plugin_data)
         return self.plugin_data
+
+    @classmethod
+    def add_cli_arguments(cls, parser):
+        """Add the parser's command-line options.
+
+        Args:
+            parser: The ``argparse.ArgumentParser`` to add the options to.
+        """
+        parser.add_argument('--allow-missing-checksum', dest='require_checksum', action='store_false',
+                            help='read sentences without a checksum (for instruments that '
+                                 "don't send one); by default they're bad rows")
+        parser.add_argument('--max-delta-t', type=float, default=15,
+                            help='longest expected time between lines, in seconds (default: 15)')
+
+    @classmethod
+    def _extract_custom_cli_kwargs(cls, args):
+        return {
+            'require_checksum': getattr(args, 'require_checksum', True),
+            'max_delta_t': args.max_delta_t,
+        }
 
 
 if __name__ == "__main__":

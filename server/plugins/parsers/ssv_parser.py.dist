@@ -34,7 +34,7 @@ class SSVParser(OpenVDMCSVParser):
     MAX_SV = 1580
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, sbe38=False):
+                 skip_header=False, use_openvdm_api=False):
 
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
@@ -107,8 +107,6 @@ class SSVParser(OpenVDMCSVParser):
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
         self.add_bounds_stat([round(df['sv_ms'].min(), ROUNDING['sv_ms']),
                               round(df['sv_ms'].max(), ROUNDING['sv_ms'])], 'SV Bounds', 'm/s')
-        self.add_value_validity_stat([len(df[df['sv_ms'] <= self.MAX_SV]),
-                                      len(df[df['sv_ms'] > self.MAX_SV])], 'SV Validity')
         self.add_value_validity_stat([len(df[(df['sv_ms'] >= self.MIN_SV) & (df['sv_ms'] <= self.MAX_SV)]),
                                       len(df[(df['sv_ms'] < self.MIN_SV) | (df['sv_ms'] > self.MAX_SV)])], "SV Validity")
 

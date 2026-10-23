@@ -591,10 +591,6 @@ class CTDProfileParser(OpenVDMCSVParser):
                     continue
                 scan_no += 1
                 try:
-                    scan_counts.append(int(raw[-2:], 16))
-                except ValueError:
-                    pass
-                try:
                     if self.bytes_per_scan and len(raw) != 2 * self.bytes_per_scan:
                         raise ValueError(f"scan is {len(raw)} characters, expected {2 * self.bytes_per_scan}")
                     if len(raw) < 24:
@@ -603,6 +599,12 @@ class CTDProfileParser(OpenVDMCSVParser):
                 except ValueError as err:
                     errors.append(lineno)
                     logging.debug("Line %s skipped: %s", lineno, err)
+                    continue
+                # Only a whole scan's last characters are its scan count (#571)
+                try:
+                    scan_counts.append(int(raw[-2:], 16))
+                except ValueError:
+                    pass
 
         # Second pass: convert each scan; its time comes from its place in the file
         temp_words = self.average_temp_words([scan[3] for scan in scans])

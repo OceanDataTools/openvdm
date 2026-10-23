@@ -83,11 +83,12 @@ class FluoroParser(OpenVDMCSVParser):
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
         self.add_bounds_stat([int(df['chlorophyll_signal'].min()),
                               int(df['chlorophyll_signal'].max())], 'Chlorophyll Bounds', 'counts')
+        # [in range, out of range], like every Validity stat (#567)
         self.add_value_validity_stat(
-            [len(df[(df['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) |
-                    (df['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]),
-             len(df[(df['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS) &
-                    (df['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)])],
+            [len(df[(df['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS) &
+                    (df['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)]),
+             len(df[(df['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) |
+                    (df['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)])],
             'Chlorophyll Validity')
 
         for name, total, bad in [

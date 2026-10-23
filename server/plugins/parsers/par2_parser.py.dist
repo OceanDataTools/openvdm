@@ -87,9 +87,9 @@ class PAR2Parser(OpenVDMCSVParser):
         self.add_value_validity_stat([len(df[df['deltaT'] <= self.MAX_DELTA_T]),
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
         self.add_bounds_stat([round(df['lw_irradiance'].min(), ROUNDING['lw_irradiance']),
-                              round(df['lw_irradiance'].max(), ROUNDING['lw_irradiance'])], 'LW Irradiance', '')
+                              round(df['lw_irradiance'].max(), ROUNDING['lw_irradiance'])], 'LW Irradiance', 'W/m^2')
         self.add_bounds_stat([round(df['sw_irradiance'].min(), ROUNDING['sw_irradiance']),
-                              round(df['sw_irradiance'].max(), ROUNDING['sw_irradiance'])], 'SW Irradiance', '')
+                              round(df['sw_irradiance'].max(), ROUNDING['sw_irradiance'])], 'SW Irradiance', 'W/m^2')
 
         for name, total, bad in [
             ('Rows', len(df) + len(errors), len(errors)),
@@ -108,8 +108,8 @@ class PAR2Parser(OpenVDMCSVParser):
         df = df.set_index('date_time')
 
         for col, unit, label in [
-            ('lw_irradiance', 'μE/cm2sec', 'LW Irradiance'),
-            ('sw_irradiance', 'μE/cm2sec', 'SW Irradiance'),
+            ('lw_irradiance', 'W/m^2', 'LW Irradiance'),  # irradiance, not PAR (#568)
+            ('sw_irradiance', 'W/m^2', 'SW Irradiance'),
         ]:
             viz = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

@@ -12,7 +12,6 @@ The others are written for the test: a line every 5 s, a 30 s gap and, for
 some, a value out of range. Each input has these rows added: a value that
 isn't a number (a bad row), a line cut short (a bad row only for parsers
 that need every field) and a line without a timestamp (a bad row, #554).
-Bugs the tests found are strict xfails at the end.
 """
 
 import argparse
@@ -162,6 +161,18 @@ def test_tsg45_cli_options(load_dist, cli_args, kwargs) -> None:
     assert cls._extract_custom_cli_kwargs(parser.parse_args(cli_args)) == kwargs
 
 
+@pytest.mark.parametrize('cli_args, kwargs', [
+    ([], {'require_checksum': True, 'max_delta_t': 15}),
+    (['--allow-missing-checksum', '--max-delta-t', '30'], {'require_checksum': False, 'max_delta_t': 30}),
+])
+def test_met_cli_options(load_dist, cli_args, kwargs) -> None:
+    """--allow-missing-checksum and --max-delta-t become the Met parser's options (#563, #564)."""
+    cls = load_dist('server/plugins/parsers/met_parser.py.dist').MetParser
+    parser = argparse.ArgumentParser()
+    cls.add_cli_arguments(parser)
+    assert cls._extract_custom_cli_kwargs(parser.parse_args(cli_args)) == kwargs
+
+
 @pytest.mark.parametrize('name', PARSERS)
 def test_empty_file(make_parser, tmp_path, name) -> None:
     """An empty file has no output."""
@@ -214,20 +225,16 @@ def test_crop_to_nothing(make_parser, caplog, name) -> None:
     assert 'empty after cropping' in caplog.text
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="Met doesn't check the sentence's checksum (#563)")
 def test_met_checksum(make_parser, tmp_path) -> None:
-    """A $WIM01 sentence whose checksum doesn't match (spliced or corrupt) is a bad row."""
+    """A $WIM01 sentence whose checksum doesn't match (spliced or corrupt) is a bad row (#563)."""
     good = _first_good('met')
-    spliced = good.replace(',24.41,', ',2.441,')  # the checksum no longer matches
+    spliced = good.replace(',24.41,', ',24.47,')  # the checksum no longer matches
     data = parse_output(make_parser('met'), _write(tmp_path, good, spliced, good))
     assert stat_value(data, 'Row Validity') == [2, 1]
 
 
-@pytest.mark.xfail(strict=True, reason="Met's MAX_DELTA_T is its logging interval (#564)")
 def test_met_delta_t_jitter(make_parser, tmp_path) -> None:
-    """MET sentences every 10 s, a few ms late, pass the DeltaT test (the sample data's MET)."""
+    """MET sentences every 10 s, a few ms late, pass the DeltaT test (the sample data's MET, #564)."""
     good = _first_good('met')
     path = tmp_path / 'log.txt'
     path.write_text(''.join(f'2026-10-01T00:{10 * n // 60:02d}:{10 * n % 60:02d}.{15 * (n % 2):03d}Z,{good}\n'
@@ -236,33 +243,29 @@ def test_met_delta_t_jitter(make_parser, tmp_path) -> None:
     assert {test['testName']: test['results'] for test in data['qualityTests']}['DeltaT'] == 'Passed'
 
 
-@pytest.mark.xfail(strict=True, reason='a position without its longitude reaches geopy (#565)')
 def test_sprint_latitude_without_longitude(make_parser, tmp_path) -> None:
-    """A Sprint line cut short after the latitude is a bad row, and the file is parsed."""
+    """A Sprint line cut short after the latitude is a bad row, and the file is parsed (#565)."""
     good = _first_good('sprint')
     cut = ','.join(good.split(',')[:6])
     data = parse_output(make_parser('sprint'), _write(tmp_path, good, cut, good))
     assert stat_value(data, 'Row Validity') == [2, 1]
 
 
-@pytest.mark.xfail(strict=True, reason='Paro counts lines without a depth as good rows (#566)')
 def test_paro_line_without_depth(make_parser, tmp_path) -> None:
-    """A Paro line without a depth isn't a good row (the CTD, O2 and compensator parsers drop them)."""
+    """A Paro line without a depth isn't a good row (the CTD, O2 and compensator parsers drop them, #566)."""
     good = _first_good('paro')
     data = parse_output(make_parser('paro'), _write(tmp_path, good, '$DPT,,0', good))
     assert stat_value(data, 'Row Validity')[0] == 2
 
 
-@pytest.mark.xfail(strict=True, reason='Chlorophyll Validity is [bad, good] (#567)')
 def test_fluoro_validity_order(make_parser) -> None:
-    """Chlorophyll Validity is [in range, out of range], like every other Validity stat."""
+    """Chlorophyll Validity is [in range, out of range], like every other Validity stat (#567)."""
     data = parse_output(make_parser('fluoro'), _input('fluoro'))
     assert stat_value(data, 'Chlorophyll Validity') == [41, 1]
 
 
-@pytest.mark.xfail(strict=True, reason='PAR2 gives irradiance in a PAR unit (#568)')
 def test_par2_irradiance_units(make_parser) -> None:
-    """Long- and short-wave irradiance are in W/m^2."""
+    """Long- and short-wave irradiance are in W/m^2 (#568)."""
     data = parse_output(make_parser('par2'), _input('par2'))
     units = {stat['statName']: stat['statUnit'] for stat in data['stats']}
     units.update({f"{viz['label']} chart": viz['unit'] for viz in data['visualizerData']})
@@ -270,8 +273,7 @@ def test_par2_irradiance_units(make_parser) -> None:
                                    'SW Irradiance chart')} == {'W/m^2'}
 
 
-@pytest.mark.xfail(strict=True, reason='SSV reports SV Validity twice (#569)')
 def test_ssv_one_validity_stat(make_parser) -> None:
-    """SSV reports one SV Validity stat."""
+    """SSV reports one SV Validity stat, checking both limits (#569)."""
     data = parse_output(make_parser('ssv'), _input('ssv'))
     assert [stat['statName'] for stat in data['stats']].count('SV Validity') == 1

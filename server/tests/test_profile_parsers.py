@@ -13,7 +13,6 @@ the new output after a change that's intended.
   skipped without it.
 - SV profile: a Valeport-style file written for the test, with two bad rows.
 
-Bugs the tests found are strict xfails at the end.
 """
 
 import argparse
@@ -376,11 +375,8 @@ def test_svp_missing_file(svp, tmp_path, caplog) -> None:
     assert 'Problem accessing input file' in caplog.text
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="a short scan's last characters are read as its scan count (#571)")
 def test_ctd_short_scan_isnt_lost_scans(ctd, tmp_path) -> None:
-    """A short (corrupt) scan is a bad row, not hundreds of lost scans."""
+    """A short (corrupt) scan is a bad row, not hundreds of lost scans (#571)."""
     path = _ctd_copy(tmp_path, scans=lambda data: data[:100] + [data[100][:30]] + data[100:])
     data = parse_output(ctd.CTDProfileParser(), path)
     assert stat_value(data, 'Row Validity') == [CTD_SCANS, 1]

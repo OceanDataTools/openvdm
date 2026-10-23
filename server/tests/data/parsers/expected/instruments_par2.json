@@ -23,7 +23,7 @@
           384.043
         ]
       ],
-      "unit": "\u03bcE/cm2sec",
+      "unit": "W/m^2",
       "label": "LW Irradiance"
     },
     {
@@ -49,7 +49,7 @@
           714.678
         ]
       ],
-      "unit": "\u03bcE/cm2sec",
+      "unit": "W/m^2",
       "label": "SW Irradiance"
     }
   ],
@@ -103,7 +103,7 @@
     {
       "statName": "LW Irradiance",
       "statType": "bounds",
-      "statUnit": "",
+      "statUnit": "W/m^2",
       "statValue": [
         375.02,
         384.98
@@ -112,7 +112,7 @@
     {
       "statName": "SW Irradiance",
       "statType": "bounds",
-      "statUnit": "",
+      "statUnit": "W/m^2",
       "statValue": [
         570.34,
         729.66
