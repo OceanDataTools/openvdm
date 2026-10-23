@@ -67,7 +67,7 @@ class DPTParser(OpenVDMCSVParser):
         # Read and parse DPT lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='DPT'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='DPT'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

@@ -11,7 +11,7 @@ inputs are lines from openvdm_sample_data, about one every 5 s, with a gap.
 The others are written for the test: a line every 5 s, a 30 s gap and, for
 some, a value out of range. Each input has these rows added: a value that
 isn't a number (a bad row), a line cut short (a bad row only for parsers
-that need every field) and a line without a timestamp (not counted, #554).
+that need every field) and a line without a timestamp (a bad row, #554).
 Bugs the tests found are strict xfails at the end.
 """
 
@@ -55,9 +55,9 @@ OPTIONS = {'tsg45': {'col_names': True}}
 # Each input file's bad rows by line number: the value that isn't a number
 # (6) and, unless the fields the parser reads are all before the cut or it
 # takes missing fields as no value, the line cut short (12)
-BAD_ROWS = {name: '6' for name in PARSERS}
-BAD_ROWS.update({name: '6, 12' for name in ('flowrate_krohne', 'fluoro', 'fluoro_triplet', 'met', 'par2', 'ph',
-                                             'ssv_valeport', 'tsg21', 'tsg45', 'wind_gill_wo75')})
+BAD_ROWS = {name: '6, 18' for name in PARSERS}
+BAD_ROWS.update({name: '6, 12, 18' for name in ('flowrate_krohne', 'fluoro', 'fluoro_triplet', 'met', 'par2', 'ph',
+                                                 'ssv_valeport', 'tsg21', 'tsg45', 'wind_gill_wo75')})
 
 
 @pytest.fixture

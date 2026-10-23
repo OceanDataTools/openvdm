@@ -81,7 +81,7 @@ class VTGParser(OpenVDMCSVParser):
         # Read and parse VTG lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='VTG'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='VTG'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to VTG_FIELDS
@@ -192,7 +192,7 @@ class VTGParser(OpenVDMCSVParser):
         # Resample and round
         # -------------------------
         df = self.resample_data(df, angle_cols=['cog_t', 'cog_m'])
-        df = self.round_data(df, ROUNDING)
+        df = self.round_data(df, ROUNDING, angle_cols=['cog_t', 'cog_m'])
         df = df.set_index('date_time')
 
         # -------------------------

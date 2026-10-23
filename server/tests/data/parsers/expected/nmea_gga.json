@@ -9,8 +9,8 @@
             "type": "LineString",
             "coordinates": [
               [
-                -93.52067823,
-                26.5852658
+                -93.52064753,
+                26.58514978
               ],
               [
                 -93.52138576,
@@ -60,7 +60,7 @@
   "qualityTests": [
     {
       "testName": "Rows",
-      "results": "Passed"
+      "results": "Warning"
     },
     {
       "testName": "DeltaT",
@@ -77,8 +77,8 @@
       "statType": "rowValidity",
       "statUnit": "",
       "statValue": [
-        43,
-        4
+        44,
+        5
       ]
     },
     {
@@ -86,7 +86,7 @@
       "statType": "timeBounds",
       "statUnit": "seconds",
       "statValue": [
-        "2012-04-28T00:00:06.109000+00:00",
+        "2012-04-28T00:00:01.109000+00:00",
         "2012-04-28T00:16:56.122000+00:00"
       ]
     },
@@ -104,7 +104,7 @@
       "statType": "valueValidity",
       "statUnit": "",
       "statValue": [
-        41,
+        42,
         1
       ]
     },
@@ -114,8 +114,8 @@
       "statUnit": "ddeg",
       "statValue": [
         26.6307905,
-        -93.52037117,
-        26.58410217,
+        -93.52030983,
+        26.5838735,
         -93.53281733
       ]
     },
@@ -133,7 +133,7 @@
       "statType": "valueValidity",
       "statUnit": "",
       "statValue": [
-        42,
+        43,
         0
       ]
     },
@@ -142,7 +142,7 @@
       "statType": "totalValue",
       "statUnit": "nm",
       "statValue": [
-        2.882
+        2.896
       ]
     },
     {

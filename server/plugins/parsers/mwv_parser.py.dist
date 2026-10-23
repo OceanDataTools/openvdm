@@ -72,7 +72,7 @@ class MWVParser(OpenVDMCSVParser):
         # Read and parse MWV lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWV'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='MWV'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
@@ -84,7 +84,8 @@ class MWVParser(OpenVDMCSVParser):
                     dir_rel = float(field_data['dir_rel']) if field_data['dir_rel'] else None
                     spd_kts = float(field_data['spd_kts']) if field_data['spd_kts'] else None
 
-                    [valid_flag, checksum] = field_data['valid_flag_checksum'].split('*')
+                    # the checksum is optional with require_checksum=False (#557)
+                    valid_flag = field_data['valid_flag_checksum'].split('*')[0]
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['dir_rel'].append(dir_rel)
@@ -174,7 +175,7 @@ class MWVParser(OpenVDMCSVParser):
         # Resample and round
         # -------------------------
         df = self.resample_data(df, angle_cols=['dir_rel'])
-        df = self.round_data(df, ROUNDING)
+        df = self.round_data(df, ROUNDING, angle_cols=['dir_rel'])
         df = df.set_index('date_time')
 
         # -------------------------

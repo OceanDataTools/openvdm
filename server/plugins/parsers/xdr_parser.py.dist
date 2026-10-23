@@ -90,7 +90,7 @@ class XDRParser(OpenVDMCSVParser):
         # Read and parse XDR lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='XDR'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='XDR'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

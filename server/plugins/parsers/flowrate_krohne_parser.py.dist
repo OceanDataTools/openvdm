@@ -67,7 +67,7 @@ class OPTIFLUXParser(OpenVDMCSVParser):
         # Read and parse lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

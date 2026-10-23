@@ -55,7 +55,7 @@ class GNSSParser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 field_data = dict(zip(FIELDS, fields))
                 try:
                     self.check_nmea_sentence(remainder, fields, None, self.require_checksum)
@@ -117,7 +117,7 @@ class GNSSParser(OpenVDMCSVParser):
                 self.add_quality_test_passed(name)
 
         df = self.resample_data(df, angle_cols=['heading'])
-        df = self.round_data(df, ROUNDING)
+        df = self.round_data(df, ROUNDING, angle_cols=['heading'])
         df = df.set_index('date_time')
 
         for col, unit, label in [

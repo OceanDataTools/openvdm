@@ -61,7 +61,7 @@ class ECOTripletParser(OpenVDMCSVParser):
         # Read and parse lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, fields_sep='\t'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, fields_sep='\t'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

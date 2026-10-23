@@ -61,7 +61,7 @@ GOOD = {
     'gga': _nmea('GPGGA,000000.987,2635.03241,N,09331.21859,W,2,09,1.1,1.89,M,,,9,0025'),
     'gnss': _nmea('PGNSS,000000.00,2635.0324,N,09331.2186,W,12.00,120.00,0.50,-0.50,0.02,0.05'),
     'hdt': _nmea('HEHDT,358.00,T'),
-    'hpr': _nmea('GPHPR,120.00,0.50,-0.50,N'),
+    'hpr': _nmea('PSAT,HPR,000000.00,120.00,0.50,-0.50,N'),
     'mwd': _nmea('WIMWD,358.0,T,346.0,M,15.0,N,7.7,M'),
     'mwv': _nmea('WIMWV,358.0,R,15.0,N,A'),
     'pashr': _nmea('PASHR,000000.000,120.00,T,-0.50,0.50,0.00,0.011,0.011,0.032,2,1'),
@@ -72,14 +72,14 @@ GOOD = {
 }
 
 # The value each parser reads that's replaced by text, by field number
-NUMBER_FIELD = {'dbs': 3, 'dpt': 1, 'gga': 7, 'gnss': 7, 'hdt': 1, 'hpr': 1, 'mwd': 1, 'mwv': 1,
+NUMBER_FIELD = {'dbs': 3, 'dpt': 1, 'gga': 7, 'gnss': 7, 'hdt': 1, 'hpr': 3, 'mwd': 1, 'mwv': 1,
                 'pashr': 2, 'psxn23': 2, 'psxn24': 2, 'vtg': 1, 'xdr': 2}
 
-# Each input file's good rows, and its bad rows by line number. The line
-# without a timestamp (29) isn't one (#554); GGA skips its first line (#555).
-ROWS = {name: (42, '6, 12, 18, 35') for name in PARSERS}
-ROWS.update({name: (42, '6, 12, 18, 35, 38') for name in ('dbs', 'dpt', 'hdt', 'mwd', 'mwv', 'vtg')})
-ROWS.update({'gga': (43, '6, 12, 18, 35'), 'wicor': (42, '6, 12, 18, 34')})
+# Each input file's good rows, and its bad rows by line number, including
+# the line without a timestamp (29, #554). WICOR's input has no such line.
+ROWS = {name: (42, '6, 12, 18, 29, 35') for name in PARSERS}
+ROWS.update({name: (42, '6, 12, 18, 29, 35, 38') for name in ('dbs', 'dpt', 'hdt', 'mwd', 'mwv', 'vtg')})
+ROWS.update({'gga': (44, '6, 12, 18, 29, 35'), 'wicor': (42, '6, 12, 18, 34')})
 
 # A window of each input file, for the crop tests
 WINDOW = {'gga': ('2012-04-28T00:01:01.109Z', '2012-04-28T00:02:01.110Z')}
@@ -345,64 +345,65 @@ def test_xdr_reads_one_layout(make_parser, tmp_path) -> None:
 
 # --- Bugs -----------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="lines without a timestamp aren't counted (#554)")
 @pytest.mark.parametrize('name', PARSERS)
 def test_line_without_timestamp_is_a_bad_row(make_parser, tmp_path, name) -> None:
-    """A line without a timestamp is a bad row."""
+    """A line without a timestamp is a bad row (#554)."""
     good = _good(name)
     path = _write(tmp_path, good, good)
     path.write_text(path.read_text() + good + '\n')
     assert stat_value(parse_output(make_parser(name), path), 'Row Validity') == [2, 1]
 
 
-@pytest.mark.xfail(strict=True, reason='GGA skips the first line by default (#555)')
 def test_gga_reads_the_first_line(make_parser, tmp_path) -> None:
-    """GGA reads a log file's first line: OpenRVDAS logs have no header."""
+    """GGA reads a log file's first line: OpenRVDAS logs have no header (#555)."""
     path = tmp_path / 'log.txt'
     path.write_text(''.join(f'2026-10-01T00:00:0{n}.000000Z,{GOOD["gga"]}\n' for n in range(3)))
     assert stat_value(parse_output(make_parser('gga'), path), 'Row Validity') == [3, 0]
 
 
-@pytest.mark.xfail(strict=True, reason="MWD's second speed is m/s, read as mph (#556)")
 def test_mwd_speed_in_m_s(make_parser, tmp_path) -> None:
-    """MWD's second speed is in m/s (unit M), not mph."""
+    """MWD's second speed is in m/s (unit M), not mph (#556)."""
     data = parse_output(make_parser('mwd'), _write(tmp_path, GOOD['mwd'], GOOD['mwd']))
     units = {stat['statUnit'] for stat in data['stats']} | {viz['unit'] for viz in data['visualizerData']}
     assert 'mph' not in units and 'm/s' in units
 
 
-@pytest.mark.xfail(strict=True, reason="MWV and PSXN23 split the checksum off the last field (#557)")
 @pytest.mark.parametrize('name', ['mwv', 'psxn23'])
 def test_require_checksum_false_last_field(make_parser, tmp_path, name) -> None:
-    """With require_checksum=False, MWV and PSXN23 read a sentence without a checksum (#418)."""
+    """With require_checksum=False, MWV and PSXN23 read a sentence without a checksum (#418, #557)."""
     good = GOOD[name]
     data = parse_output(make_parser(name, require_checksum=False), _write(tmp_path, good, good.split('*')[0], good))
     assert stat_value(data, 'Row Validity') == [3, 0]
 
 
-@pytest.mark.xfail(strict=True, reason="these parsers read every sentence in the file (#558)")
 @pytest.mark.parametrize('name, other', [
-    ('gnss', _nmea('GPZDA,000250.00,01,10,2026,00,00')),
+    pytest.param('gnss', _nmea('GPZDA,000250.00,01,10,2026,00,00'),
+                 marks=pytest.mark.xfail(strict=True, reason="GNSS's sentence isn't known yet (#558)")),
     ('hpr', _nmea('GPZDA,000250.00,01,10,2026,00,00')),
     ('pashr', _nmea('GPZDA,000250.00,01,10,2026,00,00')),
     ('psxn24', _nmea('PSXN,23,-0.50,0.50,358.00,0.00')),
 ])
 def test_other_sentences_are_skipped(make_parser, tmp_path, name, other) -> None:
-    """Another sentence in the file is neither read nor a bad row."""
+    """Another sentence in the file is neither read nor a bad row (#558)."""
     good = GOOD[name]
     assert stat_value(parse_output(make_parser(name), _write(tmp_path, good, other, good)), 'Row Validity') == [2, 0]
 
 
-@pytest.mark.xfail(strict=True, reason="PSXN24 charts heave velocity in m (#559)")
+def test_hpr_heading_types(make_parser, tmp_path) -> None:
+    """HPR reads Hemisphere's $PSAT,HPR with a GPS (N) or gyro (G) heading; another type letter
+    is a bad row (#558)."""
+    lines = [_nmea(f'PSAT,HPR,000000.00,120.00,0.50,-0.50,{kind}') for kind in ('N', 'G', 'X')]
+    assert stat_value(parse_output(make_parser('hpr'), _write(tmp_path, *lines)), 'Row Validity') == [2, 1]
+
+
 def test_psxn24_heave_velocity_unit(make_parser, tmp_path) -> None:
-    """PSXN24's heave velocity is charted in m/s."""
+    """PSXN24's heave velocity is charted in m/s (#559)."""
     data = parse_output(make_parser('psxn24'), _write(tmp_path, GOOD['psxn24'], GOOD['psxn24']))
     assert {viz['label']: viz['unit'] for viz in data['visualizerData']}['Heave Velocity'] == 'm/s'
 
 
-@pytest.mark.xfail(strict=True, reason="angles are wrapped before they're rounded (#560)")
 def test_angle_rounded_to_360(make_parser, tmp_path) -> None:
-    """A mean heading that rounds to 360 is charted as 0."""
+    """A mean heading that rounds to 360 is charted as 0 (#560)."""
     good = _nmea('HEHDT,359.9996,T')
     data = parse_output(make_parser('hdt'), _write(tmp_path, good, good))
     assert data['visualizerData'][0]['data'][0][1] == 0.0

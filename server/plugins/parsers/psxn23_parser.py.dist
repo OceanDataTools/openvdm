@@ -80,7 +80,7 @@ class PSXN23Parser(OpenVDMCSVParser):
         # Read and parse PSXN,23 lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='PSXN,23'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='PSXN,23'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
@@ -91,7 +91,8 @@ class PSXN23Parser(OpenVDMCSVParser):
                     pitch = float(field_data['pitch']) if field_data['pitch'] else None
                     heading = float(field_data['heading']) if field_data['heading'] else None
 
-                    [heave, checksum] = field_data['heave_checksum'].split('*')
+                    # the checksum is optional with require_checksum=False (#557)
+                    heave = field_data['heave_checksum'].split('*')[0]
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['roll'].append(roll)
@@ -228,7 +229,8 @@ class PSXN23Parser(OpenVDMCSVParser):
                 'heave_min': ROUNDING['heave'],
                 'heave_max': ROUNDING['heave'],
                 'heading': ROUNDING['heading'],
-            }
+            },
+            angle_cols=['heading']
         )
 
         df_env = df_env.set_index('date_time')

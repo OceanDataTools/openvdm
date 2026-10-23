@@ -15,7 +15,7 @@ sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
 from server.lib.openvdm_plugin import OpenVDMCSVParser
 
-PROC_COLS = ['date_time','dir_t','dir_m','spd_kts','spd_mph']
+PROC_COLS = ['date_time','dir_t','dir_m','spd_kts','spd_ms']
 
 FIELDS = [
     "header",
@@ -25,7 +25,7 @@ FIELDS = [
     "M",
     "spd_kts",
     "N",
-    "spd_mph",
+    "spd_ms",
     "M_checksum"
 ]
 
@@ -33,7 +33,7 @@ ROUNDING = {
     'dir_t': 2,
     'dir_m': 2,
     'spd_kts': 2,
-    'spd_mph': 2
+    'spd_ms': 2
 }
 
 
@@ -46,7 +46,7 @@ class MWDParser(OpenVDMCSVParser):
     MAX_DIR = 360.0
 
     MAX_SPD_KTS = 80
-    MAX_SPD_MPH = MAX_SPD_KTS * 1.15078
+    MAX_SPD_MS = MAX_SPD_KTS * 0.514444  # the second speed is in m/s (#556)
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
                  skip_header=False, use_openvdm_api=False, no_mag=False,
@@ -80,7 +80,7 @@ class MWDParser(OpenVDMCSVParser):
         # Read and parse MWD lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='MWD'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='MWD'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
@@ -92,14 +92,14 @@ class MWDParser(OpenVDMCSVParser):
                     dir_t = float(mwd_data['dir_t']) if mwd_data['dir_t'] else None
                     dir_m = float(mwd_data['dir_m']) if (not self.no_mag and mwd_data['dir_m']) else None
                     spd_kts = float(mwd_data['spd_kts']) if mwd_data['spd_kts'] else None
-                    spd_mph = float(mwd_data['spd_mph']) if mwd_data['spd_mph'] else None
+                    spd_ms = float(mwd_data['spd_ms']) if mwd_data['spd_ms'] else None
 
                     raw_data['date_time'].append(timestamp_str)
                     raw_data['dir_t'].append(dir_t)
                     if not self.no_mag:
                         raw_data['dir_m'].append(dir_m)
                     raw_data['spd_kts'].append(spd_kts)
-                    raw_data['spd_mph'].append(spd_mph)
+                    raw_data['spd_ms'].append(spd_ms)
 
                 except Exception as err:
                     errors.append(lineno)
@@ -158,10 +158,10 @@ class MWDParser(OpenVDMCSVParser):
                               round(df['spd_kts'].max(), ROUNDING['spd_kts'])], 'Speed Knots Bounds', 'kts')
         self.add_value_validity_stat([len(df[df['spd_kts'] <= self.MAX_SPD_KTS]),
                                       len(df[df['spd_kts'] > self.MAX_SPD_KTS])], 'Speed Knots Validity')
-        self.add_bounds_stat([round(df['spd_mph'].min(), ROUNDING['spd_mph']),
-                              round(df['spd_mph'].max(), ROUNDING['spd_mph'])], 'Speed MPH Bounds', 'mph')
-        self.add_value_validity_stat([len(df[df['spd_mph'] <= self.MAX_SPD_MPH]),
-                                      len(df[df['spd_mph'] > self.MAX_SPD_MPH])], 'Speed MPH Validity')
+        self.add_bounds_stat([round(df['spd_ms'].min(), ROUNDING['spd_ms']),
+                              round(df['spd_ms'].max(), ROUNDING['spd_ms'])], 'Speed m/s Bounds', 'm/s')
+        self.add_value_validity_stat([len(df[df['spd_ms'] <= self.MAX_SPD_MS]),
+                                      len(df[df['spd_ms'] > self.MAX_SPD_MS])], 'Speed m/s Validity')
 
         # -------------------------
         # Quality tests
@@ -171,7 +171,7 @@ class MWDParser(OpenVDMCSVParser):
             ('Rows', len(df)+len(errors), len(errors)),
             ('DeltaT', len(df), len(df[df['deltaT'] > self.MAX_DELTA_T])),
             ('Speed, kts', len(df), len(df[df['spd_kts'] > self.MAX_SPD_KTS])),
-            ('Speed, mph', len(df), len(df[df['spd_mph'] > self.MAX_SPD_MPH])),
+            ('Speed, m/s', len(df), len(df[df['spd_ms'] > self.MAX_SPD_MS])),
             ('Direction, True', len(df), len(df[(df['dir_t'] < self.MIN_DIR) | (df['dir_t'] > self.MAX_DIR)]))
         ]
 
@@ -191,7 +191,7 @@ class MWDParser(OpenVDMCSVParser):
         # Resample and round
         # -------------------------
         df = self.resample_data(df, angle_cols=['dir_t', 'dir_m'])
-        df = self.round_data(df, ROUNDING)
+        df = self.round_data(df, ROUNDING, angle_cols=['dir_t', 'dir_m'])
         df = df.set_index('date_time')
 
         # -------------------------
@@ -202,7 +202,7 @@ class MWDParser(OpenVDMCSVParser):
         for col, unit, label in [('dir_t', 'deg', 'Direction True'),
                                  ('dir_m', 'deg', 'Direction Mag.'),
                                  ('spd_kts', 'kts', 'Speed'),
-                                 ('spd_mph', 'mph', 'Speed')]:
+                                 ('spd_ms', 'm/s', 'Speed')]:
             if col == 'dir_m' and self.no_mag:
                 continue
 

@@ -58,7 +58,7 @@ class GGAParser(OpenVDMCSVParser):
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=True, use_openvdm_api=False,
+                 skip_header=False, use_openvdm_api=False,
                  timestamp_separator=None):
         super().__init__(None, PROC_COLS,
                          start_dt=start_dt, stop_dt=stop_dt,
@@ -130,7 +130,7 @@ class GGAParser(OpenVDMCSVParser):
         errors = []
 
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='GGA'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='GGA'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

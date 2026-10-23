@@ -733,12 +733,12 @@ class OpenVDMCSVParser(OpenVDMParser):
             if value not in allowed:
                 raise ValueError(f"field {index} is {value!r}, not {' or '.join(allowed)}")
 
-    def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None):
+    def read_lines_with_timestamps(self, filepath, fields_sep=',', nmea_filter=None, errors=None):
         """Yield each timestamped data line of a file, split into fields.
 
         Blank lines, ``#`` comments and (with ``skip_header``) the first line
-        are skipped. Lines without a timestamp are counted as errors and
-        skipped.
+        are skipped. Lines without a timestamp are skipped, and their line
+        numbers added to *errors*, so they count as bad rows (#554, #534).
 
         Args:
             filepath: Path to the raw data file.
@@ -748,6 +748,8 @@ class OpenVDMCSVParser(OpenVDMParser):
                 ``'PSXN,23'`` (first field ends with ``PSXN`` and second is
                 ``23``), or a callable taking the fields and returning
                 ``bool``.
+            errors: A list the zero-based line numbers of lines without a
+                timestamp are appended to; the parser's own list of bad rows.
 
         Yields:
             tuple: ``(lineno, timestamp_str, remainder, fields)``: the
@@ -782,7 +784,6 @@ class OpenVDMCSVParser(OpenVDMParser):
 
         filter_predicate = make_filter_predicate(nmea_filter)
 
-        errors = []
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 for lineno, line in enumerate(f):
@@ -794,7 +795,8 @@ class OpenVDMCSVParser(OpenVDMParser):
 
                     timestamp_str, remainder = self.extract_timestamp_and_payload(line)
                     if not timestamp_str or not remainder:
-                        errors.append(lineno)
+                        if errors is not None:
+                            errors.append(lineno)
                         continue
 
                     fields = remainder.split(fields_sep)
@@ -918,7 +920,7 @@ class OpenVDMCSVParser(OpenVDMParser):
 
 
     @staticmethod
-    def round_data(data_frame, precision=None):
+    def round_data(data_frame, precision=None, angle_cols=None):
         """Round the data's columns to per-column precisions.
 
         Args:
@@ -926,6 +928,10 @@ class OpenVDMCSVParser(OpenVDMParser):
             precision: Mapping of column name to number of decimal places.
                 ``None`` (the default) or an empty mapping returns the data
                 unchanged.
+            angle_cols: Columns holding angles in degrees, as given to
+                :meth:`resample_data`. A mean that rounds up to 360 is
+                wrapped to 0, so it's charted with the other angles near
+                north (#560). Columns not in *data_frame* are ignored.
 
         Returns:
             pandas.DataFrame: The rounded data.
@@ -937,7 +943,11 @@ class OpenVDMCSVParser(OpenVDMParser):
         if precision:
             try:
                 decimals = pd.Series(precision.values(), index=precision.keys())
-                return data_frame.round(decimals)
+                data_frame = data_frame.round(decimals)
+                for col in angle_cols or []:
+                    if col in data_frame.columns:
+                        data_frame[col] = data_frame[col] % 360
+                return data_frame
             except Exception as exc:
                 logging.error("Could not round data")
                 logging.error(str(exc))

@@ -186,7 +186,7 @@
   "qualityTests": [
     {
       "testName": "Rows",
-      "results": "Passed"
+      "results": "Warning"
     },
     {
       "testName": "DeltaT",
@@ -212,7 +212,7 @@
       "statUnit": "",
       "statValue": [
         42,
-        4
+        5
       ]
     },
     {
