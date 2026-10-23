@@ -7,7 +7,8 @@ used by OpenVDM's Data Dashboard, including a Geographic Bounds stat.
 
 Requires GDAL's Python bindings (osgeo.gdal) and the gdalwarp, gdal_translate
 and gdal2tiles.py command-line tools, which aren't installed from
-requirements.txt.
+requirements.txt. Only 8-bit (Byte) imagery can be tiled: gdal2tiles.py
+fails on other GeoTIFFs, e.g. a Float32 depth grid, and so does the file.
 """
 
 import os
@@ -25,14 +26,23 @@ from server.lib.openvdm_plugin import OpenVDMParser
 
 
 def _run_gdal_command(command):
-    """Run a GDAL command, logging stderr and raising when it fails."""
+    """Run a GDAL command; raise with its error output if it fails (#573).
+
+    Args:
+        command: The command and its arguments.
+
+    Raises:
+        RuntimeError: If the command exits with an error; the message has
+            GDAL's error output, so it's the reason the Data Dashboard shows.
+    """
     logging.debug("Command: %s", ' '.join(command))
     result = subprocess.run(command, capture_output=True, check=False, text=True)
     if result.returncode:
-        logging.error("GDAL command failed (%s): %s",
-                      result.returncode, result.stderr.strip())
-        raise subprocess.CalledProcessError(
-            result.returncode, command, output=result.stdout, stderr=result.stderr)
+        # gdal2tiles.py prints some errors (e.g. for non-8-bit data) to stdout
+        output = (result.stderr.strip() or result.stdout.strip()).splitlines()
+        reason = f"{command[0]} failed (exit status {result.returncode}): {output[-1] if output else 'no output'}"
+        logging.error(reason)
+        raise RuntimeError(reason)
 
 
 class GeoTIFFParser(OpenVDMParser):
@@ -48,7 +58,15 @@ class GeoTIFFParser(OpenVDMParser):
         self.tile_dir = None
 
     def process_file(self, filepath): # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        """Parse the GeoTIFF, write its tiles and populate the plugin data."""
+        """Parse the GeoTIFF, write its tiles and populate the plugin data.
+
+        Args:
+            filepath: Path to the GeoTIFF.
+
+        Raises:
+            RuntimeError: If a GDAL command fails or GDAL can't open the
+                reprojected GeoTIFF (#573).
+        """
 
         logging.debug("Parsing data file...")
 

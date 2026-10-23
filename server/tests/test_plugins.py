@@ -500,12 +500,9 @@ def test_em302_unknown_file(em302) -> None:
     assert em302.EM302Plugin().parse_file('/data/EM302/raw/0001.all') == {}
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="plugin_data is always a dict, so it's always kept (#574)")
 @pytest.mark.parametrize('plugin', ['openrvdas', 'rov_openrvdas', 'em302'])
 def test_file_without_data(load_plugin, fake_ovdm, monkeypatch, tmp_path, caplog, plugin) -> None:
-    """A file its parser finds no data in gives no output, not an empty data set."""
+    """A file its parser finds no data in gives no output, not an empty data set (#574)."""
     caplog.set_level(logging.WARNING)
     if plugin == 'em302':
         module = load_plugin('em302', 'geotiff_titiler')
