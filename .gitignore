@@ -25,6 +25,7 @@ www/vendor
 www/.htaccess
 www/composer.lock
 www/errorlog.html
+www/.phpunit.cache
 www/node_modules
 www/overlay_layers.json
 

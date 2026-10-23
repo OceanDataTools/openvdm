@@ -1,5 +1,6 @@
 # The checks to run before a PR is merged (#506): the Python tests with
-# coverage, ruff, and the pre-commit hooks (ruff, ESLint, php -l, PHPStan).
+# coverage, the PHP tests (#515), ruff, and the pre-commit hooks (ruff,
+# ESLint, php -l, PHPStan).
 name: Checks
 
 on:
@@ -50,6 +51,30 @@ jobs:
       # Fails below .coveragerc's fail_under
       - name: Run the tests with coverage
         run: python -m pytest --cov --cov-report=term-missing:skip-covered
+
+  phpunit:
+    name: PHPUnit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      # PHP 8.3 matches production; mbstring is needed by league/commonmark
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring
+          tools: composer
+          coverage: none
+
+      # PHPUnit is a dev dependency (#515). --no-scripts skips
+      # post_composer.sh, which installs web assets the tests don't need
+      - name: Install PHPUnit
+        working-directory: www
+        run: composer install --no-interaction --no-progress --no-scripts
+
+      - name: PHPUnit
+        working-directory: www
+        run: vendor/bin/phpunit
 
   lint:
     name: ruff, ESLint, php -l, PHPStan

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PHPUnit tests for the OpenVDM web app (#515). Run from www/: vendor/bin/phpunit
+     (needs the dev dependencies from composer install, which production installs leave out). -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         beStrictAboutOutputDuringTests="true"
+         cacheDirectory=".phpunit.cache">
+    <testsuites>
+        <testsuite name="Helpers">
+            <directory>tests/Helpers</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app/Helpers</directory>
+        </include>
+    </source>
+</phpunit>
