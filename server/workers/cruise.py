@@ -122,10 +122,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             try:
                 with open(cruise_config_file_path, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
-                    cruise_config['cruiseFinalizedOn'] = existing_data.get('cruiseFinalizedOn')
-            except OSError as exc:
-                logging.debug("Error reading config: %s", str(exc))
-                return {'verdict': False, 'reason': "Unable to read existing configuration file"}
+                # Not JSON (e.g. truncated) fails the export rather than losing the finalized date (#548)
+                if not isinstance(existing_data, dict):
+                    raise ValueError("not a JSON object")
+                cruise_config['cruiseFinalizedOn'] = existing_data.get('cruiseFinalizedOn')
+            except (OSError, ValueError) as exc:
+                reason = f"Unable to read the existing configuration file {cruise_config_fn}: {exc}"
+                logging.error(reason)
+                return {'verdict': False, 'reason': reason}
 
         def scrub_transfers(transfer_list):
             for transfer in transfer_list:
@@ -392,6 +396,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.stop = False
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self.ovdm.get_task_by_name(current_job.task)
+
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
@@ -399,8 +407,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = self.ovdm.get_task_by_name(current_job.task)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -539,34 +545,34 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.info("Adding post-hook task: %s", task)
                 post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
 
+            # Without hook tasks, go on to complete the job (#547)
             if not post_hook_jobs:
                 logging.info("No post-hook tasks found, skipping.")
-                return super().on_job_execute(current_job)
+            else:
+                # Submit jobs to Gearman
+                gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            # Submit jobs to Gearman
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+                try:
+                    submitted_job_requests = gm_client.submit_multiple_jobs(
+                        post_hook_jobs,
+                        background=False,
+                        wait_until_complete=False,  # we'll handle completion below
+                    )
 
-            try:
-                submitted_job_requests = gm_client.submit_multiple_jobs(
-                    post_hook_jobs,
-                    background=False,
-                    wait_until_complete=False,  # we'll handle completion below
-                )
+                    # Wait until all jobs complete
+                    gm_client.wait_until_jobs_completed(submitted_job_requests)
 
-                # Wait until all jobs complete
-                gm_client.wait_until_jobs_completed(submitted_job_requests)
+                    # Log results
+                    for job in submitted_job_requests:
+                        if job.complete:
+                            logging.info("Task %s completed successfully", job.job.unique)
+                        elif job.timed_out:
+                            logging.error("Task %s timed out", job.job.unique)
+                        else:
+                            logging.error("Task %s failed: %s", job.job.unique, job.exception)
 
-                # Log results
-                for job in submitted_job_requests:
-                    if job.complete:
-                        logging.info("Task %s completed successfully", job.job.unique)
-                    elif job.timed_out:
-                        logging.error("Task %s timed out", job.job.unique)
-                    else:
-                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
-
-            except Exception as e:
-                logging.exception("Error while submitting or running post-hook jobs: %s", e)
+                except Exception as e:
+                    logging.exception("Error while submitting or running post-hook jobs: %s", e)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None

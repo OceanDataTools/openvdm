@@ -119,7 +119,6 @@ def test_cruise_job_setup(cruise_worker, api, warehouse) -> None:
     api.set_running_task.assert_called_once_with(7, os.getpid(), 'H:test:1')
 
 
-@pytest.mark.xfail(strict=True, reason="#544: the task isn't looked up before the payload")
 def test_cruise_bad_payload(cruise_worker, api) -> None:
     """A payload that isn't JSON fails the job; a custom task sends a message instead of a status."""
     result = cruise_worker.on_job_execute(SimpleNamespace(data='not json', handle='H:1',
@@ -293,7 +292,7 @@ def test_set_cruisedata_permissions(cruise_worker, api, warehouse, perms) -> Non
     result = _run_cruise(cruise_worker, cruise_directory.task_set_cruisedata_directory_permissions,
                          'setCruiseDataDirectoryPermissions')
     assert _parts(result) == [('Clear CruiseData directory read permissions', 'Pass'),
-                              ('Set Directory permissions for current cruise', 'Pass')]
+                              ('Set directory permissions for current cruise', 'Pass')]
     assert perms.lockdown == [(str(warehouse.base_dir), [str(warehouse.cruise_dir)])]
     assert perms.owner == [('survey', str(warehouse.cruise_dir))]
 
@@ -311,7 +310,6 @@ def test_set_cruisedata_permissions_failures(cruise_worker, api, warehouse, perm
     assert _parts(result)[-1] == (part, 'Fail')
 
 
-@pytest.mark.xfail(strict=True, reason='#545: the ownership result is ignored')
 def test_set_cruisedata_permissions_ownership_fails(cruise_worker, warehouse, perms) -> None:
     """Ownership that can't be set fails the job, as in the create and rebuild tasks."""
     perms.owner_fail = 'chown failed'
@@ -395,9 +393,7 @@ def test_lowering_job_setup(lowering_worker, warehouse) -> None:
     assert lowering_worker.lowering_id == 'DIVE01'
 
 
-@pytest.mark.parametrize('data', [
-    pytest.param('not json', marks=pytest.mark.xfail(strict=True, reason="#544: the task isn't looked up before the payload")),
-    json.dumps({'loweringID': ''})])
+@pytest.mark.parametrize('data', ['not json', json.dumps({'loweringID': ''})])
 def test_lowering_job_needs_a_payload_and_lowering(lowering_worker, api, data) -> None:
     """A bad payload, or no lowering, fails the job."""
     api.get_lowering_id.return_value = None

@@ -156,7 +156,6 @@ def test_job_setup(worker, api, warehouse) -> None:
     api.set_running_task.assert_called_once_with(4, os.getpid(), 'H:test:1')
 
 
-@pytest.mark.xfail(strict=True, reason="#544: the task isn't looked up before the payload")
 def test_bad_payload(worker, api) -> None:
     """A payload that isn't JSON fails the job."""
     result = worker.on_job_execute(SimpleNamespace(data='not json', handle='H:1', task='exportOVDMConfig'))
@@ -220,7 +219,6 @@ def test_setup_runs_post_hooks(worker, api, fake_gearman) -> None:
     api.set_idle_task.assert_called_once_with(4)
 
 
-@pytest.mark.xfail(strict=True, reason='#547: with no hooks, on_job_complete() runs the job again')
 def test_setup_without_post_hooks_completes(worker, api, gearman_base, monkeypatch) -> None:
     """With no setupNewCruise hooks, the job completes instead of running again."""
     api.config['hooks'].pop('setupNewCruise')
@@ -325,16 +323,19 @@ def test_export_cruise_config_unreadable(worker, warehouse) -> None:
     _config_file(warehouse).write_text('{}')
     _config_file(warehouse).chmod(0)
     _setup(worker)
-    assert worker.export_cruise_config() == {'verdict': False,
-                                             'reason': 'Unable to read existing configuration file'}
+    assert worker.export_cruise_config()['reason'].startswith(
+        'Unable to read the existing configuration file cruise_config.json: [Errno 13] Permission denied')
 
 
-@pytest.mark.xfail(strict=True, reason="#548: a config file that isn't JSON raises")
-def test_export_cruise_config_not_json(worker, warehouse) -> None:
-    """An existing config file that isn't JSON is replaced (or fails the export), not a crash."""
-    _config_file(warehouse).write_text('{truncated')
+@pytest.mark.parametrize('text', ['{truncated', '[]'])
+def test_export_cruise_config_not_json(worker, warehouse, text) -> None:
+    """An existing config file that isn't a JSON object fails the export, keeping its finalized date (#548)."""
+    _config_file(warehouse).write_text(text)
     _setup(worker)
-    assert 'verdict' in worker.export_cruise_config()
+    result = worker.export_cruise_config()
+    assert result['verdict'] is False
+    assert result['reason'].startswith('Unable to read the existing configuration file cruise_config.json: ')
+    assert _config_file(warehouse).read_text() == text
 
 
 def test_export_cruise_config_write_fails(worker, monkeypatch) -> None:
