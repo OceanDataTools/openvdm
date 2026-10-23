@@ -110,6 +110,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return self._fail_job(current_job, "Retrieve current job data", reason)
 
         self.job_pid = payload_obj.get('pid')
+
+        # A job that has ended has PID 0, as every idle transfer and task
+        # does: there's nothing to stop, and looking it up would match the
+        # first idle one (#590)
+        if str(self.job_pid or '').strip() in ('', '0'):
+            logging.info("Nothing to stop: no job is running (PID %r)", self.job_pid)
+            return self.on_job_complete(current_job, json.dumps({
+                'parts': [{"partName": "Verify OpenVDM Job", "result": "Ignore",
+                           "reason": "No job is running: it may have just finished"}]
+            }))
+
         self.job_info = self._get_job_info()
 
         logging.info("Job Started: %s, Killing PID: %s", current_job.handle, self.job_pid)
