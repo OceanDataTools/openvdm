@@ -37,8 +37,9 @@ $(function () {
         if (val.length > 0 && !val.startsWith('/')) {
             val = '/' + val;
         }
+        // Strip trailing slashes, keeping the root: "//" is "/" (#608)
         if (val.length > 1) {
-            val = val.replace(/\/+$/, '');
+            val = val.replace(/\/+$/, '') || '/';
         }
         return val;
     }

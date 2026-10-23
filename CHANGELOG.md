@@ -125,6 +125,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **CTD profile parser counted a short scan as lost scans:** it read a scan's scan count before checking its length, so one line cut short looked like hundreds of lost scans and failed HEX Lost Scans. The count now comes only from whole scans; the short line is still a bad row (#571).
 - **Writing a parser: `RecursionError` instead of a clear error:** a parser that implemented neither `parse()` nor `process_file()`, or whose `parse()` called `super().parse()`, made the base class's `parse()` and `process_file()` call each other until Python gave up. It now raises "<Parser> must implement parse() or process_file()" (#533).
 - **Trackline scripts: unclear errors for some position sources:** a source given as a bare name (e.g. `PositionSources: [gps]`) failed with an `AttributeError`, and an empty list with an `IndexError` when the extent source was chosen. Both now say what's wrong, like the other mistakes in the position sources YAML (#537).
+- **A directory of `//` saved as none:** the collection system transfer form's Source Directory and the shoreside data warehouse form's Destination Directory turned `//` into an empty value, so a root typed with a doubled slash was saved as no directory at all. They now keep it as `/`, as the cruise data transfer form does since #247 (#608).
 
 ---
 
