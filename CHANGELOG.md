@@ -85,6 +85,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **A job whose payload can't be read fails its task:** the cruise, lowering, directory, data dashboard, MD5 summary and post-hook workers crashed on it, or set the error on the previous job's task. The data dashboard worker also counted the job as passed and ran its hook tasks (#544).
 - **Set CruiseData Directory Permissions** fails when the cruise directory's ownership or permissions can't be set; it reported success (#545).
 - **A cruise or lowering config file that isn't valid JSON** (e.g. cut short by a full disk) fails Export Config with the reason, keeping the file and its finalized date, instead of crashing the worker (#548).
+- **Hook tasks after a failed setup**: Setup New Cruise, Setup New Lowering and Finalize Current Lowering skip their hook tasks for a job that fails before it has a cruise or lowering ID (a payload that can't be parsed, or no current lowering). The hooks used to get the previous job's cruise or lowering (#552).
 
 ---
 

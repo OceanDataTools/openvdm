@@ -229,6 +229,16 @@ def test_setup_without_post_hooks_completes(worker, api, gearman_base, monkeypat
     api.set_idle_task.assert_called_once_with(4)
 
 
+def test_setup_with_bad_payload_skips_post_hooks(worker, api, fake_gearman, caplog) -> None:
+    """A job whose payload can't be parsed runs no hook tasks, not even with the last job's cruise (#552)."""
+    _setup(worker, 'setupNewCruise')
+    fake_gearman.jobs.clear()
+    result = worker.on_job_execute(SimpleNamespace(data='not json', handle='H:2', task='setupNewCruise'))
+    assert _parts(result) == [('Retrieve job data', 'Fail')]
+    assert fake_gearman.jobs == []
+    assert 'No cruise ID, skipping post-hook tasks.' in caplog.text
+
+
 def test_failed_job_sets_task_error(worker, api) -> None:
     """A job whose last part failed sets the task's error with its reason."""
     _setup(worker)

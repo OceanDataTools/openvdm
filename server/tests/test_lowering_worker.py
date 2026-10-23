@@ -202,6 +202,21 @@ def test_without_post_hooks_completes(worker, api, gearman_base, monkeypatch, ta
     api.set_idle_task.assert_called_once_with(6)
 
 
+@pytest.mark.parametrize('task', ['setupNewLowering', 'finalizeCurrentLowering'])
+@pytest.mark.parametrize('data, part', [('not json', 'Retrieve job data'),
+                                        ('{}', 'Verify lowering ID')], ids=['bad_payload', 'no_lowering'])
+def test_job_without_a_lowering_skips_post_hooks(worker, api, fake_gearman, caplog, task, data,
+                                                 part) -> None:
+    """A job that fails before it has a lowering runs no hook tasks, not even with the last job's (#552)."""
+    _setup(worker, task)
+    fake_gearman.jobs.clear()
+    api.get_lowering_id.return_value = None
+    result = worker.on_job_execute(SimpleNamespace(data=data, handle='H:2', task=task))
+    assert _parts(result) == [(part, 'Fail')]
+    assert fake_gearman.jobs == []
+    assert 'No lowering ID, skipping post-hook tasks.' in caplog.text
+
+
 @pytest.mark.parametrize('request_state, logged', [
     ({'complete': False, 'timed_out': True}, 'timed out'),
     ({'complete': False, 'timed_out': False, 'exception': 'boom'}, 'failed: boom')])

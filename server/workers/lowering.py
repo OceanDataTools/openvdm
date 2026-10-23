@@ -247,6 +247,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         # payload that can't be parsed fails this task (#544)
         self.task = self.ovdm.get_task_by_name(current_job.task)
 
+        # Clear the last job's lowering, so a job that fails before reading its
+        # own doesn't pass that one to the hook tasks (#552)
+        self.cruise_id = self.lowering_id = None
+        self.lowering_start_date = self.lowering_end_date = None
+
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
@@ -373,7 +378,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         no status in OpenVDM.
 
         After a lowering is set up or finalized, submits the hook tasks
-        configured for that task in ``openvdm.yaml``.
+        configured for that task in ``openvdm.yaml``, unless the job has no
+        lowering ID.
 
         Args:
             current_job: The Gearman job.
@@ -394,9 +400,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 'loweringEndDate': self.lowering_end_date
             }
 
+            # Hook tasks need the lowering: skip them for a job without one, e.g.
+            # one whose payload couldn't be parsed (#552)
+            if not self.lowering_id:
+                logging.warning("No lowering ID, skipping post-hook tasks.")
+                hook_tasks = []
+            else:
+                hook_tasks = self.ovdm.get_tasks_for_hook(current_job.task)
+
             # Collect pre-finalize jobs
             post_hook_jobs = []
-            for task in self.ovdm.get_tasks_for_hook(current_job.task):
+            for task in hook_tasks:
                 logging.info("Adding post-hook task: %s", task)
                 post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
 

@@ -400,6 +400,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         # payload that can't be parsed fails this task (#544)
         self.task = self.ovdm.get_task_by_name(current_job.task)
 
+        # Clear the last job's cruise, so a job that fails before reading its
+        # own doesn't pass that one to the hook tasks (#552)
+        self.cruise_id = self.cruise_start_date = self.cruise_end_date = None
+
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
@@ -519,7 +523,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         no status in OpenVDM.
 
         After a new cruise is set up, submits the hook tasks configured for
-        ``setupNewCruise`` in ``openvdm.yaml``.
+        ``setupNewCruise`` in ``openvdm.yaml``, unless the job has no cruise ID.
 
         Args:
             current_job: The Gearman job.
@@ -539,9 +543,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 'cruiseEndDate': self.cruise_end_date
             }
 
+            # Hook tasks need the cruise: skip them for a job without one, e.g.
+            # one whose payload couldn't be parsed (#552)
+            if not self.cruise_id:
+                logging.warning("No cruise ID, skipping post-hook tasks.")
+                hook_tasks = []
+            else:
+                hook_tasks = self.ovdm.get_tasks_for_hook(current_job.task)
+
             # Collect pre-finalize jobs
             post_hook_jobs = []
-            for task in self.ovdm.get_tasks_for_hook(current_job.task):
+            for task in hook_tasks:
                 logging.info("Adding post-hook task: %s", task)
                 post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
 
