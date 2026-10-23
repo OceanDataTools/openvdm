@@ -157,6 +157,8 @@ Tests live in `server/tests/` (`pytest.ini`'s `testpaths`; the repository root i
 
 **Worker tests:** `server/tests/cst_helpers.py` builds a real `OVDMGearmanWorker` for the collection system transfer worker with `fake_ovdm` and `warehouse`, set up as `_run_job()` leaves it (#510); other workers' tests follow the same pattern. Tests that need real rsync are marked to skip without GNU rsync 3 (macOS has openrsync), so they run in CI.
 
+**API wrapper tests:** `server/tests/test_openvdm_api.py` replaces `requests` with a fake API and checks each `OpenVDM` method's URL, HTTP method, payload and worker token. Its route check requests every URL `openvdm.py` builds and fails unless each matches a route in `www/app/Core/routes.php` (with its HTTP method), so a new method needs its route, and a renamed endpoint fails CI. A new API method also needs a row in the test's tables (`GETTERS`, `API_CALLS`); the route check fails for a URL template no test requests (#509).
+
 **Coverage:** `.coveragerc` measures `server/` and `bin/`, excluding the tests, a site's own copies of `.dist` files, and `if __name__ == "__main__":` blocks (how Supervisor starts a worker). `fail_under` is the floor: raise it when tests add coverage, never lower it. coverage.py only finds `.py` files no test ran, so a `.py.dist` file counts once a test loads it.
 
 ## Git Workflow
