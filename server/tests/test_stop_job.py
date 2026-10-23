@@ -163,12 +163,12 @@ def test_stop_with_no_running_job(worker, api, kill, pid) -> None:
     kill.assert_not_called()
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="the finally block adds a Pass after the failure (#589)")
-def test_kill_fails(worker, kill) -> None:
-    """A process that can't be signalled (e.g. not permitted) fails the job."""
+def test_kill_fails(worker, api, kill) -> None:
+    """A process that can't be signalled (e.g. not permitted) fails the job, and the job isn't
+    shown as stopped: not set idle, no "Manual Stop" message (#589)."""
     kill.side_effect = PermissionError(errno.EPERM, 'Operation not permitted')
     result = json.loads(worker.on_job_execute(_job(pid=1004)))
-    assert result['parts'][-1]['result'] == 'Fail'
+    assert [part['result'] for part in result['parts'] if part['partName'] == 'Stopped Job'] == ['Fail']
     assert 'Operation not permitted' in result['parts'][-1]['reason']
+    api.set_idle_task.assert_not_called()
+    api.send_msg.assert_not_called()

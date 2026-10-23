@@ -8,6 +8,7 @@ the OpenVDM database.
 """
 
 import argparse
+import errno
 import json
 import logging
 import os
@@ -221,7 +222,9 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
     the corresponding OpenVDM record to idle via the API. A transfer job
     that's running (holds the transfer's lock, #478) sets its own status when
     it ends; a transfer with no running job is set idle without signalling
-    its stored PID, which may belong to another process by now.
+    its stored PID, which may belong to another process by now. If the
+    process can't be signalled (other than because it's gone), the job fails
+    and the record is left as it is (#589).
 
     Args:
         worker: The active :py:class:`OVDMGearmanWorker` instance.
@@ -258,28 +261,28 @@ def task_stop_job(worker: OVDMGearmanWorker, current_job) -> str:
         else:
             os.kill(int(job_pid), signal.SIGQUIT)
     except OSError as exc:
-        if exc.errno == 3:
-            logging.warning("Process does not exist: PID %s", job_pid)
-        else:
+        if exc.errno != errno.ESRCH:
+            # The job is still running: don't show it as stopped (#589)
             reason = f"Error killing PID: {job_pid} --> {exc}"
             logging.error(reason)
             job_results['parts'].append({"partName": "Stopped Job", "result": "Fail", "reason": reason})
+            return json.dumps(job_results)
+        logging.warning("Process does not exist: PID %s", job_pid)
 
-    finally:
-        actions = {
-            'collectionSystemTransfer': worker.ovdm.set_idle_collection_system_transfer,
-            'cruiseDataTransfer': worker.ovdm.set_idle_cruise_data_transfer,
-            'task': worker.ovdm.set_idle_task
-        }
+    actions = {
+        'collectionSystemTransfer': worker.ovdm.set_idle_collection_system_transfer,
+        'cruiseDataTransfer': worker.ovdm.set_idle_cruise_data_transfer,
+        'task': worker.ovdm.set_idle_task
+    }
 
-        if job_type in actions:
-            # A signalled transfer job sets the status when it ends; idle now
-            # would show it as not running while it winds down
-            if not transfer_running:
-                actions[job_type](job_id)
-            worker.ovdm.send_msg("Manual Stop of transfer" if 'Transfer' in job_type else "Manual Stop of task", job_name)
+    if job_type in actions:
+        # A signalled transfer job sets the status when it ends; idle now
+        # would show it as not running while it winds down
+        if not transfer_running:
+            actions[job_type](job_id)
+        worker.ovdm.send_msg("Manual Stop of transfer" if 'Transfer' in job_type else "Manual Stop of task", job_name)
 
-        job_results['parts'].append({"partName": "Stopped Job", "result": "Pass"})
+    job_results['parts'].append({"partName": "Stopped Job", "result": "Pass"})
 
     return json.dumps(job_results)
 
