@@ -55,6 +55,14 @@ def test_combine_files_in_order(tmp_path) -> None:
     assert feature['geometry'] == {'type': 'LineString', 'coordinates': [[-120, 45], [-120.1, 45.1], [-120.2, 45.2]]}
 
 
+def test_visualizer_entries() -> None:
+    """Every visualizerData entry, from the old format and the current one (keyed by data type) (#602)."""
+    assert list(gj.visualizer_entries({'visualizerData': [1, 2], 'gga': {'visualizerData': [3]},
+                                       'stats': [], 'hdt': {'stats': []}, 'x': 'not a dict'})) == [1, 2, 3]
+    assert list(gj.visualizer_entries({'visualizerData': 'not a list'})) == []
+    assert list(gj.visualizer_entries(['not', 'a', 'dict'])) == []
+
+
 def test_combine_skips_other_data(tmp_path) -> None:
     """Visualizer data that isn't a GeoJSON LineString (charts, points, bad values) is skipped."""
     path = tmp_path / 'mixed.json'
