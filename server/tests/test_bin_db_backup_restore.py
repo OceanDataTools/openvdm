@@ -98,13 +98,13 @@ def test_backup_no_mysqldump(db, fake_run, tmp_path, caplog) -> None:
 
 def test_backup_cant_write(db, fake_run, tmp_path, caplog, monkeypatch) -> None:
     """If the backup file can't be written, the backup fails."""
-    real_open = open
+    real_open = os.open
 
     def refuse(path, *args, **kwargs):
         if str(path).endswith('.sql'):
             raise PermissionError(13, 'Permission denied')
         return real_open(path, *args, **kwargs)
-    monkeypatch.setattr('builtins.open', refuse)
+    monkeypatch.setattr(db.os, 'open', refuse)
     assert db.backup(str(tmp_path), CREDS) == 1
     assert 'Failed to write backup file' in caplog.text
 
@@ -181,15 +181,30 @@ def test_choose_backup_none(db, tmp_path, caplog) -> None:
     assert exc.value.code == 1 and 'No backup files found' in caplog.text
 
 
-# --- Bugs -----------------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="the backup is written with the default umask (#603)")
-def test_backup_not_world_readable(db, fake_run, tmp_path) -> None:
-    """The backup (which has the transfers' passwords) is readable only by its owner."""
-    old = os.umask(0o022)
+@pytest.mark.parametrize('umask', [0o022, 0o000])
+def test_backup_is_owner_only(db, fake_run, tmp_path, umask) -> None:
+    """The backup (which has the transfers' passwords) is readable only by its owner, and a backup
+    folder it creates is the owner's only, whatever the umask (#603)."""
+    out = tmp_path / 'backups'
+    old = os.umask(umask)
     try:
-        assert db.backup(str(tmp_path), CREDS) == 0
+        assert db.backup(str(out), CREDS) == 0
     finally:
         os.umask(old)
-    [backup] = tmp_path.iterdir()
-    assert stat.S_IMODE(backup.stat().st_mode) & 0o077 == 0
+    [backup] = out.iterdir()
+    assert stat.S_IMODE(backup.stat().st_mode) == 0o600
+    assert stat.S_IMODE(out.stat().st_mode) & 0o077 == 0
+
+
+def test_backup_never_overwrites(db, fake_run, tmp_path, monkeypatch, caplog) -> None:
+    """A backup file that already exists (two backups in the same second) isn't overwritten."""
+    class Frozen(db.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return db.datetime(2026, 10, 23, 12, 0, 0, tzinfo=tz)
+    monkeypatch.setattr(db, 'datetime', Frozen)
+    existing = tmp_path / 'openvdm_20261023_120000.sql'
+    existing.write_text('the earlier backup\n')
+    assert db.backup(str(tmp_path), CREDS) == 1
+    assert existing.read_text() == 'the earlier backup\n'
+    assert 'Failed to write backup file' in caplog.text
