@@ -50,6 +50,48 @@ TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
 
+def build_filters(cst_cfg: dict, cruise_id: str, lowering_id: str | None) -> dict:
+    """Return a transfer's include, exclude and ignore filters, with their placeholders filled in.
+
+    ``{cruiseID}`` and ``{loweringID}`` become the IDs (``{loweringID}``
+    stays as written without a lowering); the date placeholders become
+    patterns for their digits (``{YYYY}`` is ``20[0-9][0-9]``, and so on).
+    The File Naming Guide (``www/app/Helpers/FileNamingGuide.php``) explains
+    the filters this way, and a test checks it against this function (#451).
+
+    Args:
+        cst_cfg: The collection system transfer, with ``includeFilter``,
+            ``excludeFilter`` and ``ignoreFilter`` (comma-separated patterns).
+        cruise_id: The cruise.
+        lowering_id: The lowering, or ``None``.
+
+    Returns:
+        dict: ``include_filters``, ``exclude_filters`` and ``ignore_filters``,
+        each a list of patterns.
+    """
+
+    context = {
+        '{cruiseID}': cruise_id,
+        '{loweringID}': lowering_id or '{loweringID}',
+        '{YYYY}': '20[0-9][0-9]',
+        '{YY}': '[0-9][0-9]',
+        '{mm}': '[0-1][0-9]',
+        '{DD}': '[0-3][0-9]',
+        '{HH}': '[0-2][0-9]',
+        '{MM}': '[0-5][0-9]',
+        '{SS}': '[0-5][0-9]',
+    }
+
+    filters = {}
+    for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
+        expanded = cst_cfg.get(key, '')
+        for placeholder, value in context.items():
+            expanded = expanded.replace(placeholder, value)
+        filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
+
+    return filters
+
+
 def classify_file(filepath: str, size: int, mod_time: float, filters: dict,
                   data_start_time: float, data_end_time: float):
     """Decide whether a listed file is transferred, reported as excluded or ignored.
@@ -589,38 +631,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             ``{'verdict': True, 'stopped': True}`` with no files (#473).
         """
 
-        def _build_filters(cst_cfg, cruise_id, lowering_id):
-            """
-            Build a dict of filters with their wildcards replaced with the appropriate
-            values
-            """
-
-            def _expand_placeholders(template: str, context: dict) -> str:
-                for key, value in context.items():
-                    template = template.replace(key, value)
-                return template
-
-            context = {
-                '{cruiseID}': cruise_id,
-                '{loweringID}': lowering_id or '{loweringID}',
-                '{YYYY}': '20[0-9][0-9]',
-                '{YY}': '[0-9][0-9]',
-                '{mm}': '[0-1][0-9]',
-                '{DD}': '[0-3][0-9]',
-                '{HH}': '[0-2][0-9]',
-                '{MM}': '[0-5][0-9]',
-                '{SS}': '[0-5][0-9]',
-            }
-
-            filters = {}
-            for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
-                raw = cst_cfg.get(key, '')
-                expanded = _expand_placeholders(raw, context)
-                filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
-
-            return filters
-
-
         def _verify_staleness_batch(paths_sizes):
             """
             Verify a file hasn't changed size
@@ -642,7 +652,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         source_dir = os.path.join(prefix, raw_source_dir.lstrip('/')) if prefix else raw_source_dir
         cst_cfg = self.collection_system_transfer
         transfer_type = get_transfer_type(cst_cfg['transferType'])
-        filters = _build_filters(cst_cfg, self.cruise_id, self.lowering_id)
+        filters = build_filters(cst_cfg, self.cruise_id, self.lowering_id)
         logging.debug("filters: %s", filters)
         epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
         data_start_time = calendar.timegm(time.strptime(self.data_start_date, "%Y/%m/%d %H:%M"))

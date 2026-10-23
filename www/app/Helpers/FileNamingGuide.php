@@ -9,7 +9,7 @@
  *
  * - the filters are comma-separated fnmatch patterns, case-sensitive, in which
  *   "*" also matches "/";
- * - the placeholders below are filled in first (_build_filters());
+ * - the placeholders below are filled in first (build_filters());
  * - a file is checked against the default ignores, the date range, the ASCII
  *   rule, then Ignore (skipped, not reported), Include (must match) and
  *   Exclude (not copied, and listed as a filename error on the main page);
