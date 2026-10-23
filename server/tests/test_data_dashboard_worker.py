@@ -354,9 +354,11 @@ def test_update_cant_write_dashboard_file(worker, cruise) -> None:
     assert _manifest(cruise) == []
 
 
-def test_update_cant_write_manifest(worker, cruise) -> None:
+def test_update_cant_write_manifest(worker, cruise, monkeypatch) -> None:
     """A manifest that can't be written fails the update."""
-    cruise.manifest.mkdir()
+    write = data_dashboard.output_json_data_to_file
+    monkeypatch.setattr(data_dashboard, 'output_json_data_to_file', lambda path, data: (
+        {'verdict': False, 'reason': 'disk full'} if path == str(cruise.manifest) else write(path, data)))
     assert _parts(_update(worker, new=['SCS/raw/nav.gga']))[-1] == ('Writing dashboard manifest file', 'Fail')
 
 
@@ -457,23 +459,32 @@ def test_rebuild_ownership_fails(worker, perms, plugins) -> None:
     assert _parts(_rebuild(worker))[-1] == ('Set file/directory ownership', 'Fail')
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="out_obj.get() is called on None (#581)")
-def test_plugin_returns_none(worker, plugins, cruise) -> None:
-    """A plugin that returns None for a file is treated as no output, not a crash."""
+def test_plugin_returns_none(worker, plugins, cruise, caplog) -> None:
+    """A plugin that returns None for a file is treated as no output, not a crash (#581)."""
     (plugins / 'scs_plugin.py').write_text('def process_file(path):\n    return None\n')
     result = json.loads(_update(worker, new=['SCS/raw/nav.gga']))
     assert _parts(json.dumps(result))[-1] == ('Set file/directory ownership', 'Pass')
+    assert 'No output from plugin for file: SCS/raw/nav.gga' in caplog.text
 
 
-@pytest.mark.xfail(strict=True, reason="an unreadable manifest is taken to be empty (#582)")
-def test_update_with_corrupt_manifest(worker, cruise) -> None:
-    """An update doesn't replace a manifest it can't read with one listing only its own files."""
-    _update(worker, new=['SCS/raw/heading.hdt'])
-    cruise.manifest.write_text(cruise.manifest.read_text()[:-5])   # cut short
-    result = _update(worker, new=['SCS/raw/nav.gga'])
-    assert _parts(result)[-1][1] == 'Fail' or len(json.loads(cruise.manifest.read_text())) == 2
+@pytest.mark.parametrize('content', [None, '[{"raw_data": ', '{"raw_data": "x"}'])
+def test_update_with_unreadable_manifest(worker, cruise, content) -> None:
+    """An update fails, leaving the manifest, if the manifest can't be read (cut short, not a list
+    or not a file), and suggests a rebuild (#582)."""
+    if content is None:
+        cruise.manifest.mkdir()
+    else:
+        cruise.manifest.write_text(content)
+    result = json.loads(_update(worker, new=['SCS/raw/nav.gga']))
+    part = result['parts'][-1]
+    assert (part['partName'], part['result']) == ('Read dashboard manifest file', 'Fail')
+    assert part['reason'].endswith('Run Rebuild Data Dashboard to rebuild it')
+    if content is not None:
+        assert cruise.manifest.read_text() == content
+
+
+# --- Bugs -----------------------------------------------------------------------
+
 
 
 @pytest.mark.xfail(strict=True, reason="a file's data types it no longer has stay in the manifest (#583)")

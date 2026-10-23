@@ -239,7 +239,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 continue
 
             if not out_obj or out_obj.get('error'):
-                msg = out_obj.get('error', f"No output from plugin for file: {filename}")
+                # a plugin may return None for a file without data (#581)
+                msg = (out_obj or {}).get('error') or f"No output from plugin for file: {filename}"
                 logging.warning(msg)
                 self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
                 continue
@@ -486,6 +487,35 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 # -------------------------
 # Gearman task definitions
 # -------------------------
+class ManifestError(Exception):
+    """The data dashboard manifest exists but can't be read."""
+
+
+def _read_manifest(path: str) -> list:
+    """Return the data dashboard manifest's entries; none if it doesn't exist yet.
+
+    Args:
+        path: The manifest file's path.
+
+    Returns:
+        list: The manifest's entries.
+
+    Raises:
+        ManifestError: If the manifest can't be read or isn't a list of
+            entries, e.g. after a write cut short (#582).
+    """
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError) as exc:
+        raise ManifestError(f"Unable to read the dashboard manifest {path}: {exc}") from exc
+    if not isinstance(entries, list):
+        raise ManifestError(f"The dashboard manifest {path} isn't a list of entries")
+    return entries
+
+
 def task_update_data_dashboard(worker, current_job):
     """Update the data dashboard for a collection system transfer's new and updated files.
 
@@ -525,15 +555,18 @@ def task_update_data_dashboard(worker, current_job):
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Retrieve file list", "result": "Pass"})
 
+    # Load the existing manifest first: one that can't be read is left as it
+    # is, as replacing it would drop every other file from the dashboard (#582)
+    try:
+        existing_entries = _read_manifest(worker.data_dashboard_manifest_file_path)
+    except ManifestError as exc:
+        reason = f"{exc}. Run Rebuild Data Dashboard to rebuild it"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Read dashboard manifest file", "result": "Fail", "reason": reason})
+        return json.dumps(job_results)
+
     new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90,
                                                            get_source_files=get_source_files)
-
-    # Load existing manifest
-    try:
-        with open(worker.data_dashboard_manifest_file_path, 'r', encoding='utf-8') as f:
-            existing_entries = json.load(f)
-    except Exception:
-        existing_entries = []
 
     # Remove obsolete entries (a raw file may have multiple manifest entries,
     # one per data type; remove all of them together)
