@@ -102,6 +102,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Data dashboard update replaced a manifest it couldn't read:** a manifest cut short, e.g. by a full disk, was taken to be empty, and the update wrote a new one listing only its own files, so every other file dropped off the dashboard until a rebuild. The update now fails, leaves the manifest as it is, and says to run Rebuild Data Dashboard (#582).
 - **Stale data types on the data dashboard:** when an update reprocessed a file that no longer had one of its data types (e.g. `gga` and `hdt`, now only `gga`), the manifest kept the entry for the type it lost, pointing at a dashboard file without that data. Those entries are now dropped (#583).
 - **Rebuild Data Dashboard's progress past 100%:** each transfer's share of the progress was shifted by one, so a rebuild of one transfer showed 90% to 170%, and of three, up to 116%. The transfers now share 10–90% in order (#584).
+- **Stopped Update MD5 Summary reported success:** if Stop arrived while files were being hashed, the hashes done so far were saved and the job passed, leaving the other files with old hashes or none, and nothing to say so. A stopped update now fails "Calculate Hashes" with "Job was stopped by user" and leaves the summary as it was, as a stopped rebuild does. Run Rebuild MD5 Summary to add the files it didn't (#579).
 
 ---
 

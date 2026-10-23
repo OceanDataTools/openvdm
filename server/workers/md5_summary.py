@@ -435,6 +435,11 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
 
     new_hashes = worker.build_md5_hashes(current_job, filelist)
 
+    # Stopped while hashing: leave the summary as it was, as a rebuild does (#579)
+    if worker.stop:
+        job_results['parts'].append({"partName": "Calculate Hashes", "result": "Fail", "reason": "Job was stopped by user"})
+        return json.dumps(job_results)
+
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 
     logging.info("Processing existing MD5 summary file")
