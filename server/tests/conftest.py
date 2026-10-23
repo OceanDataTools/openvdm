@@ -10,6 +10,8 @@
   returns scripted results.
 - :func:`fake_run`: a ``subprocess.run`` that records commands and returns
   scripted results (#508).
+- :func:`expected`: compare a parser's output with its saved expected output;
+  ``pytest --update-expected`` saves it instead (#513).
 
 The code behind them is in :mod:`server.tests.helpers`, which tests import.
 """
@@ -25,7 +27,15 @@ import pytest
 import yaml
 
 from server.lib.openvdm import OpenVDM
-from server.tests.helpers import CONFIG_METHODS, ROOT, FakeGearmanClient, FakeRun, load_dist_file
+from server.tests.helpers import (CONFIG_METHODS, ROOT, FakeGearmanClient, FakeRun, check_expected,
+                                  load_dist_file)
+
+
+def pytest_addoption(parser) -> None:
+    """Add ``--update-expected``, which saves the parsers' output as expected (#513)."""
+    parser.addoption('--update-expected', action='store_true',
+                     help="save the parsers' output as their expected output (server/tests/data/parsers/"
+                          "expected), for a change to it that's intended")
 
 
 @pytest.fixture
@@ -131,3 +141,15 @@ def fake_run(monkeypatch) -> FakeRun:
     monkeypatch.setattr(subprocess, 'run', run)
     return run
 
+
+
+@pytest.fixture
+def expected(request) -> Callable[[str, object], None]:
+    """Return a function that compares a parser's output with its expected output.
+
+    e.g. ``expected('gga', parser.get_plugin_data())``; see
+    :func:`~server.tests.helpers.check_expected`. With ``pytest
+    --update-expected`` it saves the output instead.
+    """
+    update = request.config.getoption('--update-expected')
+    return lambda name, actual: check_expected(name, actual, update=update)

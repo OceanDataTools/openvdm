@@ -1,0 +1,244 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.469
+        ],
+        [
+          1790812920000,
+          359.699
+        ],
+        [
+          1790812980000,
+          355.345
+        ],
+        [
+          1790813040000,
+          2.867
+        ]
+      ],
+      "unit": "deg",
+      "label": "COG True"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          346.0
+        ],
+        [
+          1790812860000,
+          347.469
+        ],
+        [
+          1790812920000,
+          347.699
+        ],
+        [
+          1790812980000,
+          343.345
+        ],
+        [
+          1790813040000,
+          350.867
+        ]
+      ],
+      "unit": "deg",
+      "label": "COG Mag."
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          10.0
+        ],
+        [
+          1790812860000,
+          10.25
+        ],
+        [
+          1790812920000,
+          11.783
+        ],
+        [
+          1790812980000,
+          9.555
+        ],
+        [
+          1790813040000,
+          10.817
+        ]
+      ],
+      "unit": "kts",
+      "label": "SOG"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          18.5
+        ],
+        [
+          1790812860000,
+          18.975
+        ],
+        [
+          1790812920000,
+          21.842
+        ],
+        [
+          1790812980000,
+          17.709
+        ],
+        [
+          1790813040000,
+          20.033
+        ]
+      ],
+      "unit": "kph",
+      "label": "SOG"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Warning"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "SOG kts",
+      "results": "Passed"
+    },
+    {
+      "testName": "SOG kph",
+      "results": "Passed"
+    },
+    {
+      "testName": "COG True",
+      "results": "Passed"
+    },
+    {
+      "testName": "COG Magnetic",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        5
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "COG True Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.2,
+        359.1
+      ]
+    },
+    {
+      "statName": "COG True Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "COG Magnetic Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        340.0,
+        358.0
+      ]
+    },
+    {
+      "statName": "COG Magnetic Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "SOG Knots Bounds",
+      "statType": "bounds",
+      "statUnit": "kts",
+      "statValue": [
+        9.0,
+        30.0
+      ]
+    },
+    {
+      "statName": "SOG Knots Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "SOG KPH Bounds",
+      "statType": "bounds",
+      "statUnit": "kph",
+      "statValue": [
+        16.7,
+        55.6
+      ]
+    },
+    {
+      "statName": "SOG KPH Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    }
+  ]
+}

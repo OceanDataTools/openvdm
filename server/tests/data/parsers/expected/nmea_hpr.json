@@ -1,0 +1,148 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          120.0
+        ],
+        [
+          1790812860000,
+          120.732
+        ],
+        [
+          1790812920000,
+          120.572
+        ],
+        [
+          1790812980000,
+          118.676
+        ],
+        [
+          1790813040000,
+          122.427
+        ]
+      ],
+      "unit": "deg",
+      "label": "Heading"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.5
+        ],
+        [
+          1790812860000,
+          0.865
+        ],
+        [
+          1790812920000,
+          0.786
+        ],
+        [
+          1790812980000,
+          -0.161
+        ],
+        [
+          1790813040000,
+          1.712
+        ]
+      ],
+      "unit": "deg",
+      "label": "Pitch"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          -0.5
+        ],
+        [
+          1790812860000,
+          -0.32
+        ],
+        [
+          1790812920000,
+          -0.197
+        ],
+        [
+          1790812980000,
+          -0.5
+        ],
+        [
+          1790813040000,
+          -0.5
+        ]
+      ],
+      "unit": "deg",
+      "label": "Roll"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Pitch",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        -0.99,
+        1.99
+      ]
+    },
+    {
+      "statName": "Roll",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        -4.46,
+        3.46
+      ]
+    }
+  ]
+}

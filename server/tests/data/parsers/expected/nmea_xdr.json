@@ -1,0 +1,196 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          1013.2
+        ],
+        [
+          1790812860000,
+          1013.32
+        ],
+        [
+          1790812920000,
+          1013.26
+        ],
+        [
+          1790812980000,
+          1012.98
+        ],
+        [
+          1790813040000,
+          1013.6
+        ]
+      ],
+      "unit": "mBar",
+      "label": "Air Pres"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          22.0
+        ],
+        [
+          1790812860000,
+          22.12
+        ],
+        [
+          1790812920000,
+          22.06
+        ],
+        [
+          1790812980000,
+          21.78
+        ],
+        [
+          1790813040000,
+          22.4
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          60.0
+        ],
+        [
+          1790812860000,
+          61.22
+        ],
+        [
+          1790812920000,
+          64.33
+        ],
+        [
+          1790812980000,
+          57.79
+        ],
+        [
+          1790813040000,
+          64.04
+        ]
+      ],
+      "unit": "%",
+      "label": "Rel. Humidity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Air Pressure",
+      "results": "Passed"
+    },
+    {
+      "testName": "Air Temperature",
+      "results": "Passed"
+    },
+    {
+      "testName": "Rel. Humidity",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Air Pressure Bounds",
+      "statType": "bounds",
+      "statUnit": "mBar",
+      "statValue": [
+        1012.7,
+        1013.7
+      ]
+    },
+    {
+      "statName": "Air Pressure Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Air Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        21.5,
+        22.5
+      ]
+    },
+    {
+      "statName": "Air Temperature Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Humidity Bounds",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        55.02,
+        105.0
+      ]
+    },
+    {
+      "statName": "Humidity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          0.0
+        ],
+        [
+          1790812860000,
+          0.0
+        ],
+        [
+          1790812920000,
+          0.008
+        ],
+        [
+          1790812980000,
+          0.033
+        ],
+        [
+          1790813040000,
+          -0.033
+        ]
+      ],
+      "unit": "deg/s",
+      "label": "Yaw Rate"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.0
+        ],
+        [
+          1790812860000,
+          0.097
+        ],
+        [
+          1790812920000,
+          0.076
+        ],
+        [
+          1790812980000,
+          -0.176
+        ],
+        [
+          1790813040000,
+          0.323
+        ]
+      ],
+      "unit": "deg/s",
+      "label": "Pitch Rate"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.0
+        ],
+        [
+          1790812860000,
+          0.036
+        ],
+        [
+          1790812920000,
+          0.061
+        ],
+        [
+          1790812980000,
+          0.0
+        ],
+        [
+          1790813040000,
+          0.0
+        ]
+      ],
+      "unit": "deg/s",
+      "label": "Roll Rate"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.0
+        ],
+        [
+          1790812860000,
+          0.033
+        ],
+        [
+          1790812920000,
+          0.059
+        ],
+        [
+          1790812980000,
+          -0.1
+        ],
+        [
+          1790813040000,
+          0.0
+        ]
+      ],
+      "unit": "m",
+      "label": "Heave Velocity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Pitch Rate Bounds",
+      "statType": "bounds",
+      "statUnit": "deg/s",
+      "statValue": [
+        -0.398,
+        0.398
+      ]
+    },
+    {
+      "statName": "Roll Rate Bounds",
+      "statType": "bounds",
+      "statUnit": "deg/s",
+      "statValue": [
+        -0.792,
+        0.792
+      ]
+    },
+    {
+      "statName": "Yaw Rate Bounds",
+      "statType": "bounds",
+      "statUnit": "deg/s",
+      "statValue": [
+        -0.199,
+        0.199
+      ]
+    },
+    {
+      "statName": "Heave Velocity Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        -0.487,
+        0.487
+      ]
+    }
+  ]
+}

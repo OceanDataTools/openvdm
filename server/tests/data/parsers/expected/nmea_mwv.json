@@ -1,0 +1,161 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.47
+        ],
+        [
+          1790812920000,
+          1.28
+        ],
+        [
+          1790812980000,
+          355.35
+        ],
+        [
+          1790813040000,
+          2.87
+        ]
+      ],
+      "unit": "deg",
+      "label": "Direction Rel."
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          15.0
+        ],
+        [
+          1790812860000,
+          15.98
+        ],
+        [
+          1790812920000,
+          22.12
+        ],
+        [
+          1790812980000,
+          13.24
+        ],
+        [
+          1790813040000,
+          18.23
+        ]
+      ],
+      "unit": "kts",
+      "label": "Speed"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Warning"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Direction",
+      "results": "Passed"
+    },
+    {
+      "testName": "Speed",
+      "results": "Passed"
+    },
+    {
+      "testName": "Valid",
+      "results": "Warning"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        5
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Direction Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.2,
+        359.1
+      ]
+    },
+    {
+      "statName": "Direction Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Speed Bounds",
+      "statType": "bounds",
+      "statUnit": "kts",
+      "statValue": [
+        11.0,
+        95.0
+      ]
+    },
+    {
+      "statName": "Speed Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Sensor Data Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        37,
+        5
+      ]
+    }
+  ]
+}

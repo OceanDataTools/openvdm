@@ -1,0 +1,244 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          0.1
+        ],
+        [
+          1790812920000,
+          359.4
+        ],
+        [
+          1790812980000,
+          354.8
+        ],
+        [
+          1790813100000,
+          4.2
+        ]
+      ],
+      "unit": "deg",
+      "label": "Relative Wind Direction"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          360.0
+        ],
+        [
+          1790812920000,
+          359.5
+        ],
+        [
+          1790812980000,
+          354.5
+        ],
+        [
+          1790813100000,
+          4.5
+        ]
+      ],
+      "unit": "deg",
+      "label": "Relative Wind Direction 2"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          318.8
+        ],
+        [
+          1790812860000,
+          318.8
+        ],
+        [
+          1790812920000,
+          318.8
+        ],
+        [
+          1790812980000,
+          318.8
+        ],
+        [
+          1790813100000,
+          318.8
+        ]
+      ],
+      "unit": "deg",
+      "label": "True Wind Direction"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          308.9
+        ],
+        [
+          1790812860000,
+          308.9
+        ],
+        [
+          1790812920000,
+          308.9
+        ],
+        [
+          1790812980000,
+          308.9
+        ],
+        [
+          1790813100000,
+          308.9
+        ]
+      ],
+      "unit": "deg",
+      "label": "True Wind Direction 2"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Relative Wind Direction",
+      "results": "Warning"
+    },
+    {
+      "testName": "Relative Wind Direction 2",
+      "results": "Passed"
+    },
+    {
+      "testName": "True Wind Direction",
+      "results": "Passed"
+    },
+    {
+      "testName": "True Wind Direction 2",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:04:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        95.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity (<= 60 s)",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Relative Wind Direction Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.9,
+        359.5
+      ]
+    },
+    {
+      "statName": "Relative Wind Direction Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        36,
+        6
+      ]
+    },
+    {
+      "statName": "Relative Wind Direction 2 Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.9,
+        359.5
+      ]
+    },
+    {
+      "statName": "Relative Wind Direction 2 Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "True Wind Direction Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        318.8,
+        318.8
+      ]
+    },
+    {
+      "statName": "True Wind Direction Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "True Wind Direction 2 Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        308.9,
+        308.9
+      ]
+    },
+    {
+      "statName": "True Wind Direction 2 Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}
