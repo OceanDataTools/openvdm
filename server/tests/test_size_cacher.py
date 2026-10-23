@@ -11,8 +11,8 @@ import pytest
 from server.workers import size_cacher
 
 
-class Done(Exception):
-    """Raised by the patched sleep to end the loop."""
+class Done(BaseException):
+    """Raised by the patched sleep (or API) to end the loop; not an Exception, which the loop catches."""
 
 
 @pytest.fixture
@@ -118,19 +118,15 @@ def test_slow_pass_doesnt_wait(fake_ovdm, fake_run, monkeypatch) -> None:
         size_cacher.size_cacher(0)
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="join() of the base directory and None raises (#588)")
 def test_no_current_cruise(run, fake_ovdm, fake_run) -> None:
-    """Without a current cruise (a new install), the pass stores no sizes instead of crashing."""
+    """Without a current cruise (a new install), the pass stores no sizes instead of crashing (#588)."""
     fake_ovdm.get_cruise_id.return_value = None
     run(passes=2)
     fake_ovdm.set_cruise_size.assert_called_with(None)
 
 
-@pytest.mark.xfail(strict=True, reason="storing the sizes isn't in the try (#588)")
 def test_api_fails_storing_sizes(run, fake_ovdm, fake_run) -> None:
-    """If storing the sizes fails, the pass is logged and the loop carries on."""
+    """If storing the sizes fails, the pass is logged and the loop carries on (#588)."""
     fake_run.on('du', stdout='5\t/x\n')
     fake_ovdm.set_cruise_size.side_effect = [OSError('connection refused'), None]
     run(passes=2)
