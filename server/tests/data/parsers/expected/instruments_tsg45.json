@@ -1,0 +1,192 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1335571260000,
+          24.5004
+        ],
+        [
+          1335571320000,
+          24.5072
+        ],
+        [
+          1335571380000,
+          24.5141
+        ],
+        [
+          1335571440000,
+          24.5193
+        ],
+        [
+          1335571500000,
+          24.5224
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1335571260000,
+          5.31966
+        ],
+        [
+          1335571320000,
+          5.32032
+        ],
+        [
+          1335571380000,
+          5.32103
+        ],
+        [
+          1335571440000,
+          5.32171
+        ],
+        [
+          1335571500000,
+          5.32013
+        ]
+      ],
+      "unit": "S/m",
+      "label": "Conductivity"
+    },
+    {
+      "data": [
+        [
+          1335571260000,
+          35.4851
+        ],
+        [
+          1335571320000,
+          35.4846
+        ],
+        [
+          1335571380000,
+          35.4845
+        ],
+        [
+          1335571440000,
+          35.4855
+        ],
+        [
+          1335571500000,
+          35.4712
+        ]
+      ],
+      "unit": "PSU",
+      "label": "Salinity"
+    },
+    {
+      "data": [
+        [
+          1335571260000,
+          1533.383
+        ],
+        [
+          1335571320000,
+          1533.365
+        ],
+        [
+          1335571380000,
+          1533.342
+        ],
+        [
+          1335571440000,
+          1533.346
+        ],
+        [
+          1335571500000,
+          1533.357
+        ]
+      ],
+      "unit": "m/s",
+      "label": "SV"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        45,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2012-04-28T00:00:02.140000Z",
+        "2012-04-28T00:04:43.800000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.203,
+        57.345
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.4972,
+        24.5229
+      ]
+    },
+    {
+      "statName": "Conductivity Bounds",
+      "statType": "bounds",
+      "statUnit": "S/m",
+      "statValue": [
+        5.31944,
+        5.32179
+      ]
+    },
+    {
+      "statName": "Salinity Bounds",
+      "statType": "bounds",
+      "statUnit": "PSU",
+      "statValue": [
+        35.4682,
+        35.4864
+      ]
+    },
+    {
+      "statName": "SV Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        1533.315,
+        1533.408
+      ]
+    }
+  ]
+}

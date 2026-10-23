@@ -1,0 +1,286 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1565555940000,
+          3.17
+        ],
+        [
+          1565556000000,
+          3.167
+        ],
+        [
+          1565556060000,
+          3.163
+        ],
+        [
+          1565556120000,
+          3.16
+        ],
+        [
+          1565556180000,
+          3.16
+        ],
+        [
+          1565556240000,
+          3.16
+        ]
+      ],
+      "unit": "S/m",
+      "label": "Conductivity"
+    },
+    {
+      "data": [
+        [
+          1565555940000,
+          3.114
+        ],
+        [
+          1565556000000,
+          3.088
+        ],
+        [
+          1565556060000,
+          3.062
+        ],
+        [
+          1565556120000,
+          3.041
+        ],
+        [
+          1565556180000,
+          2.966
+        ],
+        [
+          1565556240000,
+          2.96
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1565555940000,
+          1464.152
+        ],
+        [
+          1565556000000,
+          1486.961
+        ],
+        [
+          1565556060000,
+          1520.653
+        ],
+        [
+          1565556120000,
+          1552.2
+        ],
+        [
+          1565556180000,
+          1599.655
+        ],
+        [
+          1565556240000,
+          1608.367
+        ]
+      ],
+      "unit": "psig",
+      "label": "Pressure"
+    },
+    {
+      "data": [
+        [
+          1565555940000,
+          998.602
+        ],
+        [
+          1565556000000,
+          1014.121
+        ],
+        [
+          1565556060000,
+          1037.044
+        ],
+        [
+          1565556120000,
+          1058.504
+        ],
+        [
+          1565556180000,
+          1090.785
+        ],
+        [
+          1565556240000,
+          1096.71
+        ]
+      ],
+      "unit": "m",
+      "label": "Depth"
+    },
+    {
+      "data": [
+        [
+          1565555940000,
+          34.339
+        ],
+        [
+          1565556000000,
+          34.344
+        ],
+        [
+          1565556060000,
+          34.349
+        ],
+        [
+          1565556120000,
+          34.354
+        ],
+        [
+          1565556180000,
+          34.367
+        ],
+        [
+          1565556240000,
+          34.368
+        ]
+      ],
+      "unit": "ppt",
+      "label": "Salinity"
+    },
+    {
+      "data": [
+        [
+          1565555940000,
+          1478.633
+        ],
+        [
+          1565556000000,
+          1478.79
+        ],
+        [
+          1565556060000,
+          1479.068
+        ],
+        [
+          1565556120000,
+          1479.345
+        ],
+        [
+          1565556180000,
+          1479.59
+        ],
+        [
+          1565556240000,
+          1479.663
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Sound Velocity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        45,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2019-08-11T20:38:43.882000+00:00",
+        "2019-08-11T20:43:14.283000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        4.988,
+        55.072
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Conductivity",
+      "statType": "bounds",
+      "statUnit": "S/m",
+      "statValue": [
+        3.16,
+        3.17
+      ]
+    },
+    {
+      "statName": "Temperature",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        2.957,
+        3.118
+      ]
+    },
+    {
+      "statName": "Pressure",
+      "statType": "bounds",
+      "statUnit": "psig",
+      "statValue": [
+        1459.12,
+        1611.81
+      ]
+    },
+    {
+      "statName": "Depth",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        995.176,
+        1099.05
+      ]
+    },
+    {
+      "statName": "Salinity",
+      "statType": "bounds",
+      "statUnit": "ppt",
+      "statValue": [
+        34.338,
+        34.369
+      ]
+    },
+    {
+      "statName": "Sound Velocity",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        1478.59,
+        1479.69
+      ]
+    }
+  ]
+}

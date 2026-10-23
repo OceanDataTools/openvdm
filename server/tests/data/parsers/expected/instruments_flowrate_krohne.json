@@ -1,0 +1,244 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          1.2
+        ],
+        [
+          1790812860000,
+          1.22
+        ],
+        [
+          1790812920000,
+          1.21
+        ],
+        [
+          1790812980000,
+          1.16
+        ],
+        [
+          1790813040000,
+          1.28
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Flowrate"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          150.0
+        ],
+        [
+          1790812860000,
+          154.88
+        ],
+        [
+          1790812920000,
+          214.82
+        ],
+        [
+          1790812980000,
+          141.18
+        ],
+        [
+          1790813040000,
+          166.17
+        ]
+      ],
+      "unit": "l/min",
+      "label": "Volume"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          18.5
+        ],
+        [
+          1790812860000,
+          18.57
+        ],
+        [
+          1790812920000,
+          18.54
+        ],
+        [
+          1790812980000,
+          18.37
+        ],
+        [
+          1790813040000,
+          18.74
+        ]
+      ],
+      "unit": "C",
+      "label": "Coil Temp"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          4.85
+        ],
+        [
+          1790812860000,
+          4.86
+        ],
+        [
+          1790812920000,
+          4.86
+        ],
+        [
+          1790812980000,
+          4.83
+        ],
+        [
+          1790813040000,
+          4.89
+        ]
+      ],
+      "unit": "S/m",
+      "label": "Conductivity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Flowrate",
+      "results": "Passed"
+    },
+    {
+      "testName": "Volume",
+      "results": "Passed"
+    },
+    {
+      "testName": "Coil Temp",
+      "results": "Passed"
+    },
+    {
+      "testName": "Conductivity",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Flowrate Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        1.1,
+        1.3
+      ]
+    },
+    {
+      "statName": "Flowrate Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Volume Bounds",
+      "statType": "bounds",
+      "statUnit": "l/min",
+      "statValue": [
+        130.09,
+        900.0
+      ]
+    },
+    {
+      "statName": "Volume Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Coil Temp Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        18.2,
+        18.8
+      ]
+    },
+    {
+      "statName": "Coil Temp Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Conductivity Bounds",
+      "statType": "bounds",
+      "statUnit": "S/m",
+      "statValue": [
+        4.8,
+        4.9
+      ]
+    },
+    {
+      "statName": "Conductivity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}

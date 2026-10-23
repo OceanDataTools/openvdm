@@ -1,0 +1,113 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1335571260000,
+          17.27
+        ],
+        [
+          1335571320000,
+          15.68
+        ],
+        [
+          1335571380000,
+          16.12
+        ],
+        [
+          1335571440000,
+          16.11
+        ],
+        [
+          1335571500000,
+          15.1
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Wind Speed"
+    },
+    {
+      "data": [
+        [
+          1335571260000,
+          142.4
+        ],
+        [
+          1335571320000,
+          141.5
+        ],
+        [
+          1335571380000,
+          142.0
+        ],
+        [
+          1335571440000,
+          140.1
+        ],
+        [
+          1335571500000,
+          142.8
+        ]
+      ],
+      "unit": "deg",
+      "label": "Wind Direction"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2012-04-28T00:00:01.952000+00:00",
+        "2012-04-28T00:04:32.018000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        55.001
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        44,
+        1
+      ]
+    },
+    {
+      "statName": "Wind Speed Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        14.22,
+        19.1
+      ]
+    }
+  ]
+}

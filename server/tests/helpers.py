@@ -219,6 +219,26 @@ def gnu_rsync() -> bool:
     return output.startswith('rsync  version 3')
 
 
+def parse_output(parser, path) -> Optional[dict]:
+    """Return a parser's output for *path*, as the data dashboard saves it (#513).
+
+    Args:
+        parser: The parser.
+        path: The file to parse.
+
+    Returns:
+        dict | None: The parsed ``to_json()``: ``None`` if the parser produced
+        no data.
+    """
+    parser.parse(str(path))
+    return json.loads(parser.to_json())
+
+
+def stat_value(data: dict, name: str):
+    """Return the value of the stat called *name* in a parser's output (#513)."""
+    return next(stat['statValue'] for stat in data['stats'] if stat['statName'] == name)
+
+
 def check_expected(name: str, actual, update: bool = False) -> None:
     """Compare a parser's output with its saved expected output (#513).
 

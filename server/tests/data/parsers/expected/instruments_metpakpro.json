@@ -1,0 +1,218 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          1013.2
+        ],
+        [
+          1790812860000,
+          1013.3
+        ],
+        [
+          1790812920000,
+          1013.3
+        ],
+        [
+          1790812980000,
+          1013.0
+        ],
+        [
+          1790813040000,
+          1013.5
+        ]
+      ],
+      "unit": "hPa",
+      "label": "Air Pressure"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          23.6
+        ],
+        [
+          1790812860000,
+          23.65
+        ],
+        [
+          1790812920000,
+          23.66
+        ],
+        [
+          1790812980000,
+          23.46
+        ],
+        [
+          1790813040000,
+          23.85
+        ]
+      ],
+      "unit": "C",
+      "label": "Air Temperature"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          72.0
+        ],
+        [
+          1790812860000,
+          72.6
+        ],
+        [
+          1790812920000,
+          72.6
+        ],
+        [
+          1790812980000,
+          70.7
+        ],
+        [
+          1790813040000,
+          74.4
+        ]
+      ],
+      "unit": "%",
+      "label": "Relative Humidity"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          6.5
+        ],
+        [
+          1790812860000,
+          6.8
+        ],
+        [
+          1790812920000,
+          6.8
+        ],
+        [
+          1790812980000,
+          5.8
+        ],
+        [
+          1790813040000,
+          7.7
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Relative Wind Spd"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.5
+        ],
+        [
+          1790812920000,
+          359.5
+        ],
+        [
+          1790812980000,
+          354.5
+        ],
+        [
+          1790813040000,
+          4.3
+        ]
+      ],
+      "unit": "deg",
+      "label": "Relative Wind Dir"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Air Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        23.3,
+        23.9
+      ]
+    },
+    {
+      "statName": "Air Pressure Bounds",
+      "statType": "bounds",
+      "statUnit": "hPa",
+      "statValue": [
+        1012.8,
+        1013.6
+      ]
+    },
+    {
+      "statName": "Relative Humidity",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        69.0,
+        75.0
+      ]
+    },
+    {
+      "statName": "Wind Speed Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        5.0,
+        8.0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "visualizerData": [
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                170.81470038,
+                41.05275074
+              ],
+              [
+                170.8146983,
+                41.05281353
+              ],
+              [
+                170.81477693,
+                41.05281798
+              ],
+              [
+                170.81486627,
+                41.05281984
+              ],
+              [
+                170.8148524,
+                41.05280621
+              ],
+              [
+                170.8144647,
+                41.05265727
+              ]
+            ]
+          },
+          "properties": {
+            "coordTimes": [
+              1565554380000,
+              1565554440000,
+              1565554500000,
+              1565554560000,
+              1565554620000,
+              1565554680000
+            ],
+            "name": "instruments/sprint.txt"
+          }
+        }
+      ]
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Velocity",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        45,
+        1
+      ]
+    },
+    {
+      "statName": "Geographic Bounds",
+      "statType": "geoBounds",
+      "statUnit": "ddeg",
+      "statValue": [
+        41.05285983,
+        170.81493817,
+        41.05264689,
+        170.81436586
+      ]
+    },
+    {
+      "statName": "Velocity Bounds",
+      "statType": "bounds",
+      "statUnit": "kts",
+      "statValue": [
+        0.098,
+        4.572
+      ]
+    },
+    {
+      "statName": "Velocity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        44,
+        0
+      ]
+    },
+    {
+      "statName": "Distance Traveled",
+      "statType": "totalValue",
+      "statUnit": "nm",
+      "statValue": [
+        0.073
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2019-08-11T20:12:57.758000+00:00",
+        "2019-08-11T20:17:28.596000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        4.998,
+        55.172
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    }
+  ]
+}

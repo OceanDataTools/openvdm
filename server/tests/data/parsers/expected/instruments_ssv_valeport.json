@@ -1,0 +1,148 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          1533.4
+        ],
+        [
+          1790812860000,
+          1533.47
+        ],
+        [
+          1790812920000,
+          1533.46
+        ],
+        [
+          1790812980000,
+          1533.27
+        ],
+        [
+          1790813040000,
+          1533.64
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Sound Velocity"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          24.5
+        ],
+        [
+          1790812860000,
+          24.512
+        ],
+        [
+          1790812920000,
+          24.51
+        ],
+        [
+          1790812980000,
+          24.478
+        ],
+        [
+          1790813040000,
+          24.54
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "SV",
+      "results": "Passed"
+    },
+    {
+      "testName": "Temperature",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "SV Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        1533.1,
+        1533.7
+      ]
+    },
+    {
+      "statName": "SV Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.45,
+        24.55
+      ]
+    },
+    {
+      "statName": "Temperature Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}

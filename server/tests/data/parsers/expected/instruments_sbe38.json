@@ -1,0 +1,87 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          24.35
+        ],
+        [
+          1790812860000,
+          24.3343
+        ],
+        [
+          1790812920000,
+          24.3595
+        ],
+        [
+          1790812980000,
+          24.3279
+        ],
+        [
+          1790813040000,
+          24.3904
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.0,
+        24.3998
+      ]
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          380.0
+        ],
+        [
+          1790812860000,
+          381.22
+        ],
+        [
+          1790812920000,
+          380.953
+        ],
+        [
+          1790812980000,
+          377.795
+        ],
+        [
+          1790813040000,
+          384.043
+        ]
+      ],
+      "unit": "\u03bcE/cm2sec",
+      "label": "LW Irradiance"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          650.0
+        ],
+        [
+          1790812860000,
+          669.506
+        ],
+        [
+          1790812920000,
+          665.242
+        ],
+        [
+          1790812980000,
+          614.721
+        ],
+        [
+          1790813040000,
+          714.678
+        ]
+      ],
+      "unit": "\u03bcE/cm2sec",
+      "label": "SW Irradiance"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "LW Irradiance",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        375.02,
+        384.98
+      ]
+    },
+    {
+      "statName": "SW Irradiance",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        570.34,
+        729.66
+      ]
+    }
+  ]
+}
