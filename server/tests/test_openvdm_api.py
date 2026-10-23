@@ -692,14 +692,16 @@ def test_clear_error_task(ovdm, api) -> None:
     assert 'api/tasks/setIdleTask/7' in api.paths()
 
 
-@pytest.mark.xfail(strict=True, reason="the setters don't check the HTTP status (#594)")
 @pytest.mark.parametrize('method, args, path', [
     ('set_idle_task', (7,), 'api/tasks/setIdleTask/7'),
     ('send_msg', ('t', 'b'), 'api/messages/newMessage'),
     ('set_cruise_size', (5,), 'api/warehouse/setCruiseSize'),
+    ('set_idle_cruise_data_transfer', (7,), 'api/cruiseDataTransfers/setIdleCruiseDataTransfer/7'),
+    ('track_gearman_job', ('job', 1, 'H:1'), 'api/gearman/newJob/H:1'),
+    ('clear_gearman_jobs_from_db', (), 'api/gearman/clearAllJobsFromDB'),
 ])
 def test_setter_http_error(ovdm, api, method, args, path) -> None:
-    """A setter the API answers with an error (e.g. a 404 for a route that's gone, or a 500) raises."""
+    """A setter the API answers with an error (e.g. a 404 for a route that's gone, or a 500) raises (#594)."""
     api.responses[path] = (404, 'Not Found')
     with pytest.raises(requests.HTTPError):
         getattr(ovdm, method)(*args)
