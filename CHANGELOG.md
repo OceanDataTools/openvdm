@@ -86,6 +86,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Set CruiseData Directory Permissions** fails when the cruise directory's ownership or permissions can't be set; it reported success (#545).
 - **A cruise or lowering config file that isn't valid JSON** (e.g. cut short by a full disk) fails Export Config with the reason, keeping the file and its finalized date, instead of crashing the worker (#548).
 - **Hook tasks after a failed setup**: Setup New Cruise, Setup New Lowering and Finalize Current Lowering skip their hook tasks for a job that fails before it has a cruise or lowering ID (a payload that can't be parsed, or no current lowering). The hooks used to get the previous job's cruise or lowering (#552).
+- **Post-hook commands with a missing placeholder value**: a command that uses `{cruiseID}`, `{loweringID}`, `{collectionSystemTransferID}` or `{collectionSystemTransferName}` when it has no value (e.g. no current lowering) isn't run, and the hook reports it. It used to run with the placeholder left in as text. A job without files no longer leaves `{newFiles}`/`{updatedFiles}` in the command either (#586).
 
 ---
 

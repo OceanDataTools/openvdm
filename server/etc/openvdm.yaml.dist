@@ -140,6 +140,14 @@ hooks:
 # after the successful completion of the primary OpenVDM Gearman task.  Any subsequent
 # tasks called with be called as background Gearman tasks so to not interfere with
 # OpenVDM's primary operation.
+#
+# A command's arguments may use these placeholders: {cruiseID}, {loweringID},
+# {collectionSystemTransferID} and {collectionSystemTransferName} (in the
+# postCollectionSystemTransfer and postDataDashboard hooks), and {newFiles} and
+# {updatedFiles} (the job's files, in one argument separated by spaces; dropped
+# when there are none). A command that uses one of the first four when it has no
+# value (e.g. {loweringID} without a current lowering) isn't run, and the hook
+# reports it.
 postHookCommands:
     postCollectionSystemTransfer:
         # Plot new and updated CTD casts into the CTD_Plots extra directory

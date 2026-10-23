@@ -201,7 +201,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         Replaces placeholder tokens in each command argument with runtime
         values (cruise ID, lowering ID, transfer ID/name, new/updated file
-        lists).  Empty arguments produced by substitution are dropped.
+        lists).  Empty arguments produced by substitution are dropped. A
+        command that uses a placeholder from the API with no value (e.g.
+        ``{loweringID}`` without a current lowering) gets a ``missing`` list
+        of those placeholders instead, and isn't run (#586).
 
         Args:
             command_list: List of command dicts, each with ``name`` and
@@ -235,15 +238,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             '{collectionSystemTransferName}':
                 cst_cfg.get('name') if isinstance(cst_cfg, dict) else None,
 
-            '{newFiles}': ' '.join(self.files.get('new', [])) if self.files else None,
-            '{updatedFiles}': ' '.join(self.files.get('updated', [])) if self.files else None
+            '{newFiles}': ' '.join((self.files or {}).get('new') or []),
+            '{updatedFiles}': ' '.join((self.files or {}).get('updated') or [])
         }
 
-        # Remove only None (not empty strings)
-        replacements = {k: v for k, v in replacements.items() if v is not None}
+        # The placeholders from the API that have no value; the file lists are
+        # just empty without files
+        missing = [k for k, v in replacements.items() if not v and k not in ('{newFiles}', '{updatedFiles}')]
+        replacements = {k: v for k, v in replacements.items() if k not in missing}
 
         for command in command_list:
             logging.debug("Raw Command: %s", json.dumps(command))
+            used = [token for token in missing if any(token in arg for arg in command['command'])]
+            if used:
+                command['missing'] = used
+                continue
             command['command'] = [
                 _replace_tokens(arg, replacements) for arg in command['command']
             ]
@@ -514,6 +523,12 @@ def task_post_hook(worker: OVDMGearmanWorker, current_job) -> str:
     cmd_length = len(output_results['commandList'])
     for idx, cmd in enumerate(output_results['commandList']):
         worker.send_job_status(current_job, int(80 * (idx+1)/cmd_length) + 20, 100)
+
+        if cmd.get('missing'):
+            reason = f"{cmd['name']}: not run, no value for {', '.join(cmd['missing'])}"
+            logging.error(reason)
+            reasons.append(reason)
+            continue
 
         logging.info("Executing: %s", cmd['name'])
         output_results = worker._run_command(cmd)
