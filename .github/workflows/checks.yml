@@ -38,6 +38,15 @@ jobs:
       - name: Install the requirements
         run: pip install -r requirements-dev.txt
 
+      # For the XBT parser tests (#513), which are skipped without it; the
+      # commit the parser's docstring gives, and --no-deps as there (the
+      # parser doesn't need its netCDF4 and xarray)
+      - name: Install xbt-edf-qc
+        run: >-
+          pip install --no-deps
+          "xbt-edf-qc @ git+https://github.com/botheredbybees/xbt-edf-qc.git@a784145a2dc9462d8071747b5dfcfcfd2c3fee70"
+          global-land-mask
+
       # Fails below .coveragerc's fail_under
       - name: Run the tests with coverage
         run: python -m pytest --cov --cov-report=term-missing:skip-covered
