@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import {describe, test} from 'node:test';
-import {checkFixture, choose, enter, knownBug, loadPage} from './helpers.mjs';
+import {checkFixture, choose, enter, loadPage} from './helpers.mjs';
 
 describe('extraDirectoriesFormHelper.js', () => {
     const TEMPLATE = "<What's put here>\n\n**Files:**";
@@ -95,7 +95,7 @@ describe('SSDWFormHelper.js', () => {
         assert.equal($('[name=destDir]').val(), 'remote:x');
     });
 
-    knownBug('a destination of "//" is the root (#247)', '#608', async () => {
+    test('a destination of "//" is the root (#247, #608)', async () => {
         const {$} = await page();
         enter($, 'destDir', '//');
         assert.equal($('[name=destDir]').val(), '/');

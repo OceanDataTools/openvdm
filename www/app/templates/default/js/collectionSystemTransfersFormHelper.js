@@ -86,9 +86,9 @@ $(function () {
         if (val.length > 0 && !val.startsWith('/')) {
             val = '/' + val;
         }
-        // Strip trailing slash unless the entire value is just "/"
+        // Strip trailing slashes, keeping the root: "/" and "//" are "/" (#608)
         if (val.length > 1) {
-            val = val.replace(/\/+$/, '');
+            val = val.replace(/\/+$/, '') || '/';
         }
         return val;
     }

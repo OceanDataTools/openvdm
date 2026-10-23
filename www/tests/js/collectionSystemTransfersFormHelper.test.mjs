@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {checkFixture, choose, enter, knownBug, loadPage, shown} from './helpers.mjs';
+import {checkFixture, choose, enter, loadPage, shown} from './helpers.mjs';
 
 const TEMPLATE = '<The instrument>\n\n**Files:**';
 
@@ -147,7 +147,7 @@ test('Enter in a field runs Test Setup instead of submitting', async () => {
     assert.equal(event.defaultPrevented, true);
 });
 
-knownBug('a source directory of "//" is the root, as the CDT form keeps it (#247)', '#608', async () => {
+test('a source directory of "//" is the root, as the CDT form keeps it (#247, #608)', async () => {
     const {$} = await page();
     enter($, 'sourceDir', '//');
     assert.equal($('[name=sourceDir]').val(), '/');
