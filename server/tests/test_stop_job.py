@@ -150,6 +150,19 @@ def test_stop_and_quit(worker) -> None:
     worker.shutdown.assert_called_once()
 
 
+@pytest.mark.parametrize('pid', [0, '0', '', None, ' 0 '])
+def test_stop_with_no_running_job(worker, api, kill, pid) -> None:
+    """Stop for a transfer that has just ended (its PID is now 0), or without a PID, changes nothing:
+    it doesn't set another, idle transfer idle or post a message about it (#590)."""
+    result = json.loads(worker.on_job_execute(_job(pid=pid) if pid is not None else _job()))
+    assert result['parts'] == [{'partName': 'Verify OpenVDM Job', 'result': 'Ignore',
+                                'reason': 'No job is running: it may have just finished'}]
+    api.get_collection_system_transfers.assert_not_called()
+    api.set_idle_collection_system_transfer.assert_not_called()
+    api.send_msg.assert_not_called()
+    kill.assert_not_called()
+
+
 # --- Bugs -----------------------------------------------------------------------
 
 @pytest.mark.xfail(strict=True, reason="the finally block adds a Pass after the failure (#589)")
@@ -159,14 +172,3 @@ def test_kill_fails(worker, kill) -> None:
     result = json.loads(worker.on_job_execute(_job(pid=1004)))
     assert result['parts'][-1]['result'] == 'Fail'
     assert 'Operation not permitted' in result['parts'][-1]['reason']
-
-
-@pytest.mark.xfail(strict=True, reason="PID 0 matches the first idle transfer (#590)")
-def test_stop_with_pid_0(worker, api, kill) -> None:
-    """Stop for a transfer that has just ended (its PID is now 0) changes nothing: it doesn't set
-    another, idle transfer idle or post a message about it."""
-    result = json.loads(worker.on_job_execute(_job(pid=0)))
-    assert result['parts'][-1]['result'] in ('Fail', 'Ignore')
-    api.set_idle_collection_system_transfer.assert_not_called()
-    api.send_msg.assert_not_called()
-    kill.assert_not_called()

@@ -92,6 +92,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Lowering tracklines:** `build_lowering_tracks.py` rejected every collection system as "not related to a lowering". It compared `cruiseOrLowering` with the string `"1"`, but the API returns a number, so no lowering trackline or lowering extent was ever written (#600).
 - **World-readable database backups:** `db_backup_restore.py` wrote each backup with the umask's permissions, usually readable by every user, although it holds the whole database, including the transfers' passwords. Backups are now readable only by their owner (0600), in a folder only the owner can open when the script creates it (0700), and an existing backup is never overwritten (#603).
 - **No GeoTIFF overlays on the map:** `build_overlay_layers.py` only read the old data dashboard file format, with `visualizerData` at the top level. The data dashboard writes each file keyed by data type now, so every GeoTIFF file was skipped as invalid and `overlay_layers.json` was empty. It reads both formats, with the trackline scripts' code (`geojson_utils.visualizer_entries()`), and makes a layer of each GeoTIFF entry in a file (#602).
+- **Stop for a transfer that had just finished:** its PID was already 0, as every idle transfer's and task's is, so Stop matched the first idle transfer in the list: it set that one idle (clearing its error status) and posted "Manual Stop of transfer" with its name. Stop now changes nothing when there's no PID, and says no job is running (#590).
 
 ---
 
