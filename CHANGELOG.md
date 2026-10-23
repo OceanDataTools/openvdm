@@ -96,6 +96,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Stop for a transfer that had just finished:** its PID was already 0, as every idle transfer's and task's is, so Stop matched the first idle transfer in the list: it set that one idle (clearing its error status) and posted "Manual Stop of transfer" with its name. Stop now changes nothing when there's no PID, and says no job is running (#590).
 - **The placeholder worker API key was accepted:** a site that kept `change-me-to-a-strong-random-value` as its worker key, which anyone can read in the source, gave every transfer's passwords to any request that sent it. The API now refuses the placeholder, and the workers don't send it: they log a warning saying to set a real key (#605).
 - **API errors ignored when setting a status:** the `OpenVDM` methods that set a transfer's or task's status, post a message, track a Gearman job, set the cruise or lowering size, or clear an error only noticed when the API couldn't be reached. An error response, such as a 404 for a missing route or a 500 from a PHP error, was ignored, and the worker carried on as if it had worked. They now raise on an error response, as the cruise and lowering extent setters already did (#594).
+- **`OpenVDM.clear_error_task()` never cleared an error:** it compared the task's status with the string `'3'`, but the API sends it as the number 3, so a task in error was never set idle. Nothing in OpenVDM calls it, but a site's own scripts may (#593).
 
 ---
 

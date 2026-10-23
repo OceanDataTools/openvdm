@@ -1519,7 +1519,8 @@ class OpenVDM():
 
         task = self.get_task(task_id)
 
-        if task and task['status'] == '3':
+        # The API sends the status as a number; int() also takes a string (#593)
+        if task and int(task['status']) == 3:
             self.set_idle_task(task_id)
 
 

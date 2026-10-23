@@ -684,12 +684,13 @@ def test_route_check_catches_a_missing_route(ovdm, api) -> None:
 
 # --- Bugs ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="the status is compared with the string '3' (#593)")
-def test_clear_error_task(ovdm, api) -> None:
-    """Clearing a task's error sets it idle if its status is error: 3, as the API sends it."""
-    api.responses['api/tasks/getTask/7'] = [{'taskID': 7, 'status': 3}]
+@pytest.mark.parametrize('status, cleared', [(3, True), ('3', True), (1, False), (2, False)])
+def test_clear_error_task(ovdm, api, status, cleared) -> None:
+    """Clearing a task's error sets it idle only if its status is error, 3: a number, as the API
+    sends it, or a string (#593)."""
+    api.responses['api/tasks/getTask/7'] = [{'taskID': 7, 'status': status}]
     ovdm.clear_error_task(7)
-    assert 'api/tasks/setIdleTask/7' in api.paths()
+    assert ('api/tasks/setIdleTask/7' in api.paths()) == cleared
 
 
 @pytest.mark.parametrize('method, args, path', [
