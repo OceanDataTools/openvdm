@@ -238,7 +238,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 continue
 
             if not out_obj or out_obj.get('error'):
-                msg = out_obj.get('error', f"No output from plugin for file: {filename}")
+                msg = (out_obj or {}).get('error', f"No output from plugin for file: {filename}")
                 logging.warning(msg)
                 self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
                 continue
