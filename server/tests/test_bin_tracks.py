@@ -58,7 +58,7 @@ def site(fake_ovdm, warehouse, chown):
     }.get(name)
     fake_ovdm.get_collection_system_transfer_by_name.side_effect = lambda name: {
         'OpenRVDAS': {'name': 'OpenRVDAS', 'cruiseOrLowering': 0},
-        'ROV_OpenRVDAS': {'name': 'ROV_OpenRVDAS', 'cruiseOrLowering': '1'},
+        'ROV_OpenRVDAS': {'name': 'ROV_OpenRVDAS', 'cruiseOrLowering': 1},
     }.get(name)
     return SimpleNamespace(ovdm=fake_ovdm, tracklines=tracklines, cruise_dir=warehouse.cruise_dir, chown=chown)
 
@@ -281,11 +281,10 @@ def test_lowering_tracks_failures(run, site, capsys, error, message) -> None:
     assert message in capsys.readouterr().err
 
 
-# --- Bugs ---------------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="cruiseOrLowering is compared with the string '1' (#600)")
-def test_lowering_tracks_with_integer_cruise_or_lowering(run, site) -> None:
-    """A lowering's collection system, with cruiseOrLowering 1 as the API sends it (an integer), is accepted."""
+@pytest.mark.parametrize('cruise_or_lowering', [1, '1'])
+def test_lowering_collection_system(run, site, cruise_or_lowering) -> None:
+    """A lowering's collection system is accepted with cruiseOrLowering 1, a number as the API sends
+    it, or a string (#600)."""
     site.ovdm.get_collection_system_transfer_by_name.side_effect = lambda name: {
-        'name': name, 'cruiseOrLowering': 1}
+        'name': name, 'cruiseOrLowering': cruise_or_lowering}
     assert _lowering(run) == 0
