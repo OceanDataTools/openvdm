@@ -498,12 +498,9 @@ def test_update_drops_old_data_types(worker, cruise) -> None:
         ('heading.hdt', 'hdt'), ('one.gga', 'gga')]
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-
-
-@pytest.mark.xfail(strict=True, reason="the last transfer's progress range ends past 100% (#584)")
 def test_rebuild_progress_within_100(worker) -> None:
-    """A rebuild's progress stays within 100%."""
+    """A rebuild's progress stays within 100% and never goes back (#584)."""
     _rebuild(worker)
-    assert all(call.args[1] <= call.args[2] for call in worker.send_job_status.call_args_list)
+    progress = [100 * call.args[1] / call.args[2] for call in worker.send_job_status.call_args_list]
+    assert all(value <= 100 for value in progress)
+    assert progress == sorted(progress)
