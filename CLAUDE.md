@@ -83,9 +83,10 @@ pip install -r requirements-dev.txt      # once: pytest and pytest-cov
 python -m pytest --cov                   # fails below .coveragerc's fail_under (see Testing)
 ruff check server/
 pre-commit run --all-files               # ruff, ESLint, php -l and PHPStan
+(cd www && vendor/bin/phpunit)           # the PHP tests (composer install in www/ first)
 ```
 
-There is no automated test suite for the PHP or JavaScript yet (#515, #516). Changes to the web UI need a manual check in a browser.
+The PHP tests (PHPUnit, a Composer dev dependency) are in `www/tests/`, configured by `www/phpunit.xml`; they cover the helpers in `www/app/Helpers/` that don't need a database (#515). `www/tests/bootstrap.php` declares the `Config.php.dist` constants as PHPStan's bootstrap does, with a test worker key. Controllers and models need MySQL and aren't tested; pure logic in a controller is easier to test moved into a helper. There's no JavaScript test suite yet (#516), so changes to the web UI still need a manual check in a browser.
 
 **Lint Python code:**
 ```bash
