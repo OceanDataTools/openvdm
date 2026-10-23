@@ -10,7 +10,7 @@ repos:
         name: eslint
         language: node
         entry: eslint --no-warn-ignored
-        files: ^www/app/templates/default/js/.*\.js(\.dist)?$
+        files: ^www/(app/templates/default/js/.*\.js(\.dist)?|tests/js/.*\.mjs)$
         exclude: ^www/app/templates/default/js/sb-admin-2\.js$
         additional_dependencies: ['eslint@10.11.0']
       - id: php-lint

@@ -84,9 +84,10 @@ python -m pytest --cov                   # fails below .coveragerc's fail_under 
 ruff check server/
 pre-commit run --all-files               # ruff, ESLint, php -l and PHPStan
 (cd www && vendor/bin/phpunit)           # the PHP tests (composer install in www/ first)
+(cd www && npm test)                     # the JavaScript tests (npm install in www/ first)
 ```
 
-The PHP tests (PHPUnit, a Composer dev dependency) are in `www/tests/`, configured by `www/phpunit.xml`; they cover the helpers in `www/app/Helpers/` that don't need a database (#515). `www/tests/bootstrap.php` declares the `Config.php.dist` constants as PHPStan's bootstrap does, with a test worker key. Controllers and models need MySQL and aren't tested; pure logic in a controller is easier to test moved into a helper. There's no JavaScript test suite yet (#516), so changes to the web UI still need a manual check in a browser.
+The PHP tests (PHPUnit, a Composer dev dependency) are in `www/tests/`, configured by `www/phpunit.xml`; they cover the helpers in `www/app/Helpers/` that don't need a database (#515). `www/tests/bootstrap.php` declares the `Config.php.dist` constants as PHPStan's bootstrap does, with a test worker key. Controllers and models need MySQL and aren't tested; pure logic in a controller is easier to test moved into a helper. The JavaScript tests (`node --test`, with jsdom as an npm dev dependency) are in `www/tests/js/`: each form helper is loaded unchanged into a jsdom page built from a small HTML fixture of its form, with jQuery, and driven through its events (#516). `checkFixture()` checks a fixture's field names and classes are in the form's PHP view (or its controller or helper), so a renamed field fails; `knownBug()` is the tests' strict xfail. `post_composer.sh` installs the npm packages with `--omit=dev`, so run `npm install` in `www/` for the tests. Layout and styling still need a manual check in a browser.
 
 **Lint Python code:**
 ```bash

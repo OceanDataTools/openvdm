@@ -33,5 +33,11 @@
   },
   "overrides": {
     "moment-timezone": "^0.5.35"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  },
+  "scripts": {
+    "test": "node --test 'tests/js/*.test.mjs'"
   }
 }
