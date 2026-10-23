@@ -158,7 +158,8 @@ def resolve_lowering_and_dirs(openvdm, args) -> tuple:
     if not collection_system:
         raise RuntimeError(f"Collection System not found: {args.collectionSystem}")
 
-    if collection_system["cruiseOrLowering"] != "1":
+    # The API returns cruiseOrLowering as a number (#600)
+    if str(collection_system["cruiseOrLowering"]) != "1":
         raise RuntimeError(f"Collection System: {args.collectionSystem} is not related to a lowering")
 
     warehouse_cfg = openvdm.get_shipboard_data_warehouse_config()

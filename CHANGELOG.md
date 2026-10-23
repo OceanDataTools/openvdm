@@ -9,7 +9,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 **Upgrading:** the step-by-step instructions will be in INSTALL.md.
 - **Database:** update it with `database/openvdm_216_to_217.sql`. From 2.16.0, run `database/openvdm_2160_to_2161.sql` first.
 - **Trackline hooks:** in your `openvdm.yaml`, remove `-u` from the `build_cruise_tracks.py` and `build_lowering_tracks.py` hooks, and change any 2.16.0 option names that 2.16.1 and 2.16.2 warned about: `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file` and `--gps-sources` (#388, #392).
-- **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366, #399).
+- **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366, #399, #600).
 - **Vessel settings:** re-run the installer, which asks for them, or copy the `vessel` block from `openvdm.yaml.dist` into your `openvdm.yaml` (#365).
 - **Python packages:** 2.17 needs Jinja2 for the cruise README. Re-running the installer installs it, or run `pip install -r requirements.txt` in OpenVDM's venv as the OpenVDM user. Then restart the workers (#431).
 - **README templates:** re-running the installer copies them. Or, as the OpenVDM user, copy `server/etc/cruise_readme.md.j2.dist` to `server/etc/cruise_readme.md.j2` and `server/etc/lowering_readme.md.j2.dist` to `server/etc/lowering_readme.md.j2`. Without them, the READMEs aren't written: Export OpenVDM Config, Export Lowering Config and the Rebuild README tasks fail, and Setup New Cruise/Lowering and Finalize post an OpenVDM message (#431, #445, #501).
@@ -87,6 +87,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **A cruise or lowering config file that isn't valid JSON** (e.g. cut short by a full disk) fails Export Config with the reason, keeping the file and its finalized date, instead of crashing the worker (#548).
 - **Hook tasks after a failed setup**: Setup New Cruise, Setup New Lowering and Finalize Current Lowering skip their hook tasks for a job that fails before it has a cruise or lowering ID (a payload that can't be parsed, or no current lowering). The hooks used to get the previous job's cruise or lowering (#552).
 - **Post-hook commands with a missing placeholder value**: a command that uses `{cruiseID}`, `{loweringID}`, `{collectionSystemTransferID}` or `{collectionSystemTransferName}` when it has no value (e.g. no current lowering) isn't run, and the hook reports it. It used to run with the placeholder left in as text. A job without files no longer leaves `{newFiles}`/`{updatedFiles}` in the command either (#586).
+- **Lowering tracklines:** `build_lowering_tracks.py` rejected every collection system as "not related to a lowering". It compared `cruiseOrLowering` with the string `"1"`, but the API returns a number, so no lowering trackline or lowering extent was ever written (#600).
 
 ---
 
