@@ -75,7 +75,7 @@ def test_sources_file(run, site, tmp_path, caplog) -> None:
 
 def test_invalid_and_empty(run, site, tmp_path, caplog) -> None:
     """A dashboard file that isn't a GeoTIFF's is logged and left out; no files writes an empty list."""
-    (site.dashboard / 'EM302' / 'bad.json').write_text('{"visualizerData": []}')
+    (site.dashboard / 'EM302' / 'bad.json').write_text('{"visualizerData": [{"label": "no tile URL"}]}')
     (site.dashboard / 'EM302' / 'broken.json').write_text('{cut short')
     assert run() == 0
     assert len(json.loads(site.output.read_text())) == 2
@@ -140,11 +140,20 @@ def test_load_sources_needs_input(load_dist) -> None:
         module.load_geotiff_sources_from_yaml()
 
 
-# --- Bugs ---------------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="only the old dashboard file format is read (#602)")
 def test_current_dashboard_format(run, site) -> None:
-    """Dashboard files as the data dashboard writes them today (keyed by data type) are read."""
+    """Dashboard files as the data dashboard writes them today (keyed by data type) are read (#602)."""
     _dashboard_file(site.dashboard / 'EM302' / 'a_bathy.json', 'a_bathy', 'http://ship/a.tif', keyed=True)
     assert run() == 0
-    assert 'a_bathy' in [layer['name'] for layer in json.loads(site.output.read_text())]
+    assert json.loads(site.output.read_text())[0] == {'name': 'a_bathy', 'url': TILES + quote('http://ship/a.tif', safe='')}
+
+
+def test_every_layer_in_a_file(run, site) -> None:
+    """A file with more than one GeoTIFF entry gives a layer for each; other entries are skipped."""
+    path = site.dashboard / 'EM302' / 'a_bathy.json'
+    path.write_text(json.dumps({
+        'geotiff': {'visualizerData': [{'label': 'depth', 'tileURL': 'http://ship/d.tif'},
+                                       {'label': 'chart', 'data': []}]},
+        'backscatter': {'visualizerData': [{'label': 'backscatter', 'tileURL': 'http://ship/b.tif'}]},
+        'stats': []}))
+    assert run() == 0
+    assert [layer['name'] for layer in json.loads(site.output.read_text())] == ['depth', 'backscatter', 'b_bathy']

@@ -12,6 +12,34 @@ from datetime import datetime, timezone
 from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+
+def visualizer_entries(data: dict):
+    """Yield every ``visualizerData`` entry of a data dashboard file.
+
+    Reads both formats: the old one, with ``visualizerData`` at the top
+    level, and the one the data dashboard worker writes now, with an entry
+    per data type, e.g. ``{"gga": {"visualizerData": [...]}}``.
+
+    Args:
+        data: The dashboard file's parsed JSON.
+
+    Yields:
+        Each ``visualizerData`` entry, in order.
+    """
+
+    if not isinstance(data, dict):
+        return
+
+    # Old format
+    if isinstance(data.get("visualizerData"), list):
+        yield from data["visualizerData"]
+
+    # Current format: an entry per data type
+    for value in data.values():
+        if isinstance(value, dict) and isinstance(value.get("visualizerData"), list):
+            yield from value["visualizerData"]
+
+
 def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> Optional[dict]:
     """Combine GeoJSON LineString data from a list of OpenVDM dashboard files.
 
@@ -33,24 +61,6 @@ def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> O
         A GeoJSON ``FeatureCollection`` dict on success, or ``None`` if no
         usable GeoJSON track data was found or a file could not be parsed.
     """
-
-    def iter_visualizer_entries(data: dict):
-        """
-        Yield every visualizerData entry from legacy or new dashboard JSON.
-        """
-
-        # Legacy format
-        if "visualizerData" in data and isinstance(data["visualizerData"], list):
-            yield from data["visualizerData"]
-
-        # New format: multiple datatypes possible
-        for value in data.values():
-            if (
-                isinstance(value, dict)
-                and "visualizerData" in value
-                and isinstance(value["visualizerData"], list)
-            ):
-                yield from value["visualizerData"]
 
     # ------------------------------------------------------------------
 
@@ -84,7 +94,7 @@ def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> O
             with open(file, "r", encoding="utf-8") as f:
                 raw = json.load(f)
 
-            for entry in iter_visualizer_entries(raw):
+            for entry in visualizer_entries(raw):
                 # Only GeoJSON FeatureCollections are relevant
                 if (
                     not isinstance(entry, dict)
