@@ -30,6 +30,9 @@ TIMEOUT = 5
 # Gearman task that adds files to the cruise's MD5 summary (server/workers/md5_summary.py).
 UPDATE_MD5_SUMMARY_TASK = 'updateMD5Summary'
 
+# openvdm.yaml.dist's workerApiKey: public, so the API never accepts it (#605).
+WORKER_API_KEY_PLACEHOLDER = 'change-me-to-a-strong-random-value'
+
 class OpenVDM():
     """Python wrapper around the OpenVDM REST API and YAML configuration file.
 
@@ -40,6 +43,9 @@ class OpenVDM():
     Attributes:
         config: Parsed contents of the OpenVDM YAML configuration file.
     """
+
+    # Whether the placeholder worker key has been warned about (#605)
+    _warned_placeholder_key = False
 
     def __init__(self, config_file: str = DEFAULT_CONFIG_FILE) -> None:
         """Initialise the wrapper by loading *config_file*.
@@ -126,12 +132,21 @@ class OpenVDM():
 
         Includes the ``X-Worker-Token`` header when ``workerApiKey`` is present
         in the YAML config, allowing the PHP API to return credential fields that
-        are otherwise stripped from public responses.
+        are otherwise stripped from public responses. The ``openvdm.yaml.dist``
+        placeholder isn't sent, since the API refuses it; a warning says to
+        set a real key, once per process (#605).
 
         Returns:
             A dict suitable for passing as *headers* to :mod:`requests` calls.
         """
         token = self.config.get('workerApiKey', '')
+        if token == WORKER_API_KEY_PLACEHOLDER:
+            if not OpenVDM._warned_placeholder_key:
+                logging.warning("workerApiKey in openvdm.yaml is still the placeholder, which the OpenVDM API "
+                                "refuses: set it and WORKER_API_KEY in www/app/Core/Config.php to the same "
+                                "random value (e.g. from openssl rand -hex 32)")
+                OpenVDM._warned_placeholder_key = True
+            return {}
         if token:
             return {'X-Worker-Token': token}
         return {}

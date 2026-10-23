@@ -231,4 +231,4 @@ The `Api/CollectionSystemTransfers`, `Api/CruiseDataTransfers` and `Api/Warehous
 - The same value must be set as `workerApiKey` in `server/etc/openvdm.yaml`.
 - Python workers send the header automatically via `OpenVDM._worker_headers()`, which reads the key from the YAML config.
 - `hash_equals()` is used for the comparison to prevent timing attacks.
-- When deploying, change the placeholder value (`change-me-to-a-strong-random-value`) to a strong random string in both files (e.g. `openssl rand -hex 32`).
+- When deploying, change the placeholder value (`change-me-to-a-strong-random-value`) to a strong random string in both files (e.g. `openssl rand -hex 32`); the installer does this. The placeholder is never a valid key: `TransferCredentials::isWorkerToken()` refuses it, and `_worker_headers()` doesn't send it and logs a warning once (#605).

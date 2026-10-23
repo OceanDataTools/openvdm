@@ -59,4 +59,29 @@ class TransferCredentialsTest extends TestCase
         $this->assertFalse(TransferCredentials::isWorkerRequest());
         $this->assertSame(array('name' => 'SCS'), (array) TransferCredentials::forResponse($this->rows())[0]);
     }
+
+    public static function tokens(): array
+    {
+        $placeholder = TransferCredentials::PLACEHOLDER;
+        return array(
+            'the key' => array('a-real-key', 'a-real-key', true),
+            'another token' => array('a-real-key', 'other', false),
+            'no key set' => array('', '', false),
+            // #605: the placeholder is public, so it's never a worker's key
+            'placeholder key and token' => array($placeholder, $placeholder, false),
+            'placeholder key, other token' => array($placeholder, 'a-real-key', false),
+        );
+    }
+
+    #[DataProvider('tokens')]
+    public function testIsWorkerToken(string $key, string $token, bool $worker): void
+    {
+        $this->assertSame($worker, TransferCredentials::isWorkerToken($key, $token));
+    }
+
+    public function testPlaceholderIsConfigPhpDists(): void
+    {
+        $this->assertStringContainsString("define('WORKER_API_KEY', '" . TransferCredentials::PLACEHOLDER . "');",
+                                          file_get_contents(__DIR__ . '/../../app/Core/Config.php.dist'));
+    }
 }
