@@ -387,11 +387,8 @@ def test_build_md5_summary_fails(worker, cruise) -> None:
                                             'reason': f'Error updating MD5 Summary file: {cruise.summary}'}
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="the update doesn't check Stop (#579)")
 def test_update_stopped(worker, cruise, monkeypatch) -> None:
-    """An update stopped while hashing fails, as a stopped rebuild does, and leaves the summary as it was."""
+    """An update stopped while hashing fails, as a stopped rebuild does, and leaves the summary as it was (#579)."""
     _rebuild(worker)
     before = cruise.summary.read_text()
     real = worker.hash_file
