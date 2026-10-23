@@ -1,0 +1,100 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1565554380000,
+          322.206
+        ],
+        [
+          1565554440000,
+          345.909
+        ],
+        [
+          1565554500000,
+          372.114
+        ],
+        [
+          1565554560000,
+          393.837
+        ],
+        [
+          1565554620000,
+          436.952
+        ]
+      ],
+      "unit": "m",
+      "label": "Depth"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Depth",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2019-08-11T20:12:02.594000+00:00",
+        "2019-08-11T20:16:33.018000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        55.092
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        44,
+        1
+      ]
+    },
+    {
+      "statName": "Depth Bounds",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        34.0,
+        441.686
+      ]
+    },
+    {
+      "statName": "Depth Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          0.000188057
+        ],
+        [
+          1790812860000,
+          0.00019827
+        ],
+        [
+          1790812920000,
+          0.000196157
+        ],
+        [
+          1790812980000,
+          0.000169424
+        ],
+        [
+          1790813040000,
+          0.000222217
+        ]
+      ],
+      "unit": "m^-1sr^-1",
+      "label": "Scattering"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.324
+        ],
+        [
+          1790812860000,
+          0.35
+        ],
+        [
+          1790812920000,
+          0.344
+        ],
+        [
+          1790812980000,
+          0.277
+        ],
+        [
+          1790813040000,
+          0.41
+        ]
+      ],
+      "unit": "ug/l",
+      "label": "Chlorophyll"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          1.816
+        ],
+        [
+          1790812860000,
+          2.043
+        ],
+        [
+          1790812920000,
+          1.99
+        ],
+        [
+          1790812980000,
+          1.412
+        ],
+        [
+          1790813040000,
+          2.558
+        ]
+      ],
+      "unit": "ppb",
+      "label": "FDOM"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Scattering Bounds",
+      "statType": "bounds",
+      "statUnit": "m^-1sr^-1",
+      "statValue": [
+        0.000145797,
+        0.000230317
+      ]
+    },
+    {
+      "statName": "Chlorophyll Bounds",
+      "statType": "bounds",
+      "statUnit": "ug/l",
+      "statValue": [
+        0.216,
+        0.432
+      ]
+    },
+    {
+      "statName": "FDOM Bounds",
+      "statType": "bounds",
+      "statUnit": "ppb",
+      "statValue": [
+        0.908,
+        2.724
+      ]
+    }
+  ]
+}

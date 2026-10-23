@@ -17,13 +17,12 @@ are strict xfails at the end.
 """
 
 import argparse
-import json
 import logging
 
 import pandas as pd
 import pytest
 
-from server.tests.helpers import PARSER_DATA
+from server.tests.helpers import PARSER_DATA, parse_output, stat_value
 
 # Each parser's .py.dist (server/plugins/parsers/<name>_parser.py.dist) and class
 PARSERS = {
@@ -102,17 +101,6 @@ def _good(name):
     return GOOD.get(name) or (PARSER_DATA / 'nmea' / f'{name}.txt').read_text().split(',', 1)[1].split('\n')[0]
 
 
-def _parse(parser, path):
-    """The parser's output for *path*, as the data dashboard saves it."""
-    parser.parse(str(path))
-    return json.loads(parser.to_json())
-
-
-def _stat(data, name):
-    """The value of the stat called *name*."""
-    return next(stat['statValue'] for stat in data['stats'] if stat['statName'] == name)
-
-
 def _write(tmp_path, *sentences):
     """A log file of *sentences*, timestamped 5 s apart, after a comment line."""
     path = tmp_path / 'log.txt'
@@ -136,7 +124,7 @@ def _write(tmp_path, *sentences):
 def test_output(make_parser, expected, monkeypatch, case, name, options) -> None:
     """Each parser's output for its input file is the expected output."""
     monkeypatch.chdir(PARSER_DATA)  # the GGA track is named after the file
-    expected(f'nmea_{case}', _parse(make_parser(name, **options), f'nmea/{name}.txt'))
+    expected(f'nmea_{case}', parse_output(make_parser(name, **options), f'nmea/{name}.txt'))
 
 
 @pytest.mark.parametrize('name', PARSERS)
@@ -146,7 +134,7 @@ def test_bad_rows(make_parser, caplog, name) -> None:
     caplog.set_level(logging.ERROR)
     path = PARSER_DATA / 'nmea' / f'{name}.txt'
     good, bad = ROWS[name]
-    assert _stat(_parse(make_parser(name), path), 'Row Validity') == [good, len(bad.split(', '))]
+    assert stat_value(parse_output(make_parser(name), path), 'Row Validity') == [good, len(bad.split(', '))]
     assert f'Error(s) parsing datafile {path} on row(s): {bad}' in caplog.text
 
 
@@ -168,33 +156,33 @@ def _bad_sentences(name):
 def test_bad_sentence(make_parser, tmp_path, name, case) -> None:
     """A corrupt sentence is a bad row; the good ones around it are read."""
     good = GOOD[name]
-    data = _parse(make_parser(name), _write(tmp_path, good, _bad_sentences(name)[case], good))
-    assert _stat(data, 'Row Validity') == [2, 1]
+    data = parse_output(make_parser(name), _write(tmp_path, good, _bad_sentences(name)[case], good))
+    assert stat_value(data, 'Row Validity') == [2, 1]
 
 
 @pytest.mark.parametrize('name', GOOD)
 def test_missing_checksum_is_a_bad_row(make_parser, tmp_path, name) -> None:
     """A sentence without a checksum has been cut short: by default it's a bad row (#416, #418)."""
     good = GOOD[name]
-    data = _parse(make_parser(name), _write(tmp_path, good, good.split('*')[0], good))
-    assert _stat(data, 'Row Validity') == [2, 1]
+    data = parse_output(make_parser(name), _write(tmp_path, good, good.split('*')[0], good))
+    assert stat_value(data, 'Row Validity') == [2, 1]
 
 
 @pytest.mark.parametrize('name', [name for name in GOOD if name not in ('gga', 'mwv', 'psxn23')])
 def test_require_checksum_false(make_parser, tmp_path, name) -> None:
     """With require_checksum=False, a sentence without a checksum is read (#418)."""
     good = GOOD[name]
-    data = _parse(make_parser(name, require_checksum=False), _write(tmp_path, good, good.split('*')[0], good))
-    assert _stat(data, 'Row Validity') == [3, 0]
+    data = parse_output(make_parser(name, require_checksum=False), _write(tmp_path, good, good.split('*')[0], good))
+    assert stat_value(data, 'Row Validity') == [3, 0]
 
 
 @pytest.mark.parametrize('name', [name for name in GOOD if name != 'gga'])
 def test_require_checksum_false_still_checks_it(make_parser, tmp_path, name) -> None:
     """With require_checksum=False, a checksum that doesn't match is still a bad row."""
     good = GOOD[name]
-    data = _parse(make_parser(name, require_checksum=False),
+    data = parse_output(make_parser(name, require_checksum=False),
                   _write(tmp_path, good, good[:-2] + ('00' if good[-2:] != '00' else '11'), good))
-    assert _stat(data, 'Row Validity') == [2, 1]
+    assert stat_value(data, 'Row Validity') == [2, 1]
 
 
 @pytest.mark.parametrize('name, sentence', [
@@ -216,8 +204,8 @@ def test_require_checksum_false_still_checks_it(make_parser, tmp_path, name) -> 
 def test_malformed_sentence(make_parser, tmp_path, name, sentence) -> None:
     """A sentence with the wrong number of fields, units or position format is a bad row."""
     good = GOOD[name]
-    data = _parse(make_parser(name), _write(tmp_path, good, sentence, good))
-    assert _stat(data, 'Row Validity') == [2, 1]
+    data = parse_output(make_parser(name), _write(tmp_path, good, sentence, good))
+    assert stat_value(data, 'Row Validity') == [2, 1]
 
 
 @pytest.mark.parametrize('sentence', [
@@ -227,8 +215,8 @@ def test_malformed_sentence(make_parser, tmp_path, name, sentence) -> None:
 def test_older_sentence_versions(make_parser, tmp_path, sentence) -> None:
     """DPT without the maximum range and VTG without the mode (before NMEA 2.3) are read."""
     name = sentence[3:6].lower()
-    data = _parse(make_parser(name), _write(tmp_path, GOOD[name], sentence))
-    assert _stat(data, 'Row Validity') == [2, 0]
+    data = parse_output(make_parser(name), _write(tmp_path, GOOD[name], sentence))
+    assert stat_value(data, 'Row Validity') == [2, 0]
 
 
 @pytest.mark.parametrize('name', PARSERS)
@@ -236,13 +224,13 @@ def test_empty_file(make_parser, tmp_path, name) -> None:
     """An empty file has no output."""
     path = tmp_path / 'log.txt'
     path.write_text('')
-    assert _parse(make_parser(name), path) is None
+    assert parse_output(make_parser(name), path) is None
 
 
 @pytest.mark.parametrize('name', PARSERS)
 def test_no_good_rows(make_parser, tmp_path, name) -> None:
     """A file with only bad rows has no output."""
-    assert _parse(make_parser(name), _write(tmp_path, '$GARBAGE*00', 'no timestamp here')) is None
+    assert parse_output(make_parser(name), _write(tmp_path, '$GARBAGE*00', 'no timestamp here')) is None
 
 
 @pytest.mark.filterwarnings('ignore:Could not infer format')
@@ -252,13 +240,13 @@ def test_unreadable_timestamps(make_parser, tmp_path, name) -> None:
     good = _good(name)
     path = tmp_path / 'log.txt'
     path.write_text(f'2026-13-45T00:00:00.000Z,{good}\n2026-13-45T00:00:05.000Z,{good}\n')
-    assert _parse(make_parser(name), path) is None
+    assert parse_output(make_parser(name), path) is None
 
 
 @pytest.mark.parametrize('name', PARSERS)
 def test_missing_file(make_parser, tmp_path, caplog, name) -> None:
     """A file that can't be read has no output; the error is logged."""
-    assert _parse(make_parser(name), tmp_path / 'missing.txt') is None
+    assert parse_output(make_parser(name), tmp_path / 'missing.txt') is None
     assert 'Failed to read file' in caplog.text
 
 
@@ -267,8 +255,8 @@ def test_crop(make_parser, monkeypatch, name) -> None:
     """start_dt and stop_dt crop the data to the window, inclusive."""
     monkeypatch.chdir(PARSER_DATA)
     start, stop = WINDOW.get(name, DEFAULT_WINDOW)
-    data = _parse(make_parser(name, start_dt=start, stop_dt=stop), f'nmea/{name}.txt')
-    assert [pd.Timestamp(bound) for bound in _stat(data, 'Temporal Bounds')] == [pd.Timestamp(start),
+    data = parse_output(make_parser(name, start_dt=start, stop_dt=stop), f'nmea/{name}.txt')
+    assert [pd.Timestamp(bound) for bound in stat_value(data, 'Temporal Bounds')] == [pd.Timestamp(start),
                                                                                  pd.Timestamp(stop)]
 
 
@@ -277,7 +265,7 @@ def test_crop_to_nothing(make_parser, monkeypatch, caplog, name) -> None:
     """A window with no data in it gives no output."""
     monkeypatch.chdir(PARSER_DATA)
     parser = make_parser(name, start_dt='2030-01-01T00:00:00Z')
-    assert _parse(parser, f'nmea/{name}.txt') is None
+    assert parse_output(parser, f'nmea/{name}.txt') is None
     assert 'empty after cropping' in caplog.text
 
 
@@ -298,13 +286,13 @@ def test_wicor_bad_options(load_dist, options, message) -> None:
 
 def test_wicor_category_not_in_file(make_parser, caplog) -> None:
     """A category with none of its fields in the file gives no output."""
-    assert _parse(make_parser('wicor', category='optics_chem'), PARSER_DATA / 'nmea' / 'wicor.txt') is None
+    assert parse_output(make_parser('wicor', category='optics_chem'), PARSER_DATA / 'nmea' / 'wicor.txt') is None
     assert 'No optics_chem fields in file' in caplog.text
 
 
 def test_wicor_field_not_in_file(make_parser, caplog) -> None:
     """A field that's never in the file is left out, with a warning."""
-    data = _parse(make_parser('wicor', fields=['AT', 'PH']), PARSER_DATA / 'nmea' / 'wicor.txt')
+    data = parse_output(make_parser('wicor', fields=['AT', 'PH']), PARSER_DATA / 'nmea' / 'wicor.txt')
     assert 'Field(s) not in' in caplog.text and ': PH' in caplog.text
     assert [viz['label'] for viz in data['visualizerData']] == ['Air Temperature']
 
@@ -312,8 +300,8 @@ def test_wicor_field_not_in_file(make_parser, caplog) -> None:
 def test_wicor_checksum_required(make_parser, tmp_path) -> None:
     """$WICOR sentences always need their checksum."""
     good = _good('wicor')
-    data = _parse(make_parser('wicor'), _write(tmp_path, good, good.split('*')[0], good))
-    assert _stat(data, 'Row Validity') == [2, 1]
+    data = parse_output(make_parser('wicor'), _write(tmp_path, good, good.split('*')[0], good))
+    assert stat_value(data, 'Row Validity') == [2, 1]
 
 
 @pytest.mark.parametrize('cli_args, kwargs', [
@@ -352,7 +340,7 @@ def test_no_mag_cli_option(load_dist, name) -> None:
 def test_xdr_reads_one_layout(make_parser, tmp_path) -> None:
     """XDR reads its instrument's field layout only: a sentence with an ID after each sensor isn't read (#561)."""
     standard = _nmea('WIXDR,P,1.01320,B,0,C,22.00,C,1,H,60.00,P,2')
-    assert _parse(make_parser('xdr'), _write(tmp_path, standard, standard)) is None
+    assert parse_output(make_parser('xdr'), _write(tmp_path, standard, standard)) is None
 
 
 # --- Bugs -----------------------------------------------------------------------
@@ -364,7 +352,7 @@ def test_line_without_timestamp_is_a_bad_row(make_parser, tmp_path, name) -> Non
     good = _good(name)
     path = _write(tmp_path, good, good)
     path.write_text(path.read_text() + good + '\n')
-    assert _stat(_parse(make_parser(name), path), 'Row Validity') == [2, 1]
+    assert stat_value(parse_output(make_parser(name), path), 'Row Validity') == [2, 1]
 
 
 @pytest.mark.xfail(strict=True, reason='GGA skips the first line by default (#555)')
@@ -372,13 +360,13 @@ def test_gga_reads_the_first_line(make_parser, tmp_path) -> None:
     """GGA reads a log file's first line: OpenRVDAS logs have no header."""
     path = tmp_path / 'log.txt'
     path.write_text(''.join(f'2026-10-01T00:00:0{n}.000000Z,{GOOD["gga"]}\n' for n in range(3)))
-    assert _stat(_parse(make_parser('gga'), path), 'Row Validity') == [3, 0]
+    assert stat_value(parse_output(make_parser('gga'), path), 'Row Validity') == [3, 0]
 
 
 @pytest.mark.xfail(strict=True, reason="MWD's second speed is m/s, read as mph (#556)")
 def test_mwd_speed_in_m_s(make_parser, tmp_path) -> None:
     """MWD's second speed is in m/s (unit M), not mph."""
-    data = _parse(make_parser('mwd'), _write(tmp_path, GOOD['mwd'], GOOD['mwd']))
+    data = parse_output(make_parser('mwd'), _write(tmp_path, GOOD['mwd'], GOOD['mwd']))
     units = {stat['statUnit'] for stat in data['stats']} | {viz['unit'] for viz in data['visualizerData']}
     assert 'mph' not in units and 'm/s' in units
 
@@ -388,8 +376,8 @@ def test_mwd_speed_in_m_s(make_parser, tmp_path) -> None:
 def test_require_checksum_false_last_field(make_parser, tmp_path, name) -> None:
     """With require_checksum=False, MWV and PSXN23 read a sentence without a checksum (#418)."""
     good = GOOD[name]
-    data = _parse(make_parser(name, require_checksum=False), _write(tmp_path, good, good.split('*')[0], good))
-    assert _stat(data, 'Row Validity') == [3, 0]
+    data = parse_output(make_parser(name, require_checksum=False), _write(tmp_path, good, good.split('*')[0], good))
+    assert stat_value(data, 'Row Validity') == [3, 0]
 
 
 @pytest.mark.xfail(strict=True, reason="these parsers read every sentence in the file (#558)")
@@ -402,13 +390,13 @@ def test_require_checksum_false_last_field(make_parser, tmp_path, name) -> None:
 def test_other_sentences_are_skipped(make_parser, tmp_path, name, other) -> None:
     """Another sentence in the file is neither read nor a bad row."""
     good = GOOD[name]
-    assert _stat(_parse(make_parser(name), _write(tmp_path, good, other, good)), 'Row Validity') == [2, 0]
+    assert stat_value(parse_output(make_parser(name), _write(tmp_path, good, other, good)), 'Row Validity') == [2, 0]
 
 
 @pytest.mark.xfail(strict=True, reason="PSXN24 charts heave velocity in m (#559)")
 def test_psxn24_heave_velocity_unit(make_parser, tmp_path) -> None:
     """PSXN24's heave velocity is charted in m/s."""
-    data = _parse(make_parser('psxn24'), _write(tmp_path, GOOD['psxn24'], GOOD['psxn24']))
+    data = parse_output(make_parser('psxn24'), _write(tmp_path, GOOD['psxn24'], GOOD['psxn24']))
     assert {viz['label']: viz['unit'] for viz in data['visualizerData']}['Heave Velocity'] == 'm/s'
 
 
@@ -416,5 +404,5 @@ def test_psxn24_heave_velocity_unit(make_parser, tmp_path) -> None:
 def test_angle_rounded_to_360(make_parser, tmp_path) -> None:
     """A mean heading that rounds to 360 is charted as 0."""
     good = _nmea('HEHDT,359.9996,T')
-    data = _parse(make_parser('hdt'), _write(tmp_path, good, good))
+    data = parse_output(make_parser('hdt'), _write(tmp_path, good, good))
     assert data['visualizerData'][0]['data'][0][1] == 0.0

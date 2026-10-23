@@ -1,0 +1,122 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          24.5
+        ],
+        [
+          1790812860000,
+          24.55
+        ],
+        [
+          1790812920000,
+          24.54
+        ],
+        [
+          1790812980000,
+          24.41
+        ],
+        [
+          1790813040000,
+          24.66
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          8.05
+        ],
+        [
+          1790812860000,
+          8.05
+        ],
+        [
+          1790812920000,
+          8.05
+        ],
+        [
+          1790812980000,
+          8.04
+        ],
+        [
+          1790813040000,
+          8.07
+        ]
+      ],
+      "unit": "",
+      "label": "pH"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.3,
+        24.7
+      ]
+    },
+    {
+      "statName": "pH Bounds",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        8.03,
+        8.07
+      ]
+    }
+  ]
+}

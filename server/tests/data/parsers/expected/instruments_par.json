@@ -1,0 +1,87 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          1200.0
+        ],
+        [
+          1790812860000,
+          1227.682
+        ],
+        [
+          1790812920000,
+          1228.578
+        ],
+        [
+          1790812980000,
+          1133.854
+        ],
+        [
+          1790813040000,
+          1321.268
+        ]
+      ],
+      "unit": "\u03bcE/cm2sec",
+      "label": "Irradiance"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Irradiance",
+      "statType": "bounds",
+      "statUnit": "\u03bcE/cm2sec",
+      "statValue": [
+        1050.64,
+        1349.36
+      ]
+    }
+  ]
+}

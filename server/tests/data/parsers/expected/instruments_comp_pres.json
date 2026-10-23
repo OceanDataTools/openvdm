@@ -1,0 +1,262 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1565554320000,
+          65.473
+        ],
+        [
+          1565554380000,
+          64.21
+        ],
+        [
+          1565554440000,
+          64.219
+        ],
+        [
+          1565554500000,
+          64.21
+        ],
+        [
+          1565554560000,
+          64.204
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 1"
+    },
+    {
+      "data": [
+        [
+          1565554320000,
+          71.525
+        ],
+        [
+          1565554380000,
+          71.508
+        ],
+        [
+          1565554440000,
+          71.515
+        ],
+        [
+          1565554500000,
+          71.499
+        ],
+        [
+          1565554560000,
+          71.501
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 2"
+    },
+    {
+      "data": [
+        [
+          1565554320000,
+          73.353
+        ],
+        [
+          1565554380000,
+          73.338
+        ],
+        [
+          1565554440000,
+          73.171
+        ],
+        [
+          1565554500000,
+          72.94
+        ],
+        [
+          1565554560000,
+          72.926
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 3"
+    },
+    {
+      "data": [
+        [
+          1565554320000,
+          77.492
+        ],
+        [
+          1565554380000,
+          77.482
+        ],
+        [
+          1565554440000,
+          76.782
+        ],
+        [
+          1565554500000,
+          76.282
+        ],
+        [
+          1565554560000,
+          76.283
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 4"
+    },
+    {
+      "data": [
+        [
+          1565554320000,
+          69.859
+        ],
+        [
+          1565554380000,
+          68.927
+        ],
+        [
+          1565554440000,
+          68.931
+        ],
+        [
+          1565554500000,
+          68.939
+        ],
+        [
+          1565554560000,
+          68.455
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 5"
+    },
+    {
+      "data": [
+        [
+          1565554320000,
+          54.274
+        ],
+        [
+          1565554380000,
+          54.288
+        ],
+        [
+          1565554440000,
+          54.284
+        ],
+        [
+          1565554500000,
+          54.288
+        ],
+        [
+          1565554560000,
+          53.46
+        ]
+      ],
+      "unit": "%",
+      "label": "Compensator 6"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        45,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2019-08-11T20:11:27.569000+00:00",
+        "2019-08-11T20:15:59.554000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.021,
+        55.406
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Compensator 1",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        64.179,
+        65.778
+      ]
+    },
+    {
+      "statName": "Compensator 2",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        71.483,
+        71.542
+      ]
+    },
+    {
+      "statName": "Compensator 3",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        72.926,
+        73.382
+      ]
+    },
+    {
+      "statName": "Compensator 4",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        76.259,
+        77.526
+      ]
+    },
+    {
+      "statName": "Compensator 5",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        68.434,
+        70.033
+      ]
+    },
+    {
+      "statName": "Compensator 6",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        53.46,
+        54.324
+      ]
+    }
+  ]
+}

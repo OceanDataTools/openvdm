@@ -1,0 +1,169 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1565556720000,
+          39.534
+        ],
+        [
+          1565556780000,
+          39.524
+        ],
+        [
+          1565556840000,
+          39.515
+        ],
+        [
+          1565556900000,
+          39.808
+        ],
+        [
+          1565556960000,
+          40.736
+        ],
+        [
+          1565557020000,
+          41.606
+        ]
+      ],
+      "unit": "\u03bcM",
+      "label": "ABS Value"
+    },
+    {
+      "data": [
+        [
+          1565556720000,
+          9.302
+        ],
+        [
+          1565556780000,
+          9.296
+        ],
+        [
+          1565556840000,
+          9.29
+        ],
+        [
+          1565556900000,
+          9.349
+        ],
+        [
+          1565556960000,
+          9.558
+        ],
+        [
+          1565557020000,
+          9.756
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1565556720000,
+          2.595
+        ],
+        [
+          1565556780000,
+          2.579
+        ],
+        [
+          1565556840000,
+          2.566
+        ],
+        [
+          1565556900000,
+          2.527
+        ],
+        [
+          1565556960000,
+          2.493
+        ],
+        [
+          1565557020000,
+          2.467
+        ]
+      ],
+      "unit": "%",
+      "label": "Saturation"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2019-08-11T20:51:44.886000+00:00",
+        "2019-08-11T20:56:15.286000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        55.08
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        44,
+        1
+      ]
+    },
+    {
+      "statName": "ABS Value Bounds",
+      "statType": "bounds",
+      "statUnit": "\u03bcM",
+      "statValue": [
+        39.515,
+        41.606
+      ]
+    },
+    {
+      "statName": "Temperature Bounds",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        9.29,
+        9.756
+      ]
+    },
+    {
+      "statName": "Saturation Bounds",
+      "statType": "bounds",
+      "statUnit": "%",
+      "statValue": [
+        2.467,
+        2.595
+      ]
+    }
+  ]
+}

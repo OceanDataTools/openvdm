@@ -1,0 +1,109 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1335571260000,
+          1427.368
+        ],
+        [
+          1335571320000,
+          1533.544
+        ],
+        [
+          1335571380000,
+          1533.503
+        ],
+        [
+          1335571440000,
+          1533.498
+        ],
+        [
+          1335571500000,
+          1533.514
+        ]
+      ],
+      "unit": "m/s",
+      "label": "SV"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "SV",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2012-04-28T00:00:00.984000Z",
+        "2012-04-28T00:04:30.987000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        55.001
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        44,
+        1
+      ]
+    },
+    {
+      "statName": "SV Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        153.0,
+        1533.59
+      ]
+    },
+    {
+      "statName": "SV Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        46,
+        0
+      ]
+    },
+    {
+      "statName": "SV Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        45,
+        1
+      ]
+    }
+  ]
+}

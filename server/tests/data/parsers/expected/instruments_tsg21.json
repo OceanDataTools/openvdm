@@ -1,0 +1,262 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          24.5
+        ],
+        [
+          1790812860000,
+          24.5122
+        ],
+        [
+          1790812920000,
+          24.5095
+        ],
+        [
+          1790812980000,
+          24.4779
+        ],
+        [
+          1790813040000,
+          24.5404
+        ]
+      ],
+      "unit": "C",
+      "label": "Water Temp 1"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          5.32
+        ],
+        [
+          1790812860000,
+          5.32244
+        ],
+        [
+          1790812920000,
+          5.3219
+        ],
+        [
+          1790812980000,
+          5.31559
+        ],
+        [
+          1790813040000,
+          5.32809
+        ]
+      ],
+      "unit": "S/m",
+      "label": "Conductivity"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          35.48
+        ],
+        [
+          1790812860000,
+          35.4824
+        ],
+        [
+          1790812920000,
+          35.4819
+        ],
+        [
+          1790812980000,
+          35.4756
+        ],
+        [
+          1790813040000,
+          35.4881
+        ]
+      ],
+      "unit": "PSU",
+      "label": "Salinity"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          24.35
+        ],
+        [
+          1790812860000,
+          24.3622
+        ],
+        [
+          1790812920000,
+          24.3595
+        ],
+        [
+          1790812980000,
+          24.3279
+        ],
+        [
+          1790813040000,
+          24.3904
+        ]
+      ],
+      "unit": "C",
+      "label": "Water Temp 2"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.21
+        ],
+        [
+          1790812860000,
+          0.21488
+        ],
+        [
+          1790812920000,
+          0.21381
+        ],
+        [
+          1790812980000,
+          0.20118
+        ],
+        [
+          1790813040000,
+          0.22617
+        ]
+      ],
+      "unit": "mg/m^3",
+      "label": "Fluorescence"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          1533.4
+        ],
+        [
+          1790812860000,
+          1533.47317
+        ],
+        [
+          1790812920000,
+          1533.45717
+        ],
+        [
+          1790812980000,
+          1533.26764
+        ],
+        [
+          1790813040000,
+          1533.64267
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Sound Velocity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Conductivity",
+      "statType": "bounds",
+      "statUnit": "S/m",
+      "statValue": [
+        5.31004,
+        5.32996
+      ]
+    },
+    {
+      "statName": "Water Temp 1",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.4502,
+        24.5498
+      ]
+    },
+    {
+      "statName": "Salinity",
+      "statType": "bounds",
+      "statUnit": "PSU",
+      "statValue": [
+        35.47,
+        35.49
+      ]
+    },
+    {
+      "statName": "Water Temp 2",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        24.3002,
+        24.3998
+      ]
+    },
+    {
+      "statName": "Fluorescence",
+      "statType": "bounds",
+      "statUnit": "mg/m^3",
+      "statValue": [
+        0.1901,
+        0.2299
+      ]
+    },
+    {
+      "statName": "Sound Velocity",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        1533.101,
+        1533.699
+      ]
+    }
+  ]
+}

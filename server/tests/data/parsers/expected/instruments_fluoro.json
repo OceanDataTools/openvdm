@@ -1,0 +1,100 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          120.0
+        ],
+        [
+          1790812860000,
+          127.33333333333333
+        ],
+        [
+          1790812920000,
+          457.6666666666667
+        ],
+        [
+          1790812980000,
+          106.72727272727273
+        ],
+        [
+          1790813040000,
+          144.33333333333334
+        ]
+      ],
+      "unit": "counts",
+      "label": "Chlorophyll"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Chlorophyll Signal",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        2
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:03:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Chlorophyll Bounds",
+      "statType": "bounds",
+      "statUnit": "counts",
+      "statValue": [
+        90,
+        4130
+      ]
+    },
+    {
+      "statName": "Chlorophyll Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        1,
+        41
+      ]
+    }
+  ]
+}

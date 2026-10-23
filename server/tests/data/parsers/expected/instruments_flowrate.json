@@ -1,0 +1,100 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          150.0
+        ],
+        [
+          1790812860000,
+          153.65
+        ],
+        [
+          1790812920000,
+          214.82
+        ],
+        [
+          1790812980000,
+          141.18
+        ],
+        [
+          1790813040000,
+          166.17
+        ]
+      ],
+      "unit": "l/min",
+      "label": "Volume"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Volume",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        0.3,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Volume Bounds",
+      "statType": "bounds",
+      "statUnit": "l/min",
+      "statValue": [
+        130.09,
+        900.0
+      ]
+    },
+    {
+      "statName": "Volume Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        1
+      ]
+    }
+  ]
+}
