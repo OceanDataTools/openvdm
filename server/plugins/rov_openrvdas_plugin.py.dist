@@ -145,8 +145,9 @@ class ROVOpenRVDASPlugin(OpenVDMPlugin):
         for data_type, data_parser in parsers:
             try:
                 data_parser.parse(filepath)
-                if data_parser.plugin_data:
-                    results[data_type] = data_parser.plugin_data
+                plugin_data = data_parser.get_plugin_data()
+                if plugin_data is not None:
+                    results[data_type] = plugin_data
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 logging.exception("Parser '%s' failed for file '%s': %s", data_type, filepath, exc)
         return results
