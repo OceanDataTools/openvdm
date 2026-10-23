@@ -218,7 +218,7 @@
     },
     {
       "testName": "DeltaT",
-      "results": "Failed"
+      "results": "Passed"
     }
   ],
   "stats": [
@@ -254,8 +254,8 @@
       "statType": "valueValidity",
       "statUnit": "",
       "statValue": [
-        31,
-        13
+        43,
+        1
       ]
     },
     {

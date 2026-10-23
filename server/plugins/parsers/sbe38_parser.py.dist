@@ -31,7 +31,7 @@ class SBE38Parser(OpenVDMCSVParser):
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, sbe38=False):
+                 skip_header=False, use_openvdm_api=False):
 
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,

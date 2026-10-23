@@ -92,15 +92,6 @@
       "statType": "valueValidity",
       "statUnit": "",
       "statValue": [
-        46,
-        0
-      ]
-    },
-    {
-      "statName": "SV Validity",
-      "statType": "valueValidity",
-      "statUnit": "",
-      "statValue": [
         45,
         1
       ]

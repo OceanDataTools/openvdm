@@ -59,8 +59,8 @@ class ParoParser(OpenVDMCSVParser):
 
         df = pd.DataFrame(raw_data)
         df['date_time'] = pd.to_datetime(df['date_time'], errors='coerce')
-        df = df.dropna(subset=['date_time'])
-        df = df.dropna(thresh=1)
+        # Lines without a depth (the sensor off) aren't rows, as for the CTD (#566)
+        df = df.dropna(subset=['date_time', 'depth'])
         if df.empty:
             logging.warning("Dataframe empty after filtering: %s", filepath)
             return None

@@ -57,6 +57,10 @@ class SprintParser(OpenVDMCSVParser):
                 try:
                     latitude = float(field_data['latitude']) if field_data.get('latitude') else None
                     longitude = float(field_data['longitude']) if field_data.get('longitude') else None
+                    # A line cut short between them is a bad row (#565); lines
+                    # with neither are dropped below
+                    if (latitude is None) != (longitude is None):
+                        raise ValueError("position without both a latitude and a longitude")
                     # Discard (0, 0) fixes which indicate no valid position
                     if latitude == 0 and longitude == 0:
                         continue
