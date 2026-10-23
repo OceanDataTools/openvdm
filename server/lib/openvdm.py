@@ -153,14 +153,16 @@ class OpenVDM():
 
 
     def clear_gearman_jobs_from_db(self):
-        """
-        Clear the current Gearman job request queue.
+        """Clear the current Gearman job request queue.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/gearman/clearAllJobsFromDB"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear Gearman Jobs from OpenVDM API")
             raise exc
@@ -1438,14 +1440,14 @@ class OpenVDM():
             message_body: The message body.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/messages/newMessage"
 
         try:
             payload = {'messageTitle': message_title, 'messageBody':message_body}
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to send message: \"%s: %s\" with OpenVDM API", message_title, message_body)
             raise exc
@@ -1462,7 +1464,7 @@ class OpenVDM():
                 running, ``2`` idle, ``3`` error).
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         if job_status != 3:
@@ -1472,7 +1474,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear error status for collection system transfer: %s with OpenVDM API", collection_system_transfer_id)
             raise exc
@@ -1489,7 +1491,7 @@ class OpenVDM():
                 running, ``2`` idle, ``3`` error).
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         # Ignore request if transfer does not have a error status
@@ -1499,7 +1501,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear error status for cruise data transfer: %s with OpenVDM API", cruise_data_transfer_id)
             raise exc
@@ -1532,7 +1534,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1544,7 +1546,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1564,7 +1566,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1577,7 +1579,7 @@ class OpenVDM():
 
         try:
             if set_status:
-                requests.get(url, timeout=TIMEOUT)
+                requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set test status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1595,7 +1597,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1607,7 +1609,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
@@ -1627,7 +1629,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1640,7 +1642,7 @@ class OpenVDM():
 
         try:
             if set_status:
-                requests.get(url, timeout=TIMEOUT)
+                requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
@@ -1658,7 +1660,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no task with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         task = self.get_task(task_id)
@@ -1670,7 +1672,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/tasks/setErrorTask/{task_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set error status of task: %s with OpenVDM API", task_id)
@@ -1684,13 +1686,13 @@ class OpenVDM():
             collection_system_transfer_id: The collection system transfer's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set collection system transfer: %s to idle with OpenVDM API", collection_system_transfer_id)
             raise exc
@@ -1703,13 +1705,13 @@ class OpenVDM():
             cruise_data_transfer_id: The cruise data transfer's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set cruise data transfer: %s to idle with OpenVDM API", cruise_data_transfer_id)
             raise exc
@@ -1722,13 +1724,13 @@ class OpenVDM():
             task_id: The task's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/tasks/setIdleTask/{task_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set task: %s to idle with OpenVDM API", task_id)
             raise exc
@@ -1744,7 +1746,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1757,7 +1759,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
@@ -1803,7 +1805,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1816,7 +1818,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
@@ -1862,7 +1864,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no task with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         task = self.get_task(task_id)
@@ -1874,7 +1876,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(task.get('longName', 'Unknown Task????'), job_pid, job_handle)
@@ -1892,14 +1894,14 @@ class OpenVDM():
             job_handle: The Gearman job handle.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/gearman/newJob/{job_handle}"
         payload = {'jobName': job_name, 'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to add new gearman task tracking with OpenVDM API, Task: %s", job_name)
             raise exc
@@ -1912,14 +1914,14 @@ class OpenVDM():
             size_in_bytes: Size of the cruise directory, in bytes.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/warehouse/setCruiseSize"
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set cruise size with OpenVDM API")
             raise exc
@@ -1988,14 +1990,14 @@ class OpenVDM():
             size_in_bytes: Size of the lowering directory, in bytes.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/warehouse/setLoweringSize"
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set lowering size with OpenVDM API")
             raise exc
