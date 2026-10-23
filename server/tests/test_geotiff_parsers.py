@@ -13,7 +13,6 @@ Bugs the tests found are strict xfails at the end.
 import json
 import os
 import shutil
-import subprocess
 import sys
 from types import ModuleType, SimpleNamespace
 
@@ -271,30 +270,29 @@ def test_titiler_urls_from_api(titiler, fake_ovdm, monkeypatch) -> None:
     assert parser.cruisedata_path == '/data/CruiseData'
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-@pytest.mark.xfail(strict=True, reason="the GDAL commands' results aren't checked (#573)")
 def test_gdal_command_fails(gdal_parser, geotiff, fake_run, tmp_path, caplog) -> None:
-    """If gdalwarp can't read the file, the error is reported, not an AttributeError on None, and
-    the temporary directory is removed."""
-    fake_run.on('gdalwarp', returncode=1, stderr='ERROR 4: not recognized as a supported file format')
+    """If gdalwarp can't read the file, the parser fails with GDAL's error, not an AttributeError
+    on None, and the temporary directory is removed (#573)."""
+    fake_run.on('gdalwarp', returncode=1, stderr='ERROR 4: not recognized as a supported file format\n')
     gdal_parser.fake_gdal.dataset = False
-    try:
+    with pytest.raises(RuntimeError, match='gdalwarp failed \\(exit status 1\\): ERROR 4: not recognized'):
         gdal_parser.GeoTIFFParser(output_dir=str(tmp_path)).process_file(str(geotiff))
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        assert not isinstance(err, AttributeError), err
     assert 'not recognized as a supported file format' in caplog.text
     assert not os.path.exists(os.path.dirname(fake_run.commands('gdalwarp')[0][4]))
 
 
-@pytest.mark.xfail(strict=True, reason="the GDAL commands' results aren't checked (#573)")
+def test_gdal_cant_open_output(gdal_parser, geotiff, fake_run, tmp_path) -> None:
+    """If GDAL can't open the reprojected GeoTIFF, the parser says so (#573)."""
+    gdal_parser.fake_gdal.dataset = False
+    with pytest.raises(RuntimeError, match='GDAL could not open reprojected GeoTIFF'):
+        gdal_parser.GeoTIFFParser(output_dir=str(tmp_path)).process_file(str(geotiff))
+
+
 def test_gdal_tiles_fail(gdal_parser, geotiff, fake_run, tmp_path) -> None:
-    """If gdal2tiles.py fails (it exits 2 for a GeoTIFF that isn't 8-bit), the parser doesn't point
-    the dashboard at tiles that aren't there."""
-    fake_run.on('gdal2tiles.py', returncode=2, stderr='To scale pixel values you can use: gdal_translate ...')
+    """If gdal2tiles.py fails (it exits 2 for a GeoTIFF that isn't 8-bit, saying so on stdout), the
+    parser fails with that message instead of pointing the dashboard at tiles that aren't there (#573)."""
+    fake_run.on('gdal2tiles.py', returncode=2, stdout='Generating Base Tiles:\nTo scale pixel values you can use: ...\n')
     parser = gdal_parser.GeoTIFFParser(output_dir=str(tmp_path))
-    try:
+    with pytest.raises(RuntimeError, match='gdal2tiles.py failed \\(exit status 2\\): To scale pixel values'):
         parser.process_file(str(geotiff))
-    except subprocess.CalledProcessError:
-        return
-    assert parser.get_plugin_data() is None or not parser.plugin_data['visualizerData']
+    assert parser.get_plugin_data() is None
