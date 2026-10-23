@@ -100,6 +100,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **`OpenVDM.get_required_extra_directory()` and `get_ship_to_shore_transfer()` always failed:** they called API endpoints that don't exist, so they got an error page instead of the record. They now find it by ID in the lists of required extra directories, and of optional and required ship-to-shore transfers. Nothing in OpenVDM calls them, but a site's own scripts may (#592).
 - **Data dashboard crash on a plugin that returns nothing:** a plugin returning `None` for a file, e.g. one without data, crashed Update or Rebuild Data Dashboard, and the job's other files weren't processed. The file is now skipped with "No output from plugin", like an empty result (#581).
 - **Data dashboard update replaced a manifest it couldn't read:** a manifest cut short, e.g. by a full disk, was taken to be empty, and the update wrote a new one listing only its own files, so every other file dropped off the dashboard until a rebuild. The update now fails, leaves the manifest as it is, and says to run Rebuild Data Dashboard (#582).
+- **Stale data types on the data dashboard:** when an update reprocessed a file that no longer had one of its data types (e.g. `gga` and `hdt`, now only `gga`), the manifest kept the entry for the type it lost, pointing at a dashboard file without that data. Those entries are now dropped (#583).
 
 ---
 

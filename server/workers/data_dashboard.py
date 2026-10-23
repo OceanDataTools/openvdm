@@ -580,6 +580,13 @@ def task_update_data_dashboard(worker, current_job):
             if os.path.isfile(dd_json_path):
                 os.remove(dd_json_path)
 
+    # Drop the entries for data types a reprocessed file no longer has (#583)
+    new_types = {}
+    for entry in new_entries:
+        new_types.setdefault(entry['raw_data'], set()).add(entry['type'])
+    existing_entries = [e for e in existing_entries
+                        if e['raw_data'] not in new_types or e['type'] in new_types[e['raw_data']]]
+
     # Update/add new entries (dedupe on raw_data + type so a file with
     # multiple data types keeps a manifest entry for each type)
     for entry in new_entries:

@@ -483,21 +483,23 @@ def test_update_with_unreadable_manifest(worker, cruise, content) -> None:
         assert cruise.manifest.read_text() == content
 
 
-# --- Bugs -----------------------------------------------------------------------
-
-
-
-@pytest.mark.xfail(strict=True, reason="a file's data types it no longer has stay in the manifest (#583)")
 def test_update_drops_old_data_types(worker, cruise) -> None:
-    """A file reprocessed with fewer data types loses the manifest entries for the others."""
+    """A file reprocessed with fewer data types loses the manifest entries for the others (#583)."""
     (cruise.dir / 'SCS/raw/two.txt').write_text('both')
     _update(worker, new=['SCS/raw/two.txt'])
     (cruise.dir / 'SCS/raw/two.txt').rename(cruise.dir / 'SCS/raw/one.gga')
     manifest = [dict(entry, raw_data=entry['raw_data'].replace('two.txt', 'one.gga'),
                      dd_json=entry['dd_json'].replace('two', 'one')) for entry in _manifest(cruise)]
     cruise.manifest.write_text(json.dumps(manifest))
+    _update(worker, new=['SCS/raw/heading.hdt'])
     _update(worker, updated=['SCS/raw/one.gga'])
-    assert [entry['type'] for entry in _manifest(cruise)] == ['gga']
+    # other files' entries are left alone
+    assert sorted((entry['raw_data'].rsplit('/', 1)[-1], entry['type']) for entry in _manifest(cruise)) == [
+        ('heading.hdt', 'hdt'), ('one.gga', 'gga')]
+
+
+# --- Bugs -----------------------------------------------------------------------
+
 
 
 @pytest.mark.xfail(strict=True, reason="the last transfer's progress range ends past 100% (#584)")
