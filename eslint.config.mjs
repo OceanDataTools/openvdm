@@ -144,4 +144,17 @@ export default [
         },
         rules: bugRules,
     },
+    {
+        // The JavaScript tests (#516): Node modules
+        files: ['www/tests/js/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: {console: 'readonly', process: 'readonly', URL: 'readonly'},
+        },
+        linterOptions: {
+            reportUnusedDisableDirectives: 'error',
+        },
+        rules: bugRules,
+    },
 ];

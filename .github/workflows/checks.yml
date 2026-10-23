@@ -1,6 +1,6 @@
 # The checks to run before a PR is merged (#506): the Python tests with
-# coverage, the PHP tests (#515), ruff, and the pre-commit hooks (ruff,
-# ESLint, php -l, PHPStan).
+# coverage, the PHP tests (#515), the JavaScript tests (#516), ruff, and the
+# pre-commit hooks (ruff, ESLint, php -l, PHPStan).
 name: Checks
 
 on:
@@ -75,6 +75,27 @@ jobs:
       - name: PHPUnit
         working-directory: www
         run: vendor/bin/phpunit
+
+  javascript:
+    name: JavaScript tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: www/package-lock.json
+
+      # jsdom is a dev dependency (#516); jQuery is one of the web pages'
+      - name: Install the packages
+        working-directory: www
+        run: npm ci --no-audit --no-fund
+
+      - name: Form helper tests
+        working-directory: www
+        run: npm test
 
   lint:
     name: ruff, ESLint, php -l, PHPStan
