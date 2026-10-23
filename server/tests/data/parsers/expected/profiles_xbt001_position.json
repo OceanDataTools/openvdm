@@ -1,0 +1,27 @@
+{
+  "visualizerData": [
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -74.63517,
+              36.3685
+            ]
+          },
+          "properties": {
+            "cast": "xbt001",
+            "probe type": "Deep Blue",
+            "launch": "2013-06-11T20:48:25Z",
+            "max depth": 56.7
+          }
+        }
+      ]
+    }
+  ],
+  "qualityTests": [],
+  "stats": []
+}

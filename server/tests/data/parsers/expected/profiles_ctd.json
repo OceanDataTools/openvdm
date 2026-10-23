@@ -1,0 +1,352 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1335616500000,
+          9.409
+        ],
+        [
+          1335616505000,
+          10.377
+        ],
+        [
+          1335616510000,
+          12.024
+        ],
+        [
+          1335616515000,
+          13.878
+        ],
+        [
+          1335616520000,
+          15.549
+        ],
+        [
+          1335616525000,
+          17.431
+        ],
+        [
+          1335616530000,
+          19.448
+        ],
+        [
+          1335616535000,
+          21.577
+        ],
+        [
+          1335616540000,
+          23.444
+        ]
+      ],
+      "unit": "m",
+      "label": "Depth"
+    },
+    {
+      "data": [
+        [
+          1335616500000,
+          9.472
+        ],
+        [
+          1335616505000,
+          10.446
+        ],
+        [
+          1335616510000,
+          12.105
+        ],
+        [
+          1335616515000,
+          13.97
+        ],
+        [
+          1335616520000,
+          15.653
+        ],
+        [
+          1335616525000,
+          17.548
+        ],
+        [
+          1335616530000,
+          19.579
+        ],
+        [
+          1335616535000,
+          21.722
+        ],
+        [
+          1335616540000,
+          23.601
+        ]
+      ],
+      "unit": "db",
+      "label": "Pressure"
+    },
+    {
+      "data": [
+        [
+          1335616500000,
+          28.6795
+        ],
+        [
+          1335616505000,
+          28.6287
+        ],
+        [
+          1335616510000,
+          28.4089
+        ],
+        [
+          1335616515000,
+          27.3192
+        ],
+        [
+          1335616520000,
+          26.2631
+        ],
+        [
+          1335616525000,
+          23.279
+        ],
+        [
+          1335616530000,
+          22.316
+        ],
+        [
+          1335616535000,
+          22.1245
+        ],
+        [
+          1335616540000,
+          22.0916
+        ]
+      ],
+      "unit": "C",
+      "label": "Temperature"
+    },
+    {
+      "data": [
+        [
+          1335616500000,
+          5.81619
+        ],
+        [
+          1335616505000,
+          5.80999
+        ],
+        [
+          1335616510000,
+          5.7863
+        ],
+        [
+          1335616515000,
+          5.67817
+        ],
+        [
+          1335616520000,
+          5.57575
+        ],
+        [
+          1335616525000,
+          5.29226
+        ],
+        [
+          1335616530000,
+          5.19377
+        ],
+        [
+          1335616535000,
+          5.17368
+        ],
+        [
+          1335616540000,
+          5.16983
+        ]
+      ],
+      "unit": "S/m",
+      "label": "Conductivity"
+    },
+    {
+      "data": [
+        [
+          1335616500000,
+          35.8388
+        ],
+        [
+          1335616505000,
+          35.8338
+        ],
+        [
+          1335616510000,
+          35.8342
+        ],
+        [
+          1335616515000,
+          35.9025
+        ],
+        [
+          1335616520000,
+          35.9846
+        ],
+        [
+          1335616525000,
+          36.2563
+        ],
+        [
+          1335616530000,
+          36.2877
+        ],
+        [
+          1335616535000,
+          36.2889
+        ],
+        [
+          1335616540000,
+          36.2854
+        ]
+      ],
+      "unit": "PSU",
+      "label": "Salinity"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "XMLCON NMEA Position",
+      "results": "Passed"
+    },
+    {
+      "testName": "HEX Header Position",
+      "results": "Passed"
+    },
+    {
+      "testName": "HEX Scan Positions",
+      "results": "Passed"
+    },
+    {
+      "testName": "HEX Lost Scans",
+      "results": "Passed"
+    },
+    {
+      "testName": "Ranges",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        960,
+        1
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2012-04-28T12:35:00+00:00",
+        "2012-04-28T12:35:40+00:00"
+      ]
+    },
+    {
+      "statName": "Depth",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        9.409,
+        24.31
+      ]
+    },
+    {
+      "statName": "Pressure",
+      "statType": "bounds",
+      "statUnit": "db",
+      "statValue": [
+        9.472,
+        24.473
+      ]
+    },
+    {
+      "statName": "Pressure Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        960,
+        0
+      ]
+    },
+    {
+      "statName": "Temperature",
+      "statType": "bounds",
+      "statUnit": "C",
+      "statValue": [
+        22.0824,
+        28.6795
+      ]
+    },
+    {
+      "statName": "Temperature Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        960,
+        0
+      ]
+    },
+    {
+      "statName": "Conductivity",
+      "statType": "bounds",
+      "statUnit": "S/m",
+      "statValue": [
+        5.1688,
+        5.81619
+      ]
+    },
+    {
+      "statName": "Conductivity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        960,
+        0
+      ]
+    },
+    {
+      "statName": "Salinity",
+      "statType": "bounds",
+      "statUnit": "PSU",
+      "statValue": [
+        35.8133,
+        36.4223
+      ]
+    },
+    {
+      "statName": "Salinity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        960,
+        0
+      ]
+    },
+    {
+      "statName": "Geographic Bounds",
+      "statType": "geoBounds",
+      "statUnit": "ddeg",
+      "statValue": [
+        27.5629,
+        -93.7723,
+        27.5629,
+        -93.77246
+      ]
+    }
+  ]
+}
