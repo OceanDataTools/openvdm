@@ -1,0 +1,309 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          -0.5
+        ],
+        [
+          1790812860000,
+          -0.98
+        ],
+        [
+          1790812920000,
+          -0.733
+        ],
+        [
+          1790812980000,
+          -1.22
+        ],
+        [
+          1790813040000,
+          -1.82
+        ]
+      ],
+      "unit": "deg",
+      "label": "Roll (Min)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          1.66
+        ],
+        [
+          1790812860000,
+          0.463
+        ],
+        [
+          1790812920000,
+          5.223
+        ],
+        [
+          1790812980000,
+          0.191
+        ],
+        [
+          1790813040000,
+          -0.5
+        ]
+      ],
+      "unit": "deg",
+      "label": "Roll (Max)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.5
+        ],
+        [
+          1790812860000,
+          0.617
+        ],
+        [
+          1790812920000,
+          0.489
+        ],
+        [
+          1790812980000,
+          -0.322
+        ],
+        [
+          1790813040000,
+          1.595
+        ]
+      ],
+      "unit": "deg",
+      "label": "Pitch (Min)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          1.04
+        ],
+        [
+          1790812860000,
+          0.944
+        ],
+        [
+          1790812920000,
+          1.007
+        ],
+        [
+          1790812980000,
+          0.024
+        ],
+        [
+          1790813040000,
+          1.792
+        ]
+      ],
+      "unit": "deg",
+      "label": "Pitch (Max)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.0
+        ],
+        [
+          1790812860000,
+          -0.208
+        ],
+        [
+          1790812920000,
+          -0.078
+        ],
+        [
+          1790812980000,
+          -0.341
+        ],
+        [
+          1790813040000,
+          -0.26
+        ]
+      ],
+      "unit": "m",
+      "label": "Heave (Min)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          0.63
+        ],
+        [
+          1790812860000,
+          0.208
+        ],
+        [
+          1790812920000,
+          0.411
+        ],
+        [
+          1790812980000,
+          0.053
+        ],
+        [
+          1790813040000,
+          0.05
+        ]
+      ],
+      "unit": "m",
+      "label": "Heave (Max)"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.221
+        ],
+        [
+          1790812920000,
+          3.3
+        ],
+        [
+          1790812980000,
+          355.794
+        ],
+        [
+          1790813040000,
+          2.043
+        ]
+      ],
+      "unit": "deg",
+      "label": "Heading"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Roll",
+      "results": "Passed"
+    },
+    {
+      "testName": "Pitch",
+      "results": "Passed"
+    },
+    {
+      "testName": "Heading",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Roll Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        -4.46,
+        25.0
+      ]
+    },
+    {
+      "statName": "Roll Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Pitch Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        -0.99,
+        1.99
+      ]
+    },
+    {
+      "statName": "Pitch Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Heading Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.63,
+        359.81
+      ]
+    },
+    {
+      "statName": "Heading Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Heave Bounds",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        -0.78,
+        0.78
+      ]
+    }
+  ]
+}

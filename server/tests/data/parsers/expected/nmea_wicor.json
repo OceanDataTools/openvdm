@@ -1,0 +1,244 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          6.7
+        ],
+        [
+          1790812860000,
+          7.1
+        ],
+        [
+          1790812920000,
+          7.0
+        ],
+        [
+          1790812980000,
+          6.0
+        ],
+        [
+          1790813100000,
+          7.9
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Relative Wind Speed"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          5.3
+        ],
+        [
+          1790812860000,
+          5.7
+        ],
+        [
+          1790812920000,
+          5.6
+        ],
+        [
+          1790812980000,
+          4.6
+        ],
+        [
+          1790813100000,
+          6.5
+        ]
+      ],
+      "unit": "m/s",
+      "label": "Relative Wind Speed 2"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          6.7
+        ],
+        [
+          1790812860000,
+          6.7
+        ],
+        [
+          1790812920000,
+          6.7
+        ],
+        [
+          1790812980000,
+          6.7
+        ],
+        [
+          1790813100000,
+          6.7
+        ]
+      ],
+      "unit": "m/s",
+      "label": "True Wind Speed"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          5.3
+        ],
+        [
+          1790812860000,
+          5.3
+        ],
+        [
+          1790812920000,
+          5.3
+        ],
+        [
+          1790812980000,
+          5.3
+        ],
+        [
+          1790813100000,
+          5.3
+        ]
+      ],
+      "unit": "m/s",
+      "label": "True Wind Speed 2"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Relative Wind Speed",
+      "results": "Passed"
+    },
+    {
+      "testName": "Relative Wind Speed 2",
+      "results": "Passed"
+    },
+    {
+      "testName": "True Wind Speed",
+      "results": "Passed"
+    },
+    {
+      "testName": "True Wind Speed 2",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:04:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        95.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity (<= 60 s)",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Relative Wind Speed Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        5.2,
+        8.2
+      ]
+    },
+    {
+      "statName": "Relative Wind Speed Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Relative Wind Speed 2 Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        3.8,
+        6.8
+      ]
+    },
+    {
+      "statName": "Relative Wind Speed 2 Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "True Wind Speed Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        6.7,
+        6.7
+      ]
+    },
+    {
+      "statName": "True Wind Speed Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "True Wind Speed 2 Bounds",
+      "statType": "bounds",
+      "statUnit": "m/s",
+      "statValue": [
+        5.3,
+        5.3
+      ]
+    },
+    {
+      "statName": "True Wind Speed 2 Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}

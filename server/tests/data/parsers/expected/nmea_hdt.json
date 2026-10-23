@@ -1,0 +1,100 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.221
+        ],
+        [
+          1790812920000,
+          359.163
+        ],
+        [
+          1790812980000,
+          355.794
+        ],
+        [
+          1790813040000,
+          2.043
+        ]
+      ],
+      "unit": "deg",
+      "label": "Heading True"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Warning"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Heading True",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        5
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Heading True Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.63,
+        365.0
+      ]
+    },
+    {
+      "statName": "Heading True Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    }
+  ]
+}

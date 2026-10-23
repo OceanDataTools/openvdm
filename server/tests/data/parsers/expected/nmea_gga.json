@@ -1,0 +1,185 @@
+{
+  "visualizerData": [
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -93.52067823,
+                26.5852658
+              ],
+              [
+                -93.52138576,
+                26.58794138
+              ],
+              [
+                -93.52212258,
+                26.59073704
+              ],
+              [
+                -93.52261329,
+                26.59259783
+              ]
+            ]
+          },
+          "properties": {
+            "coordTimes": [
+              1335571260000,
+              1335571320000,
+              1335571380000,
+              1335571440000
+            ],
+            "name": "nmea/gga.txt"
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -93.53273183,
+                26.630445
+              ]
+            ]
+          },
+          "properties": {
+            "coordTimes": [
+              1335572220000
+            ],
+            "name": "nmea/gga.txt"
+          }
+        }
+      ]
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Velocity",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        43,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2012-04-28T00:00:06.109000+00:00",
+        "2012-04-28T00:16:56.122000+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        4.984,
+        805.01
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Geographic Bounds",
+      "statType": "geoBounds",
+      "statUnit": "ddeg",
+      "statValue": [
+        26.6307905,
+        -93.52037117,
+        26.58410217,
+        -93.53281733
+      ]
+    },
+    {
+      "statName": "Velocity Bounds",
+      "statType": "bounds",
+      "statUnit": "kts",
+      "statValue": [
+        9.826,
+        10.59
+      ]
+    },
+    {
+      "statName": "Velocity Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Distance Traveled",
+      "statType": "totalValue",
+      "statUnit": "nm",
+      "statValue": [
+        2.882
+      ]
+    },
+    {
+      "statName": "Number of Satellites",
+      "statType": "bounds",
+      "statUnit": "sats",
+      "statValue": [
+        8,
+        10
+      ]
+    },
+    {
+      "statName": "Horizontal Degree of Precision",
+      "statType": "bounds",
+      "statUnit": "",
+      "statValue": [
+        1.0,
+        1.1
+      ]
+    },
+    {
+      "statName": "Altitude",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        1.19,
+        1.98
+      ]
+    },
+    {
+      "statName": "Height WGS84",
+      "statType": "bounds",
+      "statUnit": "m",
+      "statValue": [
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

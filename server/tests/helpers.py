@@ -21,6 +21,9 @@ from server.lib.openvdm import OpenVDM
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# The parsers' test inputs, and their expected output in expected/ (#513)
+PARSER_DATA = ROOT / 'server' / 'tests' / 'data' / 'parsers'
+
 # A job result that passes, as the workers return them
 PASS = json.dumps({'parts': [{'partName': 'Done', 'result': 'Pass'}]})
 
@@ -214,3 +217,28 @@ def gnu_rsync() -> bool:
     except OSError:
         return False
     return output.startswith('rsync  version 3')
+
+
+def check_expected(name: str, actual, update: bool = False) -> None:
+    """Compare a parser's output with its saved expected output (#513).
+
+    Args:
+        name: The expected output's name: ``PARSER_DATA/expected/<name>.json``.
+        actual: The parser's output, as ``get_plugin_data()`` returns it.
+        update: Save *actual* as the expected output instead, for a change to
+            a parser's output that's intended (``pytest --update-expected``),
+            so the change shows in the diff.
+
+    Raises:
+        AssertionError: If *actual* differs from the expected output, or
+            there's none saved.
+    """
+    path = PARSER_DATA / 'expected' / f'{name}.json'
+    actual = json.loads(json.dumps(actual))  # as saved: tuples become lists
+    if update:
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps(actual, indent=2) + '\n', encoding='utf-8')
+        return
+    assert path.exists(), f"No expected output {path.name}: run pytest with --update-expected"
+    assert actual == json.loads(path.read_text(encoding='utf-8')), \
+        f"Output differs from {path.name}; if that's intended, run pytest with --update-expected"

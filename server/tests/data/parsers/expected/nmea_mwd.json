@@ -1,0 +1,244 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          358.0
+        ],
+        [
+          1790812860000,
+          359.47
+        ],
+        [
+          1790812920000,
+          359.7
+        ],
+        [
+          1790812980000,
+          355.35
+        ],
+        [
+          1790813040000,
+          2.87
+        ]
+      ],
+      "unit": "deg",
+      "label": "Direction True"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          346.0
+        ],
+        [
+          1790812860000,
+          347.47
+        ],
+        [
+          1790812920000,
+          347.7
+        ],
+        [
+          1790812980000,
+          343.35
+        ],
+        [
+          1790813040000,
+          350.87
+        ]
+      ],
+      "unit": "deg",
+      "label": "Direction Mag."
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          15.0
+        ],
+        [
+          1790812860000,
+          15.98
+        ],
+        [
+          1790812920000,
+          22.12
+        ],
+        [
+          1790812980000,
+          13.24
+        ],
+        [
+          1790813040000,
+          18.23
+        ]
+      ],
+      "unit": "kts",
+      "label": "Speed"
+    },
+    {
+      "data": [
+        [
+          1790812800000,
+          7.7
+        ],
+        [
+          1790812860000,
+          8.22
+        ],
+        [
+          1790812920000,
+          11.4
+        ],
+        [
+          1790812980000,
+          6.81
+        ],
+        [
+          1790813040000,
+          9.4
+        ]
+      ],
+      "unit": "mph",
+      "label": "Speed"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Warning"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Speed, kts",
+      "results": "Passed"
+    },
+    {
+      "testName": "Speed, mph",
+      "results": "Passed"
+    },
+    {
+      "testName": "Direction, True",
+      "results": "Passed"
+    },
+    {
+      "testName": "Direction, Magnetic",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        5
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00.000000Z",
+        "2026-10-01T00:03:55.000000Z"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        35.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Direction True Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        0.2,
+        359.1
+      ]
+    },
+    {
+      "statName": "Direction True Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Direction Magnetic Bounds",
+      "statType": "bounds",
+      "statUnit": "deg",
+      "statValue": [
+        340.0,
+        358.0
+      ]
+    },
+    {
+      "statName": "Direction Magnetic Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    },
+    {
+      "statName": "Speed Knots Bounds",
+      "statType": "bounds",
+      "statUnit": "kts",
+      "statValue": [
+        11.0,
+        95.0
+      ]
+    },
+    {
+      "statName": "Speed Knots Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        41,
+        1
+      ]
+    },
+    {
+      "statName": "Speed MPH Bounds",
+      "statType": "bounds",
+      "statUnit": "mph",
+      "statValue": [
+        5.7,
+        48.9
+      ]
+    },
+    {
+      "statName": "Speed MPH Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}
