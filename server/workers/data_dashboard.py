@@ -641,7 +641,7 @@ def task_rebuild_data_dashboard(worker, current_job):
     manifest_entries = []
     plugin_load_failures = []
     active_csts = worker.ovdm.get_active_collection_system_transfers()
-    for idx, cst in enumerate(active_csts, 1):
+    for idx, cst in enumerate(active_csts):
         # A plugin that won't load fails its own transfer; the rest are still rebuilt
         try:
             plugin_callable, get_source_files = worker._get_plugin_functions(cfg=cst)
@@ -666,6 +666,7 @@ def task_rebuild_data_dashboard(worker, current_job):
                 cst_dir = os.path.join(worker.cruise_dir, worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'])
                 filelist.extend([os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'], f) for f in build_filelist(cst_dir).get('include', [])])
 
+        # the transfers share 10-90%, in order (#584)
         start = int(80 * idx / len(active_csts) + 10)
         end = int(80 * (idx + 1) / len(active_csts) + 10)
         new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end,
