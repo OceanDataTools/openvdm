@@ -591,7 +591,7 @@ def task_rebuild_data_dashboard(worker, current_job):
     manifest_entries = []
     plugin_load_failures = []
     active_csts = worker.ovdm.get_active_collection_system_transfers()
-    for idx, cst in enumerate(active_csts, 1):
+    for idx, cst in enumerate(active_csts):
         # A plugin that won't load fails its own transfer; the rest are still rebuilt
         try:
             plugin_callable, get_source_files = worker._get_plugin_functions(cfg=cst)
