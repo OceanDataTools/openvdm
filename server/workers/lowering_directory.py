@@ -175,6 +175,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         """
         self.stop = False
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
@@ -182,8 +186,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(

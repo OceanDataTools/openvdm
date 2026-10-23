@@ -306,6 +306,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+        if not self.task:
+            return self._fail_job(current_job, "Retrieve task", "Task not found")
+
         try:
             self.job_data = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
@@ -313,10 +319,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
-        if not self.task:
-            return self._fail_job(current_job, "Retrieve task", "Task not found")
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -410,7 +412,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if final_verdict == "Fail":
             reason = final_part.get('reason', 'Unknown failure')
-            if int(self.task['taskID']) > 0:
+            if not self.task:
+                # Not a task OpenVDM knows, so there's no status to set (#544)
+                self.ovdm.send_msg(f"{current_job.task} failed", reason)
+            elif int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
                 self.ovdm.send_msg(f"{self.task['longName']} failed", reason)

@@ -160,7 +160,6 @@ def test_job_needs_a_lowering(worker, api) -> None:
     api.set_error_task.assert_called_once_with(6, 'Lowering ID is undefined')
 
 
-@pytest.mark.xfail(strict=True, reason="#544: the task isn't looked up before the payload")
 def test_bad_payload(worker) -> None:
     """A payload that isn't JSON fails the job."""
     result = worker.on_job_execute(SimpleNamespace(data='not json', handle='H:1', task='exportLoweringConfig'))
@@ -193,7 +192,6 @@ def test_post_hooks(worker, api, fake_gearman, task) -> None:
     api.set_idle_task.assert_called_once_with(6)
 
 
-@pytest.mark.xfail(strict=True, reason='#547: with no hooks, on_job_complete() runs the job again')
 @pytest.mark.parametrize('task', ['setupNewLowering', 'finalizeCurrentLowering'])
 def test_without_post_hooks_completes(worker, api, gearman_base, monkeypatch, task) -> None:
     """With no hooks for the task, the job completes instead of running again."""
@@ -320,16 +318,19 @@ def test_export_lowering_config_unreadable(worker, lowering_dir) -> None:
     _config_file(lowering_dir).write_text('{}')
     _config_file(lowering_dir).chmod(0)
     _setup(worker)
-    assert worker.export_lowering_config() == {
-        'verdict': False, 'reason': 'Unable to read configuration file: lowering_config.json'}
+    assert worker.export_lowering_config()['reason'].startswith(
+        'Unable to read the existing configuration file lowering_config.json: [Errno 13] Permission denied')
 
 
-@pytest.mark.xfail(strict=True, reason="#548: a config file that isn't JSON raises")
-def test_export_lowering_config_not_json(worker, lowering_dir) -> None:
-    """An existing config file that isn't JSON is replaced (or fails the export), not a crash."""
-    _config_file(lowering_dir).write_text('{truncated')
+@pytest.mark.parametrize('text', ['{truncated', '[]'])
+def test_export_lowering_config_not_json(worker, lowering_dir, text) -> None:
+    """An existing config file that isn't a JSON object fails the export, keeping its finalized date (#548)."""
+    _config_file(lowering_dir).write_text(text)
     _setup(worker)
-    assert 'verdict' in worker.export_lowering_config()
+    result = worker.export_lowering_config()
+    assert result['verdict'] is False
+    assert result['reason'].startswith('Unable to read the existing configuration file lowering_config.json: ')
+    assert _config_file(lowering_dir).read_text() == text
 
 
 def test_export_lowering_config_write_fails(worker, monkeypatch, lowering_dir) -> None:

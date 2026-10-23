@@ -314,13 +314,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             The job's result, or a failed-job result if its payload can't be read.
         """
         self.stop = False
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self.get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
         try:
             payload_obj = json.loads(current_job.data)
             logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             return self._fail_job(current_job, "Retrieve job data", "Failed to parse current job payload")
-
-        self.task = self.get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
 
         # Configure logging
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -409,12 +411,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             The base ``GearmanWorker`` completion result.
         """
         try:
-            payload_obj = json.loads(current_job.data)
             results = json.loads(job_result)
         except Exception as exc:
-            logging.error("Failed to parse job data or results: %s", exc)
+            logging.error("Failed to parse job results: %s", exc)
             results = {'parts': [], 'files': {}}
-            payload_obj = {}
+
+        # Parsed separately, so a payload that can't be parsed still fails the
+        # task; its job runs no hook tasks (#544)
+        try:
+            payload_obj = json.loads(current_job.data)
+        except Exception:
+            payload_obj = None
 
         job_data = {
             'cruiseID': self.cruise_id,
@@ -425,7 +432,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
         # Handle task-specific post-processing
-        if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
+        if payload_obj is None:
+            logging.info("No post-tasks: the job's payload couldn't be parsed")
+        elif current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
             job_data['collectionSystemTransferID'] = payload_obj.get('collectionSystemTransferID')
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post-task: %s", task)
