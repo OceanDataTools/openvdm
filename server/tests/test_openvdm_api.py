@@ -181,7 +181,8 @@ def test_vessel_config(ovdm) -> None:
     assert ovdm.get_vessel_config() == {}
 
 
-@pytest.mark.parametrize('key, headers', [(TOKEN, {'X-Worker-Token': TOKEN}), ('', {}), (None, {})])
+@pytest.mark.parametrize('key, headers', [(TOKEN, {'X-Worker-Token': TOKEN}), ('', {}), (None, {}),
+                                         (openvdm.WORKER_API_KEY_PLACEHOLDER, {})])
 def test_worker_headers(ovdm, key, headers) -> None:
     """The worker token header is sent only when workerApiKey is set."""
     if key is None:
@@ -189,6 +190,21 @@ def test_worker_headers(ovdm, key, headers) -> None:
     else:
         ovdm.config['workerApiKey'] = key
     assert ovdm._worker_headers() == headers
+
+
+def test_placeholder_worker_key_warned_once(ovdm, monkeypatch, caplog) -> None:
+    """The placeholder worker key isn't sent, and a warning says to set a real one, once (#605)."""
+    monkeypatch.setattr(openvdm.OpenVDM, '_warned_placeholder_key', False)
+    ovdm.config['workerApiKey'] = openvdm.WORKER_API_KEY_PLACEHOLDER
+    assert ovdm._worker_headers() == {}
+    assert ovdm._worker_headers() == {}
+    assert caplog.text.count('workerApiKey in openvdm.yaml is still the placeholder') == 1
+
+
+def test_placeholder_is_openvdm_yaml_dists() -> None:
+    """The placeholder is openvdm.yaml.dist's workerApiKey."""
+    assert openvdm.OpenVDM.read_config(str(ROOT / 'server' / 'etc' / 'openvdm.yaml.dist'))['workerApiKey'] == \
+        openvdm.WORKER_API_KEY_PLACEHOLDER
 
 
 # --- Getters --------------------------------------------------------------------
