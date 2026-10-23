@@ -879,7 +879,10 @@ class OpenVDM():
 
 
     def get_required_extra_directory(self, extra_directory_id):
-        """Return the required extra directory with the given ID from the OpenVDM API.
+        """Return the required extra directory with the given ID.
+
+        The API has no endpoint for one required extra directory, so it's
+        found in ``get_required_extra_directories()`` (#592).
 
         Args:
             extra_directory_id: The required extra directory's ID.
@@ -893,15 +896,8 @@ class OpenVDM():
                 JSON.
         """
 
-        url = f"{self.config['siteRoot']}api/extraDirectories/getRequiredExtraDirectory/{extra_directory_id}"
-
-        try:
-            req = requests.get(url, timeout=TIMEOUT)
-            return_obj = json.loads(req.text)
-            return next(iter(return_obj), None)
-        except Exception as exc:
-            logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
-            raise exc
+        return next((d for d in self.get_required_extra_directories()
+                     if str(d['extraDirectoryID']) == str(extra_directory_id)), None)
 
 
     def get_required_extra_directory_by_name(self, extra_directory_name):
@@ -985,7 +981,11 @@ class OpenVDM():
 
 
     def get_ship_to_shore_transfer(self, ship_to_shore_transfer_id):
-        """Return the ship-to-shore transfer with the given ID from the OpenVDM API.
+        """Return the ship-to-shore transfer with the given ID, required or not.
+
+        The API has no endpoint for one ship-to-shore transfer, so it's found
+        in ``get_ship_to_shore_transfers()`` and
+        ``get_required_ship_to_shore_transfers()`` (#592).
 
         Args:
             ship_to_shore_transfer_id: The ship-to-shore transfer's ID.
@@ -999,15 +999,8 @@ class OpenVDM():
                 JSON.
         """
 
-        url = f"{self.config['siteRoot']}api/shipToShoreTransfers/getShipToShoreTransfer/{ship_to_shore_transfer_id}"
-
-        try:
-            req = requests.get(url, timeout=TIMEOUT)
-            return_obj = json.loads(req.text)
-            return next(iter(return_obj), None)
-        except Exception as exc:
-            logging.error("Unable to retrieve ship-to-shore transfer: %s from OpenVDM API", ship_to_shore_transfer_id)
-            raise exc
+        return next((t for t in self.get_ship_to_shore_transfers() + self.get_required_ship_to_shore_transfers()
+                     if str(t['shipToShoreTransferID']) == str(ship_to_shore_transfer_id)), None)
 
 
     def get_ship_to_shore_transfers(self):

@@ -97,6 +97,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **The placeholder worker API key was accepted:** a site that kept `change-me-to-a-strong-random-value` as its worker key, which anyone can read in the source, gave every transfer's passwords to any request that sent it. The API now refuses the placeholder, and the workers don't send it: they log a warning saying to set a real key (#605).
 - **API errors ignored when setting a status:** the `OpenVDM` methods that set a transfer's or task's status, post a message, track a Gearman job, set the cruise or lowering size, or clear an error only noticed when the API couldn't be reached. An error response, such as a 404 for a missing route or a 500 from a PHP error, was ignored, and the worker carried on as if it had worked. They now raise on an error response, as the cruise and lowering extent setters already did (#594).
 - **`OpenVDM.clear_error_task()` never cleared an error:** it compared the task's status with the string `'3'`, but the API sends it as the number 3, so a task in error was never set idle. Nothing in OpenVDM calls it, but a site's own scripts may (#593).
+- **`OpenVDM.get_required_extra_directory()` and `get_ship_to_shore_transfer()` always failed:** they called API endpoints that don't exist, so they got an error page instead of the record. They now find it by ID in the lists of required extra directories, and of optional and required ship-to-shore transfers. Nothing in OpenVDM calls them, but a site's own scripts may (#592).
 
 ---
 
