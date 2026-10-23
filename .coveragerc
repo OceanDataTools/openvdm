@@ -3,8 +3,12 @@
 source =
     server
     bin
+    utils
 omit =
     server/tests/*
+    # A development FTP server for the sample data's FTP transfers, installed
+    # only with the sample data
+    utils/sample_ftp_server.py
     # A site's own copies of the .dist files (ignored by git), so local
     # coverage matches CI's
     bin/*.py
@@ -19,4 +23,4 @@ exclude_also =
 # The coverage when this was set; CI fails below it. Raise it as tests are
 # added, never lower it. coverage.py only finds .py files that no test ran,
 # so a .py.dist parser, plugin or bin/ script counts once a test loads it.
-fail_under = 96
+fail_under = 97
