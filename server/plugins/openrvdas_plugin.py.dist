@@ -98,9 +98,8 @@ class OpenRVDASPlugin(OpenVDMPlugin):
         for data_type, parser in parsers:
             try:
                 parser.parse(filepath)
-                plugin_data = parser.get_plugin_data()
-                if plugin_data is not None:
-                    results[data_type] = plugin_data
+                if parser.plugin_data:
+                    results[data_type] = parser.plugin_data
             except Exception as exc:
                 logging.exception("Parser '%s' failed for file '%s': %s", data_type, filepath, exc)
         return results
