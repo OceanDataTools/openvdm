@@ -123,6 +123,8 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **PAR2 parser's irradiance units:** long- and short-wave irradiance were charted in `μE/cm2sec`, a PAR unit, and their stats had none. Both are now in W/m² (#568).
 - **SSV parser reported SV Validity twice:** the first only checked the upper limit, so the two disagreed for a value below it. Only the one checking both limits is left. The SSV and SBE38 parsers no longer take the `sbe38` argument they didn't use; a site plugin passing it gets a `TypeError` (#569).
 - **CTD profile parser counted a short scan as lost scans:** it read a scan's scan count before checking its length, so one line cut short looked like hundreds of lost scans and failed HEX Lost Scans. The count now comes only from whole scans; the short line is still a bad row (#571).
+- **Writing a parser: `RecursionError` instead of a clear error:** a parser that implemented neither `parse()` nor `process_file()`, or whose `parse()` called `super().parse()`, made the base class's `parse()` and `process_file()` call each other until Python gave up. It now raises "<Parser> must implement parse() or process_file()" (#533).
+- **Trackline scripts: unclear errors for some position sources:** a source given as a bare name (e.g. `PositionSources: [gps]`) failed with an `AttributeError`, and an empty list with an `IndexError` when the extent source was chosen. Both now say what's wrong, like the other mistakes in the position sources YAML (#537).
 
 ---
 

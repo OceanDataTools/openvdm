@@ -182,11 +182,6 @@ def test_parse_new_style() -> None:
     assert parser.process_file('b.txt')['stats'][-1]['statName'] == 'b.txt'
 
 
-def test_base_parse_dispatches_to_the_override() -> None:
-    """Calling the base class's parse() on a parser that overrides it runs the override."""
-    assert op.OpenVDMParser.parse(NewStyleParser([], []), 'c.txt')['stats'][0]['statName'] == 'c.txt'
-
-
 def test_parse_legacy() -> None:
     """parse() runs a legacy parser's process_file() and returns plugin_data, or what it returns."""
     assert LegacyParser().parse('a.txt')['stats'][0]['statType'] == 'rowValidity'
@@ -201,13 +196,21 @@ def test_parse_legacy_with_empty_plugin_data() -> None:
     assert parser.parse('a.txt') is None
 
 
-@pytest.mark.xfail(strict=True, raises=RecursionError,
-                   reason="#533: parse() and the base process_file() call each other, so the "
-                          "NotImplementedError for a parser implementing neither is never reached")
 def test_parser_implementing_neither_method() -> None:
-    """A parser with neither parse() nor process_file() says what's missing."""
+    """A parser with neither parse() nor process_file() says what's missing, not RecursionError (#533)."""
     with pytest.raises(NotImplementedError, match='must implement parse'):
         op.OpenVDMParser().parse('a.txt')
+    with pytest.raises(NotImplementedError, match='OpenVDMParser must implement parse'):
+        op.OpenVDMParser().process_file('a.txt')
+
+
+def test_parse_calling_super() -> None:
+    """A parser whose parse() calls super().parse() gets the NotImplementedError, not RecursionError (#533)."""
+    class SuperParser(op.OpenVDMParser):
+        def parse(self, filepath):
+            return super().parse(filepath)
+    with pytest.raises(NotImplementedError, match='SuperParser must implement parse'):
+        SuperParser().parse('a.txt')
 
 
 # --- NMEA checks --------------------------------------------------------------

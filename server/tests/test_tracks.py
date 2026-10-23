@@ -199,6 +199,8 @@ def test_load_position_sources_from_a_file(tmp_path) -> None:
     ('PositionSources: [{device: gps}]', "exactly one 'device' and one 'type'"),
     ('PositionSources: [{device: gps, type: a}, {device: gps, type: b}]', 'Duplicate position source device: gps'),
     ('PositionSources: [{device: a, type: gga}, {device: b, type: gga}]', 'Manifest type reused across devices'),
+    ('PositionSources: [gps]', "exactly one 'device' and one 'type'"),   # #537
+    ('PositionSources: []', 'must list at least one source'),             # #537
 ])
 def test_load_position_sources_errors(yaml_str, message) -> None:
     """Every problem with the YAML is a RuntimeError that says what's wrong."""
