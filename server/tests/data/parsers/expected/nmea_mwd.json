@@ -101,7 +101,7 @@
           9.4
         ]
       ],
-      "unit": "mph",
+      "unit": "m/s",
       "label": "Speed"
     }
   ],
@@ -119,7 +119,7 @@
       "results": "Passed"
     },
     {
-      "testName": "Speed, mph",
+      "testName": "Speed, m/s",
       "results": "Passed"
     },
     {
@@ -138,7 +138,7 @@
       "statUnit": "",
       "statValue": [
         42,
-        5
+        6
       ]
     },
     {
@@ -223,21 +223,21 @@
       ]
     },
     {
-      "statName": "Speed MPH Bounds",
+      "statName": "Speed m/s Bounds",
       "statType": "bounds",
-      "statUnit": "mph",
+      "statUnit": "m/s",
       "statValue": [
         5.7,
         48.9
       ]
     },
     {
-      "statName": "Speed MPH Validity",
+      "statName": "Speed m/s Validity",
       "statType": "valueValidity",
       "statUnit": "",
       "statValue": [
-        42,
-        0
+        41,
+        1
       ]
     }
   ]

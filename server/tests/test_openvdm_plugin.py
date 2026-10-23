@@ -285,6 +285,15 @@ def test_read_lines(data_file) -> None:
     assert lines[0] == (1, '2026-10-22T10:00:00.000Z', '$GPGGA')
 
 
+def test_read_lines_errors(data_file) -> None:
+    """Lines without a timestamp or payload are added to the errors list given, so the parser
+    counts them as bad rows (#534, #554); comments and blank lines aren't."""
+    errors = []
+    lines = _read(op.OpenVDMCSVParser([], []), data_file, errors=errors)
+    assert [lineno for lineno, _, _ in lines] == [1, 2, 5, 6]
+    assert errors == [4, 7]
+
+
 @pytest.mark.parametrize('nmea_filter, expected', [
     ('GGA', [1]),
     ('gga', [1]),

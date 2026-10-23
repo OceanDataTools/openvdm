@@ -40,7 +40,7 @@ class ParoParser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 field_data = dict(zip(FIELDS, fields))
                 try:
                     depth = float(field_data['depth']) if field_data.get('depth') else None
