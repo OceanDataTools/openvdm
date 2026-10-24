@@ -32,6 +32,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+from server.lib.placeholders import fill_placeholders
 from server.lib.transfer_utils import redact_payload
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
@@ -343,7 +344,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
         self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj.get('collectionSystemTransferID')) if 'collectionSystemTransferID' in payload_obj else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
+        dashboard_dest_dir = fill_placeholders(self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'],
+                                               self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+        self.data_dashboard_dir = os.path.join(self.cruise_dir, dashboard_dest_dir.strip('/'))
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
 
         if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD'] and not self.collection_system_transfer:
@@ -614,6 +617,34 @@ def task_update_data_dashboard(worker, current_job):
     return json.dumps(job_results)
 
 
+def _transfer_dirs(worker, cst):
+    """Return the directories a transfer's files are in, relative to the cruise directory.
+
+    Placeholders in ``destDir`` are filled in as the transfer does: a lowering
+    transfer, or a cruise transfer whose ``destDir`` has ``{loweringID}``, has
+    a directory for each lowering (#635). A ``destDir`` of ``/`` is the cruise
+    (or lowering) directory itself (#629).
+
+    Args:
+        worker: The worker, set up for the job.
+        cst: The collection system transfer's configuration.
+
+    Returns:
+        list[str]: The directories, ``''`` for the cruise directory itself.
+    """
+    lowering_base = worker.shipboard_data_warehouse_config['loweringDataBaseDir']
+    dest_dir = cst['destDir']
+
+    def fill(lowering_id=None):
+        return fill_placeholders(dest_dir, worker.cruise_id, lowering_base, lowering_id).strip('/')
+
+    if int(cst['cruiseOrLowering']) == 1:
+        return [os.path.join(lowering_base, lowering, fill(lowering)) for lowering in worker.ovdm.get_lowerings()]
+    if '{loweringID}' in dest_dir:
+        return [fill(lowering) for lowering in worker.ovdm.get_lowerings()]
+    return [fill()]
+
+
 def task_rebuild_data_dashboard(worker, current_job):
     """Rebuild the whole data dashboard for the cruise.
 
@@ -654,19 +685,11 @@ def task_rebuild_data_dashboard(worker, current_job):
             logging.warning(f"No plugin for {cst['name']}, skipping")
             continue
 
-        # Build file list. destDir is relative to the cruise (or lowering)
-        # directory: "/" is that directory itself, as the transfer takes it (#629)
-        dest_dir = cst['destDir'].lstrip('/')
-        if cst['cruiseOrLowering'] == 0:
-            cst_dir = os.path.join(worker.cruise_dir, dest_dir)
-            filelist = build_filelist(cst_dir).get('include', [])
-            filelist = [os.path.join(dest_dir, f) for f in filelist]
-        else:
-            filelist = []
-            lowerings = worker.ovdm.get_lowerings()
-            for lowering in lowerings:
-                cst_dir = os.path.join(worker.cruise_dir, worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, dest_dir)
-                filelist.extend([os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, dest_dir, f) for f in build_filelist(cst_dir).get('include', [])])
+        # Build file list
+        filelist = []
+        for rel_dir in _transfer_dirs(worker, cst):
+            filelist.extend(os.path.join(rel_dir, f)
+                            for f in build_filelist(os.path.join(worker.cruise_dir, rel_dir)).get('include', []))
 
         # the transfers share 10-90%, in order (#584)
         start = int(80 * idx / len(active_csts) + 10)

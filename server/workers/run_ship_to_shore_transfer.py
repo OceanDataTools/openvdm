@@ -38,6 +38,7 @@ from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfe
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, rclone_concurrency, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
+from server.lib.placeholders import fill_placeholders
 
 
 # Gearman task names this worker registers.
@@ -183,7 +184,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
                     if int(cs.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
-                    path_prefix = f"{base_path}/{cs['destDir']}"
+                    # {cruiseID} and {loweringDataBaseDir} filled in, {loweringID} for each lowering below (#635)
+                    path_prefix = os.path.join(base_path, fill_placeholders(
+                        cs['destDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir']).strip('/')).rstrip('/')
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if transfer is from an ed
@@ -191,7 +194,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
                     if int(ed.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
-                    path_prefix = f"{base_path}/{ed['destDir']}"
+                    # {cruiseID} and {loweringDataBaseDir} filled in, {loweringID} for each lowering below (#635)
+                    path_prefix = os.path.join(base_path, fill_placeholders(
+                        ed['destDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir']).strip('/')).rstrip('/')
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if neither

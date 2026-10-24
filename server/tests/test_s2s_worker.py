@@ -119,6 +119,21 @@ def test_file_list_lowering_extra_directory(worker, fake_ovdm, warehouse) -> Non
     assert worker(lowerings=['DIVE01']).build_filelist()['files']['include'] == ['Vehicle/DIVE01/Notes/log.txt']
 
 
+@pytest.mark.parametrize('dest_dir, cruise_or_lowering, path', [
+    ('{cruiseID}_SCS', '0', 'TEST001_SCS/nav.csv'),
+    ('/', '0', 'nav.csv'),
+    ('{loweringDataBaseDir}/{loweringID}/SCS', '0', 'Vehicle/DIVE01/SCS/nav.csv'),
+    ('{cruiseID}_ROV/', '1', 'Vehicle/DIVE01/TEST001_ROV/nav.csv'),
+])
+def test_file_list_dest_dir_placeholders(worker, fake_ovdm, warehouse, dest_dir, cruise_or_lowering, path) -> None:
+    """A source's destination directory has its placeholders filled in, and "/" is the cruise
+    (or lowering) directory itself (#635)."""
+    _tree(warehouse.cruise_dir, [path])
+    fake_ovdm.get_collection_system_transfer.return_value = {'cruiseOrLowering': cruise_or_lowering, 'destDir': dest_dir}
+    fake_ovdm.get_ship_to_shore_transfers.return_value = [_s2s(1, '*.csv', collection_system=1)]
+    assert worker(lowerings=['DIVE01']).build_filelist()['files']['include'] == [path]
+
+
 def test_file_list_non_ascii_excluded(worker, fake_ovdm, warehouse) -> None:
     """Non-ASCII names are excluded and listed in the exclude log."""
     _tree(warehouse.cruise_dir, ['café.txt'])

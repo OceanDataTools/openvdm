@@ -109,18 +109,22 @@ def test_gdal_tiles_beside_the_file(gdal_parser, geotiff, fake_run) -> None:
     assert fake_run.commands('gdal2tiles.py')[0][-1] == str(geotiff.parent / 'bathy_50m')
 
 
-def test_gdal_tiles_in_dashboard_data(fake_ovdm, gdal_parser, geotiff, fake_run, monkeypatch, tmp_path) -> None:
-    """With the API, the tiles go in the cruise's Dashboard_Data directory, under the file's
-    collection system directory, and the tile directory is relative to CruiseData."""
+@pytest.mark.parametrize('dest_dir, dashboard', [('OpenVDM/DashboardData', 'OpenVDM/DashboardData'),
+                                                 ('/{cruiseID}_Dashboard/', 'TEST001_Dashboard')])
+def test_gdal_tiles_in_dashboard_data(fake_ovdm, gdal_parser, geotiff, fake_run, monkeypatch, tmp_path,
+                                      dest_dir, dashboard) -> None:
+    """With the API, the tiles go in the cruise's Dashboard_Data directory (with its placeholders
+    filled in, #635), under the file's collection system directory, and the tile directory is
+    relative to CruiseData."""
     monkeypatch.setattr('server.lib.openvdm_plugin.OpenVDM', lambda: fake_ovdm)
     base = tmp_path / 'CruiseData'
-    fake_ovdm.get_shipboard_data_warehouse_config.return_value = {'shipboardDataWarehouseBaseDir': str(base)}
-    fake_ovdm.get_required_extra_directory_by_name.return_value = {'destDir': 'OpenVDM/DashboardData'}
+    fake_ovdm.get_shipboard_data_warehouse_config.return_value = {'shipboardDataWarehouseBaseDir': str(base),
+                                                                  'loweringDataBaseDir': 'Vehicle'}
+    fake_ovdm.get_required_extra_directory_by_name.return_value = {'destDir': dest_dir}
     fake_ovdm.get_cruise_id.return_value = 'TEST001'
     data = parse_output(gdal_parser.GeoTIFFParser(use_openvdm_api=True), geotiff)
-    assert data['visualizerData'][0]['tileDirectory'] == 'TEST001/OpenVDM/DashboardData/EM302/proc/bathy_50m'
-    assert fake_run.commands('gdal2tiles.py')[0][-1] == \
-        str(base / 'TEST001' / 'OpenVDM' / 'DashboardData' / 'EM302' / 'proc' / 'bathy_50m')
+    assert data['visualizerData'][0]['tileDirectory'] == f'TEST001/{dashboard}/EM302/proc/bathy_50m'
+    assert fake_run.commands('gdal2tiles.py')[0][-1] == str(base / 'TEST001' / dashboard / 'EM302' / 'proc' / 'bathy_50m')
     fake_ovdm.get_required_extra_directory_by_name.assert_called_with('Dashboard_Data')
 
 
