@@ -396,6 +396,26 @@ def test_rebuild(worker, cruise, perms) -> None:
     assert (cruise.dashboard / 'keep.png').exists()
 
 
+@pytest.mark.parametrize('cst, dirs', [(0, ['']), (1, ['Vehicle/DIVE01/', 'Vehicle/DIVE02/'])])
+def test_rebuild_dest_dir_root(worker, cruise, monkeypatch, cst, dirs) -> None:
+    """A destination directory of "/" is the cruise (or each lowering's) directory, not the
+    filesystem root (#629)."""
+    monkeypatch.setitem(CSTS[cst], 'destDir', '/')
+    listed = []
+    real = data_dashboard.build_filelist
+
+    def build_filelist(path, *args, **kwargs):
+        listed.append(path)
+        return real(path, *args, **kwargs)
+    monkeypatch.setattr(data_dashboard, 'build_filelist', build_filelist)
+    _rebuild(worker)
+    assert '/' not in listed
+    assert all(os.path.join(cruise.dir, d) in listed for d in dirs)
+    raw = [entry['raw_data'] for entry in _manifest(cruise)]
+    assert {'TEST001/SCS/raw/nav.gga', 'TEST001/Vehicle/DIVE01/ROV/ctd.ctd'} <= set(raw)
+    assert all('//' not in path for path in raw)
+
+
 def test_rebuild_no_dashboard_directory(worker, cruise) -> None:
     """Without the dashboard directory, the rebuild fails."""
     cruise.dashboard.rmdir()

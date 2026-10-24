@@ -97,8 +97,11 @@ $(function () {
         val = val.trim();
         // Replace backslashes with forward slashes
         val = val.replace(/\\/g, '/');
-        // Strip leading and trailing slashes (dest dir is relative within cruise dir)
-        val = val.replace(/^\/+/, '').replace(/\/+$/, '');
+        // Strip leading and trailing slashes (dest dir is relative within cruise dir),
+        // keeping "/" for the cruise directory itself: "/" and "//" are "/" (#629)
+        if (val.length > 0) {
+            val = val.replace(/^\/+/, '').replace(/\/+$/, '') || '/';
+        }
         return val;
     }
 
