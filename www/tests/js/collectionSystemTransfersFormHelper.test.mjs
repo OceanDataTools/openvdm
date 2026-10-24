@@ -111,6 +111,9 @@ const NORMALIZED = [
     ['sourceDir', 'data/xbt', '/data/xbt'],
     ['sourceDir', '/', '/'],
     ['destDir', '\\XBT\\raw\\', 'XBT/raw'],
+    ['destDir', '/', '/'],
+    ['destDir', '//', '/'],
+    ['destDir', 'XBT/', 'XBT'],
     ['name', '  XBT  ', 'XBT'],
     ['smbUser', ' survey ', 'survey'],
 ];
@@ -151,4 +154,13 @@ test('a source directory of "//" is the root, as the CDT form keeps it (#247, #6
     const {$} = await page();
     enter($, 'sourceDir', '//');
     assert.equal($('[name=sourceDir]').val(), '/');
+});
+
+test('a destination directory of "/" or "//" is the cruise directory, on blur and on submit (#629)', async () => {
+    const {$} = await page();
+    enter($, 'destDir', '//');
+    assert.equal($('[name=destDir]').val(), '/');
+    $('[name=destDir]').val('//');
+    $('form').trigger('submit');
+    assert.equal($('[name=destDir]').val(), '/');
 });

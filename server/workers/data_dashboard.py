@@ -654,17 +654,19 @@ def task_rebuild_data_dashboard(worker, current_job):
             logging.warning(f"No plugin for {cst['name']}, skipping")
             continue
 
-        # Build file list
+        # Build file list. destDir is relative to the cruise (or lowering)
+        # directory: "/" is that directory itself, as the transfer takes it (#629)
+        dest_dir = cst['destDir'].lstrip('/')
         if cst['cruiseOrLowering'] == 0:
-            cst_dir = os.path.join(worker.cruise_dir, cst['destDir'])
+            cst_dir = os.path.join(worker.cruise_dir, dest_dir)
             filelist = build_filelist(cst_dir).get('include', [])
-            filelist = [os.path.join(cst['destDir'], f) for f in filelist]
+            filelist = [os.path.join(dest_dir, f) for f in filelist]
         else:
             filelist = []
             lowerings = worker.ovdm.get_lowerings()
             for lowering in lowerings:
-                cst_dir = os.path.join(worker.cruise_dir, worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'])
-                filelist.extend([os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'], f) for f in build_filelist(cst_dir).get('include', [])])
+                cst_dir = os.path.join(worker.cruise_dir, worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, dest_dir)
+                filelist.extend([os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, dest_dir, f) for f in build_filelist(cst_dir).get('include', [])])
 
         # the transfers share 10-90%, in order (#584)
         start = int(80 * idx / len(active_csts) + 10)
