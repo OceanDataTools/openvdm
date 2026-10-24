@@ -416,6 +416,31 @@ def test_rebuild_dest_dir_root(worker, cruise, monkeypatch, cst, dirs) -> None:
     assert all('//' not in path for path in raw)
 
 
+@pytest.mark.parametrize('cst, dest_dir, raw', [
+    (0, '{cruiseID}_SCS', ['TEST001_SCS/nav.gga']),
+    (0, '{loweringDataBaseDir}/{loweringID}/SCS', ['Vehicle/DIVE01/SCS/nav.gga', 'Vehicle/DIVE02/SCS/nav.gga']),
+    (1, '{cruiseID}_ROV/', ['Vehicle/DIVE01/TEST001_ROV/nav.gga', 'Vehicle/DIVE02/TEST001_ROV/nav.gga']),
+])
+def test_rebuild_dest_dir_placeholders(worker, cruise, monkeypatch, cst, dest_dir, raw) -> None:
+    """Placeholders in a destination directory are filled in, as the transfer does: a cruise
+    transfer with {loweringID} is rebuilt from each lowering (#635)."""
+    monkeypatch.setitem(CSTS[cst], 'destDir', dest_dir)
+    for name in raw:
+        (cruise.dir / name).parent.mkdir(parents=True, exist_ok=True)
+        (cruise.dir / name).write_text('nav')
+    _rebuild(worker)
+    rebuilt = {entry['raw_data'] for entry in _manifest(cruise)}
+    assert {f'{cruise.id}/{name}' for name in raw} <= rebuilt
+    assert not any('{' in path for path in rebuilt)
+
+
+def test_dashboard_dir_placeholders(worker, api, cruise) -> None:
+    """The Dashboard_Data directory's placeholders are filled in (#635)."""
+    api.get_required_extra_directory_by_name.return_value = {'name': 'Dashboard_Data', 'destDir': '/{cruiseID}_Dashboard/'}
+    worker.on_job_execute(_job('rebuildDataDashboard'))
+    assert worker.data_dashboard_dir == str(cruise.dir / f'{cruise.id}_Dashboard')
+
+
 def test_rebuild_no_dashboard_directory(worker, cruise) -> None:
     """Without the dashboard directory, the rebuild fails."""
     cruise.dashboard.rmdir()
