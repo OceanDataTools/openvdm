@@ -378,7 +378,7 @@ def test_require_checksum_false_last_field(make_parser, tmp_path, name) -> None:
 
 @pytest.mark.parametrize('name, other', [
     pytest.param('gnss', _nmea('GPZDA,000250.00,01,10,2026,00,00'),
-                 marks=pytest.mark.xfail(strict=True, reason="GNSS's sentence isn't known yet (#558)")),
+                 marks=pytest.mark.xfail(strict=True, reason="GNSS's sentence isn't known yet (#633)")),
     ('hpr', _nmea('GPZDA,000250.00,01,10,2026,00,00')),
     ('pashr', _nmea('GPZDA,000250.00,01,10,2026,00,00')),
     ('psxn24', _nmea('PSXN,23,-0.50,0.50,358.00,0.00')),
