@@ -117,6 +117,12 @@ const templateGlobals = {
     openvdmTileLayer: 'readonly',
     openvdmProfileChartConfig: 'readonly', // dashboardCharts.js
     openvdmInvertTimeChart: 'readonly',
+    normalizeAbsolutePath: 'readonly', // directoryFields.js
+    normalizeRelativePath: 'readonly',
+    isRclonePath: 'readonly',
+    normalizeRclonePath: 'readonly',
+    normalizeCdtDestDir: 'readonly',
+    normalizeSsdwDestDir: 'readonly',
 };
 
 export default [

@@ -65,6 +65,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ### Changed
 - **Setup New Cruise deletes all OpenVDM messages,** so the Messages page and the navbar's new-message count only show messages about the current cruise. They're deleted once the form passes its checks, before the new cruise is set up, so a message the setup posts (e.g. that it failed) is kept. A rejected form deletes nothing, and Edit Cruise, Finalize and switching cruises don't delete messages (#403).
+- **Directory fields are cleaned up on the server too,** with the same rules as the forms, so a collection system transfer's Source and Destination Directories, a cruise data transfer's Destination Directory and the shoreside data warehouse's Destination Directory are saved the same way whether or not the form's scripts ran. Runs of slashes now collapse in these fields, e.g. `/data//xbt/` becomes `/data/xbt`. The forms share one script for this (#630).
 
 - **Development:** the Python tests run in GitHub Actions on every pull request, with ruff and the pre-commit hooks; `requirements-dev.txt` installs pytest and pytest-cov; coverage can't drop below `.coveragerc`'s floor; shared test fixtures; and pytest no longer reports the Test Setup workers' functions as errors. Unused imports are removed from the parser templates. No effect on running installs (#506).
 
@@ -127,6 +128,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **Trackline scripts: unclear errors for some position sources:** a source given as a bare name (e.g. `PositionSources: [gps]`) failed with an `AttributeError`, and an empty list with an `IndexError` when the extent source was chosen. Both now say what's wrong, like the other mistakes in the position sources YAML (#537).
 - **A directory of `//` saved as none:** the collection system transfer form's Source Directory and the shoreside data warehouse form's Destination Directory turned `//` into an empty value, so a root typed with a doubled slash was saved as no directory at all. They now keep it as `/`, as the cruise data transfer form does since #247 (#608).
 - **A collection system transfer's Destination Directory of `/`:** `/` stands for the cruise (or lowering) directory itself, and the controller and the transfer take it that way, but the form turned `/` and `//` into an empty value, which it then refused. The form now keeps it as `/`. Rebuild Data Dashboard joined a `/` to the cruise directory as an absolute path, so it would have listed the whole filesystem. It now reads it as the cruise (or each lowering's) directory, as the transfer does (#629).
+- **A Windows path taken for an rclone remote:** the shoreside data warehouse form, and the cruise data transfer form for a Local Directory, took a Destination Directory such as `C:\data\ssdw` for the rclone remote `C:`, and the shoreside one disabled its SSH fields. A drive letter followed by a slash (or alone) is now a Windows path: the drive letter is dropped, as the collection system transfer form already did for its Source Directory (#630).
 
 ---
 

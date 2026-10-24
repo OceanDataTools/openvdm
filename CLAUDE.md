@@ -194,7 +194,11 @@ Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `t
 
 ### rclone destination convention
 
-A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). For cruise data transfers this only applies to the Local Directory type: the CDT form rejects a `:` in the destination directory of any other type, and the workers route Test Setup to `test_cdt_rclone_destination()` on the `:`, so don't relax that check without routing by transfer type. This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). For cruise data transfers this only applies to the Local Directory type: the CDT form rejects a `:` in the destination directory of any other type, and the workers route Test Setup to `test_cdt_rclone_destination()` on the `:`, so don't relax that check without routing by transfer type. This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. A Windows path (`C:\data`) isn't a remote: the forms drop its drive letter. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+
+### Directory field normalization
+
+The CST Source and Destination Directories, the CDT Destination Directory and the SSDW Destination Directory are cleaned up by `directoryFields.js` in the forms (on blur and on submit; the controllers list it before the form helper in `$data['javascript']`) and by `Helpers\DirectoryFields` in the controllers when they're saved or tested, so a value posted without the scripts gets the same rules (#630). Backslashes become slashes and runs of slashes collapse; absolute paths get a leading slash and lose the trailing one, relative ones lose both, and `/` stays `/` in both. Change the two together: `www/tests/data/directory_fields.json` holds the cases both are tested against (PHPUnit and `npm test`).
 
 ### CDT destDir semantics
 

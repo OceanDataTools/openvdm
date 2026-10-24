@@ -25,15 +25,29 @@ const JQUERY = readFileSync(`${WWW}node_modules/jquery/dist/jquery.js`, 'utf8');
  * loaded, so this waits for it, after the script's own.
  *
  * @param {string} html the form's fixture
- * @param {string} script the script's file name in app/templates/default/js
+ * @param {string|string[]} scripts the script's file name in app/templates/default/js, or the
+ *     names of the scripts the page loads, in order (e.g. directoryFields.js before the form's)
  * @returns {Promise<{window: object, $: Function}>} the page's window and its jQuery
  */
-export async function loadPage(html, script) {
+export async function loadPage(html, scripts) {
     const dom = new JSDOM(`<!DOCTYPE html><html><body>${html}</body></html>`, {runScripts: 'outside-only'});
     dom.window.eval(JQUERY);
-    dom.window.eval(readFileSync(`${WWW}app/templates/default/js/${script}`, 'utf8'));
+    for (const script of [].concat(scripts)) {
+        dom.window.eval(readFileSync(`${WWW}app/templates/default/js/${script}`, 'utf8'));
+    }
     await new Promise((resolve) => dom.window.jQuery(resolve));
     return {window: dom.window, $: dom.window.jQuery};
+}
+
+/**
+ * The directory field cases of one kind from tests/data/directory_fields.json
+ * (#630), which the PHP tests check Helpers\DirectoryFields against too.
+ *
+ * @param {string} kind the cases' kind, e.g. 'absolute' or 'cdtDestDir'
+ * @returns {Array[]} the cases: [typed, expected], or [typed, transfer type, expected]
+ */
+export function directoryCases(kind) {
+    return JSON.parse(readFileSync(`${WWW}tests/data/directory_fields.json`, 'utf8'))[kind];
 }
 
 /**

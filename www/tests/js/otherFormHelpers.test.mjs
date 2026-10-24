@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import {describe, test} from 'node:test';
-import {checkFixture, choose, enter, loadPage} from './helpers.mjs';
+import {checkFixture, choose, directoryCases, enter, loadPage} from './helpers.mjs';
 
 describe('extraDirectoriesFormHelper.js', () => {
     const TEMPLATE = "<What's put here>\n\n**Files:**";
@@ -56,7 +56,7 @@ describe('SSDWFormHelper.js', () => {
 
     checkFixture(FORM, ['editShoresideDataWarehouse.php'], ['Controllers/Config/System.php']);
 
-    const page = () => loadPage(FORM, 'SSDWFormHelper.js');
+    const page = () => loadPage(FORM, ['directoryFields.js', 'SSDWFormHelper.js']);
     const disabled = ($) => ['sshServer', 'sshUser', 'sshPass'].map((name) => $(`[name=${name}]`).prop('disabled'));
 
     test('an rclone remote disables the SSH fields; a path enables them again', async () => {
@@ -99,6 +99,24 @@ describe('SSDWFormHelper.js', () => {
         const {$} = await page();
         enter($, 'destDir', '//');
         assert.equal($('[name=destDir]').val(), '/');
+    });
+
+    for (const [typed, expected] of directoryCases('ssdwDestDir')) {
+        test(`destination "${typed}" becomes "${expected}" on blur and on submit (#630)`, async () => {
+            const {$} = await page();
+            enter($, 'destDir', typed);
+            assert.equal($('[name=destDir]').val(), expected, 'on blur');
+            $('[name=destDir]').val(typed);
+            $('form').trigger('submit');
+            assert.equal($('[name=destDir]').val(), expected, 'on submit');
+        });
+    }
+
+    test('a Windows path is an SSH path, so the SSH fields stay enabled (#630)', async () => {
+        const {$} = await page();
+        enter($, 'destDir', 'C:\\data\\ssdw');
+        assert.equal($('[name=destDir]').val(), '/data/ssdw');
+        assert.deepEqual(disabled($), [false, false, false]);
     });
 });
 

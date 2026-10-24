@@ -6,6 +6,7 @@ use Core\View;
 use Helpers\Session;
 use Helpers\Url;
 use Helpers\DescriptionTemplates;
+use Helpers\DirectoryFields;
 
 class System extends Controller {
 
@@ -133,7 +134,7 @@ class System extends Controller {
     public function editShoresideDataWarehouse(){
 
         $data['title'] = 'Configuration';
-        $data['javascript'] = array('SSDWFormHelper');
+        $data['javascript'] = array('directoryFields', 'SSDWFormHelper');
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
@@ -157,7 +158,8 @@ class System extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::ssdwDestDir($_POST['destDir'] ?? '');
 
             if ($sshPass === '' && $storedSshPass !== '') {
                 $sshPass = $storedSshPass;

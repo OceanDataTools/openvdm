@@ -76,54 +76,13 @@ $(function () {
         return val.trim();
     }
 
-    function isRcloneDest(val) {
-        return val.indexOf(':') !== -1;
-    }
-
     function currentTransferType() {
         return $('select[name=transferType]').val() || '';
     }
 
     function normalizeDestDir(val) {
-        val = val.trim();
-        // Replace backslashes with forward slashes
-        val = val.replace(/\\/g, '/');
-        var transferType = currentTransferType();
-        if (transferType === '') {
-            // No type chosen yet: don't guess whether the path is absolute
-            return val;
-        }
-        if (transferType === '1') { // Local Directory
-            if (isRcloneDest(val)) {
-                // rclone remote:path — remote name must not have leading slashes
-                val = val.replace(/^\/+/, '');
-                return val;
-            }
-            // Local absolute path — ensure leading slash, strip trailing slash
-            if (val.length > 0 && !val.startsWith('/')) {
-                val = '/' + val;
-            }
-            if (val.length > 1) {
-                // "//" is still the root, not "" (#247)
-                val = val.replace(/\/+$/, '') || '/';
-            }
-            return val;
-        }
-        if (transferType === '4' || transferType === '5') {
-            // SSH and FTP dests are absolute paths on the remote server
-            if (val.length > 0 && !val.startsWith('/')) {
-                val = '/' + val;
-            }
-            if (val.length > 1) {
-                // "//" is still the root, not "" (#247)
-                val = val.replace(/\/+$/, '') || '/';
-            }
-            return val;
-        }
-        // Rsync and SMB: dest dir is relative to the rsync module or SMB share;
-        // "/" is its top level, so it isn't stripped to "" (#247)
-        var relative = val.replace(/^\/+/, '').replace(/\/+$/, '');
-        return (relative === '' && val !== '') ? '/' : relative;
+        // Absolute, relative or an rclone remote:path, by transfer type (directoryFields.js)
+        return normalizeCdtDestDir(val, currentTransferType());
     }
 
     // ---------------------------------------------------------------------------
@@ -172,7 +131,7 @@ $(function () {
     }
 
     function setMountpointFieldForDestDir(destDirVal) {
-        if (currentTransferType() === '1' && !isRcloneDest(destDirVal)) {
+        if (currentTransferType() === '1' && !isRclonePath(destDirVal)) {
             $('input[name=localDirIsMountPoint]').closest('.form-group').show();
         } else {
             $('input[name=localDirIsMountPoint]').closest('.form-group').hide();
@@ -186,7 +145,7 @@ $(function () {
     function setMountpointWarning(destDirVal) {
         var inMountParent = /^\/(mnt|media|net)\/[^/]/.test(destDirVal.trim());
         var markedMountPoint = $('input[name=localDirIsMountPoint]:checked').val() === '1';
-        $('.mountpointWarning').toggle(currentTransferType() === '1' && !isRcloneDest(destDirVal) &&
+        $('.mountpointWarning').toggle(currentTransferType() === '1' && !isRclonePath(destDirVal) &&
                                        inMountParent && !markedMountPoint);
     }
 
