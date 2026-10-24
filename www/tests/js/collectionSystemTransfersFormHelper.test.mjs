@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {checkFixture, choose, enter, loadPage, shown} from './helpers.mjs';
+import {checkFixture, choose, directoryCases, enter, loadPage, shown} from './helpers.mjs';
 
 const TEMPLATE = '<The instrument>\n\n**Files:**';
 
@@ -42,7 +42,7 @@ checkFixture(FORM, ['addCollectionSystemTransfers.php', 'editCollectionSystemTra
              ['Helpers/DescriptionTemplates.php', 'Controllers/Config/CollectionSystemTransfers.php']);
 
 function page() {
-    return loadPage(FORM, 'collectionSystemTransfersFormHelper.js');
+    return loadPage(FORM, ['directoryFields.js', 'collectionSystemTransfersFormHelper.js']);
 }
 
 test('no transfer type shows no type fields', async () => {
@@ -164,3 +164,18 @@ test('a destination directory of "/" or "//" is the cruise directory, on blur an
     $('form').trigger('submit');
     assert.equal($('[name=destDir]').val(), '/');
 });
+
+// The Source Directory is an absolute path, the Destination Directory one
+// relative to the cruise directory, on blur and on submit alike (#630)
+for (const [field, kind] of [['sourceDir', 'absolute'], ['destDir', 'relative']]) {
+    for (const [typed, expected] of directoryCases(kind)) {
+        test(`${field}: "${typed}" becomes "${expected}" on blur and on submit (#630)`, async () => {
+            const {$} = await page();
+            enter($, field, typed);
+            assert.equal($(`[name=${field}]`).val(), expected, 'on blur');
+            $(`[name=${field}]`).val(typed);
+            $('form').trigger('submit');
+            assert.equal($(`[name=${field}]`).val(), expected, 'on submit');
+        });
+    }
+}

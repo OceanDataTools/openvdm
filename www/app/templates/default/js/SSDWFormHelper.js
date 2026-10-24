@@ -5,10 +5,6 @@ $(function () {
     // Field normalization helpers
     // ---------------------------------------------------------------------------
 
-    function isRcloneDest(val) {
-        return val.indexOf(':') !== -1;
-    }
-
     function normalizeSshServer(val) {
         val = val.trim();
         val = val.replace(/^ssh:\/\//i, '');
@@ -22,34 +18,12 @@ $(function () {
         return val.trim();
     }
 
-    function normalizeDestDir(val) {
-        val = val.trim();
-        // Replace backslashes with forward slashes
-        val = val.replace(/\\/g, '/');
-
-        if (isRcloneDest(val)) {
-            // rclone remote:path — remote name must not have leading slashes
-            val = val.replace(/^\/+/, '');
-            return val;
-        }
-
-        // Regular SSH absolute path
-        if (val.length > 0 && !val.startsWith('/')) {
-            val = '/' + val;
-        }
-        // Strip trailing slashes, keeping the root: "//" is "/" (#608)
-        if (val.length > 1) {
-            val = val.replace(/\/+$/, '') || '/';
-        }
-        return val;
-    }
-
     // ---------------------------------------------------------------------------
     // Existing UI helpers
     // ---------------------------------------------------------------------------
 
     function setSSHUseKeyField(sshUseKey) {
-        if (isRcloneDest($('input[name=destDir]').val())) {
+        if (isRclonePath($('input[name=destDir]').val())) {
             return;
         }
         if(sshUseKey == 1){
@@ -61,7 +35,7 @@ $(function () {
     }
 
     function setSshFieldsForDestDir(destDirVal) {
-        if (isRcloneDest(destDirVal)) {
+        if (isRclonePath(destDirVal)) {
             $('input[name=sshServer]').prop('disabled', true);
             $('input[name=sshUser]').prop('disabled', true);
             $('input[name=sshPass]').prop('disabled', true);
@@ -93,7 +67,7 @@ $(function () {
     });
 
     $('input[name=destDir]').on('blur', function () {
-        var normalized = normalizeDestDir($(this).val());
+        var normalized = normalizeSsdwDestDir($(this).val());
         $(this).val(normalized);
         setSshFieldsForDestDir(normalized);
     });
@@ -108,7 +82,7 @@ $(function () {
             $(this).val($(this).val().trim());
         });
         $('input[name=sshServer]').val(normalizeSshServer($('input[name=sshServer]').val()));
-        $('input[name=destDir]').val(normalizeDestDir($('input[name=destDir]').val()));
+        $('input[name=destDir]').val(normalizeSsdwDestDir($('input[name=destDir]').val()));
     });
 
 });

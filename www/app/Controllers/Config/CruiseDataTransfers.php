@@ -8,6 +8,7 @@ use Helpers\Session;
 use Helpers\PendingPasswords;
 use Helpers\FtpFields;
 use Helpers\TransferFields;
+use Helpers\DirectoryFields;
 
 class CruiseDataTransfers extends Controller {
 
@@ -98,7 +99,7 @@ class CruiseDataTransfers extends Controller {
 
     public function add(){
         $data['title'] = 'Add ' . CRUISE_NAME . ' Data Transfer';
-        $data['javascript'] = array('cruiseDataTransfersFormHelper');
+        $data['javascript'] = array('directoryFields', 'cruiseDataTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
@@ -120,7 +121,8 @@ class CruiseDataTransfers extends Controller {
             $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
             $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
             $syncToDest = $_POST['syncToDest'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::cdtDestDir($_POST['destDir'] ?? '', $transferType);
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
             $rsyncServer = $_POST['rsyncServer'] ?? '';
             $rsyncUser = $_POST['rsyncUser'] ?? '';
@@ -266,7 +268,8 @@ class CruiseDataTransfers extends Controller {
             $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
             $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
             $syncToDest = $_POST['syncToDest'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::cdtDestDir($_POST['destDir'] ?? '', $transferType);
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
             $rsyncServer = $_POST['rsyncServer'] ?? '';
             $rsyncUser = $_POST['rsyncUser'] ?? '';
@@ -418,7 +421,7 @@ class CruiseDataTransfers extends Controller {
 
     public function edit($id){
         $data['title'] = 'Edit ' . CRUISE_NAME . ' Data Transfer';
-        $data['javascript'] = array('cruiseDataTransfersFormHelper');
+        $data['javascript'] = array('directoryFields', 'cruiseDataTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['skipEmptyDirsOptions'] = $this->_buildSkipEmptyDirsOptions();
@@ -447,7 +450,8 @@ class CruiseDataTransfers extends Controller {
             $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
             $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
             $syncToDest = $_POST['syncToDest'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::cdtDestDir($_POST['destDir'] ?? '', $transferType);
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
             $rsyncServer = $_POST['rsyncServer'] ?? '';
             $rsyncUser = $_POST['rsyncUser'] ?? '';
@@ -624,7 +628,8 @@ class CruiseDataTransfers extends Controller {
             $skipEmptyDirs = $_POST['skipEmptyDirs'] ?? '';
             $skipEmptyFiles = $_POST['skipEmptyFiles'] ?? '';
             $syncToDest = $_POST['syncToDest'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::cdtDestDir($_POST['destDir'] ?? '', $transferType);
             $localDirIsMountPoint = $_POST['localDirIsMountPoint'] ?? '';
             $rsyncServer = $_POST['rsyncServer'] ?? '';
             $rsyncUser = $_POST['rsyncUser'] ?? '';

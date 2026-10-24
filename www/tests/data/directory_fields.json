@@ -1,0 +1,73 @@
+{
+    "_comment": "Directory field cases (#630), checked against Helpers\\DirectoryFields (www/tests/Helpers/DirectoryFieldsTest.php) and directoryFields.js (www/tests/js/directoryFields.test.mjs), so the forms and the server clean up a directory the same way. Each case is [typed, expected], or [typed, transfer type, expected] for cdtDestDir.",
+    "absolute": [
+        ["", ""],
+        ["   ", ""],
+        ["/", "/"],
+        ["//", "/"],
+        ["///", "/"],
+        ["data/xbt", "/data/xbt"],
+        [" /data/xbt/ ", "/data/xbt"],
+        ["//XBT/", "/XBT"],
+        ["/data//xbt", "/data/xbt"],
+        ["C:\\data\\xbt\\", "/data/xbt"],
+        ["c:/data", "/data"],
+        ["C:\\", "/"],
+        ["C:", "/"],
+        ["\\\\server\\share", "/server/share"],
+        ["/{cruiseID}/raw/*.dat", "/{cruiseID}/raw/*.dat"]
+    ],
+    "relative": [
+        ["", ""],
+        ["   ", ""],
+        ["/", "/"],
+        ["//", "/"],
+        ["\\", "/"],
+        ["SCS", "SCS"],
+        ["/SCS/raw/", "SCS/raw"],
+        ["\\XBT\\raw\\", "XBT/raw"],
+        ["//XBT//raw//", "XBT/raw"],
+        ["{cruiseID}_SCS", "{cruiseID}_SCS"]
+    ],
+    "isRclone": [
+        ["gdrive:/cruises", true],
+        ["/gdrive:/cruises", true],
+        ["s3:bucket/path", true],
+        ["C:\\data\\ssdw", false],
+        ["C:/data", false],
+        ["C:", false],
+        ["/data/ssdw", false],
+        ["", false]
+    ],
+    "rclone": [
+        ["gdrive:/cruises", "gdrive:/cruises"],
+        [" //gdrive:/cruises ", "gdrive:/cruises"],
+        ["remote:\\a\\b", "remote:/a/b"]
+    ],
+    "cdtDestDir": [
+        [" data\\ ", "", "data/"],
+        ["", "1", ""],
+        ["mnt/usb/", "1", "/mnt/usb"],
+        ["//", "1", "/"],
+        ["//mnt//usb", "1", "/mnt/usb"],
+        ["/gdrive:/cruises", "1", "gdrive:/cruises"],
+        ["C:\\cruises", "1", "/cruises"],
+        ["/", "2", "/"],
+        ["//", "2", "/"],
+        ["/cruises/", "2", "cruises"],
+        ["\\cruises\\", "3", "cruises"],
+        ["//", "3", "/"],
+        ["data/", "4", "/data"],
+        ["//", "4", "/"],
+        ["data//cruises/", "5", "/data/cruises"],
+        ["//", "5", "/"]
+    ],
+    "ssdwDestDir": [
+        ["", ""],
+        ["data/ssdw/", "/data/ssdw"],
+        ["//", "/"],
+        ["//data//ssdw//", "/data/ssdw"],
+        ["/gdrive:/ssdw", "gdrive:/ssdw"],
+        ["C:\\data\\ssdw", "/data/ssdw"]
+    ]
+}

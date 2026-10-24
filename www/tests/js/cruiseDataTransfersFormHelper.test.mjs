@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {checkFixture, choose, enter, loadPage, shown} from './helpers.mjs';
+import {checkFixture, choose, directoryCases, enter, loadPage, shown} from './helpers.mjs';
 
 const FORM = `<form>
   <input name="name"><input name="longName">
@@ -38,7 +38,7 @@ checkFixture(FORM, ['addCruiseDataTransfers.php', 'editCruiseDataTransfers.php']
              ['Controllers/Config/CruiseDataTransfers.php']);
 
 function page() {
-    return loadPage(FORM, 'cruiseDataTransfersFormHelper.js');
+    return loadPage(FORM, ['directoryFields.js', 'cruiseDataTransfersFormHelper.js']);
 }
 
 for (const [type, cls] of Object.entries(TYPES)) {
@@ -163,4 +163,25 @@ test('Enter in a field runs Test Setup', async () => {
     $('[name=inlineTest]').on('click', (event) => { tested++; event.preventDefault(); });
     $('[name=destDir]')[0].dispatchEvent(new window.KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
     assert.equal(tested, 1);
+});
+
+// The Destination Directory for each transfer type, on blur and on submit alike (#630)
+for (const [typed, type, expected] of directoryCases('cdtDestDir')) {
+    test(`type ${type || 'none'}: destination "${typed}" becomes "${expected}" on blur and on submit (#630)`, async () => {
+        const {$} = await page();
+        enter($, 'transferType', type, 'change');
+        enter($, 'destDir', typed);
+        assert.equal($('[name=destDir]').val(), expected, 'on blur');
+        $('[name=destDir]').val(typed);
+        $('form').trigger('submit');
+        assert.equal($('[name=destDir]').val(), expected, 'on submit');
+    });
+}
+
+test('a Windows path is a local directory, not an rclone remote, so the mount point field stays (#630)', async () => {
+    const {$} = await page();
+    enter($, 'transferType', '1', 'change');
+    enter($, 'destDir', 'C:\\cruises');
+    assert.equal($('[name=destDir]').val(), '/cruises');
+    assert.equal(shown($, '.form-group.localDir'), true);
 });
