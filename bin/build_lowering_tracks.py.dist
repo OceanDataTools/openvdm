@@ -74,14 +74,16 @@ from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-posi
 # They apply to the collection system the hook names; add
 # "CollectionSystem: <name>" to tie them to one. Add "extent: true" to the
 # source the lowering's bounding box should come from (default: the first).
+# The types are the data types rov_openrvdas_plugin.py gives the sample data's
+# files, as in server/etc/lowering_position_sources.yaml.dist (#639).
 DEFAULT_POSITION_SOURCES_YAML = """
 PositionSources:
   - device: USBL-PRI
-    type: usbl_pri_gga
+    type: rov-usbl-pri
   - device: USBL-SEC
-    type: usbl_sec_gga
+    type: rov-usbl-sec
   - device: SPRINT
-    type: sprint
+    type: rov-sprint
 """
 
 # ----------------------------------------------------------------------

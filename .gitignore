@@ -16,6 +16,8 @@ server/plugins/parsers/*.py
 server/etc/openvdm.yaml
 server/etc/cruise_readme.md.j2
 server/etc/lowering_readme.md.j2
+server/etc/cruise_position_sources.yaml
+server/etc/lowering_position_sources.yaml
 www/app/Core/Config.php
 www/app/templates/default/js/chartColors.js
 www/app/templates/default/js/dataDashboardMainCustom.js
