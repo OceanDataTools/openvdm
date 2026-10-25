@@ -35,15 +35,10 @@ class Warehouse extends Controller {
 
         if($this->_warehouseModel->getSystemStatus()) {
             $response['systemStatus'] = "On";
-            $nowDateStr = gmdate('Y/m/d H:i');
-            $cruiseDates = $this->_warehouseModel->getCruiseDates();
-
-            if(isset($cruiseDates['cruiseStartDate'])) {
-                if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
-                    $response['warning'] = CRUISE_NAME . " has not started";
-                } elseif (!empty($cruiseDates['cruiseEndDate']) && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
-                    $response['warning'] = CRUISE_NAME . " has Ended";
-                }
+            // Why the System Status card is yellow, for header.js (#637)
+            $warning = \Helpers\CruiseDates::warning($this->_warehouseModel->getCruiseDates(), gmdate('Y/m/d H:i'));
+            if($warning !== '') {
+                $response['warning'] = $warning;
             }
 
         } else {
