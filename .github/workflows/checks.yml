@@ -53,18 +53,30 @@ jobs:
         run: python -m pytest --cov --cov-report=term-missing:skip-covered
 
   phpunit:
-    name: PHPUnit
+    name: PHPUnit (PHP ${{ matrix.php }})
     runs-on: ubuntu-24.04
+    # From the oldest PHP composer.json allows (and composer.lock is resolved
+    # for) to the newest the distros ship, so the locked packages are tested
+    # on each (#643)
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v6
 
-      # PHP 8.3 matches production; mbstring is needed by league/commonmark
+      # mbstring is needed by league/commonmark
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: mbstring
           tools: composer
           coverage: none
+
+      # composer.lock is tracked (#643): it must be updated with composer.json
+      - name: composer.lock matches composer.json
+        working-directory: www
+        run: composer validate --no-check-publish --no-check-all
 
       # PHPUnit is a dev dependency (#515). --no-scripts skips
       # post_composer.sh, which installs web assets the tests don't need

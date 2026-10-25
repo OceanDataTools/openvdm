@@ -2030,6 +2030,11 @@ function install_openvdm {
             # npm rewrites www/package-lock.json during the build; that isn't a
             # site change, and it would block the update
             sudo -u ${OPENVDM_USER} git checkout -- www/package-lock.json 2>/dev/null
+            # www/composer.lock is tracked from 2.17 (#643); one the build
+            # replaced (below) would block the update too. An install from
+            # before 2.17 has its own, which .gitignore listed, so git
+            # replaces it with the tracked one
+            sudo -u ${OPENVDM_USER} git checkout -- www/composer.lock 2>/dev/null
             # Update to the branch (or tag) asked for, and stop if that fails.
             # A tag is checked out as is; a branch is then fast-forwarded.
             if ! sudo -u ${OPENVDM_USER} git fetch --tags origin \
@@ -2102,10 +2107,10 @@ EOF
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
     chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
-    # composer.lock isn't tracked: each install writes its own, and it goes
-    # out of date when composer.json changes (e.g. after an upgrade), so
-    # Composer warns and installs from the old lock. The web app has no
-    # runtime dependencies to pin, so let Composer write a current one (#346)
+    # composer.lock is tracked (#643), so it matches composer.json after the
+    # update. One that doesn't (e.g. composer.json changed by hand) would make
+    # Composer warn and install from the old lock, leaving out new packages,
+    # so let Composer write a current one instead (#346)
     if [ -e composer.lock ] && ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer validate -q --no-check-publish --no-check-all > /dev/null 2>&1; then
         echo "Replacing the out-of-date www/composer.lock"
         rm -f composer.lock

@@ -27,6 +27,11 @@
             "bash ./post_composer.sh"
         ]
     },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require-dev": {

@@ -58,6 +58,7 @@ $explain = function ($described) use ($h) {
             if ($data['context']['loweringID'] !== '') { ?>, <?php echo $h(LOWERING_NAME); ?> <code><?php echo $h($data['context']['loweringID']); ?></code><?php } ?>,
             <?php echo $h(gmdate('Y/m/d H:i', $data['context']['now'])); ?> UTC).
         </p>
+        <?php echo \Helpers\Markdown::alert(); ?>
         <p class="no-print">
             <button type="button" class="btn btn-sm btn-primary" onclick="window.print()"><i class="fa fa-print"></i> Print</button>
 <?php if ($data['onlyID']) { ?>
