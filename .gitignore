@@ -25,7 +25,6 @@ www/bower_components
 www/etc/datadashboard.yaml
 www/vendor
 www/.htaccess
-www/composer.lock
 www/errorlog.html
 www/.phpunit.cache
 www/node_modules

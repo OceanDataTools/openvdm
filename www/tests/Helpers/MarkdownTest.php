@@ -1,7 +1,8 @@
 <?php
 /**
  * Tests for Helpers\Markdown (#460): descriptions rendered as on the READMEs,
- * with their HTML escaped and unsafe links dropped.
+ * with their HTML escaped and unsafe links dropped, and as escaped plain
+ * text when league/commonmark can't run (#643).
  */
 
 namespace Tests\Helpers;
@@ -60,5 +61,72 @@ class MarkdownTest extends TestCase
     {
         $this->assertStringContainsString('<a href="https://www.seabird.com/">Sea-Bird</a>',
                                           Markdown::render('[Sea-Bird](https://www.seabird.com/)'));
+    }
+
+    /**
+     * Pretend that what's listed is missing (null: check again).
+     */
+    private function setMissing(?array $missing): void
+    {
+        (new \ReflectionProperty(Markdown::class, 'missing'))->setValue(null, $missing);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->setMissing(null);
+    }
+
+    public function testNothingMissingHere(): void
+    {
+        $this->assertSame(array(), Markdown::missing());
+        $this->assertSame('', Markdown::alert());
+    }
+
+    public static function requirements(): array
+    {
+        $package = 'the league/commonmark Composer package';
+        $mbstring = "PHP's mbstring extension";
+        return array('both installed' => array(true, true, array()),
+                     'no package' => array(false, true, array($package)),
+                     'no mbstring' => array(true, false, array($mbstring)),
+                     'neither' => array(false, false, array($package, $mbstring)));
+    }
+
+    #[DataProvider('requirements')]
+    public function testFindMissing(bool $package, bool $mbstring, array $expected): void
+    {
+        $classes = array();
+        $missing = Markdown::findMissing(
+            function ($class) use ($package, &$classes) { $classes[] = $class; return $package; },
+            function ($extension) use ($mbstring) { return $extension === 'mbstring' ? $mbstring : true; }
+        );
+        $this->assertSame($expected, $missing);
+        $this->assertSame(array('League\CommonMark\CommonMarkConverter'), $classes);
+    }
+
+    public function testPlainTextWithoutThePackage(): void
+    {
+        $this->setMissing(array('the league/commonmark Composer package'));
+        $this->assertSame("<p>Raw **sonar** &lt;b&gt;files&lt;/b&gt;<br>\n- `*.raw`</p>\n",
+                          Markdown::render("Raw **sonar** <b>files</b>\r\n- `*.raw`"));
+        $this->assertSame('', Markdown::render(' '));
+    }
+
+    public function testAlertSaysWhatsMissing(): void
+    {
+        $this->setMissing(array('the league/commonmark Composer package'));
+        $this->assertStringContainsString("plain text: the league/commonmark Composer package isn't installed.",
+                                          Markdown::alert());
+        $this->setMissing(array('the league/commonmark Composer package', "PHP's mbstring extension"));
+        $this->assertStringContainsString(
+            'the league/commonmark Composer package and PHP&#039;s mbstring extension aren\'t installed. Re-run the OpenVDM installer',
+            Markdown::alert()
+        );
+    }
+
+    public function testTheGuideShowsTheAlert(): void
+    {
+        $view = file_get_contents(__DIR__ . '/../../app/views/Config/fileNamingGuide.php');
+        $this->assertStringContainsString('\Helpers\Markdown::alert()', $view);
     }
 }
