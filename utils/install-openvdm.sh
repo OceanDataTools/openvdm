@@ -518,7 +518,7 @@ function _install_packages_debian {
         php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl php${PHP_VER}-mbstring \
         php${PHP_VER}-mysql php${PHP_VER}-yaml php${PHP_VER}-zip \
         python3 python3-dev python3-pip python3-venv \
-        rclone rsync samba smbclient sshpass supervisor
+        rclone rsync samba smbclient sshpass supervisor unzip
 
     # Install php-gearman: use the native versioned package when available
     # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
