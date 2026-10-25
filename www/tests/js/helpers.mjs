@@ -27,11 +27,14 @@ const JQUERY = readFileSync(`${WWW}node_modules/jquery/dist/jquery.js`, 'utf8');
  * @param {string} html the form's fixture
  * @param {string|string[]} scripts the script's file name in app/templates/default/js, or the
  *     names of the scripts the page loads, in order (e.g. directoryFields.js before the form's)
+ * @param {Function} [setup] called with the window after jQuery loads, before the scripts: for
+ *     stubs of what the page defines elsewhere (globals, libraries, the API)
  * @returns {Promise<{window: object, $: Function}>} the page's window and its jQuery
  */
-export async function loadPage(html, scripts) {
+export async function loadPage(html, scripts, setup = () => {}) {
     const dom = new JSDOM(`<!DOCTYPE html><html><body>${html}</body></html>`, {runScripts: 'outside-only'});
     dom.window.eval(JQUERY);
+    setup(dom.window);
     for (const script of [].concat(scripts)) {
         dom.window.eval(readFileSync(`${WWW}app/templates/default/js/${script}`, 'utf8'));
     }

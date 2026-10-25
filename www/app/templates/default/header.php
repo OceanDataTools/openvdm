@@ -338,24 +338,19 @@ use Helpers\Hooks;
 <?php
     }
 
-    #2020/11/10 00:00
-    $nowDateStr = gmdate('Y/m/d H:i');
-    $cruiseDates = $_warehouseModel->getCruiseDates();
-
+    // Yellow, with a popup saying why, when the time is outside the cruise's dates (#637)
     $systemStatusClass = 'panel-red';
+    $cruiseDatesWarning = '';
 
     if($data['systemStatus'] === 'On') {
-        if(isset($cruiseDates['cruiseStartDate']) && ($cruiseDates['cruiseStartDate'] > $nowDateStr || ($cruiseDates['cruiseEndDate'] != "" && $cruiseDates['cruiseEndDate'] < $nowDateStr))) {
-            $systemStatusClass = 'panel-yellow';
-        } else {
-            $systemStatusClass = 'panel-green';
-        }
+        $cruiseDatesWarning = \Helpers\CruiseDates::warning($_warehouseModel->getCruiseDates(), gmdate('Y/m/d H:i'));
+        $systemStatusClass = $cruiseDatesWarning === '' ? 'panel-green' : 'panel-yellow';
     }
 ?>
                 <div id="systemStatusPanel" class="panel <?php echo $systemStatusClass; ?>">
                     <div class="panel-heading">
                         <div id="systemStatus" class="huge"><?php echo $data['systemStatus']; ?></div>
-                        <div class="text-right">System Status</div>
+                        <div class="text-right"><i id="systemStatusWarning" class="fa fa-question-circle" tabindex="0" data-toggle="tooltip" data-placement="bottom" title="<?php echo htmlspecialchars($cruiseDatesWarning); ?>"<?php echo $cruiseDatesWarning === '' ? ' style="display: none;"' : ''; ?>></i> System Status</div>
                     </div><!-- .panel-heading -->
                 </div> <!-- #systemStatusPanel .panel .panel-primary -->
 <?php
