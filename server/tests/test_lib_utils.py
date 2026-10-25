@@ -60,6 +60,19 @@ def test_readme_settings(tmp_path, monkeypatch) -> None:
     assert settings == {'enable': False, 'filename': '{cruiseID}.md', 'template': str(template)}
 
 
+def test_readme_settings_dist_defaults(tmp_path, monkeypatch, fake_ovdm) -> None:
+    """openvdm.yaml.dist names the READMEs after the cruise and lowering (#638)."""
+    monkeypatch.setattr(readme, 'OPENVDM_ROOT', str(tmp_path))
+    (tmp_path / 'server' / 'etc').mkdir(parents=True)
+    names = {}
+    for block, template, lowering in (('cruiseReadme', readme.DEFAULT_TEMPLATE, None),
+                                      ('loweringReadme', readme.DEFAULT_LOWERING_TEMPLATE, 'DIVE01')):
+        (tmp_path / template).write_text('x')
+        settings = readme.readme_settings(fake_ovdm.config, block, template)
+        names[block] = readme.readme_filename(settings['filename'], 'RR2601', lowering)
+    assert names == {'cruiseReadme': 'RR2601_README.md', 'loweringReadme': 'RR2601_DIVE01_README.md'}
+
+
 @pytest.mark.parametrize('block, message', [
     ({'filename': {'cruiseID': None}}, 'must be text'),
     ({'filename': 'docs/README.md'}, 'not a path'),
