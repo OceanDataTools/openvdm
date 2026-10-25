@@ -7,7 +7,9 @@ trackline code they share (``server/lib/tracks.py``) is tested in
 """
 
 import json
+import re
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -45,7 +47,7 @@ def site(fake_ovdm, warehouse, chown):
     and the fake API's answers."""
     dashboard = warehouse.cruise_dir / 'Dashboard_Data'
     _write_dashboard_files(dashboard, '', 'TEST001/Dashboard_Data', 'gga')
-    _write_dashboard_files(dashboard, 'Vehicle/DIVE01', 'TEST001/Dashboard_Data/Vehicle/DIVE01', 'usbl_pri_gga')
+    _write_dashboard_files(dashboard, 'Vehicle/DIVE01', 'TEST001/Dashboard_Data/Vehicle/DIVE01', 'rov-usbl-pri')
     tracklines = warehouse.cruise_dir / 'Tracklines'
     tracklines.mkdir()
     (warehouse.cruise_dir / 'Vehicle' / 'DIVE01' / 'Tracklines').mkdir(parents=True)
@@ -288,3 +290,40 @@ def test_lowering_collection_system(run, site, cruise_or_lowering) -> None:
     site.ovdm.get_collection_system_transfer_by_name.side_effect = lambda name: {
         'name': name, 'cruiseOrLowering': cruise_or_lowering}
     assert _lowering(run) == 0
+
+
+# --- The position sources .dist files (#639) -----------------------------------------
+
+ROOT = Path(__file__).resolve().parents[2]
+# Each .dist file's script, the sample data's collection system transfer, and its plugin
+SAMPLE = {'cruise': ('build_cruise_tracks', 'OpenRVDAS', 'openrvdas'),
+          'lowering': ('build_lowering_tracks', 'ROV_OpenRVDAS', 'rov_openrvdas')}
+
+
+def _plugin_data_types(plugin):
+    """The data types a sample plugin's file type filters give (lines commented out aren't used)."""
+    source = (ROOT / 'server' / 'plugins' / f'{plugin}_plugin.py.dist').read_text(encoding='utf-8')
+    return {match for line in source.splitlines() if not line.lstrip().startswith('#')
+            for match in re.findall(r'"data_type"\s*:\s*"([^"]+)"', line)}
+
+
+@pytest.mark.parametrize('kind', SAMPLE)
+def test_position_sources_dist(kind, load_dist) -> None:
+    """Each .dist file is valid for the sample data's collection system, its types are ones the
+    sample plugin writes, and the script's embedded default lists the same sources."""
+    script, collection_system, plugin = SAMPLE[kind]
+    sources = tracks.load_position_sources_from_yaml(
+        yaml_path=str(ROOT / 'server' / 'etc' / f'{kind}_position_sources.yaml.dist'),
+        collection_system=collection_system)
+    assert {source['type'] for source in sources} <= _plugin_data_types(plugin)
+    module = load_dist(f'bin/{script}.py.dist', name=script)
+    assert tracks.load_position_sources_from_yaml(
+        yaml_str=module.DEFAULT_POSITION_SOURCES_YAML, collection_system=collection_system) == sources
+
+
+def test_position_sources_dist_other_collection_system() -> None:
+    """A .dist file's CollectionSystem ties it to the sample data's transfer."""
+    with pytest.raises(RuntimeError, match='CollectionSystem mismatch'):
+        tracks.load_position_sources_from_yaml(
+            yaml_path=str(ROOT / 'server' / 'etc' / 'lowering_position_sources.yaml.dist'),
+            collection_system='OpenRVDAS')

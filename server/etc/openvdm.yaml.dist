@@ -171,7 +171,10 @@ postHookCommands:
         # To use a block, remove the first "#" from each of its lines; to use an
         # option, also remove the "#" before its "-":
         #   --position-sources  a PositionSources YAML file, instead of editing the
-        #                       script's embedded default
+        #                       script's embedded default. The installer copies
+        #                       server/etc/cruise_position_sources.yaml and
+        #                       lowering_position_sources.yaml from their .dist
+        #                       files, which match the sample data
         #   --extra-directory   another extra directory for the files
         #   --no-set-extent     don't set the cruise's or lowering's bounding box
         #                       (cruiseExtent, loweringExtent); add it when another

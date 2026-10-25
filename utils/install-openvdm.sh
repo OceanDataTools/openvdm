@@ -2215,6 +2215,16 @@ EOF
         fi
     done
 
+    # The trackline hooks' position sources (#639). A copy that's already
+    # there is the site's own, so it's kept
+    for _POSITION_SOURCES in cruise_position_sources.yaml lowering_position_sources.yaml; do
+        if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES} ] ; then
+            echo "Building ${_POSITION_SOURCES%%_*} position sources"
+            cp ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}.dist ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}
+            chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}
+        fi
+    done
+
     echo "Setting the vessel in ${_YAML}"
     write_vessel_config "${_YAML}"
 
