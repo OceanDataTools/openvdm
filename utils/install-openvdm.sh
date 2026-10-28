@@ -2083,6 +2083,21 @@ EOSQL
             sed -i -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
 
+        # The default cruise starts on the install day (UTC) and lasts 30
+        # days, with the year in its ID (ODT<YY>01), and the default lowering
+        # starts with it, so a new install is within its cruise (#647). The
+        # sample data keeps ODT2601: its file names and filters use it
+        _CRUISE_ID="ODT$(date -u +%y)01"
+        [ "$INSTALL_SAMPLEDATA" = "yes" ] && _CRUISE_ID=ODT2601
+        _CRUISE_START="$(date -u +%Y/%m/%d) 00:00"
+        _CRUISE_END="$(date -u -d '+30 days' +%Y/%m/%d) 00:00"
+        cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
+
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_ID}' WHERE name = 'cruiseID';
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_START}' WHERE name IN ('cruiseStartDate', 'loweringStartDate');
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_END}' WHERE name = 'cruiseEndDate';
+EOF
+
         hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
         cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
 
