@@ -9,12 +9,15 @@ fixture. A bad payload, and a task OpenVDM doesn't know, are tested in
 
 import json
 import os
+import re
 import signal
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import yaml
 
+from server.tests.helpers import ROOT
 from server.workers import post_hooks
 
 CSTS = {3: {'collectionSystemTransferID': 3, 'name': 'CTD'}, 5: {'collectionSystemTransferID': 5, 'name': 'SCS'}}
@@ -297,3 +300,50 @@ def test_stop_and_quit(worker) -> None:
 def test_build_commands_none(worker) -> None:
     """No command list builds no commands."""
     assert worker._build_commands(None) is None
+
+
+# --- openvdm.yaml.dist's examples ---------------------------------------------------
+
+# A line of a commented-out example block, not of the comments explaining it: "#" then
+# "-" or "commandList:", or spaces and then "- ", "command:" or "commandList:"
+EXAMPLE_LINE = re.compile(r'^(\s*)#(?=-|commandList:|\s+(?:- |command:|commandList:))', re.MULTILINE)
+
+NAV_QA = ['/opt/nav-qa-processing/.venv/bin/nav-qa-processing', 'openvdm']
+NAV_QA_CONFIGS = ['--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml',
+                  '--site-config=/opt/nav-qa-processing/configs/site.toml']
+
+
+def _dist_examples() -> dict:
+    """openvdm.yaml.dist's postHookCommands with every example block used, as its comments say:
+    the first "#" removed from each of the block's lines."""
+    text = (ROOT / 'server' / 'etc' / 'openvdm.yaml.dist').read_text(encoding='utf-8')
+    _, hooks = text.split('\npostHookCommands:\n')
+    return yaml.safe_load('postHookCommands:\n' + EXAMPLE_LINE.sub(r'\1', hooks))['postHookCommands']
+
+
+def test_dist_examples_combine() -> None:
+    """All the examples can be used together: the transfer hooks' blocks are entries of one list,
+    and preFinalizeCurrentCruise's commands share its one commandList (#653)."""
+    hooks = _dist_examples()
+    assert [entry['collectionSystemTransferName'] for entry in hooks['postCollectionSystemTransfer']] == \
+        ['CTD', 'OpenRVDAS']
+    assert [cmd['name'] for cmd in hooks['preFinalizeCurrentCruise']['commandList']] == \
+        ['Export Sealog data for current cruise', 'Navigation QA']
+
+
+def test_dist_nav_qa_hooks(worker, api, fake_run) -> None:
+    """The nav-qa-processing examples run its hook command on the GNSS transfer's new and
+    updated files, and on finalize with the transfer named (#653)."""
+    api.config['postHookCommands'] = _dist_examples()
+    api.get_collection_system_transfer.side_effect = \
+        lambda cst_id: {'collectionSystemTransferID': 7, 'name': 'OpenRVDAS'}
+    result = worker.on_job_execute(_job(collectionSystemTransferID=7, cruiseID='C1',
+                                        files={'new': ['OpenRVDAS/a.txt'], 'updated': ['OpenRVDAS/b.txt']}))
+    assert _parts(result)[-1] == ('Running commands', 'Pass')
+    assert fake_run.commands() == [NAV_QA + ['OpenRVDAS'] + NAV_QA_CONFIGS + [
+        '--changed-files=OpenRVDAS/a.txt', '--changed-files=OpenRVDAS/b.txt', '--min-interval=6h']]
+
+    fake_run.calls.clear()
+    result = worker.on_job_execute(_job('preFinalizeCurrentCruise', cruiseID='C1'))
+    assert _parts(result)[-1] == ('Running commands', 'Pass')
+    assert fake_run.commands()[1] == NAV_QA + ['OpenRVDAS'] + NAV_QA_CONFIGS

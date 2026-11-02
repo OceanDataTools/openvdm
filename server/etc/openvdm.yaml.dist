@@ -162,6 +162,24 @@ postHookCommands:
         #    - --extra-directory=CTD_Plots
         #    - "{newFiles}"
         #    - "{updatedFiles}"
+        # Navigation QA (nav-qa-processing, installed in /opt/nav-qa-processing with its
+        # site TOML; see its INSTALL.md): reassess the cruise's GNSS feed after a transfer
+        # of new or updated nav files, at most every 6 hours (--min-interval). OpenRVDAS is
+        # the transfer that carries the feed. It writes its reports and GeoCSV products to
+        # an extra directory. It also sets the cruise's bounding box, as the cruise
+        # tracklines hook (postDataDashboard) does: give one of the two --no-set-extent
+        #- collectionSystemTransferName: OpenRVDAS
+        #  commandList:
+        #  - name: "Navigation QA"
+        #    command:
+        #    - /opt/nav-qa-processing/.venv/bin/nav-qa-processing
+        #    - openvdm
+        #    - "{collectionSystemTransferName}"
+        #    - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #    - "--site-config=/opt/nav-qa-processing/configs/site.toml"
+        #    - "--changed-files={newFiles}"
+        #    - "--changed-files={updatedFiles}"
+        #    - "--min-interval=6h"
     postDataDashboard:
         # Tracklines: after each data dashboard update or rebuild for a collection
         # system, write a GeoJSON and a KML trackline per position source to the
@@ -223,12 +241,24 @@ postHookCommands:
         #  - "-s"
         #  - "-l"
     preFinalizeCurrentCruise:
+        # This hook has one commandList: to use either command, or both, remove the first
+        # "#" from the commandList line and from each line of the commands you want
         #commandList:
         #- name: "Export Sealog data for current cruise"
         #  command:
         #  - ssh
         #  - survey@192.168.0.22
         #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
+        # Navigation QA (nav-qa-processing, as in postCollectionSystemTransfer): the cruise's
+        # final reports, in the finalized cruise's MD5 summary. The transfer is named, not
+        # {collectionSystemTransferName}, which has no value in this hook
+        #- name: "Navigation QA"
+        #  command:
+        #  - /opt/nav-qa-processing/.venv/bin/nav-qa-processing
+        #  - openvdm
+        #  - OpenRVDAS
+        #  - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #  - "--site-config=/opt/nav-qa-processing/configs/site.toml"
     postFinalizeCurrentCruise:
         #commandList:
         #- name: "Export Sealog data for current cruise"
