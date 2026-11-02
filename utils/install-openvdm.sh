@@ -41,6 +41,12 @@ SUPPORTED_PYTHON_VERSIONS="3.14 3.13 3.12 3.11"
 # xbt-edf-qc commit installed with the sample data, for the XBT plugin (#300)
 XBT_EDF_QC_COMMIT='a784145a2dc9462d8071747b5dfcfcfd2c3fee70'
 
+# Checksum of this copy of the installer, read before the install can replace
+# it, and the directory it was run from (where its preferences file is), for
+# check_installer_version (#650)
+INSTALLER_SUM=$(sha256sum "$0" 2>/dev/null | cut -d' ' -f1)
+INSTALLER_START_DIR=${PWD}
+
 
 ###########################################################################
 ###########################################################################
@@ -78,6 +84,36 @@ yes_no() {
             * ) echo "Please answer yes or no.";;
         esac
     done
+}
+
+###########################################################################
+###########################################################################
+# Stop when a package install fails: the rest of the install needs the
+# packages, and carrying on made it fail later, or not until OpenVDM ran (#650)
+function packages_failed {
+    echo "ERROR: Couldn't install the packages above (see $1's message)."
+    echo "       Fix the problem and re-run the installer."
+    exit_gracefully
+}
+
+###########################################################################
+###########################################################################
+# Stop unless this copy of the installer is the one in the code it has just
+# cloned or updated. The packages come from this copy's lists, so an older
+# copy installs the code without the packages it needs (#650)
+function check_installer_version {
+    local CHECKED_OUT="${INSTALL_ROOT}/openvdm/utils/install-openvdm.sh"
+    if [ -z "${INSTALLER_SUM}" ]; then
+        echo "WARNING: Couldn't read this copy of the installer ($0) to compare it with ${CHECKED_OUT}."
+        return
+    fi
+    if [ "${INSTALLER_SUM}" != "$(sha256sum "${CHECKED_OUT}" | cut -d' ' -f1)" ]; then
+        echo "ERROR: This copy of the installer isn't the one in '${OPENVDM_BRANCH}', which"
+        echo "       it has just downloaded, so it would install the wrong packages for it."
+        echo "       Run that copy instead. Your answers are its defaults:"
+        echo "           cd ${INSTALLER_START_DIR} && sudo bash ${CHECKED_OUT}"
+        exit_gracefully
+    fi
 }
 
 ###########################################################################
@@ -327,8 +363,14 @@ function install_packages {
 
     # Install Composer (both families)
     cd ~
-    curl -sS https://getcomposer.org/installer | php
-    mv composer.phar /usr/local/bin/composer
+    if ! curl -fsS https://getcomposer.org/installer -o composer-setup.php \
+        || ! php composer-setup.php \
+        || ! mv composer.phar /usr/local/bin/composer; then
+        rm -f composer-setup.php
+        echo "ERROR: Couldn't install Composer (see the message above)."
+        exit_gracefully
+    fi
+    rm -f composer-setup.php
 
     cd "${startingDir}"
 }
@@ -403,7 +445,7 @@ function _install_packages_debian {
     export NEEDRESTART_MODE=a
 
     apt-get update -qq
-    apt-get install -q -y ca-certificates curl gnupg
+    apt-get install -q -y ca-certificates curl gnupg || packages_failed apt-get
 
     # Use the codename already parsed from /etc/os-release in detect_os()
     # rather than calling lsb_release, which is not installed on minimal Debian.
@@ -413,7 +455,7 @@ function _install_packages_debian {
 
     if [ "$OS_ID" = "ubuntu" ]; then
         # Ubuntu: software-properties-common provides add-apt-repository
-        apt-get install -q -y software-properties-common
+        apt-get install -q -y software-properties-common || packages_failed apt-get
 
         # Ubuntu: use Ondrej's PPA from Launchpad via keyserver.ubuntu.com
         KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
@@ -518,15 +560,16 @@ function _install_packages_debian {
         php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl php${PHP_VER}-mbstring \
         php${PHP_VER}-mysql php${PHP_VER}-yaml php${PHP_VER}-zip \
         python3 python3-dev python3-pip python3-venv \
-        rclone rsync samba smbclient sshpass supervisor unzip
+        rclone rsync samba smbclient sshpass supervisor unzip \
+        || packages_failed apt-get
 
     # Install php-gearman: use the native versioned package when available
     # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
     if _apt_has "php${PHP_VER}-gearman"; then
-        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman"
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman" || packages_failed apt-get
     else
         echo "php${PHP_VER}-gearman not packaged; building via PECL (requires libgearman-dev)..."
-        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-dev" php-pear
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-dev" php-pear || packages_failed apt-get
         if printf "\n" | pecl install gearman; then
             echo "extension=gearman.so" > "/etc/php/${PHP_VER}/mods-available/gearman.ini"
             phpenmod -v "${PHP_VER}" gearman 2>/dev/null || true
@@ -553,7 +596,7 @@ function _install_packages_debian {
     if [ "$_PYTHON_INSTALLED" = "false" ]; then
         if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
             echo "No versioned python3.11+ package found; system python3 is $(python3 --version)"
-            NEEDRESTART_MODE=a apt-get install -q -y python3-dev python3-venv
+            NEEDRESTART_MODE=a apt-get install -q -y python3-dev python3-venv || packages_failed apt-get
         else
             echo "ERROR: Python >= 3.11 is required but no suitable version is available."
             exit_gracefully
@@ -564,7 +607,8 @@ function _install_packages_debian {
     if [ "$INSTALL_MAPPROXY" = "yes" ]; then
         NEEDRESTART_MODE=a apt-get install -q -y \
             libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev
+            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev \
+            || packages_failed apt-get
     fi
 }
 
@@ -580,8 +624,12 @@ function _build_gearmand_from_source {
 
     echo "Building gearmand ${GEARMAND_VERSION} from source (not in EPEL 10)..."
     # gearmand 1.1.21 uses autotools, not cmake; gperf required by configure
-    dnf install -y autoconf automake boost-devel gcc-c++ gperf libevent-devel libtool \
-        libuuid-devel openssl-devel
+    if ! dnf install -y autoconf automake boost-devel gcc-c++ gperf libevent-devel libtool \
+        libuuid-devel openssl-devel; then
+        echo "ERROR: failed to install the packages to build gearmand" >&2
+        rm -rf "${BUILD_DIR}"
+        return 1
+    fi
 
     # Download to file so curl errors are detectable
     if ! curl -fsSL \
@@ -643,7 +691,7 @@ GEARUNIT
 # RHEL/Rocky/Alma package installation
 function _install_packages_rhel {
 
-    dnf install -y epel-release
+    dnf install -y epel-release || packages_failed dnf
 
     # Enable powertools (v8) or crb (v9+)
     if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
@@ -664,7 +712,8 @@ function _install_packages_rhel {
         # does not prevent PHP itself from being installed).
         dnf module reset php -y 2>/dev/null || true
         dnf module enable php:8.3 -y 2>/dev/null || true
-        dnf install -y php php-cli php-common php-devel php-mbstring php-mysqlnd php-pear php-yaml php-zip
+        dnf install -y php php-cli php-common php-devel php-mbstring php-mysqlnd php-pear php-yaml php-zip \
+            || packages_failed dnf
         # gearmand and libgearman are not in EPEL 10 — build from source so that
         # both the daemon and the headers needed for the PECL extension are available.
         if command -v gearmand &>/dev/null; then
@@ -692,15 +741,17 @@ function _install_packages_rhel {
             echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
     elif [ "$OS_VERSION_MAJOR" -ge 9 ]; then
-        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm" || packages_failed dnf
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip \
+            || packages_failed dnf
     else
-        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm" || packages_failed dnf
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip \
+            || packages_failed dnf
     fi
 
     # On RHEL 9, enable the mysql:8.0 module stream if the system has one.
@@ -718,7 +769,7 @@ function _install_packages_rhel {
     _PYTHON_INSTALLED=false
     for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
         if dnf info "python${_VER}" > /dev/null 2>&1; then
-            dnf install -y "python${_VER}" "python${_VER}-devel"
+            dnf install -y "python${_VER}" "python${_VER}-devel" || packages_failed dnf
             _PYTHON_INSTALLED=true
             break
         fi
@@ -744,7 +795,8 @@ function _install_packages_rhel {
             mariadb-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \
             rsync samba samba-client samba-common samba-common-tools \
-            setroubleshoot sshpass supervisor unzip zlib-devel
+            setroubleshoot sshpass supervisor unzip zlib-devel \
+            || packages_failed dnf
         # gearmand was already built from source in the PHP section above
     else
         dnf -y install \
@@ -754,7 +806,8 @@ function _install_packages_rhel {
             openssh-server policycoreutils-python-utils proj proj-devel \
             python3-pyproj \
             rsync samba samba-client samba-common samba-common-tools \
-            setroubleshoot sshpass supervisor unzip zlib-devel
+            setroubleshoot sshpass supervisor unzip zlib-devel \
+            || packages_failed dnf
     fi
 
     # rclone is not in RHEL/AlmaLinux repos — install from official script
@@ -2055,6 +2108,8 @@ function install_openvdm {
         fi
     fi
 
+    check_installer_version
+
     cd ${INSTALL_ROOT}/openvdm
 
     if mysql --user=root --password=${NEW_ROOT_DATABASE_PASSWORD} -e 'use openvdm' 2> /dev/null; then
@@ -2130,7 +2185,14 @@ EOF
         echo "Replacing the out-of-date www/composer.lock"
         rm -f composer.lock
     fi
-    sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer -q install --no-dev
+    # Not quiet, and stop if it fails: a missing PHP extension stops Composer
+    # (and post_composer.sh's npm install), which otherwise only showed when
+    # the web app broke (#650)
+    if ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer install --no-dev; then
+        echo "ERROR: composer install failed (see its message above). Fix the problem"
+        echo "       (e.g. install the PHP extension it names) and re-run the installer."
+        exit_gracefully
+    fi
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
