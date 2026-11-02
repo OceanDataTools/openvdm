@@ -2292,26 +2292,28 @@ function install_sample_data {
         fi
     fi
 
-    # Extract sample data files
+    # Extract sample data files. The archive was made on a Mac: without
+    # --no-same-owner, root's tar keeps its owner (501:staff) (#649)
     echo "Extracting sample data to ${SAMPLEDATA_ROOT}"
     mkdir -p "${SAMPLEDATA_ROOT}"
-    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}" --warning=no-unknown-keyword
-
-    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
-    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssdw"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
+    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}" \
+        --no-same-owner --warning=no-unknown-keyword
     # Older sample_data.tgz archives don't include the FTP directories
     mkdir -p "${SAMPLEDATA_ROOT}/ftp_source" "${SAMPLEDATA_ROOT}/ftp_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_destination"
+
+    # Only the archive's directories are chowned recursively, in case
+    # SAMPLEDATA_ROOT holds anything else. The archive's top directory is
+    # mode 700, which would keep the guest shares' users out
+    chown "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}"
+    chmod 755 "${SAMPLEDATA_ROOT}"
+    for _d in anon_source anon_destination auth_source auth_destination \
+              ftp_source ftp_destination local_source local_destination \
+              rsync_source rsync_destination ssdw ssh_source ssh_destination; do
+        [ -d "${SAMPLEDATA_ROOT}/${_d}" ] && \
+            chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/${_d}"
+    done
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
 
     if [ "$HAS_SELINUX" = true ]; then
         # Samba shares need samba_share_t; rsync daemon (rsync_t) needs
