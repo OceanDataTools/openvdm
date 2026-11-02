@@ -68,6 +68,7 @@ cd www/
 composer install            # includes PHPStan; production installs use --no-dev
 bash ./post_composer.sh
 ```
+The development packages (PHPUnit, PHPStan) need PHP's `dom` extension (`php8.x-xml` on Debian/Ubuntu, `php-xml` on RHEL), which the installer doesn't install (#650).
 `www/composer.lock` is tracked and resolved for PHP 8.2 (`config.platform` in `composer.json`), so every install gets the same packages (#643). After changing `composer.json`, run `composer update` (or `composer update <package>`) in `www/` and commit the lock with it; CI fails when they don't match.
 
 JavaScript dependencies:

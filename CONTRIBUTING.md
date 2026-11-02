@@ -140,6 +140,8 @@ pip install -r requirements-dev.txt     # pytest and pytest-cov
 cd www && composer install && cd ..     # installs PHPStan (a dev dependency)
 ```
 
+The development packages (PHPUnit, PHPStan) need PHP's `dom` extension, which the installer doesn't install: `php8.x-xml` on Debian/Ubuntu (your PHP version) or `php-xml` on RHEL.
+
 Then, before opening a pull request:
 
 ```

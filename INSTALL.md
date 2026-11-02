@@ -51,6 +51,8 @@ Run the install script
 bash ./install-openvdm.sh
 ```
 
+Download the script from the same branch you'll answer at the installer's branch question. The packages it installs come from the copy you run, so after downloading the code, the installer stops if your copy isn't the one in that branch, and gives the command to run that one instead.
+
 You will need to answer some questions about your configuration.  For each of the questions there is a default answer. To accept the default answer hit <ENTER>.
 
 ```
