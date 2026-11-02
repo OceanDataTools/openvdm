@@ -537,14 +537,19 @@ def task_update_data_dashboard(worker, current_job):
             if os.path.isfile(dd_json_path):
                 os.remove(dd_json_path)
 
-    # Update/add new entries (dedupe on raw_data + type so a file with
-    # multiple data types keeps a manifest entry for each type)
+    # Reprocessing a raw file replaces its full set of data types. Keeping the
+    # previous entries would leave types in the manifest that the new JSON lacks.
+    previous_raw_paths = {entry['raw_data'] for entry in existing_entries}
+    processed_raw_paths = {entry['raw_data'] for entry in new_entries}
+    existing_entries = [entry for entry in existing_entries if entry['raw_data'] not in processed_raw_paths]
+
+    # Add the current entries, preserving whether each raw file was new or updated.
     for entry in new_entries:
-        if not any(e['raw_data'] == entry['raw_data'] and e['type'] == entry['type'] for e in existing_entries):
-            existing_entries.append(entry)
-            job_results['files']['new'].append(entry['dd_json'])
-        else:
+        if entry['raw_data'] in previous_raw_paths:
             job_results['files']['updated'].append(entry['dd_json'])
+        else:
+            job_results['files']['new'].append(entry['dd_json'])
+        existing_entries.append(entry)
 
     # Write updated manifest
     result = output_json_data_to_file(worker.data_dashboard_manifest_file_path, existing_entries)
