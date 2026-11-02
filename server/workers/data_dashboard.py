@@ -518,12 +518,18 @@ def task_update_data_dashboard(worker, current_job):
     new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90,
                                                            get_source_files=get_source_files)
 
-    # Load existing manifest
+    # Load existing manifest. A missing file is expected on the first update,
+    # but replacing an unreadable manifest would silently drop every other entry.
     try:
         with open(worker.data_dashboard_manifest_file_path, 'r', encoding='utf-8') as f:
             existing_entries = json.load(f)
-    except Exception:
+    except FileNotFoundError:
         existing_entries = []
+    except (OSError, ValueError) as exc:
+        reason = f"Could not read dashboard manifest: {exc}. Rebuild Data Dashboard to recover."
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Read dashboard manifest file", "result": "Fail", "reason": reason})
+        return json.dumps(job_results)
 
     # Remove obsolete entries (a raw file may have multiple manifest entries,
     # one per data type; remove all of them together)
