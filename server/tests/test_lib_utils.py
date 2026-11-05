@@ -353,6 +353,59 @@ def test_rclone_failure(tmp_path) -> None:
     assert str(exc.value) == 'rclone exited with code 1: a.txt: Failed to copy: 403 Forbidden'
 
 
+# rclone sync of a directory where big.bin and live.log were written to during
+# every attempt (rclone 1.75's output, with rclone 1.60's final line) (#668)
+RCLONE_CHANGED_OUTPUT = """\
+2026/11/05 14:13:55 INFO  : stable.txt: Copied (new)
+2026/11/05 14:13:55 NOTICE: big.bin.ed6d6138.partial: Removing partially written file on error: \
+can't copy - source file is being updated (size changed from 20000406 to 20000407)
+2026/11/05 14:13:55 ERROR : big.bin: Failed to copy: can't copy - source file is being updated \
+(size changed from 20000406 to 20000407)
+2026/11/05 14:13:55 ERROR : live.log: Failed to copy: can't copy - source file is being updated \
+(size changed from 62 to 63)
+2026/11/05 14:13:55 ERROR : Local file system at /dst: not deleting files as there were IO errors
+2026/11/05 14:13:55 ERROR : Local file system at /dst: not deleting directories as there were IO errors
+2026/11/05 14:13:55 ERROR : Attempt 1/2 failed with 2 errors and: can't copy - source file is being updated \
+(size changed from 62 to 63)
+2026/11/05 14:13:59 ERROR : big.bin: Failed to copy: can't copy - source file is being updated \
+(size changed from 20000407 to 20000408)
+2026/11/05 14:13:59 ERROR : live.log: Failed to copy: can't copy - source file is being updated \
+(mod time changed from 2026-11-05 14:13:55 to 2026-11-05 14:13:59)
+2026/11/05 14:13:59 ERROR : Attempt 2/2 failed with 2 errors and: can't copy - source file is being updated \
+(size changed from 63 to 64)
+2026/11/05 14:13:59 ERROR : Failed to sync with 2 errors: last error was: can't copy - source file is \
+being updated (size changed from 63 to 64)"""
+
+
+def test_rclone_changed_files_are_not_errors(tmp_path, caplog) -> None:
+    """Exit 6 with only files that changed while being copied counts as success (#668)."""
+    with caplog.at_level(logging.WARNING):
+        result = tu.run_transfer_command(_tool(tmp_path, 'rclone', RCLONE_CHANGED_OUTPUT, 6), 3)
+    assert result == {'new': ['stable.txt'], 'updated': [], 'deleted': [], 'stopped': False}
+    assert caplog.messages == [
+        "rclone exited with code 6: 2 files (big.bin, live.log) changed while being copied and will be "
+        "copied on a later transfer (rclone skipped this transfer's deletions); treating as success"]
+
+
+@pytest.mark.parametrize('output, code', [
+    (RCLONE_CHANGED_OUTPUT + '\n2026/11/05 14:13:59 ERROR : a.txt: Failed to copy: 403 Forbidden', 6),
+    (RCLONE_CHANGED_OUTPUT, 1),
+    ('2026/11/05 14:13:59 ERROR : Failed to sync with 1 errors: last error was: directory not found', 6),
+])
+def test_rclone_changed_files_with_other_errors(tmp_path, output, code) -> None:
+    """Another error, or another exit code, still fails the transfer (#668)."""
+    with pytest.raises(tu.TransferCommandError) as exc:
+        tu.run_transfer_command(_tool(tmp_path, 'rclone', output, code), 3)
+    assert exc.value.returncode == code
+
+
+def test_changed_files_lists_the_first_ten() -> None:
+    """The warning names the first ten files that changed (#668)."""
+    assert tu._changed_files(['a.log']) == '1 file (a.log)'
+    assert tu._changed_files([f'{i}.log' for i in range(12)]) == \
+        '12 files (0.log, 1.log, 2.log, 3.log, 4.log, 5.log, 6.log, 7.log, 8.log, 9.log and 2 more)'
+
+
 def test_stop_terminates_the_command(tmp_path) -> None:
     """Stop ends the command and returns the files so far, without failing."""
     lines = iter([False, True])
