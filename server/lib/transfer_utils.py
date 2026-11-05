@@ -42,6 +42,17 @@ RSYNC_OK_CODES = (0, 24)
 # looks for it gives code 23 with only this error; that's also a vanished file
 RSYNC_VANISHED_RE = re.compile(r'^rsync: (\[sender\] )?link_stat ".*" failed: No such file or directory')
 
+# rclone refuses a file that changed while it was being copied and, when that
+# happens on every attempt, exits with code 6. Like rsync's vanished files
+# that's normal for live data: the file is copied on a later run (#668)
+RCLONE_CHANGED_CODE = 6
+RCLONE_ERROR_RE = re.compile(r'\bERROR\s*:\s*(.*)$')
+RCLONE_CHANGED_RE = re.compile(r"^(.+): Failed to copy: can't copy - source file is being updated")
+# The ERROR lines that follow from those: each attempt's summary, the final one
+# (rclone 1.60) and, for sync, the skipped deletions
+RCLONE_FOLLOW_ON_RE = re.compile(r'^(Attempt \d+/\d+ failed with|Failed to (sync|copy)( with \d+ errors)?:)')
+RCLONE_NOT_DELETING_RE = re.compile(r': not deleting (files|directories) as there were IO errors$')
+
 
 class TransferCommandError(Exception):
     """A transfer command exited with an error.
@@ -141,6 +152,19 @@ def _rsync_failure_detail(errors: list, error_count: int, recent) -> str:
     return errors[0] + (f" (and {more} more error{'s' if more > 1 else ''})" if more else '')
 
 
+def _changed_files(paths: list) -> str:
+    """Return the files rclone didn't copy because they changed, for a warning.
+
+    Args:
+        paths: The files, in the order rclone reported them.
+
+    Returns:
+        e.g. ``1 file (a.log)`` or ``12 files (a.log, …, j.log and 2 more)``.
+    """
+    shown = ', '.join(paths[:10]) + (f' and {len(paths) - 10} more' if len(paths) > 10 else '')
+    return f"{len(paths)} file{'s' if len(paths) > 1 else ''} ({shown})"
+
+
 def error_detail(tool: str, lines: list) -> str:
     """Return the most specific error line from a command's output.
 
@@ -191,7 +215,8 @@ def run_transfer_command(cmd: list, file_count: int,
         TransferCommandError: If the command exits with an error, unless it
             was stopped. For rsync, code 24 (source files vanished), and code
             23 when its only errors are listed files that no longer exist,
-            aren't errors.
+            aren't errors; for rclone, code 6 when its only errors are files
+            that changed while being copied (#668).
     """
     result = {'new': [], 'updated': [], 'deleted': [], 'stopped': False}
 
@@ -210,6 +235,8 @@ def run_transfer_command(cmd: list, file_count: int,
     errors = []           # the first errors that aren't vanished listed files
     error_count = 0
     vanished_count = 0
+    changed = {}          # rclone: files that changed while being copied, in order
+    deletions_skipped = False
 
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
         for line in proc.stdout:
@@ -243,6 +270,16 @@ def run_transfer_command(cmd: list, file_count: int,
                     remaining, total = int(match.group(1)), int(match.group(2))
                     percent = int(100 * (total - remaining) / total)
             else:
+                match = RCLONE_ERROR_RE.search(line)
+                if match:
+                    error = match.group(1)
+                    changed_file = RCLONE_CHANGED_RE.match(error)
+                    if changed_file:
+                        changed[changed_file.group(1)] = None
+                    elif RCLONE_NOT_DELETING_RE.search(error):
+                        deletions_skipped = True
+                    elif not RCLONE_FOLLOW_ON_RE.match(error):
+                        error_count += 1
                 match = RCLONE_FILE_RE.search(line)
                 if match:
                     path, action = match.group(1), match.group(2)
@@ -268,6 +305,8 @@ def run_transfer_command(cmd: list, file_count: int,
     ok_codes = RSYNC_OK_CODES if tool == 'rsync' else (0,)
     if tool == 'rsync' and returncode == 23 and vanished_count and not error_count:
         ok_codes = (23,)    # only listed files that have since vanished
+    if tool == 'rclone' and returncode == RCLONE_CHANGED_CODE and changed and not error_count:
+        ok_codes = (RCLONE_CHANGED_CODE,)    # only files that changed while being copied
     if returncode not in ok_codes:
         detail = (_rsync_failure_detail(errors, error_count, recent) if tool == 'rsync'
                   else error_detail(tool, recent))
@@ -278,6 +317,11 @@ def run_transfer_command(cmd: list, file_count: int,
     if returncode == 23:
         logging.warning("rsync exited with code 23: %d listed file%s vanished before the "
                         "transfer; treating as success", vanished_count, 's' if vanished_count > 1 else '')
+    elif tool == 'rclone' and returncode == RCLONE_CHANGED_CODE:
+        logging.warning("rclone exited with code 6: %s changed while being copied and will be "
+                        "copied on a later transfer%s; treating as success",
+                        _changed_files(list(changed)),
+                        " (rclone skipped this transfer's deletions)" if deletions_skipped else '')
     elif returncode != 0:
         logging.warning("%s exited with code %d (%s); treating as success",
                         tool, returncode, error_detail(tool, recent))
