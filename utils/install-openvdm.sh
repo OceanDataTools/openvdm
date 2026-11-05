@@ -1368,6 +1368,24 @@ EOF
 EOF
 
     if [ "$OS_FAMILY" = "debian" ]; then
+        # Ubuntu 26.04's apache2.service sets MemoryDenyWriteExecute, which
+        # stops PCRE's JIT compiler: the first preg_match() in each Apache
+        # child process then raises a warning, which fails the request.
+        # Turn the JIT off for Apache's PHP where the unit sets it (#662).
+        if [ "$(systemctl show -p MemoryDenyWriteExecute --value apache2 2>/dev/null)" = "yes" ]; then
+            for _php_conf_d in /etc/php/*/apache2/conf.d; do
+                [ -d "${_php_conf_d}" ] || continue
+                echo "Turning off PCRE JIT for Apache's PHP in ${_php_conf_d}"
+                cat > "${_php_conf_d}/99-openvdm.ini" <<'EOF'
+; Added by the OpenVDM installer: apache2.service sets MemoryDenyWriteExecute,
+; which PCRE's JIT compiler needs (#662)
+pcre.jit=0
+EOF
+            done
+        else
+            rm -f /etc/php/*/apache2/conf.d/99-openvdm.ini
+        fi
+
         echo "Enabling rewrite Module"
         a2enmod -q rewrite
 
