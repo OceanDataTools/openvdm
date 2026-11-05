@@ -44,6 +44,21 @@ TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }
 
+
+def excluded_ids(value) -> list:
+    """Return the IDs in a transfer's ``excludedCollectionSystems`` or ``excludedExtraDirectories``.
+
+    Args:
+        value: The comma-separated list of IDs, or ``None``. Empty entries
+            and ``0`` (no exclusion) are skipped (#660).
+
+    Returns:
+        list[str]: The IDs, without surrounding spaces.
+    """
+    ids = (entry.strip() for entry in str(value or '').split(','))
+    return [entry for entry in ids if entry not in ('', '0')]
+
+
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """Gearman worker for cruise data transfers to a secondary destination.
 
@@ -111,9 +126,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             exclude_filterlist.append(f"{os.path.join(wh_cfg['loweringDataBaseDir'], '*', self.ovdm.get_lowering_config_fn())}")
 
         # Handle excluded collection systems
-        ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
-
-        for cst_id in filter(lambda x: x and x != 0, ex_cst_ids):
+        for cst_id in excluded_ids(cdt_cfg.get('excludedCollectionSystems')):
             try:
                 cst_cfg = self.ovdm.get_collection_system_transfer(cst_id)
                 cruise_or_lowering = cst_cfg.get('cruiseOrLowering')
@@ -135,9 +148,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, str(exc))
 
         # Handle excluded extra directories
-        ex_ed_ids = cdt_cfg.get('excludedExtraDirectories', '').split(',') if cdt_cfg.get('excludedExtraDirectories') else []
-
-        for ed_id in filter(lambda x: x and x != 0, ex_ed_ids):
+        for ed_id in excluded_ids(cdt_cfg.get('excludedExtraDirectories')):
             try:
                 ed_cfg = self.ovdm.get_extra_directory(ed_id)
                 cruise_or_lowering = ed_cfg.get('cruiseOrLowering')
