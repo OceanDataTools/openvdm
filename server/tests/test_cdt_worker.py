@@ -93,16 +93,29 @@ def test_exclude_list_without_openvdm_files(worker, warehouse) -> None:
                             os.path.join('Vehicle', '*', 'lowering_config.json')]
 
 
-def test_exclude_list_excluded_directories(worker, fake_ovdm) -> None:
+@pytest.mark.parametrize('value, ids', [
+    (None, []), ('', []), ('0', []), (0, []), ('0,', []),
+    ('1,2,0,', ['1', '2']), (' 3 , 0 ,4', ['3', '4']), (5, ['5']),
+])
+def test_excluded_ids(value, ids) -> None:
+    """Empty entries and 0 aren't IDs to exclude (#660)."""
+    assert cdt_run.excluded_ids(value) == ids
+
+
+def test_exclude_list_excluded_directories(worker, fake_ovdm, caplog) -> None:
     """Excluded collection systems and extra directories, cruise- or lowering-level."""
     systems = {'1': {'cruiseOrLowering': 0, 'destDir': 'SCS/{cruiseID}'},
                '2': {'cruiseOrLowering': 1, 'destDir': 'Video/{loweringID}'}}
     fake_ovdm.get_collection_system_transfer.side_effect = lambda cst_id: systems[cst_id]
     fake_ovdm.get_extra_directory.side_effect = lambda ed_id: {'cruiseOrLowering': 0, 'destDir': 'Products'}
 
-    excludes = worker(excludedCollectionSystems='1,2,0,', excludedExtraDirectories='7').build_exclude_filterlist()
+    excludes = worker(excludedCollectionSystems='1,2,0,', excludedExtraDirectories='7,0').build_exclude_filterlist()
 
     assert excludes[:3] == ['SCS/TEST001/**', os.path.join('Vehicle', '*', 'Video/*') + '/**', 'Products/**']
+    # ID 0 means no exclusion: it isn't looked up (#660)
+    assert [c.args for c in fake_ovdm.get_collection_system_transfer.call_args_list] == [('1',), ('2',)]
+    assert [c.args for c in fake_ovdm.get_extra_directory.call_args_list] == [('7',)]
+    assert 'Could not retrieve' not in caplog.text
 
 
 def test_exclude_list_lowering_extra_directory(worker, fake_ovdm) -> None:
