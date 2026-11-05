@@ -7,24 +7,6 @@ parameters:
 			path: app/Core/Error.php
 
 		-
-			message: '#^Call to static method customErrorMsg\(\) on an unknown class Helpers\\Logger\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Helpers/Database.php
-
-		-
-			message: '#^Call to static method newMessage\(\) on an unknown class Helpers\\Logger\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Helpers/Database.php
-
-		-
-			message: '#^Method Helpers\\Database\:\:get\(\) should return Helpers\\Database but return statement is missing\.$#'
-			identifier: return.missing
-			count: 1
-			path: app/Helpers/Database.php
-
-		-
 			message: '#^Variable \$dates might not be defined\.$#'
 			identifier: variable.undefined
 			count: 1
