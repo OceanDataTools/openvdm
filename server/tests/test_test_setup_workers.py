@@ -376,6 +376,26 @@ def test_cdt_crash(cdt_worker, fake_ovdm) -> None:
     assert fake_ovdm.set_error_cruise_data_transfer_test.call_args.args[1].endswith('(unknown, line ?)')
 
 
+@pytest.mark.parametrize('kind', ['cst', 'cdt'])
+def test_api_error_during_setup_fails_the_job(kind, cst_worker, cdt_worker, fake_ovdm, caplog) -> None:
+    """The API failing while the job is set up fails the job; the worker keeps running (#661).
+
+    Setting the test error fails too: that's logged.
+    """
+    worker, task, payload, set_error = {
+        'cst': (cst_worker, 'testCollectionSystemTransfer', {'collectionSystemTransfer': {'collectionSystemTransferID': 3}},
+                fake_ovdm.set_error_collection_system_transfer_test),
+        'cdt': (cdt_worker, 'testCruiseDataTransfer', {'cruiseDataTransfer': {'cruiseDataTransferID': 5}},
+                fake_ovdm.set_error_cruise_data_transfer_test),
+    }[kind]
+    fake_ovdm.get_shipboard_data_warehouse_config.side_effect = json.JSONDecodeError('Expecting value', '', 0)
+    set_error.side_effect = RuntimeError('API down')
+
+    assert worker.on_job_execute(_job(task, **payload)) == 'crashed'
+    assert set_error.call_args.args[1].startswith('Worker crashed: JSONDecodeError: Expecting value')
+    assert "Unable to set the transfer's status" in caplog.text
+
+
 def test_cdt_stop_quit_and_ignore(cdt_worker, monkeypatch) -> None:
     """Stop sets the flag, quit shuts down, and an ignored test completes."""
     cdt_worker.stop_task()

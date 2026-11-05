@@ -489,6 +489,32 @@ def test_crashed_job_reports_where(job_worker, fake_ovdm, monkeypatch) -> None:
         'Worker crashed: UnknownError (unknown, line ?)'
 
 
+def test_api_error_during_setup_fails_the_job(job_worker, fake_ovdm, monkeypatch) -> None:
+    """The API failing while the job is set up fails the job; the worker keeps running (#661)."""
+    monkeypatch.setattr(cdt_run.python3_gearman.GearmanWorker, 'on_job_exception', lambda self, job, info: 'crashed')
+    job_worker.send_job_data = Mock()
+    fake_ovdm.get_shipboard_data_warehouse_config.side_effect = json.JSONDecodeError('Expecting value', '', 0)
+
+    assert job_worker.on_job_execute(_job()) == 'crashed'
+    assert fake_ovdm.set_error_cruise_data_transfer.call_args.args[1].startswith('Worker crashed: JSONDecodeError: Expecting value')
+    cdt_run.release_transfer_lock.assert_called_once_with('lock')
+
+
+def test_api_error_setting_the_status(job_worker, fake_ovdm, monkeypatch, caplog) -> None:
+    """The API failing to set the status fails the job; the worker keeps running (#661)."""
+    monkeypatch.setattr(cdt_run.python3_gearman.GearmanWorker, 'on_job_execute',
+                        lambda self, job: self.on_job_complete(job, json.dumps({
+                            'parts': [{'partName': 'Transfer Files', 'result': 'Pass'}],
+                            'files': {'new': [], 'updated': [], 'exclude': []}})))
+    monkeypatch.setattr(cdt_run.python3_gearman.GearmanWorker, 'on_job_exception', lambda self, job, info: 'crashed')
+    job_worker.send_job_data = Mock()
+    fake_ovdm.set_idle_cruise_data_transfer.side_effect = RuntimeError('API down')
+    fake_ovdm.set_error_cruise_data_transfer.side_effect = RuntimeError('API down')
+
+    assert job_worker.on_job_execute(_job()) == 'crashed'
+    assert "Unable to set the transfer's status" in caplog.text
+
+
 def test_stop_and_quit(job_worker, monkeypatch) -> None:
     """Stop sets the flag; quit also shuts the worker down."""
     job_worker.stop_task()
