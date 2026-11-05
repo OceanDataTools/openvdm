@@ -367,10 +367,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             current_job: The Gearman job.
 
         Returns:
-            str: The job result from :meth:`_run_job`.
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
         """
         try:
             return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
         finally:
             release_transfer_lock(self.transfer_lock)
             self.transfer_lock = None
@@ -494,7 +500,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         if cdt_id:
-            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            try:
+                self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 

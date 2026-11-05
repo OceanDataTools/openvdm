@@ -143,6 +143,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **A Windows path taken for an rclone remote:** the shoreside data warehouse form, and the cruise data transfer form for a Local Directory, took a Destination Directory such as `C:\data\ssdw` for the rclone remote `C:`, and the shoreside one disabled its SSH fields. A drive letter followed by a slash (or alone) is now a Windows path: the drive letter is dropped, as the collection system transfer form already did for its Source Directory (#630).
 - **Database errors shown as a missing class:** when the web app couldn't connect to MySQL, every page failed with `Class "Helpers\Logger" not found`, and the database's error was lost. The page now shows the usual error message, and the database's error is logged in `www/errorlog.html` (#655).
 - **Warnings about collection system transfer 0 and extra directory 0:** every cruise data transfer logged that it couldn't retrieve them, because `0` (no exclusion) in its exclude lists was looked up as an ID (#660).
+- **Transfer workers ending on an API error:** when the OpenVDM API failed while a collection system, cruise data or ship-to-shore transfer, or a Test Setup, was starting, or while its status was being set, the worker exited and Supervisor restarted it, and the job got no result. Now the job fails, with the error as the transfer's status when the API can still set it, and the worker keeps running (#661).
 
 ---
 

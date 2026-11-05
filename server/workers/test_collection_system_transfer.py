@@ -137,6 +137,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
+        """Run a job for this worker's task.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
+        """
+        try:
+            return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
+
+
+    def _run_job(self, current_job):
         """Set up and run a job for this worker's task.
 
         Reads the job's JSON payload (``collectionSystemTransfer``,
@@ -249,8 +268,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cst_id = (self.collection_system_transfer or {}).get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
-                                                                set_status=not transfer_locked(CST, cst_id))
+            try:
+                self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
+                                                                    set_status=not transfer_locked(CST, cst_id))
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 
