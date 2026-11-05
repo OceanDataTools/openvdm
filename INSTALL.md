@@ -18,6 +18,16 @@ At the time of this writing OpenVDM was built and tested against Debian 12/13, U
 
 > **Note for Rocky/AlmaLinux/RHEL 10:** These releases ship PHP 8.3 natively so the Remi repository is not used. The `php-gearman` extension is not packaged and is built automatically from source via PECL during installation. This requires an active internet connection and adds a few minutes to the install time.
 
+### Memory
+OpenVDM needs at least **4 GB** of memory. MySQL, Apache and gearmand share it with the 20 or so workers that Supervisor runs, and a data dashboard worker processing files can use several hundred MB on its own (#658).
+
+2 GB isn't enough. On a 2 GB test install with the sample data, the kernel ran out of memory and repeatedly killed MySQL and the workers (#657). The web interface failed while MySQL was down, and Supervisor's workers kept restarting. To check whether that's happening, look for OOM kills in the kernel log. `journalctl -k` only reads the current boot, so add `-b -1` to read the one before a restart:
+```
+sudo journalctl -k --no-pager | grep -i -E "out of memory|killed process"
+```
+
+For a short test on a smaller machine, add swap and leave out TiTiler (the installer's TiTiler question).
+
 ### If you are installing OpenVDM remotely
 
 If this is going to be a remote install then SSH Server must be installed.
