@@ -49,6 +49,19 @@ def test_list_ftp_source(fake_run) -> None:
     assert cmd[-2:] == ['--exclude=*.tmp', '--exclude=old/**']
 
 
+def test_list_ftp_source_with_dirs(fake_run) -> None:
+    """with_dirs lists the directories too, with None as their size (#659)."""
+    fake_run.on('rclone', 'lsjson', stdout=json.dumps([
+        {'Path': 'sub', 'Size': -1, 'IsDir': True, 'ModTime': '2019-08-11T19:03:35Z'},
+        {'Path': 'sub/b.raw', 'Size': 2048, 'IsDir': False, 'ModTime': '2019-08-11T19:03:36Z'},
+    ]))
+
+    success, entries = cu.list_ftp_source(CONFIG, 'ftp_source', '/data', with_dirs=True)
+
+    assert success and [(path, size) for path, size, _ in entries] == [('sub', None), ('sub/b.raw', 2048)]
+    assert '--files-only' not in fake_run.calls[0].cmd
+
+
 def test_list_ftp_source_refused_directory_fails(fake_run) -> None:
     """A directory the server won't list fails the listing instead of looking empty (#208)."""
     fake_run.on('rclone', 'lsjson', returncode=3, stderr='2026/10/22 10:00:00 ERROR : sub: error listing: 550 Permission denied\n')
