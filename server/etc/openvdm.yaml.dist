@@ -35,6 +35,13 @@ vessel:
     #    operatorID: ""   # e.g. edu.ucsd.sio
     #    schedulerID: ""  # e.g. org.unols
 
+# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if
+# any. Saved in each lowering's loweringConfig.json and lowering README. The
+# installer asks for it; leave the fields empty without a vehicle.
+vehicle:
+    name: ""
+    operator: ""  # the institution that owns and operates it
+
 # The transferInterval defines the interval for performing collectionSystemTransfer.
 # The unit is in minutes.
 transferInterval: 5

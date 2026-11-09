@@ -246,6 +246,10 @@ function set_default_variables {
     DEFAULT_R2R_OPERATOR_ID=
     DEFAULT_R2R_SCHEDULER_ID=
 
+    DEFAULT_VEHICLE=no
+    DEFAULT_VEHICLE_NAME=
+    DEFAULT_VEHICLE_OPERATOR=
+
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
         echo Reading pre-saved defaults from "$PREFERENCES_FILE"
@@ -297,6 +301,10 @@ DEFAULT_VESSEL_R2R=$VESSEL_R2R
 DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
 DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
 DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
+
+DEFAULT_VEHICLE=$VEHICLE
+DEFAULT_VEHICLE_NAME=$(printf '%q' "$VEHICLE_NAME")
+DEFAULT_VEHICLE_OPERATOR=$(printf '%q' "$VEHICLE_OPERATOR")
 EOF
     chmod 600 "$PREFERENCES_FILE"
 }
@@ -1892,12 +1900,12 @@ function setup_ssh {
 ###########################################################################
 ###########################################################################
 # Install OpenVDM
-function _vessel_yaml_get {
-    # Print the value of $2 in the top-level "vessel:" block of the
+function _yaml_block_get {
+    # Print the value of $3 in the top-level "$2:" block (e.g. vessel) of the
     # openvdm.yaml file $1, unquoted. Prints nothing if the file, block or
     # key is missing, or the key is commented out.
-    awk -v key="$2" -v q="'" '
-        /^vessel:/ { in_block = 1; next }
+    awk -v block="$2" -v key="$3" -v q="'" '
+        $0 ~ "^" block ":" { in_block = 1; next }
         in_block && /^[^[:space:]#]/ { exit }
         in_block && $0 ~ "^[[:space:]]+" key ":" {
             value = $0
@@ -2012,14 +2020,50 @@ function _yaml_quote {
     printf '"%s"' "${value//\"/\\\"}"
 }
 
+function _set_yaml_block {
+    # Put the top-level block in file $3 (starting with its "$2:" line) into
+    # the openvdm.yaml file $1, in place of its "$2:" block, or at the end of
+    # the file after the comment lines in file $4 if it has none (files from
+    # before 2.17). The rest of the file is left as it is.
+    local yaml_file=$1 block=$2 block_file=$3 comment_file=$4
+
+    if grep -q "^${block}:" "$yaml_file"; then
+        # Replace the block: the "$2:" line and the indented, blank or
+        # commented-out lines after it, up to the next top-level line
+        awk -v block="$block" -v block_file="$block_file" '
+            $0 ~ "^" block ":" {
+                while ((getline line < block_file) > 0) print line
+                skipping = 1; blank = 0; next
+            }
+            skipping && /^([[:space:]]|$)/ { if ($0 ~ /^[[:space:]]*$/) blank = 1; next }
+            skipping { skipping = 0; if (blank) print "" }
+            { print }' "$yaml_file" > "${yaml_file}.new"
+    else
+        {
+            cat "$yaml_file"
+            [ -n "$(tail -c1 "$yaml_file")" ] && echo
+            echo
+            cat "$comment_file" "$block_file"
+        } > "${yaml_file}.new"
+    fi
+
+    # Keep the file's owner and permissions
+    cat "${yaml_file}.new" > "$yaml_file"
+    rm -f "${yaml_file}.new"
+
+    local venv_python=${INSTALL_ROOT}/openvdm/venv/bin/python
+    if [ -x "$venv_python" ] && ! "$venv_python" -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' "$yaml_file" 2>/dev/null; then
+        echo "WARNING: ${yaml_file} isn't valid YAML after setting the ${block}; please check it."
+    fi
+}
+
 function write_vessel_config {
     # Write the "vessel:" block of the openvdm.yaml file $1 from the VESSEL_*
-    # and R2R_* answers, in place of the existing block, or at the end of
-    # the file if it has none (files from before 2.17). The rest of the file
-    # is left as it is.
+    # and R2R_* answers
     local yaml_file=$1
-    local block_file
+    local block_file comment_file
     block_file=$(mktemp)
+    comment_file=$(mktemp)
 
     {
         echo "vessel:"
@@ -2040,37 +2084,36 @@ function write_vessel_config {
             echo "    #    schedulerID: \"\"  # e.g. org.unols"
         fi
     } > "$block_file"
+    {
+        echo "# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json"
+        echo "# and read by QA tools (e.g. sbe-qa-processing). All fields are optional."
+    } > "$comment_file"
 
-    if grep -q '^vessel:' "$yaml_file"; then
-        # Replace the block: the "vessel:" line and the indented, blank or
-        # commented-out lines after it, up to the next top-level line
-        awk -v block_file="$block_file" '
-            /^vessel:/ {
-                while ((getline line < block_file) > 0) print line
-                skipping = 1; blank = 0; next
-            }
-            skipping && /^([[:space:]]|$)/ { if ($0 ~ /^[[:space:]]*$/) blank = 1; next }
-            skipping { skipping = 0; if (blank) print "" }
-            { print }' "$yaml_file" > "${yaml_file}.new"
-    else
-        {
-            cat "$yaml_file"
-            [ -n "$(tail -c1 "$yaml_file")" ] && echo
-            echo
-            echo "# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json"
-            echo "# and read by QA tools (e.g. sbe-qa-processing). All fields are optional."
-            cat "$block_file"
-        } > "${yaml_file}.new"
-    fi
+    _set_yaml_block "$yaml_file" vessel "$block_file" "$comment_file"
+    rm -f "$block_file" "$comment_file"
+}
 
-    # Keep the file's owner and permissions
-    cat "${yaml_file}.new" > "$yaml_file"
-    rm -f "${yaml_file}.new" "$block_file"
+function write_vehicle_config {
+    # Write the "vehicle:" block of the openvdm.yaml file $1 from the
+    # VEHICLE_* answers (#674); its fields are empty without a vehicle
+    local yaml_file=$1
+    local block_file comment_file
+    block_file=$(mktemp)
+    comment_file=$(mktemp)
 
-    local venv_python=${INSTALL_ROOT}/openvdm/venv/bin/python
-    if [ -x "$venv_python" ] && ! "$venv_python" -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' "$yaml_file" 2>/dev/null; then
-        echo "WARNING: ${yaml_file} isn't valid YAML after setting the vessel; please check it."
-    fi
+    {
+        echo "vehicle:"
+        echo "    name: $(_yaml_quote "$VEHICLE_NAME")"
+        echo "    operator: $(_yaml_quote "$VEHICLE_OPERATOR")  # the institution that owns and operates it"
+    } > "$block_file"
+    {
+        echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if"
+        echo "# any. Saved in each lowering's loweringConfig.json and lowering README. The"
+        echo "# installer asks for it; leave the fields empty without a vehicle."
+    } > "$comment_file"
+
+    _set_yaml_block "$yaml_file" vehicle "$block_file" "$comment_file"
+    rm -f "$block_file" "$comment_file"
 }
 
 function install_openvdm {
@@ -2170,6 +2213,14 @@ UPDATE OVDM_CoreVars SET value = '${_CRUISE_ID}' WHERE name = 'cruiseID';
 UPDATE OVDM_CoreVars SET value = '${_CRUISE_START}' WHERE name IN ('cruiseStartDate', 'loweringStartDate');
 UPDATE OVDM_CoreVars SET value = '${_CRUISE_END}' WHERE name = 'cruiseEndDate';
 EOF
+
+        # A vehicle's dives are lowerings, so turn on lowering components (#674)
+        if [ "$VEHICLE" = "yes" ]; then
+            cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
+
+UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
+EOF
+        fi
 
         hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
         cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
@@ -2327,6 +2378,8 @@ EOF
 
     echo "Setting the vessel in ${_YAML}"
     write_vessel_config "${_YAML}"
+    echo "Setting the vehicle in ${_YAML}"
+    write_vehicle_config "${_YAML}"
 
     cd ${startingDir}
 }
@@ -2902,12 +2955,12 @@ echo
 # so changes made there by hand are kept
 _EXISTING_YAML=${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
-    DEFAULT_VESSEL_NAME=$(_vessel_yaml_get "$_EXISTING_YAML" name)
-    DEFAULT_VESSEL_CONTACT_INSTITUTION=$(_vessel_yaml_get "$_EXISTING_YAML" institution)
-    DEFAULT_VESSEL_CONTACT_EMAIL=$(_vessel_yaml_get "$_EXISTING_YAML" email)
-    DEFAULT_R2R_VESSEL_ID=$(_vessel_yaml_get "$_EXISTING_YAML" vesselID)
-    DEFAULT_R2R_OPERATOR_ID=$(_vessel_yaml_get "$_EXISTING_YAML" operatorID)
-    DEFAULT_R2R_SCHEDULER_ID=$(_vessel_yaml_get "$_EXISTING_YAML" schedulerID)
+    DEFAULT_VESSEL_NAME=$(_yaml_block_get "$_EXISTING_YAML" vessel name)
+    DEFAULT_VESSEL_CONTACT_INSTITUTION=$(_yaml_block_get "$_EXISTING_YAML" vessel institution)
+    DEFAULT_VESSEL_CONTACT_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vessel email)
+    DEFAULT_R2R_VESSEL_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel vesselID)
+    DEFAULT_R2R_OPERATOR_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel operatorID)
+    DEFAULT_R2R_SCHEDULER_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel schedulerID)
     DEFAULT_VESSEL_R2R=no
     if [ -n "$DEFAULT_R2R_VESSEL_ID$DEFAULT_R2R_OPERATOR_ID$DEFAULT_R2R_SCHEDULER_ID" ]; then
         DEFAULT_VESSEL_R2R=yes
@@ -2976,6 +3029,40 @@ else
     R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID}
     R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID}
     R2R_SCHEDULER_ID=${DEFAULT_R2R_SCHEDULER_ID}
+fi
+echo
+
+#########################################################################
+# Vehicle (#674)
+echo "#####################################################################"
+echo "A vehicle (ROV, HOV or AUV) whose dives OpenVDM manages as lowerings."
+echo "Its name and operator are saved with each lowering. On a new install,"
+echo "answering yes also turns on lowering components."
+echo
+
+# An existing openvdm.yaml's vehicle settings win over the saved defaults,
+# so changes made there by hand are kept
+if [ -e "$_EXISTING_YAML" ] && grep -q '^vehicle:' "$_EXISTING_YAML"; then
+    DEFAULT_VEHICLE_NAME=$(_yaml_block_get "$_EXISTING_YAML" vehicle name)
+    DEFAULT_VEHICLE_OPERATOR=$(_yaml_block_get "$_EXISTING_YAML" vehicle operator)
+    DEFAULT_VEHICLE=no
+    if [ -n "$DEFAULT_VEHICLE_NAME$DEFAULT_VEHICLE_OPERATOR" ]; then
+        DEFAULT_VEHICLE=yes
+    fi
+fi
+
+yes_no "Will OpenVDM be used with a vehicle (ROV, HOV, AUV)? " $DEFAULT_VEHICLE
+VEHICLE=$YES_NO_RESULT
+
+if [ "$VEHICLE" = "yes" ]; then
+    read -r -p "Vehicle name? ($DEFAULT_VEHICLE_NAME) " VEHICLE_NAME
+    VEHICLE_NAME=${VEHICLE_NAME:-$DEFAULT_VEHICLE_NAME}
+
+    read -r -p "Vehicle operator (the institution that owns and operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
+    VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
+else
+    VEHICLE_NAME=
+    VEHICLE_OPERATOR=
 fi
 echo
 

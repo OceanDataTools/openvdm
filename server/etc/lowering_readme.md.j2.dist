@@ -13,7 +13,7 @@
 # Lowering {{ lowering.loweringID }}{% if cruise.cruiseID %} (cruise {{ cruise.cruiseID }}){% endif %}
 
 
-This directory holds the data collected during lowering {{ lowering.loweringID }}{% if cruise.cruiseID %} of cruise {{ cruise.cruiseID }}{% if cruise.cruiseName %} ({{ cruise.cruiseName }}){% endif %}{% endif %}{% if vessel.name %} aboard {{ vessel.name }}{% endif %}, organized by OpenVDM (Open Vessel Data Management).
+This directory holds the data collected during lowering {{ lowering.loweringID }}{% if vehicle.name %} by {{ vehicle.name }}{% endif %}{% if cruise.cruiseID %} of cruise {{ cruise.cruiseID }}{% if cruise.cruiseName %} ({{ cruise.cruiseName }}){% endif %}{% endif %}{% if vessel.name %} aboard {{ vessel.name }}{% endif %}, organized by OpenVDM (Open Vessel Data Management).
 
 ## Lowering
 
@@ -22,6 +22,12 @@ This directory holds the data collected during lowering {{ lowering.loweringID }
 {% endif %}
 {% if lowering.loweringExtent %}
 - **Extent:** {{ lowering.loweringExtent.westernmost }} to {{ lowering.loweringExtent.easternmost }} longitude, {{ lowering.loweringExtent.southernmost }} to {{ lowering.loweringExtent.northernmost }} latitude (decimal degrees)
+{% endif %}
+{% if vehicle.name %}
+- **Vehicle:** {{ vehicle.name }}
+{% endif %}
+{% if vehicle.operator %}
+- **Vehicle operator:** {{ vehicle.operator }}
 {% endif %}
 {% if vessel.name %}
 - **Vessel:** {{ vessel.name }}
