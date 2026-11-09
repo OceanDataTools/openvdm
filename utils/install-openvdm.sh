@@ -249,6 +249,7 @@ function set_default_variables {
     DEFAULT_VEHICLE=no
     DEFAULT_VEHICLE_NAME=
     DEFAULT_VEHICLE_OPERATOR=
+    DEFAULT_VEHICLE_EMAIL=
 
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
@@ -305,6 +306,7 @@ DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
 DEFAULT_VEHICLE=$VEHICLE
 DEFAULT_VEHICLE_NAME=$(printf '%q' "$VEHICLE_NAME")
 DEFAULT_VEHICLE_OPERATOR=$(printf '%q' "$VEHICLE_OPERATOR")
+DEFAULT_VEHICLE_EMAIL=$(printf '%q' "$VEHICLE_EMAIL")
 EOF
     chmod 600 "$PREFERENCES_FILE"
 }
@@ -2105,6 +2107,7 @@ function write_vehicle_config {
         echo "vehicle:"
         echo "    name: $(_yaml_quote "$VEHICLE_NAME")"
         echo "    operator: $(_yaml_quote "$VEHICLE_OPERATOR")  # the institution that owns and operates it"
+        echo "    email: $(_yaml_quote "$VEHICLE_EMAIL")     # the operator's contact email"
     } > "$block_file"
     {
         echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if"
@@ -3036,8 +3039,8 @@ echo
 # Vehicle (#674)
 echo "#####################################################################"
 echo "A vehicle (ROV, HOV or AUV) whose dives OpenVDM manages as lowerings."
-echo "Its name and operator are saved with each lowering. On a new install,"
-echo "answering yes also turns on lowering components."
+echo "Its name, operator and contact email are saved with each lowering. On a"
+echo "new install, answering yes also turns on lowering components."
 echo
 
 # An existing openvdm.yaml's vehicle settings win over the saved defaults,
@@ -3045,8 +3048,9 @@ echo
 if [ -e "$_EXISTING_YAML" ] && grep -q '^vehicle:' "$_EXISTING_YAML"; then
     DEFAULT_VEHICLE_NAME=$(_yaml_block_get "$_EXISTING_YAML" vehicle name)
     DEFAULT_VEHICLE_OPERATOR=$(_yaml_block_get "$_EXISTING_YAML" vehicle operator)
+    DEFAULT_VEHICLE_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vehicle email)
     DEFAULT_VEHICLE=no
-    if [ -n "$DEFAULT_VEHICLE_NAME$DEFAULT_VEHICLE_OPERATOR" ]; then
+    if [ -n "$DEFAULT_VEHICLE_NAME$DEFAULT_VEHICLE_OPERATOR$DEFAULT_VEHICLE_EMAIL" ]; then
         DEFAULT_VEHICLE=yes
     fi
 fi
@@ -3058,13 +3062,18 @@ if [ "$VEHICLE" = "yes" ]; then
     read -r -p "Vehicle name? ($DEFAULT_VEHICLE_NAME) " VEHICLE_NAME
     VEHICLE_NAME=${VEHICLE_NAME:-$DEFAULT_VEHICLE_NAME}
 
-    # Usually the vessel's operator, so offer that until one is set
+    # Usually the vessel's operator, so offer its details until they're set
     DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_CONTACT_INSTITUTION}
+    DEFAULT_VEHICLE_EMAIL=${DEFAULT_VEHICLE_EMAIL:-$VESSEL_CONTACT_EMAIL}
     read -r -p "Vehicle operator (the institution that owns and operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
     VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
+
+    read -r -p "Vehicle contact email? ($DEFAULT_VEHICLE_EMAIL) " VEHICLE_EMAIL
+    VEHICLE_EMAIL=${VEHICLE_EMAIL:-$DEFAULT_VEHICLE_EMAIL}
 else
     VEHICLE_NAME=
     VEHICLE_OPERATOR=
+    VEHICLE_EMAIL=
 fi
 echo
 

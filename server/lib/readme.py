@@ -309,9 +309,9 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
           ``None``).
         - ``cruise``: the ``cruiseID`` and ``cruiseName`` it belongs to.
         - ``vessel``: as ``vessel`` in ``openvdm.yaml``, unset fields left out.
-        - ``vehicle``: the ``name`` and ``operator`` of the vehicle that made
-          the dive, from the lowering's config, so a rebuilt README matches
-          it; ``{}`` without one (#674).
+        - ``vehicle``: the ``name``, ``operator`` and ``email`` of the
+          vehicle that made the dive, from the lowering's config, so a
+          rebuilt README matches it; ``{}`` without one (#674).
         - ``collection_systems``, ``extra_directories``: the lowering's
           folders, each with ``name``, ``longName``, ``description`` and
           ``destDir`` (relative to the lowering's directory).

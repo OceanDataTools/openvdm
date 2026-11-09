@@ -26,8 +26,8 @@ This directory holds the data collected during lowering {{ lowering.loweringID }
 {% if vehicle.name %}
 - **Vehicle:** {{ vehicle.name }}
 {% endif %}
-{% if vehicle.operator %}
-- **Vehicle operator:** {{ vehicle.operator }}
+{% if vehicle.operator or vehicle.email %}
+- **Vehicle operator:** {{ [vehicle.operator, vehicle.email] | select | join(", ") }}
 {% endif %}
 {% if vessel.name %}
 - **Vessel:** {{ vessel.name }}

@@ -329,8 +329,8 @@ class OpenVDM():
 
         Returns:
             dict: e.g. ``{'name': 'Jason', 'operator': 'Woods Hole
-            Oceanographic Institution'}``; ``{}`` if nothing is set, as
-            without a vehicle.
+            Oceanographic Institution', 'email': ...}``; ``{}`` if nothing is
+            set, as without a vehicle.
         """
 
         return _settings_block(self.config.get('vehicle'))

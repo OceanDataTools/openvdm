@@ -311,7 +311,7 @@ def test_export_lowering_config(worker, api, lowering_dir, perms) -> None:
 
 def test_export_lowering_config_vehicle(worker, api, lowering_dir) -> None:
     """The vehicle settings from openvdm.yaml, unset fields left out (#674)."""
-    api.config['vehicle'] = {'name': ' Jason ', 'operator': 'WHOI', 'notes': ''}
+    api.config['vehicle'] = {'name': ' Jason ', 'operator': 'WHOI', 'email': ''}
     _setup(worker)
     worker.export_lowering_config()
     assert json.loads(_config_file(lowering_dir).read_text())['vehicle'] == {'name': 'Jason', 'operator': 'WHOI'}
@@ -389,13 +389,13 @@ def test_build_lowering_readme(worker, api, lowering_dir, perms) -> None:
 
 def test_build_lowering_readme_vehicle(worker, api, lowering_dir) -> None:
     """The vehicle comes from the lowering's config file, not openvdm.yaml as it is now (#674)."""
-    api.config['vehicle'] = {'name': 'Jason', 'operator': 'WHOI'}
+    api.config['vehicle'] = {'name': 'Jason', 'operator': 'WHOI', 'email': 'ops@whoi.example'}
     _setup(worker)
     worker.export_lowering_config()
     api.config['vehicle'] = {'name': 'Sentry'}
     assert worker.build_lowering_readme() == {'verdict': True}
     text = (lowering_dir / 'README.md').read_text()
-    assert 'lowering DIVE01 by Jason' in text and '- **Vehicle operator:** WHOI' in text
+    assert 'lowering DIVE01 by Jason' in text and '- **Vehicle operator:** WHOI, ops@whoi.example' in text
     assert 'Sentry' not in text
 
 

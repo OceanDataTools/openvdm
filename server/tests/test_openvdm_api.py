@@ -183,9 +183,9 @@ def test_vessel_config(ovdm) -> None:
 
 def test_vehicle_config(ovdm) -> None:
     """The vehicle block, as for the vessel; nothing without a vehicle (#674)."""
-    ovdm.config['vehicle'] = {'name': ' Jason ', 'operator': None}
-    assert ovdm.get_vehicle_config() == {'name': 'Jason'}
-    ovdm.config['vehicle'] = {'name': '', 'operator': ''}
+    ovdm.config['vehicle'] = {'name': ' Jason ', 'operator': None, 'email': 'ops@whoi.example'}
+    assert ovdm.get_vehicle_config() == {'name': 'Jason', 'email': 'ops@whoi.example'}
+    ovdm.config['vehicle'] = {'name': '', 'operator': '', 'email': ''}
     assert ovdm.get_vehicle_config() == {}
     ovdm.config.pop('vehicle')
     assert ovdm.get_vehicle_config() == {}
