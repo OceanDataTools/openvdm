@@ -52,6 +52,8 @@ Router::any('config/system/editShipToShoreBWLimit', '\Controllers\Config\System@
 Router::any('config/system/enableMD5FilesizeLimit', '\Controllers\Config\System@enableMD5FilesizeLimit');
 Router::any('config/system/disableMD5FilesizeLimit', '\Controllers\Config\System@disableMD5FilesizeLimit');
 Router::any('config/system/editMD5FilesizeLimit', '\Controllers\Config\System@editMD5FilesizeLimit');
+Router::any('config/system/showLoweringComponents', '\Controllers\Config\System@showLoweringComponents');
+Router::any('config/system/hideLoweringComponents', '\Controllers\Config\System@hideLoweringComponents');
 
 Router::any('config/system/editCruiseConfigFn', '\Controllers\Config\System@editCruiseConfigFn');
 Router::any('config/system/editLoweringConfigFn', '\Controllers\Config\System@editLoweringConfigFn');

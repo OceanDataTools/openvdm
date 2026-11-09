@@ -67,6 +67,7 @@ class System extends Controller {
         $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
         $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
         $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
+        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
 
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -410,6 +411,28 @@ class System extends Controller {
     public function disableMD5FilesizeLimit() {
 
         $this->_warehouseModel->disableMd5FilesizeLimit();
+        Url::redirect('config/system');
+    }
+
+    public function showLoweringComponents() {
+
+        $this->_warehouseModel->showLoweringComponents();
+
+        # Rebuild the current cruise's directory so it gets the lowering
+        # base directory, as the cruise forms' switch did before #676
+        $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
+        if (!empty($gmData['cruiseID'])) {
+            $gmc= new \GearmanClient();
+            $gmc->addServer();
+            $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
+        }
+
+        Url::redirect('config/system');
+    }
+
+    public function hideLoweringComponents() {
+
+        $this->_warehouseModel->hideLoweringComponents();
         Url::redirect('config/system');
     }
 
