@@ -93,6 +93,18 @@ def test_file_list_by_priority(worker, fake_ovdm, warehouse) -> None:
     assert files == {'include': ['TEST001_summary.txt', 'track.kml'], 'new': [], 'updated': [], 'exclude': []}
 
 
+def test_file_list_required_openvdm_files(worker, fake_ovdm, warehouse) -> None:
+    """The required transfers' file name placeholders are filled in; spaces around filters ignored (#679)."""
+    _tree(warehouse.cruise_dir, ['cruise_config.json', 'md5_summary.txt', 'md5_summary.md5', 'other.json'])
+    fake_ovdm.get_required_ship_to_shore_transfers.return_value = [
+        _s2s(1, '{md5_summary_fn}, {md5_summary_md5_fn} ,'), _s2s(2, '{cruise_config_fn}')]
+
+    files = worker().build_filelist()['files']
+
+    assert sorted(files['include'][:2]) == ['md5_summary.md5', 'md5_summary.txt']
+    assert files['include'][2:] == ['cruise_config.json']
+
+
 def test_file_list_from_collection_systems_and_extra_directories(worker, fake_ovdm, warehouse) -> None:
     """Patterns are relative to the source's directory; lowering-level ones to each lowering's."""
     _tree(warehouse.cruise_dir, ['SCS/nav.csv', 'SCS/raw.dat', 'Vehicle/DIVE01/Video/clip.jpg',

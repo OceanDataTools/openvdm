@@ -140,8 +140,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         def _keyword_replace_and_split(raw_filter):
-            """
-            Replace any wildcards in the provided filters
+            """Fill in the placeholders and split the comma-separated filters.
+
+            ``{cruiseID}`` and the OpenVDM file names the required transfers
+            use (#679); ``{loweringID}`` is filled in for each lowering later.
             """
 
             def _expand_placeholders(template: str, context: dict) -> str:
@@ -150,12 +152,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return template
 
 
+            warehouse = self.shipboard_data_warehouse_config
             context = {
-                '{cruiseID}': self.cruise_id
-                #'{loweringID}': self.lowering_id or '{loweringID}'
+                '{cruiseID}': self.cruise_id,
+                '{cruise_config_fn}': warehouse['cruiseConfigFn'],
+                '{md5_summary_fn}': warehouse['md5SummaryFn'],
+                '{md5_summary_md5_fn}': warehouse['md5SummaryMd5Fn'],
             }
 
-            return _expand_placeholders(raw_filter, context).split(',')
+            return [flt.strip() for flt in _expand_placeholders(raw_filter, context).split(',')
+                    if flt.strip()]
 
         transfers = (
             self.ovdm.get_required_ship_to_shore_transfers()
