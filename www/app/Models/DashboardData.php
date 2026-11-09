@@ -6,7 +6,6 @@ use Core\Model;
 
 class DashboardData extends Model {
 
-    // const CONFIG_FN = 'ovdmConfig.json';
     // const MANIFEST_FN = 'manifest.json';
 
     private $_cruiseDataDir;

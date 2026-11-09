@@ -2125,7 +2125,7 @@ function write_vessel_config {
         fi
     } > "$block_file"
     {
-        echo "# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json"
+        echo "# The vessel this OpenVDM install is on. Saved in each cruise's config file"
         echo "# and read by QA tools (e.g. sbe-qa-processing). All fields are optional."
     } > "$comment_file"
 
@@ -2149,7 +2149,7 @@ function write_vehicle_config {
     } > "$block_file"
     {
         echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if"
-        echo "# any. Saved in each lowering's loweringConfig.json and lowering README. The"
+        echo "# any. Saved in each lowering's config file and lowering README. The"
         echo "# installer asks for it; leave the fields empty without a vehicle."
     } > "$comment_file"
 

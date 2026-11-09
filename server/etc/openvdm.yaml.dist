@@ -22,7 +22,7 @@ siteRoot: "http://127.0.0.1/"
 # Change this to a strong random value before deploying (e.g. openssl rand -hex 32).
 workerApiKey: "change-me-to-a-strong-random-value"
 
-# The vessel this OpenVDM install is on. Saved in each cruise's ovdmConfig.json
+# The vessel this OpenVDM install is on. Saved in each cruise's config file
 # and read by QA tools (e.g. sbe-qa-processing). All fields are optional.
 vessel:
     name: ""
@@ -36,7 +36,7 @@ vessel:
     #    schedulerID: ""  # e.g. org.unols
 
 # The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if
-# any. Saved in each lowering's loweringConfig.json and lowering README. The
+# any. Saved in each lowering's config file and lowering README. The
 # installer asks for it; leave the fields empty without a vehicle.
 vehicle:
     name: ""

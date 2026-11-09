@@ -324,7 +324,7 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
 
     Args:
         lowering_config: The lowering's config, as written to its
-            ``loweringConfig.json`` (``loweringID``, dates, ``loweringExtent``,
+            config file (``loweringID``, dates, ``loweringExtent``,
             ``loweringFinalizedOn``, ``vehicle``).
         cruise_config: The current cruise's config (``OpenVDM.get_cruise_config()``).
         collection_systems: All collection system transfers
