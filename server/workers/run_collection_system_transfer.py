@@ -770,9 +770,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     command.insert(2, '--protect-args')
 
             # The SSH password goes to sshpass in a file, not on the command line (#426)
-            with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as command:
-                logging.debug("File list Command: %s", ' '.join(command))
-                proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
+                logging.debug("File list Command: %s", ' '.join(run_cmd))
+                proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
             # A failed or partial listing looks like missing files, and
             # with syncFromSource those are deleted from the destination (#238)
             reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
@@ -854,7 +854,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return_files['include'] = verified_paths
                 return_files['filesize'] = verified_sizes
             else:
-                proc = subprocess.run(command, capture_output=True, text=True, check=False)
+                # A password file of its own: the listing's was deleted when it finished (#688)
+                with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
+                    proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
                 # Otherwise the staleness check is silently skipped (#238)
                 reason = _rsync_listing_failure(f"Error re-listing source directory {raw_source_dir}",
                                                 proc, cst_cfg['syncFromSource'] == 1)
