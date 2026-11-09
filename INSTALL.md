@@ -678,7 +678,7 @@ sudo bash ./utils/install-openvdm.sh
    The installer:
    - installs Jinja2 into OpenVDM's virtual environment, and PHP's `mbstring` extension and the `league/commonmark` Composer package (#431, #460, #643);
    - asks for the vessel settings (name, contact, and R2R IDs if the vessel submits data to R2R) and writes them to the `vessel` block of your `openvdm.yaml` (#365, #462);
-   - asks whether OpenVDM is used with a vehicle (ROV, HOV, AUV) and, if so, for its name, operator and contact email, which default to the vessel's contact, and writes them to the `vehicle` block. On an existing database it doesn't turn on lowering components: use **Show Lowering Components** on the **Edit Cruise** form (#674);
+   - asks whether OpenVDM is used with a vehicle (ROV, HOV, AUV) and, if so, for its name, operator and contact email, which default to the vessel's contact, and writes them to the `vehicle` block. On an existing database it doesn't turn on lowering components: use **Show Lowering Components** under **System Behaviors** on the Configuration page's **System** tab (#674, #676);
    - copies `server/etc/cruise_readme.md.j2`, `lowering_readme.md.j2`, `cruise_position_sources.yaml` and `lowering_position_sources.yaml` from their `.dist` files, keeping any you already have (#501, #639);
    - starts the workers through `server/lib/worker_launcher.py`, which posts an OpenVDM message when a worker fails (#503);
    - replaces a worker API key that's still `change-me-to-a-strong-random-value` with a random one, in `openvdm.yaml` and `Config.php`. The API refuses the placeholder from 2.17 (#605);
