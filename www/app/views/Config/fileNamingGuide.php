@@ -53,7 +53,7 @@ $explain = function ($described) use ($h) {
         <h1 class="page-header">File Naming Guide</h1>
         <p>
             What each collection system's files must be called for OpenVDM to copy them into the
-            <?php echo $h(strtolower(CRUISE_NAME)); ?> data, from the transfers' filters as they are now
+            <?php echo $h(\Helpers\Terms::cruise(true)); ?> data, from the transfers' filters as they are now
             (<?php echo $h(CRUISE_NAME); ?> <code><?php echo $h($data['context']['cruiseID']); ?></code><?php
             if ($data['context']['loweringID'] !== '') { ?>, <?php echo $h(LOWERING_NAME); ?> <code><?php echo $h($data['context']['loweringID']); ?></code><?php } ?>,
             <?php echo $h(gmdate('Y/m/d H:i', $data['context']['now'])); ?> UTC).

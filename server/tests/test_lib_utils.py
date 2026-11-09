@@ -168,6 +168,36 @@ def test_lowering_readme_context_vehicle() -> None:
                                                 'README.md')['vehicle'] == {}
 
 
+@pytest.mark.parametrize('name, expected', [
+    ('Voyage', 'voyage'), ('Research Expedition', 'research expedition'), ('ROV Dive', 'ROV dive'),
+    ('Sea-Trial', 'sea-trial'), ('A Dive', 'a dive')])
+def test_lower_term(name, expected) -> None:
+    """Lower case for a sentence, except words in capitals, as Helpers\\Terms::lower() (#684)."""
+    assert readme.lower_term(name) == expected
+
+
+def test_readme_context_terms() -> None:
+    """The defaults without terms; any missing filled in; a _lower form of each (#684)."""
+    context = readme.build_cruise_readme_context(CRUISE_CONFIG, [], [], None, 'README.md')
+    assert context['terms']['cruise'] == 'Cruise' and context['terms']['lowerings_lower'] == 'lowerings'
+    context = readme.build_lowering_readme_context({'loweringID': 'DIVE01'}, CRUISE_CONFIG, [], [], None,
+                                                   'README.md', terms={'cruise': 'Voyage', 'lowering': 'Dive'})
+    assert context['terms'] == {'cruise': 'Voyage', 'cruises': 'Cruises', 'lowering': 'Dive',
+                                'lowerings': 'Lowerings', 'cruise_lower': 'voyage',
+                                'cruises_lower': 'cruises', 'lowering_lower': 'dive',
+                                'lowerings_lower': 'lowerings'}
+
+
+def test_cruise_readme_lowerings_entry_terms() -> None:
+    """The lowerings folder is named with the install's terms, without the generic explanation (#684)."""
+    context = readme.build_cruise_readme_context(CRUISE_CONFIG, SYSTEMS, EXTRA_DIRS, VESSEL, 'README.md',
+                                                 show_lowerings=True, terms={'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'ROV Dive', 'lowerings': 'ROV Dives'})
+    text = readme.render_readme(os.path.join(readme.OPENVDM_ROOT, 'server', 'etc', 'cruise_readme.md.j2.dist'),
+                                context)
+    assert '`Vehicle/`: ROV Dives' in text and 'A directory for each ROV dive, named by its ROV dive ID' in text
+    assert 'vehicle dive or deployment' not in text
+
+
 # --- README: rendering and writing --------------------------------------------
 
 def test_render_readme(tmp_path) -> None:

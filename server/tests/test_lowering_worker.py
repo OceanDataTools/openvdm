@@ -399,6 +399,17 @@ def test_build_lowering_readme_vehicle(worker, api, lowering_dir) -> None:
     assert 'Sentry' not in text
 
 
+def test_build_lowering_readme_terms(worker, api, lowering_dir) -> None:
+    """The README calls the lowering and cruise what the install does; an acronym keeps its capitals (#684)."""
+    api.get_terms.return_value = {'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'ROV Dive', 'lowerings': 'ROV Dives'}
+    _setup(worker)
+    worker.export_lowering_config()
+    assert worker.build_lowering_readme() == {'verdict': True}
+    text = (lowering_dir / 'README.md').read_text()
+    assert '# ROV Dive DIVE01 (voyage TEST001)' in text and 'during ROV dive DIVE01' in text
+    assert "the ROV dive's OpenVDM configuration" in text
+
+
 def test_build_lowering_readme_turned_off(worker, api, lowering_dir) -> None:
     """Turned off in openvdm.yaml: skipped, nothing written."""
     api.config['loweringReadme']['enable'] = False

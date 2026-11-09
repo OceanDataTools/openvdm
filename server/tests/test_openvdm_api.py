@@ -181,6 +181,15 @@ def test_vessel_config(ovdm) -> None:
     assert ovdm.get_vessel_config() == {}
 
 
+def test_terms_defaults(ovdm, api) -> None:
+    """Names the API leaves out, or a response that isn't an object, get the defaults (#684)."""
+    api.responses['api/warehouse/getTerms'] = (200, json.dumps({'cruise': 'Voyage', 'lowering': ''}))
+    assert ovdm.get_terms() == {'cruise': 'Voyage', 'cruises': 'Cruises', 'lowering': 'Lowering',
+                                'lowerings': 'Lowerings'}
+    api.responses['api/warehouse/getTerms'] = (200, json.dumps(['Voyage']))
+    assert ovdm.get_terms()['cruise'] == 'Cruise'
+
+
 def test_vehicle_config(ovdm) -> None:
     """The vehicle block, as for the vessel; nothing without a vehicle (#674)."""
     ovdm.config['vehicle'] = {'name': ' Jason ', 'operator': None, 'email': 'ops@whoi.example'}
@@ -222,6 +231,9 @@ def test_placeholder_is_openvdm_yaml_dists() -> None:
 # (method, args, API path, response, return value); a ✓ in TOKEN_PATHS sends the worker token
 GETTERS = [
     ('get_show_lowering_components', (), 'api/warehouse/getShowLoweringComponents', 'true', True),
+    ('get_terms', (), 'api/warehouse/getTerms',
+     {'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'Dive', 'lowerings': 'Dives'},
+     {'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'Dive', 'lowerings': 'Dives'}),
     ('get_md5_filesize_limit', (), 'api/warehouse/getMD5FilesizeLimit', {'md5FilesizeLimit': '10'}, '10'),
     ('get_md5_filesize_limit_status', (), 'api/warehouse/getMD5FilesizeLimitStatus',
      {'md5FilesizeLimitStatus': 'On'}, 'On'),

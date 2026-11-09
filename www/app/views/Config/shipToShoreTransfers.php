@@ -100,7 +100,7 @@ use Helpers\Session;
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
-            <p>This page is for managing ship-to-shore transfers between the Shipboard Data Warehouse and the Shoreside Data Warehouse. A Ship-to-Shore Transfers specifies subsets of the cruise data directory that should be queued for transfer.</p>
+            <p>This page is for managing ship-to-shore transfers between the Shipboard Data Warehouse and the Shoreside Data Warehouse. A Ship-to-Shore Transfers specifies subsets of the <?php echo \Helpers\Terms::cruise(true); ?> data directory that should be queued for transfer.</p>
             <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit Ship-to-Shore Transfer Form" where you can modify the Ship-to-Shore Transfer.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Ship-to-Shore Transfer. There is a confirmation window so don't worry about accidental clicks.</p>
             <p>The button in the <strong>Enabled</strong> Column shows whether a Ship-to-Shore Transfer will be performed.  Click the button in the enable column to toggle the enable status of the cooresponding Ship-to-Shore Transfer.</p>

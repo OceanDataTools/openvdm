@@ -63,8 +63,8 @@ class FileNamingGuide
     public static function placeholderKey($context)
     {
         $rows = array(
-            array('{cruiseID}', 'the ' . strtolower(CRUISE_NAME) . ' ID', $context['cruiseID']),
-            array('{loweringID}', 'the ' . strtolower(LOWERING_NAME) . ' ID', $context['loweringID']),
+            array('{cruiseID}', 'the ' . Terms::cruise(true) . ' ID', $context['cruiseID']),
+            array('{loweringID}', 'the ' . Terms::lowering(true) . ' ID', $context['loweringID']),
         );
         foreach (self::DATE_PLACEHOLDERS as $placeholder => list($meaning, $format)) {
             $rows[] = array($placeholder, $meaning, '');
@@ -251,7 +251,7 @@ class FileNamingGuide
                     continue;
                 }
                 if ($placeholder === '{loweringID}') {
-                    $add('text', 'the ' . strtolower(LOWERING_NAME) . ' ID');
+                    $add('text', 'the ' . Terms::lowering(true) . ' ID');
                     $i += strlen($placeholder) - 1;
                     continue;
                 }

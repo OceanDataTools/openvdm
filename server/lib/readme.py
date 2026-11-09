@@ -27,6 +27,8 @@ from typing import Optional
 
 import jinja2
 
+from server.lib.openvdm import DEFAULT_TERMS
+
 # The OpenVDM checkout: server/lib/readme.py -> the repository root
 OPENVDM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
@@ -189,10 +191,39 @@ def _extent(value) -> Optional[dict]:
     return value if isinstance(value, dict) and value else None
 
 
+def lower_term(name: str) -> str:
+    """Return a cruise or lowering name as it reads in a sentence (#684).
+
+    Each word in lower case, except one in capitals, such as an acronym, as
+    ``Helpers\\Terms::lower()`` does in the web app: "ROV Dive" gives
+    "ROV dive".
+
+    Args:
+        name: The name, e.g. ``'Voyage'``.
+
+    Returns:
+        str: e.g. ``'voyage'``.
+    """
+    return re.sub(r'[^\s-]+', lambda m: m.group(0) if len(m.group(0)) > 1 and m.group(0).isupper()
+                  else m.group(0).lower(), name)
+
+
+def _terms(terms) -> dict:
+    """Return the cruise and lowering names for a template (#684).
+
+    The names in *terms* (``OpenVDM.get_terms()``), with
+    :data:`server.lib.openvdm.DEFAULT_TERMS`' for any missing, and each also
+    as ``<name>_lower`` (:func:`lower_term`) for the middle of a sentence.
+    """
+    terms = terms if isinstance(terms, dict) else {}
+    names = {key: str(terms.get(key) or default) for key, default in DEFAULT_TERMS.items()}
+    return {**names, **{f'{key}_lower': lower_term(value) for key, value in names.items()}}
+
+
 def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                                 extra_directories: list, vessel: dict,
                                 readme_fn: str, finalized_on: Optional[str] = None,
-                                show_lowerings: bool = False) -> dict:
+                                show_lowerings: bool = False, terms: Optional[dict] = None) -> dict:
     """Return the variables a cruise README template is rendered with.
 
     Only enabled collection systems and extra directories are listed, and
@@ -208,6 +239,8 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
         readme_fn: The README's file name.
         finalized_on: When the cruise was finalized, if it has been.
         show_lowerings: Whether lowerings are used (``showLoweringComponents``).
+        terms: What the install calls cruises and lowerings
+            (``OpenVDM.get_terms()``); the defaults without it.
 
     Returns:
         dict: The template variables:
@@ -268,6 +301,7 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
 
     return {
         'cruise': cruise,
+        'terms': _terms(terms),
         'vessel': vessel or {},
         'collection_systems': _directories(collection_systems, 0, cruise_id, lowering_data_base_dir),
         'extra_directories': cruise_extra_directories,
@@ -281,7 +315,7 @@ def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  
 
 def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  # pylint: disable=too-many-arguments,too-many-positional-arguments
                                   collection_systems: list, extra_directories: list,
-                                  vessel: dict, readme_fn: str) -> dict:
+                                  vessel: dict, readme_fn: str, terms: Optional[dict] = None) -> dict:
     """Return the variables a lowering README template is rendered with.
 
     As for :func:`build_cruise_readme_context`, only enabled lowering-level
@@ -298,10 +332,13 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
         extra_directories: All extra directories (``OpenVDM.get_extra_directories()``).
         vessel: The vessel settings (``OpenVDM.get_vessel_config()``).
         readme_fn: The README's file name.
+        terms: What the install calls cruises and lowerings
+            (``OpenVDM.get_terms()``); the defaults without it.
 
     Returns:
         dict: The template variables:
 
+        - ``terms``: as for :func:`build_cruise_readme_context`.
         - ``lowering``: ``loweringID``, ``loweringStartDate``,
           ``loweringEndDate`` (``''`` when unset), ``loweringExtent``
           (``westernmost``, ``easternmost``, ``southernmost`` and
@@ -342,6 +379,7 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
     return {
         'lowering': lowering,
         'cruise': {key: (cruise_config.get(key) or '') for key in ('cruiseID', 'cruiseName')},
+        'terms': _terms(terms),
         'vessel': vessel or {},
         'vehicle': vehicle if isinstance(vehicle, dict) else {},
         'collection_systems': _directories(collection_systems, 1, cruise_id, lowering_data_base_dir, lowering_id),

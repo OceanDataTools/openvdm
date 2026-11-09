@@ -202,12 +202,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             cruise_config = self.ovdm.get_cruise_config()
             collection_systems = self.ovdm.get_collection_system_transfers()
             extra_directories = self.ovdm.get_extra_directories()
+            terms = self.ovdm.get_terms()
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return {'verdict': False, 'reason': f"Unable to get the configuration from OpenVDM: {exc}"}
 
         context = build_lowering_readme_context(
             lowering_config, cruise_config, collection_systems, extra_directories,
-            self.ovdm.get_vessel_config(), readme_fn)
+            self.ovdm.get_vessel_config(), readme_fn, terms=terms)
 
         try:
             text = render_readme(settings['template'], context)

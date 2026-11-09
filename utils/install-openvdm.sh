@@ -246,6 +246,11 @@ function set_default_variables {
     DEFAULT_R2R_OPERATOR_ID=
     DEFAULT_R2R_SCHEDULER_ID=
 
+    DEFAULT_CRUISE_NAME=Cruise
+    DEFAULT_CRUISE_NAME_PLURAL=
+    DEFAULT_LOWERING_NAME=Lowering
+    DEFAULT_LOWERING_NAME_PLURAL=
+
     DEFAULT_VEHICLE=no
     DEFAULT_VEHICLE_NAME=
     DEFAULT_VEHICLE_OPERATOR=
@@ -302,6 +307,11 @@ DEFAULT_VESSEL_R2R=$VESSEL_R2R
 DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
 DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
 DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
+
+DEFAULT_CRUISE_NAME=$(printf '%q' "$CRUISE_NAME")
+DEFAULT_CRUISE_NAME_PLURAL=$(printf '%q' "$CRUISE_NAME_PLURAL")
+DEFAULT_LOWERING_NAME=$(printf '%q' "$LOWERING_NAME")
+DEFAULT_LOWERING_NAME_PLURAL=$(printf '%q' "$LOWERING_NAME_PLURAL")
 
 DEFAULT_VEHICLE=$VEHICLE
 DEFAULT_VEHICLE_NAME=$(printf '%q' "$VEHICLE_NAME")
@@ -1200,9 +1210,9 @@ EOF
     cat > /etc/samba/openvdm.conf <<EOF
 # SMB Shares for OpenVDM
 
-[CruiseData]
-  comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/CruiseData
+[${CRUISEDATA_DIRNAME}]
+  comment=${CRUISE_NAME} Data, read-only access to guest
+  path=${DATA_ROOT}/${CRUISEDATA_DIRNAME}
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -1325,8 +1335,8 @@ EOF
 
     cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /CruiseData/ $DATA_ROOT/CruiseData/
-    <Directory "$DATA_ROOT/CruiseData">
+    Alias /${CRUISEDATA_DIRNAME}/ $DATA_ROOT/${CRUISEDATA_DIRNAME}/
+    <Directory "$DATA_ROOT/${CRUISEDATA_DIRNAME}">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1747,8 +1757,6 @@ function configure_directories {
     if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData
-
         if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
             mkdir -p ${DATA_ROOT}/PublicData
             chmod -R 777 ${DATA_ROOT}/PublicData
@@ -1759,6 +1767,14 @@ function configure_directories {
         fi
 
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
+    fi
+
+    # The cruise data directory, named after the cruises (#684), also when
+    # the data root already existed
+    if [ ! -d "${DATA_ROOT}/${CRUISEDATA_DIRNAME}" ]; then
+        echo "Creating the ${CRUISE_NAME} data directory: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+        mkdir -p "${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+        chown ${OPENVDM_USER}:${OPENVDM_USER} "${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
@@ -1902,6 +1918,28 @@ function setup_ssh {
 ###########################################################################
 ###########################################################################
 # Install OpenVDM
+function _config_php_get {
+    # Print the value of define('$2', '...') in the Config.php file $1.
+    # Prints nothing if the file or the define is missing.
+    sed -n "s/^[[:space:]]*define('$2',[[:space:]]*'\(.*\)');.*/\1/p" "$1" 2>/dev/null | head -n 1
+}
+
+function _ask_name {
+    # Ask $1 with the default $2 until the answer is a name OpenVDM can use
+    # in Config.php and directory names: letters, digits, spaces and hyphens,
+    # starting with a letter or digit (#684). Sets NAME_RESULT
+    local answer
+    while true; do
+        read -r -p "$1 ($2) " answer
+        answer=${answer:-$2}
+        if [[ "$answer" =~ ^[A-Za-z0-9][A-Za-z0-9\ -]*$ ]]; then
+            NAME_RESULT=$answer
+            return
+        fi
+        echo "Use letters, digits, spaces and hyphens only, e.g. Voyage or Research Expedition."
+    done
+}
+
 function _yaml_block_get {
     # Print the value of $3 in the top-level "$2:" block (e.g. vessel) of the
     # openvdm.yaml file $1, unquoted. Prints nothing if the file, block or
@@ -2305,7 +2343,12 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/${CRUISEDATA_DIRNAME}');|" | \
+    sed -e "s|define('CRUISEDATA_APACHEDIR', '/CruiseData');|define('CRUISEDATA_APACHEDIR', '/${CRUISEDATA_DIRNAME}');|" | \
+    sed -e "s|define('CRUISE_NAME', 'Cruise');|define('CRUISE_NAME', '${CRUISE_NAME}');|" | \
+    sed -e "s|define('CRUISE_NAME_PLURAL', 'Cruises');|define('CRUISE_NAME_PLURAL', '${CRUISE_NAME_PLURAL}');|" | \
+    sed -e "s|define('LOWERING_NAME', 'Lowering');|define('LOWERING_NAME', '${LOWERING_NAME}');|" | \
+    sed -e "s|define('LOWERING_NAME_PLURAL', 'Lowerings');|define('LOWERING_NAME_PLURAL', '${LOWERING_NAME_PLURAL}');|" | \
     sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" | \
     sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
     sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
@@ -2955,6 +2998,54 @@ fi
 echo
 
 #########################################################################
+# Names for cruises and lowerings (#684)
+echo "#####################################################################"
+echo "What your organization calls a cruise, e.g. Cruise, Expedition or"
+echo "Voyage. OpenVDM's web pages and READMEs use it, and on a new install"
+echo "the data directory, Samba share and web address are named after it"
+echo "(e.g. VoyageData)."
+echo
+
+# An existing Config.php's names win over the saved defaults, and its data
+# directory keeps its name, so an existing install's data and links don't move
+_EXISTING_CONFIG_PHP=${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
+_EXISTING_BASEDIR=
+if [ -e "$_EXISTING_CONFIG_PHP" ]; then
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISE_NAME)
+    DEFAULT_CRUISE_NAME=${_value:-$DEFAULT_CRUISE_NAME}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISE_NAME_PLURAL)
+    DEFAULT_CRUISE_NAME_PLURAL=${_value:-$DEFAULT_CRUISE_NAME_PLURAL}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" LOWERING_NAME)
+    DEFAULT_LOWERING_NAME=${_value:-$DEFAULT_LOWERING_NAME}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" LOWERING_NAME_PLURAL)
+    DEFAULT_LOWERING_NAME_PLURAL=${_value:-$DEFAULT_LOWERING_NAME_PLURAL}
+    _EXISTING_BASEDIR=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISEDATA_BASEDIR)
+fi
+
+_ask_name "What is a cruise called?" "$DEFAULT_CRUISE_NAME"
+CRUISE_NAME=$NAME_RESULT
+# The plural's default is the saved one only if it's for the same name
+if [ "$CRUISE_NAME" != "$DEFAULT_CRUISE_NAME" ] || [ -z "$DEFAULT_CRUISE_NAME_PLURAL" ]; then
+    DEFAULT_CRUISE_NAME_PLURAL="${CRUISE_NAME}s"
+fi
+_ask_name "And more than one?" "$DEFAULT_CRUISE_NAME_PLURAL"
+CRUISE_NAME_PLURAL=$NAME_RESULT
+
+# Lowerings are named with the vehicle's questions; until then, the saved names
+LOWERING_NAME=$DEFAULT_LOWERING_NAME
+LOWERING_NAME_PLURAL=${DEFAULT_LOWERING_NAME_PLURAL:-${LOWERING_NAME}s}
+
+if [ -n "$_EXISTING_BASEDIR" ]; then
+    CRUISEDATA_DIRNAME=$(basename "$_EXISTING_BASEDIR")
+    if [ "$CRUISEDATA_DIRNAME" != "$(printf '%s' "$CRUISE_NAME" | tr -cd 'A-Za-z0-9')Data" ]; then
+        echo "The data directory keeps its name: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+    fi
+else
+    CRUISEDATA_DIRNAME="$(printf '%s' "$CRUISE_NAME" | tr -cd 'A-Za-z0-9')Data"
+fi
+echo
+
+#########################################################################
 # Vessel
 echo "#####################################################################"
 echo "The vessel this OpenVDM install is on. It's saved with each cruise and"
@@ -3081,6 +3172,15 @@ if [ "$VEHICLE" = "yes" ]; then
 
     read -r -p "Vehicle contact email? ($DEFAULT_VEHICLE_EMAIL) " VEHICLE_EMAIL
     VEHICLE_EMAIL=${VEHICLE_EMAIL:-$DEFAULT_VEHICLE_EMAIL}
+
+    # What its dives are called, e.g. Lowering, Dive or Deployment (#684)
+    _ask_name "What is one of the vehicle's dives called (e.g. Lowering, Dive or Deployment)?" "$DEFAULT_LOWERING_NAME"
+    LOWERING_NAME=$NAME_RESULT
+    if [ "$LOWERING_NAME" != "$DEFAULT_LOWERING_NAME" ] || [ -z "$DEFAULT_LOWERING_NAME_PLURAL" ]; then
+        DEFAULT_LOWERING_NAME_PLURAL="${LOWERING_NAME}s"
+    fi
+    _ask_name "And more than one?" "$DEFAULT_LOWERING_NAME_PLURAL"
+    LOWERING_NAME_PLURAL=$NAME_RESULT
 else
     VEHICLE_NAME=
     VEHICLE_OPERATOR=
@@ -3188,7 +3288,7 @@ OVDM_LOWERING_ID=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe 
     "SELECT value FROM OVDM_CoreVars WHERE name='loweringID';" 2>/dev/null)
 OVDM_SHOW_LOWERING=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
     "SELECT value FROM OVDM_CoreVars WHERE name='showLoweringComponents';" 2>/dev/null)
-OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+OVDM_CRUISE_DIR="${DATA_ROOT}/${CRUISEDATA_DIRNAME}/${OVDM_CRUISE_ID}"
 OVDM_ROOT="${INSTALL_ROOT}/openvdm"
 
 export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
@@ -3314,7 +3414,7 @@ echo "#####################################################################"
 echo "OpenVDM Installation: Complete"
 echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
 echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
-echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+echo "${CRUISE_NAME} data will be stored at: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
 echo
 
 #########################################################################

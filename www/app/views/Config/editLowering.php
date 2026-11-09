@@ -48,7 +48,7 @@ use Helpers\Form;
     } else {
 ?>
                                     <select name="loweringID" class="form-control disabled">
-                                        <option>No <?php echo LOWERING_NAME ?>s Available</option>
+                                        <option>No <?php echo \Helpers\Terms::lowerings(); ?> Available</option>
 <?php
     }
 ?>

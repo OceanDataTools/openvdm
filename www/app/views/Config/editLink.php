@@ -50,7 +50,7 @@ use Helpers\Form;
             <h3>Page Guide</h3>
             <p>This form is for editing a link displayed in the navigational sidebar.</p>
             <p>The <strong>Name</strong> field is a link name (i.e. <?php echo CRUISE_NAME; ?> Data).  This name should be short but can have spaces.</p>
-            <p>The <strong>URL</strong> field is the full URL for the link (i.e. http://192.168.1.42/CruiseData ).  Currently there is one wildcard enabled.  If the URL contains the string '{cruiseID}', that string will be replaced with the current cruise ID.</p>
+            <p>The <strong>URL</strong> field is the full URL for the link (i.e. http://192.168.1.42<?php echo CRUISEDATA_APACHEDIR; ?> ).  Currently there is one wildcard enabled.  If the URL contains the string '{cruiseID}', that string will be replaced with the current <?php echo \Helpers\Terms::cruise(true); ?> ID.</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>

@@ -680,6 +680,7 @@ sudo bash ./utils/install-openvdm.sh
    The installer:
    - installs Jinja2 into OpenVDM's virtual environment, and PHP's `mbstring` extension and the `league/commonmark` Composer package (#431, #460, #643);
    - asks for the vessel settings (name, contact, and R2R IDs if the vessel submits data to R2R) and writes them to the `vessel` block of your `openvdm.yaml` (#365, #462);
+   - asks what a cruise is called (e.g. Voyage) and its plural, with your `Config.php`'s names as the defaults, and, if OpenVDM is used with a vehicle, the same for a lowering. Your data directory, Samba share and web address keep their names (`CruiseData`); only a new install names them after the cruise name (#684);
    - asks whether OpenVDM is used with a vehicle (ROV, HOV, AUV) and, if so, for its name, operator and contact email, which default to the vessel's contact, and writes them to the `vehicle` block. On an existing database it doesn't turn on lowering components: use **Show Lowering Components** under **System Behaviors** on the Configuration page's **System** tab (#674, #676);
    - copies `server/etc/cruise_readme.md.j2`, `lowering_readme.md.j2`, `cruise_position_sources.yaml` and `lowering_position_sources.yaml` from their `.dist` files, keeping any you already have (#501, #639);
    - starts the workers through `server/lib/worker_launcher.py`, which posts an OpenVDM message when a worker fails (#503);
@@ -698,7 +699,7 @@ mysql -u root -p openvdm < ./database/openvdm_216_to_217.sql
 cd <openvdm_root>
 diff www/app/Core/Config.php.216 www/app/Core/Config.php
 ```
-   Copy over only the settings you'd changed yourself. The installer has already set `SITETITLE` to v2.17.0. `CST_DESCRIPTION_TEMPLATE` and `EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE` are new and commented out, so the defaults are used; see "Description templates" in the CHANGELOG (#449). Keep the `.216` copy until the upgrade is working.
+   Copy over only the settings you'd changed yourself. The installer has already set `CRUISE_NAME`, `LOWERING_NAME` and their new plurals from your answers, and `SITETITLE` to v2.17.0. `CST_DESCRIPTION_TEMPLATE` and `EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE` are new and commented out, so the defaults are used; see "Description templates" in the CHANGELOG (#449). Keep the `.216` copy until the upgrade is working.
 7. Add the README settings to your `server/etc/openvdm.yaml`: copy the `cruiseReadme` and `loweringReadme` blocks from `server/etc/openvdm.yaml.dist`. The installer doesn't add them. Without them, the READMEs are written as `README.md` instead of `<cruiseID>_README.md` and `<cruiseID>_<loweringID>_README.md` (#431, #445, #638).
 
    `openvdm.yaml.dist` also has new commented-out hook examples to copy if you want them: the trackline scripts (`postDataDashboard`, #396) and [nav-qa-processing](https://github.com/OceanDataTools/nav-qa-processing) (`postCollectionSystemTransfer` and `preFinalizeCurrentCruise`, #653).

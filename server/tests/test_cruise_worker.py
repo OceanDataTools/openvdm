@@ -378,6 +378,16 @@ def test_build_cruise_readme(worker, api, warehouse, perms) -> None:
     api.update_md5_summary.assert_called_once_with(updated=['README.md'], cruise_id='TEST001', background=False)
 
 
+def test_build_cruise_readme_terms(worker, api, warehouse) -> None:
+    """The README calls the cruise what the install does (#684)."""
+    api.get_terms.return_value = {'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'ROV Dive', 'lowerings': 'ROV Dives'}
+    _setup(worker)
+    worker.export_cruise_config()
+    assert worker.build_cruise_readme() == {'verdict': True}
+    text = (warehouse.cruise_dir / 'README.md').read_text()
+    assert '# Voyage TEST001' in text and 'during voyage TEST001' in text and '## Voyage' in text
+
+
 def test_build_cruise_readme_without_config_file(worker, warehouse, caplog) -> None:
     """Without a config file yet, the README is written without a finalized date."""
     _setup(worker)
