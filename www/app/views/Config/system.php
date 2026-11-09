@@ -85,6 +85,23 @@ if ($data['shipboardDataWarehouseStatus'] === '3') {
 ?>
                         </td>
                     </tr>
+                    <tr>
+                        <td>Show <?php echo LOWERING_NAME; ?> Components</td>
+                        <td></td>
+                        <td style='text-align:center'>
+<?php
+            if($data['showLoweringComponents'] === True){
+?>
+                            <a class="btn btn-xs btn-success" href='<?php echo DIR; ?>config/system/hideLoweringComponents'>On</a>
+<?php
+            } else {
+?>
+                            <a class="btn btn-xs btn-danger" href='<?php echo DIR; ?>config/system/showLoweringComponents'>Off</a>
+<?php
+            }
+?>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
             <table class='table table-striped table-hover table-bordered responsive'>

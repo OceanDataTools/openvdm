@@ -138,9 +138,6 @@ use Helpers\Form;
                                         <th style='width:20px;'>Enabled</th>
                                     </tr>
                                     <tr>
-                                        <td>Show Lowering Components</td><td style='width:20px; text-align:center'><?php echo $data['showLoweringComponents'] === True ? Form::submit(array('name'=>'hideLoweringComponents', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'showLoweringComponents', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
-                                    </tr>
-                                    <tr>
                                         <td>Ship-to-Shore Transfers</td><td style='width:20px; text-align:center'><?php echo $data['shipToShoreTransfersEnable'] === '1' ? Form::submit(array('name'=>'disableSSDW', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'enableSSDW', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
                                     </tr>
                                 </table>

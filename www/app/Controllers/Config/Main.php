@@ -74,7 +74,6 @@ class Main extends Controller {
         $data['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         $data['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         $data['cruises'] = $this->_warehouseModel->getCruises();
-        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         $error = [];
 
         if(isset($_POST['submit'])) {
@@ -216,28 +215,6 @@ class Main extends Controller {
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(!empty($_POST)) {
-
-            if(isset($_POST['hideLoweringComponents'])) {
-                $this->_warehouseModel->hideLoweringComponents();
-            }
-
-            if(isset($_POST['showLoweringComponents'])) {
-                $this->_warehouseModel->showLoweringComponents();
-
-                # create the gearman client
-                $gmc= new \GearmanClient();
-
-                # add the default server (localhost)
-                $gmc->addServer();
-
-                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
-
-                #submit job to Gearman
-                $data['jobResults'] = json_decode($gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData)));
-            }
-
-            $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         }
 
         View::rendertemplate('header',$data);
@@ -468,7 +445,6 @@ class Main extends Controller {
         }
 
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
-        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         $data['title'] = 'Configuration';
         $data['css'] = array('datetimepicker');
         $data['javascript'] = array('datetimepicker');
@@ -594,23 +570,6 @@ class Main extends Controller {
             $data['cruiseEndPort'] = $_POST['cruiseEndPort'] ?? '';
 
 
-            if(isset($_POST['hideLoweringComponents'])) {
-                $this->_warehouseModel->hideLoweringComponents();
-            }
-
-            if(isset($_POST['showLoweringComponents'])) {
-                $this->_warehouseModel->showLoweringComponents();
-
-                # Rebuild the current cruise's directory so it gets the lowering
-                # base directory, as Edit Cruise does
-                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
-                if (!empty($gmData['cruiseID'])) {
-                    $gmc= new \GearmanClient();
-                    $gmc->addServer();
-                    $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
-                }
-            }
-
             if(isset($_POST['disableSSDW'])) {
                 $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($SSDW->cruiseDataTransferID);
             }
@@ -632,7 +591,6 @@ class Main extends Controller {
 
             $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
             $data['shipToShoreTransfersEnable'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($SSDW->cruiseDataTransferID)[0]->enable;
-            $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
 
         }
 

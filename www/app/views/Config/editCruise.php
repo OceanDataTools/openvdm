@@ -120,20 +120,6 @@ use Helpers\Form;
                         </div>
                         <div class="row">
                             <div class="col-lg-12">
-                                <label>Other Options</label>
-                                <table class='table table-striped table-hover table-bordered responsive'>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th style='width:20px;'>Enabled</th>
-                                    </tr>
-                                    <tr>
-                                        <td>Show <?php echo LOWERING_NAME; ?> Components</td><td style='width:20px; text-align:center'><?php echo $data['showLoweringComponents'] === True ? Form::submit(array('name'=>'hideLoweringComponents', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'showLoweringComponents', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
                             </div>
