@@ -3058,6 +3058,8 @@ if [ "$VEHICLE" = "yes" ]; then
     read -r -p "Vehicle name? ($DEFAULT_VEHICLE_NAME) " VEHICLE_NAME
     VEHICLE_NAME=${VEHICLE_NAME:-$DEFAULT_VEHICLE_NAME}
 
+    # Usually the vessel's operator, so offer that until one is set
+    DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_CONTACT_INSTITUTION}
     read -r -p "Vehicle operator (the institution that owns and operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
     VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
 else
