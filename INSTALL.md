@@ -200,7 +200,9 @@ The sample data also sets up local test servers for each transfer type: Samba sh
 - the OpenVDM user, with the OpenVDM password, can read the sample data root and write only to `ftp_destination`;
 - anonymous users can read `ftp_source`.
 
-The sample data includes lowering-level transfers, so installing it also turns on lowering components. After setting up the cruise, the installer sets up the current lowering (`ROV0001` on a new install) and runs its transfers along with the cruise's.
+The sample data includes lowering-level transfers, from an ROV. They follow the answer to the installer's vehicle question (#681):
+- **yes:** the installer turns on lowering components and, after setting up the cruise, sets up the current lowering (`ROV0001` on a new install) and runs its transfers along with the cruise's. The data dashboard's Lowering tab is shown;
+- **no** (the default): the sample is cruise-only. The lowering-level transfers are disabled and no lowering is set up. To try them later, turn on **Show Lowering Components** on the System tab, enable the transfers, and set up a lowering.
 
 ### All done... almost ###
 When the script completes successfully there will a message containing how to access the OpenVDM web-interface:
