@@ -167,6 +167,25 @@ def test_local_file_list(worker, tmp_path) -> None:
     assert result['files']['new'] == [] and result['files']['updated'] == []
 
 
+def test_empty_directories() -> None:
+    """Directories with nothing under them but default-ignored files, unless filtered out (#659)."""
+    dirs = ['/src/a', '/src/b', '/src/b/c', '/src/d', '/src/e', '/src/tmp', '/src/caf\u00e9', '/src/old']
+    paths = ['/src/d/x.raw', '/src/e/.DS_Store']
+    filters = {'ignore_filters': ['*/tmp/*'], 'exclude_filters': ['*/old/'], 'include_filters': ['*.raw']}
+    assert cst_run.empty_directories(dirs, paths, filters) == ['/src/a', '/src/b/c', '/src/e']
+    assert cst_run.empty_directories(['a', 'a/b'], [], filters) == ['a/b']
+
+
+@pytest.mark.parametrize('skip, dirs', [(0, ['a', 'b/c']), (1, [])])
+def test_local_file_list_empty_directories(worker, tmp_path, skip, dirs) -> None:
+    """With Skip empty directories off, the source's empty directories are listed (#659)."""
+    _tree(tmp_path / 'src', {'d/x.raw': 'x'})
+    (tmp_path / 'src' / 'a').mkdir()
+    (tmp_path / 'src' / 'b' / 'c').mkdir(parents=True)
+    result = worker(sourceDir=str(tmp_path / 'src'), skipEmptyDirs=skip).build_cst_filelist()
+    assert result['files']['include'] == ['d/x.raw'] and result['files']['dirs'] == dirs
+
+
 def test_local_file_list_lowering_placeholder(worker, tmp_path) -> None:
     """Filters can use {loweringID}."""
     _tree(tmp_path, {'DIVE01.raw': 'a', 'DIVE02.raw': 'b'})
@@ -269,6 +288,20 @@ def test_rsync_file_list(worker, fake_run) -> None:
     assert cmd[-3:] == ['--password-file=/tmp/pw', '--no-motd', 'rsync://survey@host/module/data/']
 
 
+@pytest.mark.parametrize('skip, dirs', [(0, ['a', 'b/c']), (1, [])])
+def test_rsync_file_list_empty_directories(worker, fake_run, skip, dirs) -> None:
+    """The listing's d lines give the empty directories, without "." (#659)."""
+    fake_run.on('rsync', stdout='drwxr-xr-x          4,096 2026/10/22 10:00:00 .\n'
+                                'drwxr-xr-x          4,096 2026/10/22 10:00:00 a\n'
+                                'drwxr-xr-x          4,096 2026/10/22 10:00:00 b\n'
+                                'drwxr-xr-x          4,096 2026/10/22 10:00:00 b/c\n'
+                                'drwxr-xr-x          4,096 2026/10/22 10:00:00 d\n'
+                                'lrwxrwxrwx              5 2026/10/22 10:00:00 d/link\n'
+                                '-rw-r--r--             10 2026/10/22 10:00:00 a.raw\n')
+    result = worker(transferType=2, skipEmptyDirs=skip).build_cst_filelist(rsync_password_filepath='/tmp/pw')
+    assert result['files']['include'] == ['a.raw'] and result['files']['dirs'] == dirs
+
+
 def test_ssh_file_list(worker, fake_run) -> None:
     """The SSH password goes to sshpass in a file (#426); macOS gets no --protect-args."""
     fake_run.on('sshpass', stdout=RSYNC_LISTING)
@@ -321,18 +354,34 @@ def test_rsync_staleness_relisting_fails(worker, fake_run, monkeypatch) -> None:
 def test_ftp_file_list(worker, monkeypatch) -> None:
     """FTP sources are listed with rclone lsjson, not through the mount (#208)."""
     calls = []
-    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda config, remote, path, excludes: calls.append(
+    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda config, remote, path, excludes, **kwargs: calls.append(
         (config, remote, path)) or (True, [('a.raw', 10, time.time()), ('sub/b.csv', 3, time.time())]))
 
     result = worker(transferType=5, includeFilter='*.raw').build_cst_filelist(prefix='/mnt', rclone_config='cfg')
 
-    assert result['files'] == {'include': ['a.raw'], 'exclude': ['sub/b.csv'], 'new': [], 'updated': []}
+    assert result['files'] == {'include': ['a.raw'], 'exclude': ['sub/b.csv'], 'new': [], 'updated': [], 'dirs': []}
     assert calls == [('cfg', 'ftp_source', '/data')]
+
+
+@pytest.mark.parametrize('skip, dirs', [(0, ['empty']), (1, [])])
+def test_ftp_file_list_empty_directories(worker, monkeypatch, skip, dirs) -> None:
+    """The directories are listed only with Skip empty directories off (#659)."""
+    calls = []
+    def listing(*args, with_dirs=False):
+        calls.append(with_dirs)
+        entries = [('sub/a.raw', 10, time.time())]
+        return True, entries + ([('sub', None, 0), ('empty', None, 0)] if with_dirs else [])
+    monkeypatch.setattr(cst_run, 'list_ftp_source', listing)
+
+    result = worker(transferType=5, skipEmptyDirs=skip).build_cst_filelist(prefix='/mnt', rclone_config='cfg')
+
+    assert result['files']['include'] == ['sub/a.raw'] and result['files']['dirs'] == dirs
+    assert calls == [skip == 0]
 
 
 def test_ftp_file_list_failure(worker, monkeypatch) -> None:
     """A failed rclone listing fails the file list."""
-    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args: (False, '550 Permission denied'))
+    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args, **kwargs: (False, '550 Permission denied'))
     assert worker(transferType=5).build_cst_filelist(prefix='/mnt', rclone_config='cfg') == {
         'verdict': False, 'reason': 'Error listing source directory /data: 550 Permission denied'}
 
@@ -341,7 +390,7 @@ def test_ftp_staleness(worker, monkeypatch) -> None:
     """The re-listing drops files whose size changed; a failed re-listing fails."""
     now = time.time()
     listings = iter([(True, [('a.raw', 10, now), ('b.raw', 5, now)]), (True, [('a.raw', 10, now), ('b.raw', 9, now)])])
-    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args: next(listings))
+    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args, **kwargs: next(listings))
     monkeypatch.setattr(cst_run.time, 'sleep', lambda seconds: None)
     w = worker(transferType=5, staleness=5)
     assert w.build_cst_filelist(prefix='/mnt', rclone_config='c')['files']['include'] == ['a.raw']

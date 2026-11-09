@@ -484,6 +484,14 @@ def test_delete_from_dest(tmp_path) -> None:
     assert sorted(os.listdir(tmp_path)) == ['keep.txt', 'sub']
 
 
+def test_delete_from_dest_keeps_listed_directories(tmp_path) -> None:
+    """The source's empty directories aren't removed with the others (#659)."""
+    for directory in ('keep/inner', 'gone'):
+        (tmp_path / directory).mkdir(parents=True)
+    assert fu.delete_from_dest(str(tmp_path), [], ['keep/inner']) == []
+    assert sorted(os.listdir(tmp_path)) == ['keep'] and os.listdir(tmp_path / 'keep') == ['inner']
+
+
 @pytest.mark.parametrize('error, message', [(FileNotFoundError, 'not found'),
                                             (PermissionError, 'permission errors'),
                                             (OSError, 'OS error')])

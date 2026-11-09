@@ -103,6 +103,34 @@ def test_local_transfer_syncs_deletions(worker, fake_copy, tmp_path) -> None:
     assert result['files']['deleted'] == ['old.raw'] and not os.path.exists(os.path.join(w.dest_dir, 'old.raw'))
 
 
+def test_local_transfer_creates_empty_directories(worker, fake_copy, tmp_path) -> None:
+    """The source's empty directories are created, and kept by Sync from source (#659)."""
+    _tree(tmp_path / 'src', {'a.raw': 'a'})
+    (tmp_path / 'src' / 'empty').mkdir()
+    (tmp_path / 'src' / 'b' / 'c').mkdir(parents=True)
+    w = worker(sourceDir=str(tmp_path / 'src'), syncFromSource=1)
+    _tree(tmp_path, {os.path.relpath(w.dest_dir, tmp_path) + '/old/x.raw': 'gone from the source'})
+
+    result = w.transfer_from_source(None)
+
+    assert result['verdict'] and result['dirs_created'] == 2 and result['files']['new'] == ['a.raw']
+    assert sorted(os.listdir(w.dest_dir)) == ['a.raw', 'b', 'empty'] and os.path.isdir(os.path.join(w.dest_dir, 'b', 'c'))
+    assert w.transfer_from_source(None)['dirs_created'] == 0
+
+
+def test_empty_directory_that_cant_be_created(worker, fake_copy, tmp_path) -> None:
+    """A directory that can't be created fails the transfer, with the files copied (#659)."""
+    _tree(tmp_path / 'src', {'a.raw': 'a'})
+    (tmp_path / 'src' / 'empty').mkdir()
+    w = worker(sourceDir=str(tmp_path / 'src'))
+    _tree(tmp_path, {os.path.relpath(w.dest_dir, tmp_path) + '/empty': 'a file in its place'})
+
+    result = w.transfer_from_source(None)
+
+    assert not result['verdict'] and result['reason'].startswith('Transfer failed: unable to create directory ')
+    assert result['files']['new'] == ['a.raw']
+
+
 def test_wildcard_source_copies_each_match_into_its_own_directory(worker, fake_copy, tmp_path) -> None:
     """Each match goes into a directory of its name; deletions are per match."""
     _tree(tmp_path / 'src', {'run01/a.raw': '1', 'run02/a.raw': '2', 'other/a.raw': 'x'})
@@ -202,7 +230,7 @@ def test_ftp_transfer(worker, fake_copy, monkeypatch) -> None:
 
     monkeypatch.setattr(cst_run, 'prepare_ftp_config', lambda cfg, tmpdir: (True, 'rclone.conf'))
     monkeypatch.setattr(cst_run, 'prepare_ftp_mount', mount)
-    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args: (True, [('a.raw', 1, 1.7e9)]))
+    monkeypatch.setattr(cst_run, 'list_ftp_source', lambda *args, **kwargs: (True, [('a.raw', 1, 1.7e9)]))
     w = worker(transferType=5)
     os.makedirs(w.dest_dir)
 
@@ -515,6 +543,14 @@ def test_task_transfers_and_writes_the_logs(task_worker, fake_copy, fake_ovdm, t
     assert json.loads((tmp_path / 'logs' / 'TEST001_SCS_Exclude.log').read_text()) == {'exclude': ['b.csv']}
 
 
+def test_task_sets_ownership_of_created_directories(task_worker, fake_copy, tmp_path) -> None:
+    """Empty directories created without any files still get their ownership set (#659)."""
+    (tmp_path / 'src' / 'empty').mkdir()
+    result = cst_run.task_run_collection_system_transfer(task_worker, _job())
+    assert ('Setting file/directory ownership/permissions', 'Pass') in _parts(result)
+    assert cst_run.set_owner_group_permissions.call_args_list[0].args == ('survey', task_worker.dest_dir)
+
+
 def test_task_with_nothing_new_writes_only_the_exclude_log(task_worker, fake_copy, tmp_path) -> None:
     """Without new or updated files, only the exclude log is written."""
     result = cst_run.task_run_collection_system_transfer(task_worker, _job())
@@ -618,6 +654,19 @@ def test_real_sync_from_source_deletes(worker, fake_ovdm, tmp_path, monkeypatch)
     os.remove(tmp_path / 'src' / 'b.raw')
     result = w.transfer_from_source(None)
     assert result['files']['deleted'] == ['b.raw'] and os.listdir(w.dest_dir) == ['a.raw']
+
+
+@needs_gnu_rsync
+def test_real_local_transfer_creates_empty_directories(worker, fake_ovdm, tmp_path) -> None:
+    """With a real rsync, the empty directories are created next to the copied files (#659)."""
+    _tree(tmp_path / 'src', {'sub/a.raw': 'a'})
+    (tmp_path / 'src' / 'a').mkdir()
+    (tmp_path / 'src' / 'b' / 'c').mkdir(parents=True)
+    w = worker(sourceDir=str(tmp_path / 'src'))
+    os.makedirs(w.dest_dir)
+
+    assert w.transfer_from_source(None)['dirs_created'] == 2
+    assert sorted(os.listdir(w.dest_dir)) == ['a', 'b', 'sub'] and os.listdir(os.path.join(w.dest_dir, 'b')) == ['c']
 
 
 def test_task_failed_transfer_ownership_failure_is_logged(task_worker, fake_copy, tmp_path, monkeypatch, caplog) -> None:

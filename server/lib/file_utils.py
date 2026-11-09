@@ -295,15 +295,19 @@ def clear_directory(target_dir: str, delete_self: bool = False) -> dict:
     }
 
 
-def delete_from_dest(dest_dir: str, include_files: List[str]) -> List[str]:
+def delete_from_dest(dest_dir: str, include_files: List[str],
+                     keep_dirs: Optional[List[str]] = None) -> List[str]:
     """Delete any file in *dest_dir* that is not present in *include_files*.
 
-    Also removes empty subdirectories left behind after deletion.
+    Also removes empty subdirectories left behind after deletion, except
+    those in *keep_dirs*.
 
     Args:
         dest_dir: Root directory to prune.
         include_files: List of relative paths that should be *kept*.  Any file
             in *dest_dir* whose relative path is not in this list is deleted.
+        keep_dirs: Relative paths of empty directories to keep, such as the
+            source's empty directories (#659).
 
     Returns:
         List of relative paths that were deleted.
@@ -328,9 +332,12 @@ def delete_from_dest(dest_dir: str, include_files: List[str]) -> List[str]:
                 except OSError as exc:
                     logging.error("File not deleted due to OS error: %s, %s", full_path, str(exc))
 
+    keep_dirs = set(keep_dirs or [])
     for root, dirs, _ in os.walk(dest_dir, topdown=False):
         for d in dirs:
             dir_path = os.path.join(root, d)
+            if os.path.relpath(dir_path, dest_dir) in keep_dirs:
+                continue
             try:
                 if not os.listdir(dir_path):  # is empty
                     os.rmdir(dir_path)
