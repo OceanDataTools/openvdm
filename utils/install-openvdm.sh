@@ -2491,12 +2491,21 @@ EOF
     rm -f /tmp/openvdm_sample_data_custom.sql
 
     # The sample data includes lowering-level transfers (e.g. ROV_OpenRVDAS),
-    # which only run with lowering components on. The post-install step sets
-    # up the sample lowering.
-    echo "Turning on lowering components for the sample data"
-    mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+    # which only run with lowering components on. With a vehicle, turn them
+    # on; the post-install step sets up the sample lowering. Without one, the
+    # sample is cruise-only: its lowering-level transfers are disabled (the
+    # rows stay, to turn on later), so no lowering is set up (#681)
+    if [ "$VEHICLE" = "yes" ]; then
+        echo "Turning on lowering components for the sample data"
+        mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
 UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
 EOF
+    else
+        echo "No vehicle: disabling the sample data's lowering-level transfers"
+        mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+UPDATE OVDM_CollectionSystemTransfers SET enable = 0 WHERE cruiseOrLowering = 1;
+EOF
+    fi
 
     # Enable sample data plugins and the parsers they import (copy .dist files
     # only if active copy does not exist). The parsers are read from each
@@ -2541,9 +2550,10 @@ EOF
         || echo "WARNING: xbt-edf-qc not installed; the XBT plugin won't parse casts"
 
     # Show the sample lowering's data: uncomment the example Lowering tab at
-    # the end of the data dashboard config, unless it already has one (#272)
+    # the end of the data dashboard config, unless it already has one (#272).
+    # Only with a vehicle, since there's no sample lowering without one (#681)
     local DASHBOARD_YAML="${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml"
-    if [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
+    if [ "$VEHICLE" = "yes" ] && [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
         && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
         echo "Enabling the data dashboard's Lowering tab"
         sed -i -e '/^#- title: Lowering$/,/^$/s/^#//' "${DASHBOARD_YAML}"
@@ -3040,7 +3050,8 @@ echo
 echo "#####################################################################"
 echo "A vehicle (ROV, HOV or AUV) whose dives OpenVDM manages as lowerings."
 echo "Its name, operator and contact email are saved with each lowering. On a"
-echo "new install, answering yes also turns on lowering components."
+echo "new install, answering yes also turns on lowering components. With the"
+echo "sample data, yes also sets up its sample lowering; no installs it cruise-only."
 echo
 
 # An existing openvdm.yaml's vehicle settings win over the saved defaults,
@@ -3244,10 +3255,11 @@ for label, task, timeout in cruise_steps:
         print(f'  Warning: {label} failed: {e}', file=sys.stderr)
 
 
-# The sample data turns on lowering components (#201); set up its lowering
+# With a vehicle, the sample data turns on lowering components (#201, #681); set up its lowering
 # the same way as the cruise, so the lowering-level sample transfers can run.
 lowering_ready = False
-if install_sampledata and show_lowering and lowering_id:
+# Not without enabled lowering-level transfers, as with no vehicle (#681)
+if install_sampledata and show_lowering and lowering_id and lowering_cst_ids:
     try:
         sys.path.insert(0, os.environ['OVDM_ROOT'])
         from server.lib.openvdm import OpenVDM
