@@ -33,6 +33,23 @@ UPDATE_MD5_SUMMARY_TASK = 'updateMD5Summary'
 # openvdm.yaml.dist's workerApiKey: public, so the API never accepts it (#605).
 WORKER_API_KEY_PLACEHOLDER = 'change-me-to-a-strong-random-value'
 
+
+def _settings_block(block) -> dict:
+    """Return an ``openvdm.yaml`` settings block as strings, unset fields left out.
+
+    Used for the ``vessel`` and ``vehicle`` blocks. Empty values, and
+    sub-blocks with nothing set, are left out; ``{}`` if the block is
+    missing or isn't a mapping.
+    """
+
+    def prune(value):
+        if isinstance(value, dict):
+            pruned = {key: prune(item) for key, item in value.items()}
+            return {key: item for key, item in pruned.items() if item not in ('', {})}
+        return '' if value is None else str(value).strip()
+
+    return prune(block) if isinstance(block, dict) else {}
+
 class OpenVDM():
     """Python wrapper around the OpenVDM REST API and YAML configuration file.
 
@@ -301,14 +318,22 @@ class OpenVDM():
             only there for vessels that submit data to R2R.
         """
 
-        def prune(value):
-            if isinstance(value, dict):
-                pruned = {key: prune(item) for key, item in value.items()}
-                return {key: item for key, item in pruned.items() if item not in ('', {})}
-            return '' if value is None else str(value).strip()
+        return _settings_block(self.config.get('vessel'))
 
-        vessel = self.config.get('vessel')
-        return prune(vessel) if isinstance(vessel, dict) else {}
+
+    def get_vehicle_config(self) -> dict:
+        """Return the vehicle settings (the ``vehicle`` block of ``openvdm.yaml``).
+
+        The vehicle (ROV, HOV, AUV) whose dives are the lowerings (#674).
+        Unset fields are left out, as by :meth:`get_vessel_config`.
+
+        Returns:
+            dict: e.g. ``{'name': 'Jason', 'operator': 'Woods Hole
+            Oceanographic Institution', 'email': ...}``; ``{}`` if nothing is
+            set, as without a vehicle.
+        """
+
+        return _settings_block(self.config.get('vehicle'))
 
 
     def get_transfer_public_data(self):

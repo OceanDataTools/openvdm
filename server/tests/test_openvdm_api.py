@@ -151,7 +151,7 @@ def test_config_without_pyyaml(config_file, monkeypatch) -> None:
     ('get_plugin_dir', '/opt/openvdm/server/plugins'), ('get_plugin_suffix', '_plugin.py'),
     ('get_gearman_server', 'gearman.example:4730'), ('get_site_root', SITE), ('get_transfer_interval', 5),
     ('get_logfile_purge_timedelta', '12 hours'), ('show_only_current_cruise_dir', False),
-    ('get_transfer_public_data', True), ('get_vessel_config', {}),
+    ('get_transfer_public_data', True), ('get_vessel_config', {}), ('get_vehicle_config', {}),
 ])
 def test_config_getters(ovdm, api, method, expected) -> None:
     """The config getters read openvdm.yaml (with defaults), and don't call the API."""
@@ -179,6 +179,16 @@ def test_vessel_config(ovdm) -> None:
     assert ovdm.get_vessel_config() == {}
     ovdm.config['vessel'] = 'not a block'
     assert ovdm.get_vessel_config() == {}
+
+
+def test_vehicle_config(ovdm) -> None:
+    """The vehicle block, as for the vessel; nothing without a vehicle (#674)."""
+    ovdm.config['vehicle'] = {'name': ' Jason ', 'operator': None, 'email': 'ops@whoi.example'}
+    assert ovdm.get_vehicle_config() == {'name': 'Jason', 'email': 'ops@whoi.example'}
+    ovdm.config['vehicle'] = {'name': '', 'operator': '', 'email': ''}
+    assert ovdm.get_vehicle_config() == {}
+    ovdm.config.pop('vehicle')
+    assert ovdm.get_vehicle_config() == {}
 
 
 @pytest.mark.parametrize('key, headers', [(TOKEN, {'X-Worker-Token': TOKEN}), ('', {}), (None, {}),

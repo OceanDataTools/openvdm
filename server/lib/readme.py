@@ -291,7 +291,7 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
     Args:
         lowering_config: The lowering's config, as written to its
             ``loweringConfig.json`` (``loweringID``, dates, ``loweringExtent``,
-            ``loweringFinalizedOn``).
+            ``loweringFinalizedOn``, ``vehicle``).
         cruise_config: The current cruise's config (``OpenVDM.get_cruise_config()``).
         collection_systems: All collection system transfers
             (``OpenVDM.get_collection_system_transfers()``).
@@ -309,6 +309,9 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
           ``None``).
         - ``cruise``: the ``cruiseID`` and ``cruiseName`` it belongs to.
         - ``vessel``: as ``vessel`` in ``openvdm.yaml``, unset fields left out.
+        - ``vehicle``: the ``name``, ``operator`` and ``email`` of the
+          vehicle that made the dive, from the lowering's config, so a
+          rebuilt README matches it; ``{}`` without one (#674).
         - ``collection_systems``, ``extra_directories``: the lowering's
           folders, each with ``name``, ``longName``, ``description`` and
           ``destDir`` (relative to the lowering's directory).
@@ -328,6 +331,7 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
         'loweringID', 'loweringStartDate', 'loweringEndDate')}
     lowering['loweringExtent'] = _extent(lowering_config.get('loweringExtent'))
     lowering['loweringFinalizedOn'] = lowering_config.get('loweringFinalizedOn') or None
+    vehicle = lowering_config.get('vehicle')
 
     lowering_dir = '/'.join(part for part in (lowering_data_base_dir, lowering_id) if part)
     dashboard_dir = next((entry['destDir'] for entry in _directories(
@@ -339,6 +343,7 @@ def build_lowering_readme_context(lowering_config: dict, cruise_config: dict,  #
         'lowering': lowering,
         'cruise': {key: (cruise_config.get(key) or '') for key in ('cruiseID', 'cruiseName')},
         'vessel': vessel or {},
+        'vehicle': vehicle if isinstance(vehicle, dict) else {},
         'collection_systems': _directories(collection_systems, 1, cruise_id, lowering_data_base_dir, lowering_id),
         'extra_directories': _directories(extra_directories, 1, cruise_id, lowering_data_base_dir, lowering_id),
         'files': {

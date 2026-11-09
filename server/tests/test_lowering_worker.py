@@ -302,11 +302,19 @@ def test_export_lowering_config(worker, api, lowering_dir, perms) -> None:
     config = json.loads(_config_file(lowering_dir).read_text())
     assert config['collectionSystemTransfersConfig'] == [
         {'name': 'Video', 'longName': 'HD video', 'description': 'Camera', 'destDir': 'Video'}]
-    assert 'loweringExtent' not in config
+    assert 'loweringExtent' not in config and 'vehicle' not in config
     assert config['loweringFinalizedOn'] is None
     assert perms.paths == [str(_config_file(lowering_dir))]
     api.update_md5_summary.assert_called_once_with(updated=['Vehicle/DIVE01/lowering_config.json'],
                                                    cruise_id='TEST001', background=False)
+
+
+def test_export_lowering_config_vehicle(worker, api, lowering_dir) -> None:
+    """The vehicle settings from openvdm.yaml, unset fields left out (#674)."""
+    api.config['vehicle'] = {'name': ' Jason ', 'operator': 'WHOI', 'email': ''}
+    _setup(worker)
+    worker.export_lowering_config()
+    assert json.loads(_config_file(lowering_dir).read_text())['vehicle'] == {'name': 'Jason', 'operator': 'WHOI'}
 
 
 def test_export_lowering_config_extent(worker, api, lowering_dir) -> None:
@@ -377,6 +385,18 @@ def test_build_lowering_readme(worker, api, lowering_dir, perms) -> None:
     assert str(lowering_dir / 'README.md') in perms.paths
     api.update_md5_summary.assert_called_once_with(updated=['Vehicle/DIVE01/README.md'], cruise_id='TEST001',
                                                    background=False)
+
+
+def test_build_lowering_readme_vehicle(worker, api, lowering_dir) -> None:
+    """The vehicle comes from the lowering's config file, not openvdm.yaml as it is now (#674)."""
+    api.config['vehicle'] = {'name': 'Jason', 'operator': 'WHOI', 'email': 'ops@whoi.example'}
+    _setup(worker)
+    worker.export_lowering_config()
+    api.config['vehicle'] = {'name': 'Sentry'}
+    assert worker.build_lowering_readme() == {'verdict': True}
+    text = (lowering_dir / 'README.md').read_text()
+    assert 'lowering DIVE01 by Jason' in text and '- **Vehicle operator:** WHOI, ops@whoi.example' in text
+    assert 'Sentry' not in text
 
 
 def test_build_lowering_readme_turned_off(worker, api, lowering_dir) -> None:
