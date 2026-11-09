@@ -6,7 +6,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.17.0] – Unreleased
 
-**Upgrading:** the step-by-step instructions will be in INSTALL.md.
+**Upgrading:** follow "Upgrading from 2.16.3" in [INSTALL.md](INSTALL.md) (from 2.14 or 2.15, its "From 2.14 or 2.15"). In short:
 - **Database:** update it with `database/openvdm_216_to_217.sql`. From 2.16.0, run `database/openvdm_2160_to_2161.sql` first.
 - **Trackline hooks:** in your `openvdm.yaml`, remove `-u` from the `build_cruise_tracks.py` and `build_lowering_tracks.py` hooks, and change any 2.16.0 option names that 2.16.1 and 2.16.2 warned about: `--no_combine`, `--kml_only`, `--geojson_only`, `--config_file` and `--gps-sources` (#388, #392).
 - **Trackline scripts:** copy the updated `build_cruise_tracks.py.dist` and `build_lowering_tracks.py.dist` over your copies, keeping your own position sources (#366, #399, #600, #639).
@@ -75,6 +75,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 - **`www/composer.lock` is tracked:** it was ignored, so each install resolved its own, and an update kept the old one, which left out PHP packages added since: with 2.17's `league/commonmark`, the File Naming Guide failed to load. The lock now comes with the code, pinned to PHP 8.2 (the oldest `composer.json` allows), so every install gets the same package versions. Updating the code replaces the lock an earlier install wrote, and CI checks the lock matches `composer.json` and runs the PHP tests on PHP 8.2 to 8.5 (#643).
 - **The MD5 checksum file size limit is off by default,** so a new install checksums every file in the MD5 summary. It was on, at 10 MB, so many ordinary data files (multibeam, imagery, video) got `*` in place of a checksum. Turning it on from the System page now starts it at 100 MB. Existing installs keep their settings (#667).
 - **A new install's cruise starts on the install day:** the default cruise had fixed dates in 2026, so a new install's System Status card turned yellow once they had passed (#637). The installer now starts it on the install day (UTC), ending 30 days later, with the year in its ID (`ODT2701` in 2027; `ODT2601` with the sample data, whose files are named after it), and starts the default lowering on the same day. Re-running the installer over an existing database leaves them alone. The default ship-to-shore transfers are numbered 1–3 (#647).
+- **Dependencies:** moment 2.31.0, for its path traversal advisory (GHSA-4p3w-j4w9-5jqw), and league/commonmark 2.10.7. Bootstrap 3's `npm audit` finding remains (#178) (#672).
 
 - **Development:** the Python tests run in GitHub Actions on every pull request, with ruff and the pre-commit hooks; `requirements-dev.txt` installs pytest and pytest-cov; coverage can't drop below `.coveragerc`'s floor; shared test fixtures; and pytest no longer reports the Test Setup workers' functions as errors. Unused imports are removed from the parser templates. No effect on running installs (#506).
 

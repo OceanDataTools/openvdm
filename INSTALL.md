@@ -332,6 +332,8 @@ pip install -r requirements.txt
 
 ## Upgrading from 2.14.
 
+> **Upgrading to 2.17:** these steps take the database to 2.16, but the installer installs the current code. See [From 2.14 or 2.15](#from-214-or-215) for the rest.
+
 OpenVDM 2.15 moved from PHP 7.3 to PHP 8.2, and 2.16 needs Python 3.11 or later. There are two ways to upgrade a 2.14 server. Both use the same two database update scripts, which take a 2.14 database to the 2.16 schema.
 
 - **In place:** re-run the 2.16 installer on the same server. Use this on Rocky Linux or AlmaLinux 8 or 9, where the installer moves PHP to 8.2 from the Remi repository. This route has been tested end to end on Rocky Linux 9. On Ubuntu and Debian, 2.14 ran PHP 7.3 as Apache's PHP module (`libapache2-mod-php7.3`), and the 2.16 installer doesn't switch Apache off it. Use the fresh-OS route there.
@@ -448,6 +450,8 @@ Transfer logs are no longer kept in the cruise directory. 2.15 moved them to `/v
 For what changed in each release, see [CHANGELOG.md](CHANGELOG.md). Also see "Upgrading from 2.15" below for its note on directories made by `bin/build_remote_directory.py`.
 
 ## Upgrading from 2.15.
+
+> **Upgrading to 2.17:** these steps take the database to 2.16, but the installer installs the current code. See [From 2.14 or 2.15](#from-214-or-215) for the rest.
 
 OpenVDM v2.16 adds FTP Server as a collection system transfer type (#17), which needs a database update (step 3). Several plugins, parsers and `bin/` scripts were also fixed, and the installer doesn't update your copies of those. See the 2.16.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details of each change.
 
@@ -645,3 +649,98 @@ sudo supervisorctl restart openvdm:*
 ```
 7. Before setting OpenVDM back to On, run **Test Setup** on each cruise data transfer whose destination is a Local Directory in `/mnt`, `/media` or `/net`. Such a destination must now be on a mounted filesystem even when **Destination Directory is mountpoint** is No: one on the root disk fails Test Setup and every transfer (#464). Mount the drive or share, or move a destination that deliberately copies to the root disk out of these directories. The edit form also warns about such a destination.
 8. Set OpenVDM back to On.
+
+## Upgrading from 2.16.3.
+
+OpenVDM v2.17 writes a README into each cruise and lowering directory, adds descriptions to collection systems and extra directories, a File Naming Guide, a cruise description, vessel settings, and the cruise's and lowering's extents for QA tools. The Configuration page warns about workers that aren't running. Many parsers, workers and the installer are fixed. See the 2.17.0 entry in [CHANGELOG.md](CHANGELOG.md) for the details.
+
+2.17 needs a database update, new Python and PHP packages (Jinja2, PHP's `mbstring` extension and `league/commonmark`), and new files in `server/etc`, so the installer must be re-run. The removed trackline options and updated `.dist` files need changes to your own files too.
+
+If you're upgrading from 2.16.0, 2.16.1 or 2.16.2, do the steps of their sections first, from the one for your version on. You can skip their `SITETITLE` and worker restart steps, and the installer re-run below covers their Supervisor change. From 2.14 or 2.15, see [From 2.14 or 2.15](#from-214-or-215) below.
+
+1. Make sure OpenVDM is set to Off and that there are no running transfers or tasks.
+2. Back up the database. The script asks for the MySQL root password twice:
+```
+cd <openvdm_root>
+sudo bash ./utils/export_openvdm_db.sh > ~/openvdm_backup_before_2.17.sql
+```
+3. Set your `Config.php` aside as a `.216` copy. The installer rewrites it from the 2.17 template on every run, so changes you've made to it are lost. Copy it rather than moving it: the installer reads the worker API key from it. Your `openvdm.yaml` and `datadashboard.yaml` are kept as they are:
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> cp www/app/Core/Config.php www/app/Core/Config.php.216
+```
+4. Update the code as the OpenVDM user, then re-run the installer from the updated copy. The installer stops if the copy you run isn't the one in the branch it installs, since the packages come from the copy you run (#650). Give the same answers as before, and don't install the sample data:
+```
+cd <openvdm_root>
+sudo -u <openvdm_user> git pull --ff-only
+sudo bash ./utils/install-openvdm.sh
+```
+   The installer:
+   - installs Jinja2 into OpenVDM's virtual environment, and PHP's `mbstring` extension and the `league/commonmark` Composer package (#431, #460, #643);
+   - asks for the vessel settings (name, contact, and R2R IDs if the vessel submits data to R2R) and writes them to the `vessel` block of your `openvdm.yaml` (#365, #462);
+   - copies `server/etc/cruise_readme.md.j2`, `lowering_readme.md.j2`, `cruise_position_sources.yaml` and `lowering_position_sources.yaml` from their `.dist` files, keeping any you already have (#501, #639);
+   - starts the workers through `server/lib/worker_launcher.py`, which posts an OpenVDM message when a worker fails (#503);
+   - replaces a worker API key that's still `change-me-to-a-strong-random-value` with a random one, in `openvdm.yaml` and `Config.php`. The API refuses the placeholder from 2.17 (#605);
+   - on Ubuntu 26.04, turns off PHP's PCRE JIT for Apache (#662);
+   - replaces `www/composer.lock` with the one in the code, which is tracked from 2.17 (#643);
+   - leaves the database alone.
+5. Update the database. The script prints nothing when it succeeds, and is safe to run again:
+```
+cd <openvdm_root>
+mysql -u root -p openvdm < ./database/openvdm_216_to_217.sql
+```
+   It adds the cruise description, the cruise and lowering extents, the description column of collection systems and extra directories, the Rebuild README tasks and the File Naming Guide link, and widens the CoreVars `value` column. If you see errors, save them and contact OceanDataTools; restore the backup from step 2 and try again.
+6. Merge your changes into the new `Config.php`. `diff` shows the differences:
+```
+cd <openvdm_root>
+diff www/app/Core/Config.php.216 www/app/Core/Config.php
+```
+   Copy over only the settings you'd changed yourself. The installer has already set `SITETITLE` to v2.17.0. `CST_DESCRIPTION_TEMPLATE` and `EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE` are new and commented out, so the defaults are used; see "Description templates" in the CHANGELOG (#449). Keep the `.216` copy until the upgrade is working.
+7. Add the README settings to your `server/etc/openvdm.yaml`: copy the `cruiseReadme` and `loweringReadme` blocks from `server/etc/openvdm.yaml.dist`. The installer doesn't add them. Without them, the READMEs are written as `README.md` instead of `<cruiseID>_README.md` and `<cruiseID>_<loweringID>_README.md` (#431, #445, #638).
+
+   `openvdm.yaml.dist` also has new commented-out hook examples to copy if you want them: the trackline scripts (`postDataDashboard`, #396) and [nav-qa-processing](https://github.com/OceanDataTools/nav-qa-processing) (`postCollectionSystemTransfer` and `preFinalizeCurrentCruise`, #653).
+8. If your `openvdm.yaml` hooks run `build_cruise_tracks.py` or `build_lowering_tracks.py`, remove `-u` and change any of the old option names that 2.16.1 warned about: `--no_combine`, `--kml_only` and `--geojson_only` become `--no-combine`, `--kml-only` and `--geojson-only`, and `--config_file` and `--gps-sources` become `--position-sources`. 2.17 removes them, so a hook that still uses one stops with a usage error (#388, #392).
+9. Copy the updated plugin, parser and script templates over your copies. The installer only copies a `.dist` file when your copy doesn't exist yet. Only the files you actually use need copying. If you've customized a file, merge the changes into your copy instead of overwriting it; `diff <file>.dist <file>` shows what changed.
+
+   Every parser that reads timestamped log files changed (#554). To re-copy the `.dist` version of every parser you have a copy of, run the commands below. They overwrite customized parsers too, so save a copy of those first and merge your changes back afterwards:
+```
+cd <openvdm_root>/server/plugins/parsers
+for f in *_parser.py; do [ -e "$f.dist" ] && sudo -u <openvdm_user> cp "$f.dist" "$f"; done
+```
+
+| File (in `<openvdm_root>`) | Why |
+|---|---|
+| `server/plugins/parsers/*_parser.py` | Lines without a timestamp are bad rows (#554); fixes to the GGA, MWD, MWV, PSXN23/24, PASHR, HPR, Met, Sprint, Paro, fluorometer, PAR2, SSV and SBE38 parsers (#555–#560, #563–#569), the CTD profile parser (#571) and the GeoTIFF parser (#573). A copy that isn't updated still works. **The SSV and SBE38 parsers no longer take `sbe38`**: remove it from your plugins' `parser_options` (#569) |
+| `server/plugins/openrvdas_plugin.py`, `rov_openrvdas_plugin.py`, `em302_plugin.py` | Empty data sets are no longer listed on the dashboard (#574). **Keep your own changes**, e.g. the ROV plugin's `SEALOG_SERVER_URL` and `SEALOG_JWT` |
+| `bin/build_cruise_tracks.py`, `bin/build_lowering_tracks.py` | Removed options, cruise and lowering extents, lowering tracklines (#366, #399, #600, #639). **Keep your own position sources**, or move them to `server/etc/cruise_position_sources.yaml` and `lowering_position_sources.yaml` and pass them with `--position-sources` |
+| `bin/build_overlay_layers.py` | Reads the data dashboard's current file format, so GeoTIFF overlays show again (#602). **Keep your own GeoTIFF sources** |
+| `bin/db_backup_restore.py` | Backups readable only by their owner (#603) |
+
+10. If you use `bin/db_backup_restore.py`, make the backups you already have readable only by their owner. They hold the transfers' passwords (#603):
+```
+sudo chmod 700 <openvdm_root>/database/backups
+sudo chmod 600 <openvdm_root>/database/backups/*.sql
+```
+11. Restart the OpenVDM workers so they load the updated plugins and parsers:
+```
+sudo supervisorctl restart openvdm:*
+```
+12. On the **Configuration** page, check that there's no warning about workers that aren't running (#503). If there is, the worker's log in `/var/log/openvdm` says why, e.g. a missing Python package.
+13. Set OpenVDM back to On.
+14. Under **Maintenance Tasks** on the **Configuration** page:
+    - run **Re-export the OpenVDM Configuration**, which adds the vessel settings to the cruise's `ovdmConfig.json` and writes the cruise README. If you use lowerings, also run **Re-export the Lowering Configuration**, which writes the lowering README;
+    - run **Rebuild Data Dashboard**, so existing files are re-parsed with the fixed parsers. This rebuilds the current cruise only.
+15. Add a Description to your collection system transfers and extra directories (their edit forms have a **Use template** button), and try the File Naming Guide from the Collection System Transfers page. Then run **Rebuild the Cruise README** (and **Rebuild the Lowering README**) to put the descriptions in the READMEs.
+
+### From 2.14 or 2.15
+
+"Upgrading from 2.14" and "Upgrading from 2.15" install the current code, which is 2.17, but take the database only as far as 2.16. Follow them, but in their database step also run, after their scripts:
+```
+cd <openvdm_root>
+mysql -u root -p openvdm < ./database/openvdm_2160_to_2161.sql
+mysql -u root -p openvdm < ./database/openvdm_216_to_217.sql
+```
+Then do steps 7 to 15 above, and these steps of the 2.16 sections, which the 2.14 and 2.15 steps don't cover:
+- the trackline scripts need an enabled `Tracklines` extra directory whose folder exists (step 5 of "Upgrading from 2.16.0");
+- in your plugins, change `DBTParser` to `DPTParser`, and add `'require_checksum': False` to the `parser_options` of NMEA instruments that don't send a checksum (step 4 of "Upgrading from 2.16.1");
+- before setting OpenVDM back to On, run **Test Setup** on cruise data transfers to `/mnt`, `/media` or `/net` (step 7 of "Upgrading from 2.16.2").
