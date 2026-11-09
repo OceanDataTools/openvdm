@@ -152,7 +152,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
                 $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
                 if ($setLatestLowering) {
-                    # Switching to another cruise: its extent, from its ovdmConfig.json
+                    # Switching to another cruise: its extent, from its cruise config file
                     $this->_warehouseModel->setCruiseExtent(array('value' => $cruiseExtent ? json_encode($cruiseExtent) : ''));
                 }
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
@@ -171,9 +171,9 @@ class Main extends Controller {
                     $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringDates['loweringStartDate'] ?? ''));
                     $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringDates['loweringEndDate'] ?? ''));
                     if ($setLatestLowering || strcmp($loweringID, $previousLoweringID) != 0) {
-                        # Another lowering: its extent, from its loweringConfig.json.
+                        # Another lowering: its extent, from its lowering config file.
                         # The same lowering keeps the extent build_lowering_tracks set,
-                        # which can be newer than its loweringConfig.json
+                        # which can be newer than its lowering config file
                         $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
                         $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
                     }
@@ -292,7 +292,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringStartDate));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringEndDate));
                 if ($setLatestLowering) {
-                    # Switching to another lowering: its extent, from its loweringConfig.json
+                    # Switching to another lowering: its extent, from its lowering config file
                     $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
                     $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
                 }

@@ -732,7 +732,7 @@ sudo supervisorctl restart openvdm:*
 12. On the **Configuration** page, check that there's no warning about workers that aren't running (#503). If there is, the worker's log in `/var/log/openvdm` says why, e.g. a missing Python package.
 13. Set OpenVDM back to On.
 14. Under **Maintenance Tasks** on the **Configuration** page:
-    - run **Re-export the OpenVDM Configuration**, which adds the vessel settings to the cruise's `ovdmConfig.json` and writes the cruise README. If you use lowerings, also run **Re-export the Lowering Configuration**, which adds the vehicle settings to the lowering's `loweringConfig.json` and writes the lowering README;
+    - run **Re-export the OpenVDM Configuration**, which adds the vessel settings to the cruise's config file (`cruise_config.json`) and writes the cruise README. If you use lowerings, also run **Re-export the Lowering Configuration**, which adds the vehicle settings to the lowering's config file (`lowering_config.json`) and writes the lowering README;
     - run **Rebuild Data Dashboard**, so existing files are re-parsed with the fixed parsers. This rebuilds the current cruise only.
 15. Add a Description to your collection system transfers and extra directories (their edit forms have a **Use template** button), and try the File Naming Guide from the Collection System Transfers page. Then run **Rebuild the Cruise README** (and **Rebuild the Lowering README**) to put the descriptions in the READMEs.
 
