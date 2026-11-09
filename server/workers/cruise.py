@@ -226,6 +226,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             collection_systems = self.ovdm.get_collection_system_transfers()
             extra_directories = self.ovdm.get_extra_directories()
             show_lowerings = self.ovdm.get_show_lowering_components()
+            terms = self.ovdm.get_terms()
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return {'verdict': False, 'reason': f"Unable to get the cruise configuration from OpenVDM: {exc}"}
 
@@ -239,7 +240,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         context = build_cruise_readme_context(
             cruise_config, collection_systems, extra_directories, self.ovdm.get_vessel_config(),
-            readme_fn, finalized_on=finalized_on, show_lowerings=show_lowerings)
+            readme_fn, finalized_on=finalized_on, show_lowerings=show_lowerings, terms=terms)
 
         try:
             text = render_readme(settings['template'], context)

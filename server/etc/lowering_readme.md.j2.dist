@@ -8,14 +8,15 @@
   described in build_lowering_readme_context() in server/lib/readme.py. The
   README is rebuilt whenever the lowering config is exported: Setup New
   Lowering, Finalize Lowering and Export Lowering Config, and by the Rebuild
-  the Lowering README task.
+  the Lowering README task. terms has what the install calls cruises and
+  lowerings, as in the cruise README template.
 -#}
-# Lowering {{ lowering.loweringID }}{% if cruise.cruiseID %} (cruise {{ cruise.cruiseID }}){% endif %}
+# {{ terms.lowering }} {{ lowering.loweringID }}{% if cruise.cruiseID %} ({{ terms.cruise_lower }} {{ cruise.cruiseID }}){% endif %}
 
 
-This directory holds the data collected during lowering {{ lowering.loweringID }}{% if vehicle.name %} by {{ vehicle.name }}{% endif %}{% if cruise.cruiseID %} of cruise {{ cruise.cruiseID }}{% if cruise.cruiseName %} ({{ cruise.cruiseName }}){% endif %}{% endif %}{% if vessel.name %} aboard {{ vessel.name }}{% endif %}, organized by OpenVDM (Open Vessel Data Management).
+This directory holds the data collected during {{ terms.lowering_lower }} {{ lowering.loweringID }}{% if vehicle.name %} by {{ vehicle.name }}{% endif %}{% if cruise.cruiseID %} of {{ terms.cruise_lower }} {{ cruise.cruiseID }}{% if cruise.cruiseName %} ({{ cruise.cruiseName }}){% endif %}{% endif %}{% if vessel.name %} aboard {{ vessel.name }}{% endif %}, organized by OpenVDM (Open Vessel Data Management).
 
-## Lowering
+## {{ terms.lowering }}
 
 {% if lowering.loweringStartDate or lowering.loweringEndDate %}
 - **Dates:** {{ lowering.loweringStartDate or "?" }} to {{ lowering.loweringEndDate or "?" }}
@@ -53,7 +54,7 @@ Paths are relative to this directory.
 {% endmacro %}
 {% set entries = [
     {"destDir": files.readme, "longName": "this file", "file": true},
-    {"destDir": files.lowering_config, "longName": "the lowering's OpenVDM configuration (JSON): the lowering details above and the directory layout", "file": true},
+    {"destDir": files.lowering_config, "longName": "the " ~ terms.lowering_lower ~ "'s OpenVDM configuration (JSON): the " ~ terms.lowering_lower ~ " details above and the directory layout", "file": true},
 ] + collection_systems + extra_directories %}
 {% for d in entries | sort(attribute="destDir") %}
 {{ entry(d) }}

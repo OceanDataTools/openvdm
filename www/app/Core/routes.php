@@ -163,6 +163,7 @@ Router::any('api/warehouse/getShipboardDataWarehouseStatus', 'Controllers\Api\Wa
 Router::any('api/warehouse/getShipToShoreBWLimitStatus', 'Controllers\Api\Warehouse@getShipToShoreBWLimitStatus');
 Router::any('api/warehouse/getSystemStatus', 'Controllers\Api\Warehouse@getSystemStatus');
 Router::any('api/warehouse/getShowLoweringComponents', 'Controllers\Api\Warehouse@getShowLoweringComponents');
+Router::any('api/warehouse/getTerms', 'Controllers\Api\Warehouse@getTerms');
 Router::any('api/warehouse/getDataDashboardManifestFn', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::any('api/warehouse/getCruiseDataURL', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::post('api/warehouse/setCruiseSize', 'Controllers\Api\Warehouse@setCruiseSize');

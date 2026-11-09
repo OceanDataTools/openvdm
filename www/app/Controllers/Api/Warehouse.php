@@ -80,6 +80,13 @@ class Warehouse extends Controller {
         echo json_encode($this->_warehouseModel->getShowLoweringComponents());
     }
 
+    // getTerms - return what this install calls cruises and lowerings (#684):
+    // cruise, cruises, lowering and lowerings.
+    public function getTerms() {
+
+        echo json_encode(\Helpers\Terms::all());
+    }
+
 	// getCruiseSize - return the size of the cruise directory.
 	public function getCruiseSize() {
 

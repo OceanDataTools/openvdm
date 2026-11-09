@@ -71,13 +71,17 @@ class Config
 
         /*
          * Define what to call the cruise. (i.e. 'Cruise', 'Expedition', 'Voyage')
+         * and more than one. The installer asks for both (#684)
          */
         define('CRUISE_NAME', 'Cruise');
+        define('CRUISE_NAME_PLURAL', 'Cruises');
 
         /*
          * Define what to call the lowering. (i.e. 'Lowering', 'Dive', 'Deployment')
+         * and more than one. The installer asks for both (#684)
          */
         define('LOWERING_NAME', 'Lowering');
+        define('LOWERING_NAME_PLURAL', 'Lowerings');
 
         /*
          * Define what to name the cruise config file. (i.e. 'cruise_config.json')

@@ -33,6 +33,9 @@ UPDATE_MD5_SUMMARY_TASK = 'updateMD5Summary'
 # openvdm.yaml.dist's workerApiKey: public, so the API never accepts it (#605).
 WORKER_API_KEY_PLACEHOLDER = 'change-me-to-a-strong-random-value'
 
+# What cruises and lowerings are called when the web app doesn't say (#684).
+DEFAULT_TERMS = {'cruise': 'Cruise', 'cruises': 'Cruises', 'lowering': 'Lowering', 'lowerings': 'Lowerings'}
+
 
 def _settings_block(block) -> dict:
     """Return an ``openvdm.yaml`` settings block as strings, unset fields left out.
@@ -234,6 +237,36 @@ class OpenVDM():
         except Exception as exc:
             logging.error("Unable to retrieve 'showLoweringComponents' flag from OpenVDM API")
             raise exc
+
+
+    def get_terms(self) -> dict:
+        """Return what this install calls cruises and lowerings (#684).
+
+        ``CRUISE_NAME``, ``LOWERING_NAME`` and their plurals in the web app's
+        ``Config.php``, which the installer sets (e.g. Voyage, Dive).
+
+        Returns:
+            dict: ``cruise``, ``cruises``, ``lowering`` and ``lowerings``, e.g.
+            ``{'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'Dive',
+            'lowerings': 'Dives'}``. :data:`DEFAULT_TERMS`' value is used for
+            any the API leaves out.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or returns invalid
+                JSON.
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/getTerms"
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            terms = json.loads(req.text)
+        except Exception as exc:
+            logging.error("Unable to retrieve the cruise and lowering names from OpenVDM API")
+            raise exc
+
+        terms = terms if isinstance(terms, dict) else {}
+        return {key: str(terms.get(key) or default) for key, default in DEFAULT_TERMS.items()}
 
 
     def get_cruise_config(self):

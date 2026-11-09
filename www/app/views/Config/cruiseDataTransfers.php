@@ -105,7 +105,7 @@ use Helpers\Session;
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
-            <p>This page is for managing <?php echo CRUISE_NAME; ?> Data Transfers.  A <?php echo CRUISE_NAME; ?> Data Transfer is an OpenVDM-managed copy of all collected data from the current cruise data directory on the Shipboard Data Warehouse to a remote server, NAS box or external HDD connected to the Shipboard Data Warehouse.</p>
+            <p>This page is for managing <?php echo CRUISE_NAME; ?> Data Transfers.  A <?php echo CRUISE_NAME; ?> Data Transfer is an OpenVDM-managed copy of all collected data from the current <?php echo \Helpers\Terms::cruise(true); ?> data directory on the Shipboard Data Warehouse to a remote server, NAS box or external HDD connected to the Shipboard Data Warehouse.</p>
             <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit <?php echo CRUISE_NAME; ?> Data Transfer Form" where you can modify the <?php echo CRUISE_NAME; ?> Data Transfer settings.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Collection System Transfer. There is a confirmation window so don't worry about accidental clicks.</p>
             <p>Clicking a <strong class="text-primary">Test</strong> link will verify the corresponding <?php echo CRUISE_NAME; ?> Data Transfer configuration is valid. A window will appear displaying the test results.  If there is a <i class="fa fa-warning text-danger"></i> in a row, the corresponding <?php echo CRUISE_NAME; ?> Data Transfer has encountered and error.  Click <strong class="text-primary">Test</strong> to diagnose the problem.</p>

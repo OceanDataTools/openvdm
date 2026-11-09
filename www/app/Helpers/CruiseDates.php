@@ -44,7 +44,7 @@ class CruiseDates
         }
 
         return "The current time ($now UTC) is $where. Collection system transfers set to skip files "
-            . "created/modified outside of the " . strtolower(CRUISE_NAME) . " start/stop times won't "
+            . "created/modified outside of the " . Terms::cruise(true) . " start/stop times won't "
             . "transfer files written now. If the dates are wrong, correct them with Edit Current "
             . CRUISE_NAME . ".";
     }
