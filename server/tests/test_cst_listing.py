@@ -315,6 +315,19 @@ def test_ssh_file_list(worker, fake_run) -> None:
     assert '--protect-args' not in fake_run.calls[1].cmd
 
 
+def test_ssh_staleness_relisting_logs_in(worker, fake_run, monkeypatch) -> None:
+    """The re-listing gets a password file of its own, which exists while it runs (#688)."""
+    monkeypatch.setattr(cst_run.time, 'sleep', lambda seconds: None)
+    fake_run.on('sshpass', stdout=RSYNC_LISTING)
+    result = worker(transferType=4, staleness=5).build_cst_filelist()
+
+    assert len(result['files']['include']) == 3
+    listing, relisting = fake_run.calls
+    assert relisting.cmd[:2] == ['sshpass', '-f'] and relisting.cmd[3:] == listing.cmd[3:]
+    assert listing.files[listing.cmd[2]] == relisting.files[relisting.cmd[2]] == 'ssh-pw\n'
+    fake_run.assert_not_in_commands('ssh-pw')
+
+
 @pytest.mark.parametrize('sync, returncode, stderr, ok', [
     (0, 23, 'rsync: opendir "/data/private" failed: Permission denied (13)\n', True),
     (1, 23, 'rsync: opendir "/data/private" failed: Permission denied (13)\n', False),
