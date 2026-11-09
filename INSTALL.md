@@ -678,6 +678,7 @@ sudo bash ./utils/install-openvdm.sh
    The installer:
    - installs Jinja2 into OpenVDM's virtual environment, and PHP's `mbstring` extension and the `league/commonmark` Composer package (#431, #460, #643);
    - asks for the vessel settings (name, contact, and R2R IDs if the vessel submits data to R2R) and writes them to the `vessel` block of your `openvdm.yaml` (#365, #462);
+   - asks whether OpenVDM is used with a vehicle (ROV, HOV, AUV) and, if so, for its name, operator and contact email, which default to the vessel's contact, and writes them to the `vehicle` block. On an existing database it doesn't turn on lowering components: use **Show Lowering Components** on the **Edit Cruise** form (#674);
    - copies `server/etc/cruise_readme.md.j2`, `lowering_readme.md.j2`, `cruise_position_sources.yaml` and `lowering_position_sources.yaml` from their `.dist` files, keeping any you already have (#501, #639);
    - starts the workers through `server/lib/worker_launcher.py`, which posts an OpenVDM message when a worker fails (#503);
    - replaces a worker API key that's still `change-me-to-a-strong-random-value` with a random one, in `openvdm.yaml` and `Config.php`. The API refuses the placeholder from 2.17 (#605);
@@ -728,7 +729,7 @@ sudo supervisorctl restart openvdm:*
 12. On the **Configuration** page, check that there's no warning about workers that aren't running (#503). If there is, the worker's log in `/var/log/openvdm` says why, e.g. a missing Python package.
 13. Set OpenVDM back to On.
 14. Under **Maintenance Tasks** on the **Configuration** page:
-    - run **Re-export the OpenVDM Configuration**, which adds the vessel settings to the cruise's `ovdmConfig.json` and writes the cruise README. If you use lowerings, also run **Re-export the Lowering Configuration**, which writes the lowering README;
+    - run **Re-export the OpenVDM Configuration**, which adds the vessel settings to the cruise's `ovdmConfig.json` and writes the cruise README. If you use lowerings, also run **Re-export the Lowering Configuration**, which adds the vehicle settings to the lowering's `loweringConfig.json` and writes the lowering README;
     - run **Rebuild Data Dashboard**, so existing files are re-parsed with the fixed parsers. This rebuilds the current cruise only.
 15. Add a Description to your collection system transfers and extra directories (their edit forms have a **Use template** button), and try the File Naming Guide from the Collection System Transfers page. Then run **Rebuild the Cruise README** (and **Rebuild the Lowering README**) to put the descriptions in the READMEs.
 
