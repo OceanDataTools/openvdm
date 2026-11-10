@@ -23,7 +23,8 @@ siteRoot: "http://127.0.0.1/"
 workerApiKey: "change-me-to-a-strong-random-value"
 
 # The vessel this OpenVDM install is on. Saved in each cruise's config file
-# and read by QA tools (e.g. sbe-qa-processing). All fields are optional.
+# and README, and read by QA tools (e.g. sbe-qa-processing). The installer
+# asks for it; all fields are optional.
 vessel:
     name: ""
     operator: ""  # the organization that operates it
@@ -34,12 +35,12 @@ vessel:
     #    operatorID: ""   # e.g. edu.ucsd.sio
     #    schedulerID: ""  # e.g. org.unols
 
-# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if
-# any. Saved in each lowering's config file and lowering README. The
-# installer asks for it; leave the fields empty without a vehicle.
+# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings.
+# Saved in each lowering's config file and README. The installer asks for
+# it; all fields are optional, and left empty without a vehicle.
 vehicle:
     name: ""
-    operator: ""  # the institution that owns and operates it
+    operator: ""  # the organization that operates it
     email: ""     # the operator's contact email
 
 # The transferInterval defines the interval for performing collectionSystemTransfer.

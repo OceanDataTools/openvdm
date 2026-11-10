@@ -2128,7 +2128,8 @@ function write_vessel_config {
     } > "$block_file"
     {
         echo "# The vessel this OpenVDM install is on. Saved in each cruise's config file"
-        echo "# and read by QA tools (e.g. sbe-qa-processing). All fields are optional."
+        echo "# and README, and read by QA tools (e.g. sbe-qa-processing). The installer"
+        echo "# asks for it; all fields are optional."
     } > "$comment_file"
 
     _set_yaml_block "$yaml_file" vessel "$block_file" "$comment_file"
@@ -2146,13 +2147,13 @@ function write_vehicle_config {
     {
         echo "vehicle:"
         echo "    name: $(_yaml_quote "$VEHICLE_NAME")"
-        echo "    operator: $(_yaml_quote "$VEHICLE_OPERATOR")  # the institution that owns and operates it"
+        echo "    operator: $(_yaml_quote "$VEHICLE_OPERATOR")  # the organization that operates it"
         echo "    email: $(_yaml_quote "$VEHICLE_EMAIL")     # the operator's contact email"
     } > "$block_file"
     {
-        echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings, if"
-        echo "# any. Saved in each lowering's config file and lowering README. The"
-        echo "# installer asks for it; leave the fields empty without a vehicle."
+        echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings."
+        echo "# Saved in each lowering's config file and README. The installer asks for"
+        echo "# it; all fields are optional, and left empty without a vehicle."
     } > "$comment_file"
 
     _set_yaml_block "$yaml_file" vehicle "$block_file" "$comment_file"
@@ -3119,7 +3120,7 @@ VESSEL_NAME=${VESSEL_NAME:-$DEFAULT_VESSEL_NAME}
 read -r -p "Vessel operator (the organization that operates it)? ($DEFAULT_VESSEL_OPERATOR) " VESSEL_OPERATOR
 VESSEL_OPERATOR=${VESSEL_OPERATOR:-$DEFAULT_VESSEL_OPERATOR}
 
-read -r -p "Operator's contact email? ($DEFAULT_VESSEL_EMAIL) " VESSEL_EMAIL
+read -r -p "Vessel operator's contact email? ($DEFAULT_VESSEL_EMAIL) " VESSEL_EMAIL
 VESSEL_EMAIL=${VESSEL_EMAIL:-$DEFAULT_VESSEL_EMAIL}
 
 if [ "$VESSEL_R2R" = "yes" ]; then
@@ -3171,10 +3172,10 @@ if [ "$VEHICLE" = "yes" ]; then
     # Usually the vessel's operator, so offer its details until they're set
     DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_OPERATOR}
     DEFAULT_VEHICLE_EMAIL=${DEFAULT_VEHICLE_EMAIL:-$VESSEL_EMAIL}
-    read -r -p "Vehicle operator (the institution that owns and operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
+    read -r -p "Vehicle operator (the organization that operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
     VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
 
-    read -r -p "Vehicle contact email? ($DEFAULT_VEHICLE_EMAIL) " VEHICLE_EMAIL
+    read -r -p "Vehicle operator's contact email? ($DEFAULT_VEHICLE_EMAIL) " VEHICLE_EMAIL
     VEHICLE_EMAIL=${VEHICLE_EMAIL:-$DEFAULT_VEHICLE_EMAIL}
 
     # What its dives are called, e.g. Lowering, Dive or Deployment (#684)
