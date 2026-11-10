@@ -33,8 +33,8 @@ This directory holds the data collected during {{ terms.lowering_lower }} {{ low
 {% if vessel.name %}
 - **Vessel:** {{ vessel.name }}
 {% endif %}
-{% if vessel.contact and (vessel.contact.institution or vessel.contact.email) %}
-- **Contact:** {{ [vessel.contact.institution, vessel.contact.email] | select | join(", ") }}
+{% if vessel.operator or vessel.email %}
+- **Vessel operator:** {{ [vessel.operator, vessel.email] | select | join(", ") }}
 {% endif %}
 
 ## Directory layout

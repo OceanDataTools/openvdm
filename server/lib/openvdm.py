@@ -345,10 +345,10 @@ class OpenVDM():
         form.
 
         Returns:
-            dict: e.g. ``{'name': 'Roger Revelle', 'contact': {'institution':
-            ..., 'email': ...}, 'r2r': {'vesselID': '33RR', 'operatorID':
-            ..., 'schedulerID': ...}}``; ``{}`` if nothing is set. ``r2r`` is
-            only there for vessels that submit data to R2R.
+            dict: e.g. ``{'name': 'Roger Revelle', 'operator': ..., 'email':
+            ..., 'r2r': {'vesselID': '33RR', 'operatorID': ..., 'schedulerID':
+            ...}}``; ``{}`` if nothing is set. ``r2r`` is only there for
+            vessels that submit data to R2R (#693).
         """
 
         return _settings_block(self.config.get('vessel'))
