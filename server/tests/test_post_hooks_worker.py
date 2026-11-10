@@ -311,6 +311,7 @@ EXAMPLE_LINE = re.compile(r'^(\s*)#(?=-|commandList:|\s+(?:- |command:|commandLi
 NAV_QA = ['/opt/nav-qa-processing/.venv/bin/nav-qa-processing', 'openvdm']
 NAV_QA_CONFIGS = ['--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml',
                   '--site-config=/opt/nav-qa-processing/configs/site.toml']
+SBE_QA = ['/opt/sbe-qa-processing/.venv/bin/sbe-qa-processing', 'openvdm']
 
 
 def _dist_examples() -> dict:
@@ -323,10 +324,13 @@ def _dist_examples() -> dict:
 
 def test_dist_examples_combine() -> None:
     """All the examples can be used together: the transfer hooks' blocks are entries of one list,
-    and preFinalizeCurrentCruise's commands share its one commandList (#653)."""
+    with one entry per transfer (only the first is used), and preFinalizeCurrentCruise's commands
+    share its one commandList (#653, #697)."""
     hooks = _dist_examples()
     assert [entry['collectionSystemTransferName'] for entry in hooks['postCollectionSystemTransfer']] == \
         ['CTD', 'OpenRVDAS']
+    assert [cmd['name'] for cmd in hooks['postCollectionSystemTransfer'][0]['commandList']] == \
+        ['Plot CTD casts', 'SBE 9 QA report']
     assert [cmd['name'] for cmd in hooks['preFinalizeCurrentCruise']['commandList']] == \
         ['Export Sealog data for current cruise', 'Navigation QA']
 
@@ -347,3 +351,19 @@ def test_dist_nav_qa_hooks(worker, api, fake_run) -> None:
     result = worker.on_job_execute(_job('preFinalizeCurrentCruise', cruiseID='C1'))
     assert _parts(result)[-1] == ('Running commands', 'Pass')
     assert fake_run.commands()[1] == NAV_QA + ['OpenRVDAS'] + NAV_QA_CONFIGS
+
+
+def test_dist_ctd_hooks(worker, api, fake_run) -> None:
+    """The CTD transfer's examples plot its new and updated casts, then run sbe-qa-processing's
+    hook command on them (#697)."""
+    api.config['postHookCommands'] = _dist_examples()
+    api.get_collection_system_transfer.side_effect = \
+        lambda cst_id: {'collectionSystemTransferID': 3, 'name': 'CTD'}
+    result = worker.on_job_execute(_job(collectionSystemTransferID=3, cruiseID='C1',
+                                        files={'new': ['CTD/a.hex', 'CTD/a.hdr'], 'updated': []}))
+    assert _parts(result)[-1] == ('Running commands', 'Pass')
+    assert fake_run.commands() == [
+        ['/opt/openvdm/venv/bin/python', '/opt/openvdm/bin/plot_ctd_casts.py',
+         '--extra-directory=CTD_Plots', 'CTD/a.hex CTD/a.hdr'],
+        SBE_QA + ['CTD', '--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml',
+                  '--changed-files=CTD/a.hex CTD/a.hdr', '--changed-files=']]
