@@ -239,8 +239,8 @@ function set_default_variables {
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
 
     DEFAULT_VESSEL_NAME=
-    DEFAULT_VESSEL_CONTACT_INSTITUTION=
-    DEFAULT_VESSEL_CONTACT_EMAIL=
+    DEFAULT_VESSEL_OPERATOR=
+    DEFAULT_VESSEL_EMAIL=
     DEFAULT_VESSEL_R2R=no
     DEFAULT_R2R_VESSEL_ID=
     DEFAULT_R2R_OPERATOR_ID=
@@ -261,6 +261,9 @@ function set_default_variables {
         echo Reading pre-saved defaults from "$PREFERENCES_FILE"
         source "$PREFERENCES_FILE"
         echo branch $DEFAULT_OPENVDM_BRANCH
+        # Saved by an earlier 2.17 build, before the vessel's operator (#693)
+        DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-$DEFAULT_VESSEL_CONTACT_INSTITUTION}
+        DEFAULT_VESSEL_EMAIL=${DEFAULT_VESSEL_EMAIL:-$DEFAULT_VESSEL_CONTACT_EMAIL}
     fi
 }
 
@@ -301,8 +304,8 @@ DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
 
 DEFAULT_VESSEL_NAME=$(printf '%q' "$VESSEL_NAME")
-DEFAULT_VESSEL_CONTACT_INSTITUTION=$(printf '%q' "$VESSEL_CONTACT_INSTITUTION")
-DEFAULT_VESSEL_CONTACT_EMAIL=$(printf '%q' "$VESSEL_CONTACT_EMAIL")
+DEFAULT_VESSEL_OPERATOR=$(printf '%q' "$VESSEL_OPERATOR")
+DEFAULT_VESSEL_EMAIL=$(printf '%q' "$VESSEL_EMAIL")
 DEFAULT_VESSEL_R2R=$VESSEL_R2R
 DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
 DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
@@ -2108,9 +2111,8 @@ function write_vessel_config {
     {
         echo "vessel:"
         echo "    name: $(_yaml_quote "$VESSEL_NAME")"
-        echo "    contact:"
-        echo "        institution: $(_yaml_quote "$VESSEL_CONTACT_INSTITUTION")"
-        echo "        email: $(_yaml_quote "$VESSEL_CONTACT_EMAIL")"
+        echo "    operator: $(_yaml_quote "$VESSEL_OPERATOR")  # the organization that operates it"
+        echo "    email: $(_yaml_quote "$VESSEL_EMAIL")     # the operator's contact email"
         echo "    # Only for vessels that submit data to R2R (Rolling Deck to Repository)"
         if [ "$VESSEL_R2R" = "yes" ]; then
             echo "    r2r:"
@@ -3060,8 +3062,10 @@ echo
 _EXISTING_YAML=${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
 if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
     DEFAULT_VESSEL_NAME=$(_yaml_block_get "$_EXISTING_YAML" vessel name)
-    DEFAULT_VESSEL_CONTACT_INSTITUTION=$(_yaml_block_get "$_EXISTING_YAML" vessel institution)
-    DEFAULT_VESSEL_CONTACT_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vessel email)
+    DEFAULT_VESSEL_OPERATOR=$(_yaml_block_get "$_EXISTING_YAML" vessel operator)
+    # contact.institution in an openvdm.yaml from an earlier 2.17 build (#693)
+    DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-$(_yaml_block_get "$_EXISTING_YAML" vessel institution)}
+    DEFAULT_VESSEL_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vessel email)
     DEFAULT_R2R_VESSEL_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel vesselID)
     DEFAULT_R2R_OPERATOR_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel operatorID)
     DEFAULT_R2R_SCHEDULER_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel schedulerID)
@@ -3091,13 +3095,13 @@ if [ ${#R2R_RECORD[@]} -gt 0 ]; then
     # made to openvdm.yaml are kept.
     if [ "${R2R_RECORD[2]}" != "$DEFAULT_R2R_VESSEL_ID" ]; then
         DEFAULT_VESSEL_NAME=
-        DEFAULT_VESSEL_CONTACT_INSTITUTION=
+        DEFAULT_VESSEL_OPERATOR=
         DEFAULT_R2R_VESSEL_ID=
         DEFAULT_R2R_OPERATOR_ID=
         DEFAULT_R2R_SCHEDULER_ID=
     fi
     DEFAULT_VESSEL_NAME=${DEFAULT_VESSEL_NAME:-${R2R_RECORD[1]}}
-    DEFAULT_VESSEL_CONTACT_INSTITUTION=${DEFAULT_VESSEL_CONTACT_INSTITUTION:-${R2R_RECORD[4]}}
+    DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-${R2R_RECORD[4]}}
     DEFAULT_R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID:-${R2R_RECORD[2]}}
     DEFAULT_R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID:-${R2R_RECORD[3]}}
     # R2R's record has no scheduler ID; UNOLS vessels are scheduled by UNOLS
@@ -3112,11 +3116,11 @@ echo
 read -r -p "Vessel name? ($DEFAULT_VESSEL_NAME) " VESSEL_NAME
 VESSEL_NAME=${VESSEL_NAME:-$DEFAULT_VESSEL_NAME}
 
-read -r -p "Contact institution (operator of the vessel)? ($DEFAULT_VESSEL_CONTACT_INSTITUTION) " VESSEL_CONTACT_INSTITUTION
-VESSEL_CONTACT_INSTITUTION=${VESSEL_CONTACT_INSTITUTION:-$DEFAULT_VESSEL_CONTACT_INSTITUTION}
+read -r -p "Vessel operator (the organization that operates it)? ($DEFAULT_VESSEL_OPERATOR) " VESSEL_OPERATOR
+VESSEL_OPERATOR=${VESSEL_OPERATOR:-$DEFAULT_VESSEL_OPERATOR}
 
-read -r -p "Contact email? ($DEFAULT_VESSEL_CONTACT_EMAIL) " VESSEL_CONTACT_EMAIL
-VESSEL_CONTACT_EMAIL=${VESSEL_CONTACT_EMAIL:-$DEFAULT_VESSEL_CONTACT_EMAIL}
+read -r -p "Operator's contact email? ($DEFAULT_VESSEL_EMAIL) " VESSEL_EMAIL
+VESSEL_EMAIL=${VESSEL_EMAIL:-$DEFAULT_VESSEL_EMAIL}
 
 if [ "$VESSEL_R2R" = "yes" ]; then
     echo
@@ -3165,8 +3169,8 @@ if [ "$VEHICLE" = "yes" ]; then
     VEHICLE_NAME=${VEHICLE_NAME:-$DEFAULT_VEHICLE_NAME}
 
     # Usually the vessel's operator, so offer its details until they're set
-    DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_CONTACT_INSTITUTION}
-    DEFAULT_VEHICLE_EMAIL=${DEFAULT_VEHICLE_EMAIL:-$VESSEL_CONTACT_EMAIL}
+    DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_OPERATOR}
+    DEFAULT_VEHICLE_EMAIL=${DEFAULT_VEHICLE_EMAIL:-$VESSEL_EMAIL}
     read -r -p "Vehicle operator (the institution that owns and operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
     VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
 

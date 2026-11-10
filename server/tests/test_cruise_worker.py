@@ -286,7 +286,7 @@ def test_stop_and_quit(worker) -> None:
 
 def test_export_cruise_config(worker, api, warehouse, perms) -> None:
     """Credentials and transfer settings dropped, file names, paths and the vessel added, empty values left out."""
-    api.config['vessel'] = {'name': 'R/V Example', 'contact': {'email': 'ops@example.org', 'phone': ''}}
+    api.config['vessel'] = {'name': 'R/V Example', 'email': 'ops@example.org', 'operator': ''}
     _setup(worker)
     assert worker.export_cruise_config() == {'verdict': True}
     config = json.loads(_config_file(warehouse).read_text())
@@ -301,7 +301,7 @@ def test_export_cruise_config(worker, api, warehouse, perms) -> None:
         assert key not in config, key
     assert config['md5SummaryFn'] == 'md5_summary.txt'
     assert config['dataDashboardManifestPath'] == 'OpenVDM/DashboardData/manifest.json'
-    assert config['vessel'] == {'name': 'R/V Example', 'contact': {'email': 'ops@example.org'}}
+    assert config['vessel'] == {'name': 'R/V Example', 'email': 'ops@example.org'}
     assert perms.paths == [str(_config_file(warehouse))]
     api.update_md5_summary.assert_called_once_with(updated=['cruise_config.json'], cruise_id='TEST001',
                                                    background=False)

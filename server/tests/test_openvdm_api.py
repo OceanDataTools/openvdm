@@ -171,11 +171,11 @@ def test_hooks_and_post_hook_commands(ovdm) -> None:
 
 def test_vessel_config(ovdm) -> None:
     """The vessel block, as strings, without unset fields or empty sub-blocks (#365)."""
-    ovdm.config['vessel'] = {'name': ' Roger Revelle ', 'contact': {'institution': 'SIO', 'email': None},
+    ovdm.config['vessel'] = {'name': ' Roger Revelle ', 'operator': 'SIO', 'email': None,
                              'r2r': {'vesselID': 3301, 'operatorID': '', 'schedulerID': None}}
-    assert ovdm.get_vessel_config() == {'name': 'Roger Revelle', 'contact': {'institution': 'SIO'},
+    assert ovdm.get_vessel_config() == {'name': 'Roger Revelle', 'operator': 'SIO',
                                         'r2r': {'vesselID': '3301'}}
-    ovdm.config['vessel'] = {'name': '', 'contact': {'email': ''}}
+    ovdm.config['vessel'] = {'name': '', 'email': '', 'r2r': {'vesselID': ''}}
     assert ovdm.get_vessel_config() == {}
     ovdm.config['vessel'] = 'not a block'
     assert ovdm.get_vessel_config() == {}
