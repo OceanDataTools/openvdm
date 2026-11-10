@@ -433,16 +433,6 @@ class Main extends Controller {
 
         //$collectionSystemTransfersModel;
         //$collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
-        $SSDW = null;
-
-        $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        foreach($requiredCruiseDataTransfers as $requiredCruiseDataTransfer) {
-            if(strcmp($requiredCruiseDataTransfer->name, 'SSDW') === 0) {
-                $SSDW = $requiredCruiseDataTransfer;
-                $data['shipToShoreTransfersEnable'] = $SSDW->enable;
-                break;
-            }
-        }
 
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
         $data['title'] = 'Configuration';
@@ -570,14 +560,6 @@ class Main extends Controller {
             $data['cruiseEndPort'] = $_POST['cruiseEndPort'] ?? '';
 
 
-            if(isset($_POST['disableSSDW'])) {
-                $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($SSDW->cruiseDataTransferID);
-            }
-
-            if(isset($_POST['enableSSDW'])) {
-                $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($SSDW->cruiseDataTransferID);
-            }
-
             foreach($data['collectionSystemTransfers'] as $row) {
                 if(isset($_POST['enableCS' . $row->collectionSystemTransferID])) {
                     $this->_collectionSystemTransfersModel->enableCollectionSystemTransfer($row->collectionSystemTransferID);
@@ -590,7 +572,6 @@ class Main extends Controller {
             }
 
             $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
-            $data['shipToShoreTransfersEnable'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($SSDW->cruiseDataTransferID)[0]->enable;
 
         }
 
