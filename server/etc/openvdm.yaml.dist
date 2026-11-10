@@ -159,10 +159,13 @@ hooks:
 # reports it.
 postHookCommands:
     postCollectionSystemTransfer:
-        # Plot new and updated CTD casts into the CTD_Plots extra directory
-        # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
+        # Only a transfer's first entry is used, so the CTD transfer's two commands share
+        # one entry: to use either command, or both, remove the first "#" from the entry's
+        # first two lines and from each line of the commands you want
         #- collectionSystemTransferName: CTD
         #  commandList:
+        # Plot new and updated CTD casts into the CTD_Plots extra directory
+        # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
         #  - name: "Plot CTD casts"
         #    command:
         #    - /opt/openvdm/venv/bin/python
@@ -170,6 +173,21 @@ postHookCommands:
         #    - --extra-directory=CTD_Plots
         #    - "{newFiles}"
         #    - "{updatedFiles}"
+        # CTD QA (sbe-qa-processing, installed in /opt/sbe-qa-processing with its site
+        # TOML; see its INSTALL.md): after a transfer of new or updated CTD files, assess
+        # the cruise's casts so far and write the reports to the CTD_QA extra directory,
+        # replacing the previous run's. Its area check uses the cruise's bounding box
+        # (set by the cruise tracklines or navigation QA hook). Optional arguments:
+        # --execute-notebook, --theme=PATH, and --site-config=PATH for a site TOML
+        # elsewhere than /opt/sbe-qa-processing/configs/site.toml
+        #  - name: "SBE 9 QA report"
+        #    command:
+        #    - /opt/sbe-qa-processing/.venv/bin/sbe-qa-processing
+        #    - openvdm
+        #    - "{collectionSystemTransferName}"
+        #    - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #    - "--changed-files={newFiles}"
+        #    - "--changed-files={updatedFiles}"
         # Navigation QA (nav-qa-processing, installed in /opt/nav-qa-processing with its
         # site TOML; see its INSTALL.md): reassess the cruise's GNSS feed after a transfer
         # of new or updated nav files, at most every 6 hours (--min-interval). OpenRVDAS is
