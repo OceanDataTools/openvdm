@@ -463,6 +463,42 @@ function _apt_has {
         | grep -qv '^(none)$'
 }
 
+# Make the PHP just installed (PHP_VER) the one Apache and the php command
+# use. A server upgraded from an older OpenVDM keeps the PHP it ran before
+# (e.g. php7.3 from 2.12) as Apache's module, which a2enmod won't enable a
+# second one beside, and the web app then fails Composer's platform check
+# (#699).
+function _use_php_debian {
+    local _load _mod
+    for _load in /etc/apache2/mods-enabled/php*.load; do
+        [ -e "$_load" ] || continue
+        _mod=$(basename "$_load" .load)
+        if [ "$_mod" != "php${PHP_VER}" ]; then
+            echo "Disabling Apache's ${_mod} module, for PHP ${PHP_VER}"
+            a2dismod -q "$_mod"
+        fi
+    done
+    if ! a2enmod -q "php${PHP_VER}"; then
+        echo "ERROR: Couldn't enable Apache's php${PHP_VER} module (see the message above)."
+        exit_gracefully
+    fi
+    for _load in /etc/apache2/mods-enabled/php*.load; do
+        [ -e "$_load" ] || continue
+        if [ "$(basename "$_load" .load)" != "php${PHP_VER}" ]; then
+            echo "ERROR: Apache still has ${_load} enabled; disable it with a2dismod."
+            exit_gracefully
+        fi
+    done
+
+    # The php command (and phar), which update-alternatives' auto mode
+    # usually points at the newest PHP already, but not after a manual choice
+    for _mod in php phar phar.phar; do
+        if [ -x "/usr/bin/${_mod}${PHP_VER}" ]; then
+            update-alternatives --quiet --set "$_mod" "/usr/bin/${_mod}${PHP_VER}"
+        fi
+    done
+}
+
 function _install_packages_debian {
 
     export NEEDRESTART_MODE=a
@@ -600,6 +636,8 @@ function _install_packages_debian {
             echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
     fi
+
+    _use_php_debian
 
     # Install the newest supported Python (SUPPORTED_PYTHON_VERSIONS).
     # Try versioned packages from newest to oldest; fall back to system python3
