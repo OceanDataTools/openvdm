@@ -338,7 +338,7 @@ pip install -r requirements.txt
 
 OpenVDM 2.15 moved from PHP 7.3 to PHP 8.2, and 2.16 needs Python 3.11 or later. There are two ways to upgrade a 2.14 server. Both use the same two database update scripts, which take a 2.14 database to the 2.16 schema.
 
-- **In place:** re-run the 2.16 installer on the same server. Use this on Rocky Linux or AlmaLinux 8 or 9, where the installer moves PHP to 8.2 from the Remi repository. This route has been tested end to end on Rocky Linux 9. On Ubuntu and Debian, 2.14 ran PHP 7.3 as Apache's PHP module (`libapache2-mod-php7.3`), and the 2.16 installer doesn't switch Apache off it. Use the fresh-OS route there.
+- **In place:** re-run the 2.16 installer on the same server. Use this on Rocky Linux or AlmaLinux 8 or 9, where the installer moves PHP to 8.2 from the Remi repository. This route has been tested end to end on Rocky Linux 9. On Ubuntu and Debian, 2.14 ran PHP 7.3 as Apache's PHP module (`libapache2-mod-php7.3`), and the 2.16 installer doesn't switch Apache off it. Use the fresh-OS route there. The 2.17 installer does switch it (#699), but the in-place route hasn't been tested end to end on Ubuntu or Debian.
 - **On a fresh OS:** install 2.16 on a new or reinstalled server, and bring the 2.14 database, settings and cruise data across.
 
 Whichever you choose, if the server is a virtual machine, take a snapshot first.
@@ -685,6 +685,7 @@ sudo bash ./utils/install-openvdm.sh
    - copies `server/etc/cruise_readme.md.j2`, `lowering_readme.md.j2`, `cruise_position_sources.yaml` and `lowering_position_sources.yaml` from their `.dist` files, keeping any you already have (#501, #639);
    - starts the workers through `server/lib/worker_launcher.py`, which posts an OpenVDM message when a worker fails (#503);
    - replaces a worker API key that's still `change-me-to-a-strong-random-value` with a random one, in `openvdm.yaml` and `Config.php`. The API refuses the placeholder from 2.17 (#605);
+   - on Debian and Ubuntu, makes the PHP it installs (8.3 where it's packaged) the one Apache and the `php` command use: it disables an older PHP's Apache module, which would otherwise stay enabled and fail every page with Composer's *Your Composer dependencies require a PHP version ">= 8.2.0"*, and sets the `php` alternative (#699);
    - on Ubuntu 26.04, turns off PHP's PCRE JIT for Apache (#662);
    - replaces `www/composer.lock` with the one in the code, which is tracked from 2.17 (#643);
    - leaves the database alone.
