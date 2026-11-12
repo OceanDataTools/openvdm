@@ -4,7 +4,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
-## [2.17.0] – Unreleased
+## [2.17.0] – 2026-11-12
 
 **Upgrading:** follow "Upgrading from 2.16.3" in [INSTALL.md](INSTALL.md) (from 2.14 or 2.15, its "From 2.14 or 2.15"). In short:
 - **Database:** update it with `database/openvdm_216_to_217.sql`. From 2.16.0, run `database/openvdm_2160_to_2161.sql` first.
