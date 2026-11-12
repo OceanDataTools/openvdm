@@ -38,7 +38,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.transfer_lock import CST, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.file_utils import write_list_file, is_ascii, is_default_ignore, is_default_ignore_dir, transfer_exclude_patterns, delete_from_dest, output_json_data_to_file, set_owner_group_permissions, temporary_directory, start_orphan_cleanup
@@ -49,6 +49,48 @@ from server.lib.openvdm import OpenVDM
 TASK_NAMES = {
     'RUN_COLLECTION_SYSTEM_TRANSFER': 'runCollectionSystemTransfer'
 }
+
+def build_filters(cst_cfg: dict, cruise_id: str, lowering_id: str | None) -> dict:
+    """Return a transfer's include, exclude and ignore filters, with their placeholders filled in.
+
+    ``{cruiseID}`` and ``{loweringID}`` become the IDs (``{loweringID}``
+    stays as written without a lowering); the date placeholders become
+    patterns for their digits (``{YYYY}`` is ``20[0-9][0-9]``, and so on).
+    The File Naming Guide (``www/app/Helpers/FileNamingGuide.php``) explains
+    the filters this way, and a test checks it against this function (#451).
+
+    Args:
+        cst_cfg: The collection system transfer, with ``includeFilter``,
+            ``excludeFilter`` and ``ignoreFilter`` (comma-separated patterns).
+        cruise_id: The cruise.
+        lowering_id: The lowering, or ``None``.
+
+    Returns:
+        dict: ``include_filters``, ``exclude_filters`` and ``ignore_filters``,
+        each a list of patterns.
+    """
+
+    context = {
+        '{cruiseID}': cruise_id,
+        '{loweringID}': lowering_id or '{loweringID}',
+        '{YYYY}': '20[0-9][0-9]',
+        '{YY}': '[0-9][0-9]',
+        '{mm}': '[0-1][0-9]',
+        '{DD}': '[0-3][0-9]',
+        '{HH}': '[0-2][0-9]',
+        '{MM}': '[0-5][0-9]',
+        '{SS}': '[0-5][0-9]',
+    }
+
+    filters = {}
+    for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
+        expanded = cst_cfg.get(key, '')
+        for placeholder, value in context.items():
+            expanded = expanded.replace(placeholder, value)
+        filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
+
+    return filters
+
 
 def classify_file(filepath: str, size: int, mod_time: float, filters: dict,
                   data_start_time: float, data_end_time: float):
@@ -227,6 +269,42 @@ def process_rsync_batch(batch, filters, data_start_time, data_end_time, epoch):
         if result:
             results.append(result)
     return results
+
+
+def empty_directories(dirs: list, paths: list, filters: dict) -> list:
+    """Return the source's empty directories, which the transfer creates in the destination.
+
+    rsync's ``--files-from`` list only creates the directories of the files it
+    copies, so with "Skip empty directories" off the transfer creates the
+    others itself (#659). A directory is empty when nothing else in the
+    listing is under it, apart from default-ignored files; creating it
+    creates its parents. Like a file, it's left out when its name isn't
+    ASCII or ``<path>/`` matches the transfer's ignore or exclude filters
+    (so a filter for everything under a directory also covers it), but its
+    modification time doesn't matter.
+
+    Args:
+        dirs: The directories in the listing, as paths of the same form as
+            the files (absolute for a walked source, relative for an rsync
+            listing).
+        paths: Everything else in the listing (files and links).
+        filters: Dict with ``ignore_filters`` and ``exclude_filters`` keys,
+            each a list of glob patterns.
+
+    Returns:
+        list[str]: The empty directories, sorted.
+    """
+    parents = set()
+    for path in list(dirs) + [path for path in paths if not is_default_ignore(path)]:
+        parent = os.path.dirname(path.rstrip('/'))
+        while parent and parent not in parents and parent != os.path.dirname(parent):
+            parents.add(parent)
+            parent = os.path.dirname(parent)
+
+    patterns = filters['ignore_filters'] + filters['exclude_filters']
+    return sorted(d for d in dirs
+                  if d not in parents and is_ascii(d)
+                  and not any(fnmatch.fnmatch(d.rstrip('/') + '/', p) for p in patterns))
 
 
 def _add_files(all_files: dict, dest_name: Optional[str], files: dict) -> None:
@@ -584,42 +662,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         Returns:
             dict: ``{'verdict': True, 'files': {'include', 'exclude', 'new',
-            'updated', 'filesize'}}``, or ``{'verdict': False, 'reason':
+            'updated', 'dirs'}}`` (*dirs*: the empty directories to create,
+            with "Skip empty directories" off, #659), or ``{'verdict': False, 'reason':
             ...}``. When the job is stopped while the source is listed,
             ``{'verdict': True, 'stopped': True}`` with no files (#473).
         """
-
-        def _build_filters(cst_cfg, cruise_id, lowering_id):
-            """
-            Build a dict of filters with their wildcards replaced with the appropriate
-            values
-            """
-
-            def _expand_placeholders(template: str, context: dict) -> str:
-                for key, value in context.items():
-                    template = template.replace(key, value)
-                return template
-
-            context = {
-                '{cruiseID}': cruise_id,
-                '{loweringID}': lowering_id or '{loweringID}',
-                '{YYYY}': '20[0-9][0-9]',
-                '{YY}': '[0-9][0-9]',
-                '{mm}': '[0-1][0-9]',
-                '{DD}': '[0-3][0-9]',
-                '{HH}': '[0-2][0-9]',
-                '{MM}': '[0-5][0-9]',
-                '{SS}': '[0-5][0-9]',
-            }
-
-            filters = {}
-            for key in ['includeFilter', 'excludeFilter', 'ignoreFilter']:
-                raw = cst_cfg.get(key, '')
-                expanded = _expand_placeholders(raw, context)
-                filters[key.replace('Filter', '_filters')] = expanded.split(',') if expanded else []
-
-            return filters
-
 
         def _verify_staleness_batch(paths_sizes):
             """
@@ -642,13 +689,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         source_dir = os.path.join(prefix, raw_source_dir.lstrip('/')) if prefix else raw_source_dir
         cst_cfg = self.collection_system_transfer
         transfer_type = get_transfer_type(cst_cfg['transferType'])
-        filters = _build_filters(cst_cfg, self.cruise_id, self.lowering_id)
+        filters = build_filters(cst_cfg, self.cruise_id, self.lowering_id)
         logging.debug("filters: %s", filters)
         epoch = datetime.strptime('1970/01/01 00:00:00', "%Y/%m/%d %H:%M:%S")
         data_start_time = calendar.timegm(time.strptime(self.data_start_date, "%Y/%m/%d %H:%M"))
         data_end_time = calendar.timegm(time.strptime(self.data_end_date, "%Y/%m/%d %H:%M:%S"))
 
         return_files = {'include': [], 'exclude': [], 'new': [], 'updated': [], 'filesize': []}
+        # The source's directories, for the empty ones to create (#659)
+        create_dirs = cst_cfg.get('skipEmptyDirs') == 0
+        dirs = []
         # Stopped while listing: no files, so nothing is copied or deleted (#473)
         stopped = {'verdict': True, 'stopped': True,
                    'files': {'include': [], 'exclude': [], 'new': [], 'updated': []}}
@@ -663,12 +713,14 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             # mount, which is slow over FTP and shows a directory the server
             # refuses to list as empty (#208)
             success, listing = list_ftp_source(rclone_config, FTP_REMOTE, raw_source_dir,
-                                               exclude_patterns)
+                                               exclude_patterns, with_dirs=create_dirs)
             if not success:
                 return {'verdict': False,
                         'reason': f"Error listing source directory {raw_source_dir}: {listing}"}
+            dirs = [os.path.join(source_dir, path) for path, size, _ in listing if size is None]
             filepaths = [(os.path.join(source_dir, path), size, mod_time)
-                         for path, size, mod_time in listing]
+                         for path, size, mod_time in listing if size is not None]
+            entries = [path for path, _, _ in filepaths]
         elif transfer_type in ['local', 'smb']:
             # A missing source or a listing error must not look like an empty
             # source: with syncFromSource that would delete the destination (#206)
@@ -681,8 +733,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 if self.stop:
                     return stopped
                 dirnames[:] = [d for d in dirnames if not is_default_ignore_dir(os.path.join(root, d))]
+                if create_dirs:
+                    dirs.extend(os.path.join(root, d) for d in dirnames)
                 for filename in filenames:
                     filepaths.append(os.path.join(root, filename))
+            entries = filepaths
 
             if walk_errors:
                 if transfer_type == 'smb':
@@ -715,17 +770,23 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                     command.insert(2, '--protect-args')
 
             # The SSH password goes to sshpass in a file, not on the command line (#426)
-            with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as command:
-                logging.debug("File list Command: %s", ' '.join(command))
-                proc = subprocess.run(command, capture_output=True, text=True, check=False)
+            with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
+                logging.debug("File list Command: %s", ' '.join(run_cmd))
+                proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
             # A failed or partial listing looks like missing files, and
             # with syncFromSource those are deleted from the destination (#238)
             reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
                                             proc, cst_cfg['syncFromSource'] == 1)
             if reason:
                 return {'verdict': False, 'reason': reason}
-            filepaths = proc.stdout.splitlines()
-            filepaths = [filepath for filepath in filepaths if filepath.startswith('-')]
+            lines = proc.stdout.splitlines()
+            filepaths = [line for line in lines if line.startswith('-')]
+            entries = []
+            if create_dirs:
+                for line in lines:
+                    parts = line.split(None, 4)
+                    if len(parts) == 5 and parts[4] != '.':
+                        (dirs if parts[0].startswith('d') else entries).append(parts[4])
 
         total_files = len(filepaths)
         logging.debug("Discovered %d files", total_files)
@@ -757,6 +818,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         if self.stop:
             return stopped
+
+        return_files['dirs'] = empty_directories(dirs, entries, filters) if create_dirs else []
 
         # Optional staleness check
         staleness = cst_cfg.get('staleness')
@@ -791,7 +854,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return_files['include'] = verified_paths
                 return_files['filesize'] = verified_sizes
             else:
-                proc = subprocess.run(command, capture_output=True, text=True, check=False)
+                # A password file of its own: the listing's was deleted when it finished (#688)
+                with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
+                    proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
                 # Otherwise the staleness check is silently skipped (#238)
                 reason = _rsync_listing_failure(f"Error re-listing source directory {raw_source_dir}",
                                                 proc, cst_cfg['syncFromSource'] == 1)
@@ -816,6 +881,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             base_len = len(source_dir.rstrip(os.sep)) + 1
             return_files['include'] = [f[base_len:] for f in return_files['include']]
             return_files['exclude'] = [f[base_len:] for f in return_files['exclude']]
+            return_files['dirs'] = [f[base_len:] for f in return_files['dirs']]
 
         return {'verdict': True, 'files': return_files}
 
@@ -856,9 +922,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             current_job: The Gearman job, for progress updates.
 
         Returns:
-            dict: ``{'verdict': True, 'files': ...}`` with the ``new``,
-            ``updated`` and ``exclude`` files (and ``deleted``, when the
-            transfer syncs deletions), or ``{'verdict': False, 'reason':
+            dict: ``{'verdict': True, 'files': ..., 'dirs_created': n}`` with
+            the ``new``, ``updated`` and ``exclude`` files (and ``deleted``,
+            when the transfer syncs deletions) and how many of the source's
+            empty directories were created (#659), or ``{'verdict': False, 'reason':
             ...}``. Stopped while listing, ``'stopped': True`` with no files:
             nothing is copied or deleted (#473).
         """
@@ -943,6 +1010,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
 
             all_files = {'new': [], 'updated': [], 'exclude': []}
+            dirs_created = 0
             if cst_cfg['syncFromSource'] == 1:
                 all_files['deleted'] = []
 
@@ -1020,9 +1088,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 files['new'] = new_files
                 files['updated'] = updated_files
 
+                # Create the source's empty directories, which the file list
+                # leaves out (#659)
+                missing = [os.path.join(effective_dest, d) for d in files.get('dirs', [])
+                           if not os.path.isdir(os.path.join(effective_dest, d))]
+                for directory in missing:
+                    try:
+                        os.makedirs(directory, exist_ok=True)
+                    except OSError as exc:
+                        _add_files(all_files, dest_name, files)
+                        return {'verdict': False, 'files': all_files,
+                                'reason': f"Transfer failed: unable to create directory {directory}: {exc}"}
+                if missing:
+                    logging.info("Created %d empty director%s", len(missing),
+                                 'ies' if len(missing) > 1 else 'y')
+                    dirs_created += len(missing)
+
                 # Delete files if sync'ing with source
                 if cst_cfg['syncFromSource'] == 1:
-                    deleted = delete_from_dest(effective_dest, files['include'])
+                    deleted = delete_from_dest(effective_dest, files['include'], files.get('dirs'))
                     if dest_name:
                         all_files['deleted'].extend([os.path.join(dest_name, f) for f in deleted])
                     else:
@@ -1030,7 +1114,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
                 _add_files(all_files, dest_name, files)
 
-        return {'verdict': True, 'files': all_files}
+        return {'verdict': True, 'files': all_files, 'dirs_created': dirs_created}
 
 
     def on_job_execute(self, current_job):
@@ -1040,10 +1124,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             current_job: The Gearman job.
 
         Returns:
-            str: The job result from :meth:`_run_job`.
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
         """
         try:
             return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
         finally:
             release_transfer_lock(self.transfer_lock)
             self.transfer_lock = None
@@ -1071,7 +1161,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
 
             cst_cfg = payload_obj.get('collectionSystemTransfer', {})
             cst_id = cst_cfg.get('collectionSystemTransferID')
@@ -1203,7 +1293,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {reason}')
+            try:
+                self.ovdm.set_error_collection_system_transfer(cst_id, f'Worker crashed: {reason}')
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -1408,6 +1502,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
 
     job_results['files'] = results['files']
     job_results['parts'].append({"partName": "Transfer Files", "result": "Pass"})
+    dirs_created = results.get('dirs_created')
 
     if len(job_results['files']['new']) > 0:
         logging.debug("%s file(s) added", len(job_results['files']['new']))
@@ -1418,7 +1513,7 @@ def task_run_collection_system_transfer(worker, current_job): # pylint: disable=
     if job_results['files'].get('deleted') and len(job_results['files']['deleted']) > 0:
         logging.debug("%s file(s) deleted", len(job_results['files']['deleted']))
 
-    if job_results['files']['new'] or job_results['files']['updated']:
+    if job_results['files']['new'] or job_results['files']['updated'] or dirs_created:
         logging.info("Setting file permissions")
         worker.send_job_status(current_job, 96, 100)
 

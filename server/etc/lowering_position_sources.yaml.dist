@@ -1,0 +1,24 @@
+# Position sources for the lowering tracklines: bin/build_lowering_tracks.py
+# reads this file when its openvdm.yaml hook passes
+# --position-sources=/opt/openvdm/server/etc/lowering_position_sources.yaml.
+# The installer copies it from its .dist; edit the copy to match this vehicle.
+# These match the sample data (OceanDataTools/openvdm_sample_data).
+#
+# CollectionSystem (optional): the collection system transfer these sources
+#   belong to. The script fails if its hook names another one; without it,
+#   they apply to whichever the hook names.
+# PositionSources: one entry per trackline, each with:
+#   device: the name in the trackline files' names
+#           (<loweringID>_<device>_Trackline.json and .kml)
+#   type:   the data dashboard data type of its position files, the
+#           data_type its plugin gives them (rov_openrvdas_plugin.py here)
+#   extent: true (optional, one source at most): the source the lowering's
+#           bounding box comes from; without it, the first
+CollectionSystem: ROV_OpenRVDAS
+PositionSources:
+  - device: USBL-PRI
+    type: rov-usbl-pri
+  - device: USBL-SEC
+    type: rov-usbl-sec
+  - device: SPRINT
+    type: rov-sprint

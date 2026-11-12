@@ -9,7 +9,7 @@ $hooks = Hooks::get();
 
 ?>
     </div> <!-- page-wrapper -->
-    <span class="text-muted pull-right" style="padding: 15px"><a href="https://github.com/oceandatatools/openvdm" target="_blank">OpenVDM</a> is licensed under the <a href="http://www.gnu.org/licenses/MIT">MIT</a> public license</span>
+    <span class="text-muted pull-right no-print" style="padding: 15px"><a href="https://github.com/oceandatatools/openvdm" target="_blank">OpenVDM</a> is licensed under the <a href="http://www.gnu.org/licenses/MIT">MIT</a> public license</span>
 </div> <!-- wrapper -->
 
 

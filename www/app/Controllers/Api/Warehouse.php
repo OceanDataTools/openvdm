@@ -35,15 +35,10 @@ class Warehouse extends Controller {
 
         if($this->_warehouseModel->getSystemStatus()) {
             $response['systemStatus'] = "On";
-            $nowDateStr = gmdate('Y/m/d H:i');
-            $cruiseDates = $this->_warehouseModel->getCruiseDates();
-
-            if(isset($cruiseDates['cruiseStartDate'])) {
-                if($cruiseDates['cruiseStartDate'] > $nowDateStr) {
-                    $response['warning'] = CRUISE_NAME . " has not started";
-                } elseif (!empty($cruiseDates['cruiseEndDate']) && $cruiseDates['cruiseEndDate'] < $nowDateStr) {
-                    $response['warning'] = CRUISE_NAME . " has Ended";
-                }
+            // Why the System Status card is yellow, for header.js (#637)
+            $warning = \Helpers\CruiseDates::warning($this->_warehouseModel->getCruiseDates(), gmdate('Y/m/d H:i'));
+            if($warning !== '') {
+                $response['warning'] = $warning;
             }
 
         } else {
@@ -83,6 +78,13 @@ class Warehouse extends Controller {
     public function getShowLoweringComponents() {
 
         echo json_encode($this->_warehouseModel->getShowLoweringComponents());
+    }
+
+    // getTerms - return what this install calls cruises and lowerings (#684):
+    // cruise, cruises, lowering and lowerings.
+    public function getTerms() {
+
+        echo json_encode(\Helpers\Terms::all());
     }
 
 	// getCruiseSize - return the size of the cruise directory.
@@ -125,6 +127,94 @@ class Warehouse extends Controller {
     public function getCruiseLocation() {
 
         $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
+        echo json_encode($response);
+    }
+
+    // getCruiseExtent - return the current cruise's bounding box, or null.
+    public function getCruiseExtent() {
+
+        $response['cruiseExtent'] = $this->_warehouseModel->getCruiseExtent();
+        echo json_encode($response);
+    }
+
+    // setCruiseExtent - set the current cruise's bounding box (#366), from
+    // POST 'extent': JSON with westernmost, easternmost, southernmost and
+    // northernmost in decimal degrees, or empty to clear it. Only for workers
+    // (X-Worker-Token), since the value ends up in QA reports. westernmost >
+    // easternmost is a box across the antimeridian.
+    public function setCruiseExtent() {
+
+        $extent = $this->_postedExtent();
+        if ($extent === false) {
+            return;
+        }
+
+        $this->_warehouseModel->setCruiseExtent(array('value' => $extent ? json_encode($extent) : ''));
+        echo json_encode(array('cruiseExtent' => $extent));
+    }
+
+    // getLoweringExtent - return the current lowering's bounding box, or null.
+    public function getLoweringExtent() {
+
+        $response['loweringExtent'] = $this->_warehouseModel->getLoweringExtent();
+        echo json_encode($response);
+    }
+
+    // setLoweringExtent - set the current lowering's bounding box (#399), as
+    // setCruiseExtent does for the cruise.
+    public function setLoweringExtent() {
+
+        $extent = $this->_postedExtent();
+        if ($extent === false) {
+            return;
+        }
+
+        $this->_warehouseModel->setLoweringExtent(array('value' => $extent ? json_encode($extent) : ''));
+        echo json_encode(array('loweringExtent' => $extent));
+    }
+
+    // The bounding box POSTed to setCruiseExtent or setLoweringExtent, checked:
+    // an array of the four edges, null to clear it, or false after sending a
+    // 403 (no worker token) or 400 (a missing or out-of-range edge, or south
+    // above north) response.
+    private function _postedExtent() {
+
+        if (!TransferCredentials::isWorkerRequest()) {
+            http_response_code(403);
+            echo json_encode(array('error' => 'A worker token is required'));
+            return false;
+        }
+
+        $raw = $_POST['extent'] ?? '';
+        if ($raw === '') {
+            return null;
+        }
+
+        $extent = json_decode($raw, true);
+        $limits = array('westernmost' => 180, 'easternmost' => 180, 'southernmost' => 90, 'northernmost' => 90);
+        $checked = array();
+        foreach ($limits as $edge => $limit) {
+            $value = is_array($extent) ? ($extent[$edge] ?? null) : null;
+            if ((!is_int($value) && !is_float($value)) || abs($value) > $limit) {
+                http_response_code(400);
+                echo json_encode(array('error' => "Invalid or missing $edge"));
+                return false;
+            }
+            $checked[$edge] = (float) $value;
+        }
+        if ($checked['southernmost'] > $checked['northernmost']) {
+            http_response_code(400);
+            echo json_encode(array('error' => 'southernmost is north of northernmost'));
+            return false;
+        }
+
+        return $checked;
+    }
+
+    // getCruiseDescription - return the current cruise description.
+    public function getCruiseDescription() {
+
+        $response['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
         echo json_encode($response);
     }
 
@@ -326,6 +416,8 @@ class Warehouse extends Controller {
         $response['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $response['cruisePI'] = $this->_warehouseModel->getCruisePI();
         $response['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
+        $response['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
+        $response['cruiseExtent'] = $this->_warehouseModel->getCruiseExtent();
         $response['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $response['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $response['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
@@ -363,6 +455,7 @@ class Warehouse extends Controller {
         $response['loweringID'] = $this->_warehouseModel->getLoweringID();
         $response['loweringStartDate'] = $this->_warehouseModel->getLoweringStartDate();
         $response['loweringEndDate'] = $this->_warehouseModel->getLoweringEndDate();
+        $response['loweringExtent'] = $this->_warehouseModel->getLoweringExtent();
         $response['collectionSystemTransfersConfig'] = $collectionSystemsTransfersModel->getLoweringOnlyCollectionSystemTransfers();
 
         $response['collectionSystemTransfersConfig'] = TransferCredentials::forResponse($response['collectionSystemTransfersConfig']);

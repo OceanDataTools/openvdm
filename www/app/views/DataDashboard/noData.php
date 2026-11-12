@@ -11,7 +11,7 @@
             <p>The fact that you reached this page doesn't means that there is a problem.</p>
             <p>You may be at this page because of one of the following reasons:</p>
             <ul>
-                <li>The data simply hasn't arrived yet (very possible if the cruise just started)</li>
+                <li>The data simply hasn't arrived yet (very possible if the <?php echo \Helpers\Terms::cruise(true); ?> just started)</li>
                 <li>The name of the data dashboard directory has changed in the configuration but the directory has not been renamed (or vice-versa).</li>
                 <li>The data was removed (Grab a pitchfork and rally the lynch mob!)</li>
             </ul>

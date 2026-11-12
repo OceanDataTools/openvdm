@@ -33,7 +33,20 @@ $(function () {
         }
     }
 
-    function updateSystemStatusPanel(systemStatusPanel, systemStatus) {
+    // The System Status card's question mark and popup, shown while the card
+    // is yellow, saying why: the time is outside the cruise's dates (#637)
+    function updateSystemStatusWarning(systemStatusWarning, warning) {
+        var icon = $(systemStatusWarning);
+        if (icon.attr('data-original-title') !== warning) {
+            icon.attr('title', warning).tooltip('fixTitle');
+        }
+        if (warning === '') {
+            icon.tooltip('hide');
+        }
+        icon.toggle(warning !== '');
+    }
+
+    function updateSystemStatusPanel(systemStatusPanel, systemStatus, systemStatusWarning) {
         var systemStatusURL = siteRoot + 'api/warehouse/getSystemStatus';
         $.getJSON(systemStatusURL, function (data, status) {
             if (status === 'success' && data !== null) {
@@ -42,16 +55,21 @@ $(function () {
                     $(systemStatus).html("On");
                     $(systemStatusPanel).removeClass('panel-primary');
                     $(systemStatusPanel).removeClass('panel-red');
-                    $(systemStatusPanel).addClass('panel-green');
+                    // Yellow when the time is outside the cruise's dates, as header.php makes it
+                    $(systemStatusPanel).toggleClass('panel-yellow', Boolean(data.warning));
+                    $(systemStatusPanel).toggleClass('panel-green', !data.warning);
+                    updateSystemStatusWarning(systemStatusWarning, data.warning || '');
                 } else if (data.systemStatus === "Off") {
                     $(systemStatus).html("Off");
                     $(systemStatusPanel).removeClass('panel-primary');
                     $(systemStatusPanel).removeClass('panel-green');
+                    $(systemStatusPanel).removeClass('panel-yellow');
                     $(systemStatusPanel).addClass('panel-red');
+                    updateSystemStatusWarning(systemStatusWarning, '');
                 }
             }
             setTimeout(function () {
-                updateSystemStatusPanel(systemStatusPanel, systemStatus);
+                updateSystemStatusPanel(systemStatusPanel, systemStatus, systemStatusWarning);
             }, 5000);
         });
     }
@@ -371,7 +389,13 @@ $(function () {
         $('#OVDM_messageCount').html(parseInt($('#OVDM_messageCount').text())-1); // decrement message count
     });
 
-    updateSystemStatusPanel('#systemStatusPanel', '#systemStatus');
+    // The card links to Enable/Disable System when logged in: a click on its
+    // question mark only shows the popup
+    $('#systemStatusWarning').tooltip().on('click', function (event) {
+        event.preventDefault();
+    });
+
+    updateSystemStatusPanel('#systemStatusPanel', '#systemStatus', '#systemStatusWarning');
     updateCruiseIDPanel('#cruiseIDPanel', '#cruiseID');
     updateCruiseSizePanel('#cruiseSizePanel', '#cruiseSize');
 

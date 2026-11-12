@@ -2,6 +2,7 @@
 
 use Core\Error;
 use Helpers\Form;
+use Helpers\DescriptionTemplates;
 use Helpers\FormCustom;
 
 ?>
@@ -35,6 +36,7 @@ use Helpers\FormCustom;
                             <div class="col-lg-12">
                                 <div class="form-group"><label>Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'name', 'value'=>$data['row'][0]->name)); ?></div>
                                 <div class="form-group"><label>Long Name</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'longName', 'value'=>$data['row'][0]->longName)); ?></div>
+                                <?php echo DescriptionTemplates::formGroup(DescriptionTemplates::extraDirectory(), $data['row'][0]->description ?? ''); ?>
                                 <div class="form-group"><label>Destination Directory</label><?php echo Form::input( array('class'=>'form-control', 'name'=>'destDir', 'value'=>$data['row'][0]->destDir)); ?></div>
 
 <?php
@@ -58,10 +60,10 @@ use Helpers\FormCustom;
         </div>
         <div class="col-lg-6">
             <h3>Page Guide</h3>
-            <p>This page is for editing an extra directory in the cruise data directory.  Extra directories are for holding files that can not be automatically transferred into the cruise data directory via Collection System Transfers.</p>
+            <p>This page is for editing an extra directory in the <?php echo \Helpers\Terms::cruise(true); ?> data directory.  Extra directories are for holding files that can not be automatically transferred into the <?php echo \Helpers\Terms::cruise(true); ?> data directory via Collection System Transfers.</p>
             <p>The <strong>Name</strong> field is a short name for the Collection System Transfer (i.e. Products).  These names should NOT have spaces in them.</p>
             <p>The <strong>Long Name</strong> field is a longer name for the Collection System Transfer (i.e. <?php echo CRUISE_NAME; ?> Products ).  These names can have spaces in them.</p>
-            <p>The <strong>Destination Directory</strong> is where the data will be stored within the cruise data directory.  This can be a parent directory (i.e. Products) or a sub-directory (i.e. EM302/Products).  If a sub-directory is desired use the UNIX-style directory notation '/'.</p>
+            <p>The <strong>Destination Directory</strong> is where the data will be stored within the <?php echo \Helpers\Terms::cruise(true); ?> data directory.  This can be a parent directory (i.e. Products) or a sub-directory (i.e. EM302/Products).  If a sub-directory is desired use the UNIX-style directory notation '/'.</p>
             <p>Click the <strong>Update</strong> button to submit the changes to OpenVDM.  Click the <strong>Cancel</strong> button to exit this form.</p>
         </div>
     </div>

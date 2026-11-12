@@ -32,7 +32,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, set_owner_group_permissions, transfer_exclude_patterns, temporary_directory, write_list_file, start_orphan_cleanup
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError, error_detail
+from server.lib.transfer_utils import TransferCommandError, error_detail, redact_payload
 from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.connection_utils import FTP_REMOTE, build_rclone_command, build_rclone_config_for_ssh, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, detect_smb_version, get_transfer_type, mount_smb_share, prepare_ftp_config, rclone_concurrency, rclone_destination, rsync_dest_path, test_cdt_destination, test_cdt_rclone_destination
@@ -43,6 +43,21 @@ from server.lib.openvdm import OpenVDM
 TASK_NAMES = {
     'RUN_CRUISE_DATA_TRANSFER': 'runCruiseDataTransfer'
 }
+
+
+def excluded_ids(value) -> list:
+    """Return the IDs in a transfer's ``excludedCollectionSystems`` or ``excludedExtraDirectories``.
+
+    Args:
+        value: The comma-separated list of IDs, or ``None``. Empty entries
+            and ``0`` (no exclusion) are skipped (#660).
+
+    Returns:
+        list[str]: The IDs, without surrounding spaces.
+    """
+    ids = (entry.strip() for entry in str(value or '').split(','))
+    return [entry for entry in ids if entry not in ('', '0')]
+
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     """Gearman worker for cruise data transfers to a secondary destination.
@@ -111,9 +126,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             exclude_filterlist.append(f"{os.path.join(wh_cfg['loweringDataBaseDir'], '*', self.ovdm.get_lowering_config_fn())}")
 
         # Handle excluded collection systems
-        ex_cst_ids = cdt_cfg.get('excludedCollectionSystems', '').split(',') if cdt_cfg.get('excludedCollectionSystems') else []
-
-        for cst_id in filter(lambda x: x and x != 0, ex_cst_ids):
+        for cst_id in excluded_ids(cdt_cfg.get('excludedCollectionSystems')):
             try:
                 cst_cfg = self.ovdm.get_collection_system_transfer(cst_id)
                 cruise_or_lowering = cst_cfg.get('cruiseOrLowering')
@@ -135,9 +148,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 logging.warning("Could not retrieve collection system transfer %s: %s", cst_id, str(exc))
 
         # Handle excluded extra directories
-        ex_ed_ids = cdt_cfg.get('excludedExtraDirectories', '').split(',') if cdt_cfg.get('excludedExtraDirectories') else []
-
-        for ed_id in filter(lambda x: x and x != 0, ex_ed_ids):
+        for ed_id in excluded_ids(cdt_cfg.get('excludedExtraDirectories')):
             try:
                 ed_cfg = self.ovdm.get_extra_directory(ed_id)
                 cruise_or_lowering = ed_cfg.get('cruiseOrLowering')
@@ -186,12 +197,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
     def make_cruise_dir(self, dest_dir, extra_args=None):
         """Create the cruise directory on an rclone destination (``rclone mkdir``).
 
-        Failures are logged, not raised.
+        A failed ``mkdir`` is only logged: ``rclone copy`` creates the
+        directory too.
 
         Args:
             dest_dir: rclone destination (``remote:path``).
             extra_args: Extra rclone arguments (e.g. ``['--config', path]``),
                 or ``None``.
+
+        Returns:
+            bool: ``False`` if rclone isn't installed, so the copy can't run
+            either (#524); ``True`` otherwise.
         """
 
         # Build rclone command
@@ -209,6 +225,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         except subprocess.CalledProcessError as e:
             logging.error("Error creating cruise directory: %s", e.stderr)
+        except FileNotFoundError:
+            logging.error("Error creating cruise directory: rclone is not installed")
+            return False
+
+        return True
 
 
     def run_transfer_command(self, current_job, command, file_count):
@@ -286,11 +307,20 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 dest_dir = os.path.join(mntpoint, cdt_cfg['destDir'].lstrip('/'))
 
             elif transfer_type == 'rsync':
+                # Without the password (the worker API token), writing it
+                # would raise (#524)
+                if cdt_cfg.get('rsyncPass') is None:
+                    return {'verdict': False,
+                            'reason': 'rsyncPass not available — worker API token may be '
+                                      'misconfigured or password not set for this transfer'}
                 # Write rsync password file
                 password_file = os.path.join(tmpdir, 'rsyncPass')
-                with open(password_file, 'w', encoding='utf-8') as f:
-                    f.write(cdt_cfg['rsyncPass'])
-                os.chmod(password_file, 0o600)
+                try:
+                    with open(password_file, 'w', encoding='utf-8') as f:
+                        f.write(cdt_cfg['rsyncPass'])
+                    os.chmod(password_file, 0o600)
+                except OSError:
+                    return {'verdict': False, 'reason': 'Error writing rsync password file'}
                 dest_dir = f"rsync://{cdt_cfg['rsyncUser']}@{rsync_dest_path(cdt_cfg['rsyncServer'], cdt_cfg['destDir'])}/"
 
             elif transfer_type == 'ssh':
@@ -360,7 +390,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 # === USING RCLONE === (local directories and SMB mounts, and
                 # rclone remotes for SSH and FTP destinations)
                 else:
-                    self.make_cruise_dir(dest_dir, rclone_args)
+                    if not self.make_cruise_dir(dest_dir, rclone_args):
+                        return {'verdict': False, 'reason': 'rclone is not installed'}
 
                     # Local directories and SMB mounts get the local limits,
                     # rclone remotes the remote ones (#465)
@@ -398,10 +429,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             current_job: The Gearman job.
 
         Returns:
-            str: The job result from :meth:`_run_job`.
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
         """
         try:
             return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
         finally:
             release_transfer_lock(self.transfer_lock)
             self.transfer_lock = None
@@ -429,7 +466,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("Payload: %s", current_job.data)
+            logging.debug("Payload: %s", redact_payload(current_job.data))
 
             cdt_id = payload_obj['cruiseDataTransfer']['cruiseDataTransferID']
             self.cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)
@@ -516,7 +553,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         if cdt_id:
-            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            try:
+                self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 

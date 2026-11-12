@@ -196,7 +196,7 @@ def test_worker_holds_the_lock_while_the_job_runs() -> None:
 
 @pytest.mark.parametrize('module', [cst_run, cdt_run, s2s_run])
 def test_worker_releases_the_lock_when_the_job_raises(module) -> None:
-    """An exception in the job doesn't leave the transfer locked."""
+    """An exception in the job fails it (#661) and doesn't leave the transfer locked."""
     worker = object.__new__(module.OVDMGearmanWorker)
 
     def run(job):
@@ -204,8 +204,9 @@ def test_worker_releases_the_lock_when_the_job_raises(module) -> None:
         raise RuntimeError('boom')
 
     worker._run_job = run
-    with pytest.raises(RuntimeError):
-        worker.on_job_execute(Mock())
+    worker.on_job_exception = Mock(return_value='crashed')
+    assert worker.on_job_execute(Mock()) == 'crashed'
+    assert worker.on_job_exception.call_args.args[1][0] is RuntimeError
     assert worker.transfer_lock is None
     assert not transfer_locked(CST, 1) and not transfer_locked(CDT, 1)
 

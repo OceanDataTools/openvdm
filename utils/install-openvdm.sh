@@ -41,6 +41,12 @@ SUPPORTED_PYTHON_VERSIONS="3.14 3.13 3.12 3.11"
 # xbt-edf-qc commit installed with the sample data, for the XBT plugin (#300)
 XBT_EDF_QC_COMMIT='a784145a2dc9462d8071747b5dfcfcfd2c3fee70'
 
+# Checksum of this copy of the installer, read before the install can replace
+# it, and the directory it was run from (where its preferences file is), for
+# check_installer_version (#650)
+INSTALLER_SUM=$(sha256sum "$0" 2>/dev/null | cut -d' ' -f1)
+INSTALLER_START_DIR=${PWD}
+
 
 ###########################################################################
 ###########################################################################
@@ -78,6 +84,36 @@ yes_no() {
             * ) echo "Please answer yes or no.";;
         esac
     done
+}
+
+###########################################################################
+###########################################################################
+# Stop when a package install fails: the rest of the install needs the
+# packages, and carrying on made it fail later, or not until OpenVDM ran (#650)
+function packages_failed {
+    echo "ERROR: Couldn't install the packages above (see $1's message)."
+    echo "       Fix the problem and re-run the installer."
+    exit_gracefully
+}
+
+###########################################################################
+###########################################################################
+# Stop unless this copy of the installer is the one in the code it has just
+# cloned or updated. The packages come from this copy's lists, so an older
+# copy installs the code without the packages it needs (#650)
+function check_installer_version {
+    local CHECKED_OUT="${INSTALL_ROOT}/openvdm/utils/install-openvdm.sh"
+    if [ -z "${INSTALLER_SUM}" ]; then
+        echo "WARNING: Couldn't read this copy of the installer ($0) to compare it with ${CHECKED_OUT}."
+        return
+    fi
+    if [ "${INSTALLER_SUM}" != "$(sha256sum "${CHECKED_OUT}" | cut -d' ' -f1)" ]; then
+        echo "ERROR: This copy of the installer isn't the one in '${OPENVDM_BRANCH}', which"
+        echo "       it has just downloaded, so it would install the wrong packages for it."
+        echo "       Run that copy instead. Your answers are its defaults:"
+        echo "           cd ${INSTALLER_START_DIR} && sudo bash ${CHECKED_OUT}"
+        exit_gracefully
+    fi
 }
 
 ###########################################################################
@@ -202,11 +238,32 @@ function set_default_variables {
     DEFAULT_SUPERVISORD_WEBINTERFACE=no
     DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=no
 
+    DEFAULT_VESSEL_NAME=
+    DEFAULT_VESSEL_OPERATOR=
+    DEFAULT_VESSEL_EMAIL=
+    DEFAULT_VESSEL_R2R=no
+    DEFAULT_R2R_VESSEL_ID=
+    DEFAULT_R2R_OPERATOR_ID=
+    DEFAULT_R2R_SCHEDULER_ID=
+
+    DEFAULT_CRUISE_NAME=Cruise
+    DEFAULT_CRUISE_NAME_PLURAL=
+    DEFAULT_LOWERING_NAME=Lowering
+    DEFAULT_LOWERING_NAME_PLURAL=
+
+    DEFAULT_VEHICLE=no
+    DEFAULT_VEHICLE_NAME=
+    DEFAULT_VEHICLE_OPERATOR=
+    DEFAULT_VEHICLE_EMAIL=
+
     # Read in the preferences file, if it exists, to overwrite the defaults.
     if [ -e "$PREFERENCES_FILE" ]; then
         echo Reading pre-saved defaults from "$PREFERENCES_FILE"
         source "$PREFERENCES_FILE"
         echo branch $DEFAULT_OPENVDM_BRANCH
+        # Saved by an earlier 2.17 build, before the vessel's operator (#693)
+        DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-$DEFAULT_VESSEL_CONTACT_INSTITUTION}
+        DEFAULT_VESSEL_EMAIL=${DEFAULT_VESSEL_EMAIL:-$DEFAULT_VESSEL_CONTACT_EMAIL}
     fi
 }
 
@@ -245,6 +302,24 @@ DEFAULT_SAMPLEDATA_BRANCH=$SAMPLEDATA_BRANCH
 
 DEFAULT_SUPERVISORD_WEBINTERFACE=$SUPERVISORD_WEBINTERFACE
 DEFAULT_SUPERVISORD_WEBINTERFACE_AUTH=$SUPERVISORD_WEBINTERFACE_AUTH
+
+DEFAULT_VESSEL_NAME=$(printf '%q' "$VESSEL_NAME")
+DEFAULT_VESSEL_OPERATOR=$(printf '%q' "$VESSEL_OPERATOR")
+DEFAULT_VESSEL_EMAIL=$(printf '%q' "$VESSEL_EMAIL")
+DEFAULT_VESSEL_R2R=$VESSEL_R2R
+DEFAULT_R2R_VESSEL_ID=$(printf '%q' "$R2R_VESSEL_ID")
+DEFAULT_R2R_OPERATOR_ID=$(printf '%q' "$R2R_OPERATOR_ID")
+DEFAULT_R2R_SCHEDULER_ID=$(printf '%q' "$R2R_SCHEDULER_ID")
+
+DEFAULT_CRUISE_NAME=$(printf '%q' "$CRUISE_NAME")
+DEFAULT_CRUISE_NAME_PLURAL=$(printf '%q' "$CRUISE_NAME_PLURAL")
+DEFAULT_LOWERING_NAME=$(printf '%q' "$LOWERING_NAME")
+DEFAULT_LOWERING_NAME_PLURAL=$(printf '%q' "$LOWERING_NAME_PLURAL")
+
+DEFAULT_VEHICLE=$VEHICLE
+DEFAULT_VEHICLE_NAME=$(printf '%q' "$VEHICLE_NAME")
+DEFAULT_VEHICLE_OPERATOR=$(printf '%q' "$VEHICLE_OPERATOR")
+DEFAULT_VEHICLE_EMAIL=$(printf '%q' "$VEHICLE_EMAIL")
 EOF
     chmod 600 "$PREFERENCES_FILE"
 }
@@ -311,8 +386,14 @@ function install_packages {
 
     # Install Composer (both families)
     cd ~
-    curl -sS https://getcomposer.org/installer | php
-    mv composer.phar /usr/local/bin/composer
+    if ! curl -fsS https://getcomposer.org/installer -o composer-setup.php \
+        || ! php composer-setup.php \
+        || ! mv composer.phar /usr/local/bin/composer; then
+        rm -f composer-setup.php
+        echo "ERROR: Couldn't install Composer (see the message above)."
+        exit_gracefully
+    fi
+    rm -f composer-setup.php
 
     cd "${startingDir}"
 }
@@ -382,12 +463,48 @@ function _apt_has {
         | grep -qv '^(none)$'
 }
 
+# Make the PHP just installed (PHP_VER) the one Apache and the php command
+# use. A server upgraded from an older OpenVDM keeps the PHP it ran before
+# (e.g. php7.3 from 2.12) as Apache's module, which a2enmod won't enable a
+# second one beside, and the web app then fails Composer's platform check
+# (#699).
+function _use_php_debian {
+    local _load _mod
+    for _load in /etc/apache2/mods-enabled/php*.load; do
+        [ -e "$_load" ] || continue
+        _mod=$(basename "$_load" .load)
+        if [ "$_mod" != "php${PHP_VER}" ]; then
+            echo "Disabling Apache's ${_mod} module, for PHP ${PHP_VER}"
+            a2dismod -q "$_mod"
+        fi
+    done
+    if ! a2enmod -q "php${PHP_VER}"; then
+        echo "ERROR: Couldn't enable Apache's php${PHP_VER} module (see the message above)."
+        exit_gracefully
+    fi
+    for _load in /etc/apache2/mods-enabled/php*.load; do
+        [ -e "$_load" ] || continue
+        if [ "$(basename "$_load" .load)" != "php${PHP_VER}" ]; then
+            echo "ERROR: Apache still has ${_load} enabled; disable it with a2dismod."
+            exit_gracefully
+        fi
+    done
+
+    # The php command (and phar), which update-alternatives' auto mode
+    # usually points at the newest PHP already, but not after a manual choice
+    for _mod in php phar phar.phar; do
+        if [ -x "/usr/bin/${_mod}${PHP_VER}" ]; then
+            update-alternatives --quiet --set "$_mod" "/usr/bin/${_mod}${PHP_VER}"
+        fi
+    done
+}
+
 function _install_packages_debian {
 
     export NEEDRESTART_MODE=a
 
     apt-get update -qq
-    apt-get install -q -y ca-certificates curl gnupg
+    apt-get install -q -y ca-certificates curl gnupg || packages_failed apt-get
 
     # Use the codename already parsed from /etc/os-release in detect_os()
     # rather than calling lsb_release, which is not installed on minimal Debian.
@@ -397,7 +514,7 @@ function _install_packages_debian {
 
     if [ "$OS_ID" = "ubuntu" ]; then
         # Ubuntu: software-properties-common provides add-apt-repository
-        apt-get install -q -y software-properties-common
+        apt-get install -q -y software-properties-common || packages_failed apt-get
 
         # Ubuntu: use Ondrej's PPA from Launchpad via keyserver.ubuntu.com
         KEYRING_FILE="$KEYRING_DIR/ondrej-php.gpg"
@@ -499,18 +616,19 @@ function _install_packages_debian {
         cifs-utils fuse3 gdal-bin gearman-job-server git \
         libapache2-mod-php${PHP_VER} libapache2-mod-wsgi-py3 libgearman-dev \
         $MYSQL_PKGS \
-        php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl \
+        php${PHP_VER} php${PHP_VER}-cli php${PHP_VER}-curl php${PHP_VER}-mbstring \
         php${PHP_VER}-mysql php${PHP_VER}-yaml php${PHP_VER}-zip \
         python3 python3-dev python3-pip python3-venv \
-        rclone rsync samba smbclient sshpass supervisor
+        rclone rsync samba smbclient sshpass supervisor unzip \
+        || packages_failed apt-get
 
     # Install php-gearman: use the native versioned package when available
     # (from Ondrej PPA on 22.04/24.04), otherwise build via PECL.
     if _apt_has "php${PHP_VER}-gearman"; then
-        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman"
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-gearman" || packages_failed apt-get
     else
         echo "php${PHP_VER}-gearman not packaged; building via PECL (requires libgearman-dev)..."
-        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-dev" php-pear
+        NEEDRESTART_MODE=a apt-get install -q -y "php${PHP_VER}-dev" php-pear || packages_failed apt-get
         if printf "\n" | pecl install gearman; then
             echo "extension=gearman.so" > "/etc/php/${PHP_VER}/mods-available/gearman.ini"
             phpenmod -v "${PHP_VER}" gearman 2>/dev/null || true
@@ -518,6 +636,8 @@ function _install_packages_debian {
             echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
     fi
+
+    _use_php_debian
 
     # Install the newest supported Python (SUPPORTED_PYTHON_VERSIONS).
     # Try versioned packages from newest to oldest; fall back to system python3
@@ -537,7 +657,7 @@ function _install_packages_debian {
     if [ "$_PYTHON_INSTALLED" = "false" ]; then
         if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" 2>/dev/null; then
             echo "No versioned python3.11+ package found; system python3 is $(python3 --version)"
-            NEEDRESTART_MODE=a apt-get install -q -y python3-dev python3-venv
+            NEEDRESTART_MODE=a apt-get install -q -y python3-dev python3-venv || packages_failed apt-get
         else
             echo "ERROR: Python >= 3.11 is required but no suitable version is available."
             exit_gracefully
@@ -548,7 +668,8 @@ function _install_packages_debian {
     if [ "$INSTALL_MAPPROXY" = "yes" ]; then
         NEEDRESTART_MODE=a apt-get install -q -y \
             libgeos-dev libgdal-dev proj-bin \
-            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev
+            python3-pyproj gdal-bin libfreetype6-dev libjpeg-dev apache2-dev \
+            || packages_failed apt-get
     fi
 }
 
@@ -564,8 +685,12 @@ function _build_gearmand_from_source {
 
     echo "Building gearmand ${GEARMAND_VERSION} from source (not in EPEL 10)..."
     # gearmand 1.1.21 uses autotools, not cmake; gperf required by configure
-    dnf install -y autoconf automake boost-devel gcc-c++ gperf libevent-devel libtool \
-        libuuid-devel openssl-devel
+    if ! dnf install -y autoconf automake boost-devel gcc-c++ gperf libevent-devel libtool \
+        libuuid-devel openssl-devel; then
+        echo "ERROR: failed to install the packages to build gearmand" >&2
+        rm -rf "${BUILD_DIR}"
+        return 1
+    fi
 
     # Download to file so curl errors are detectable
     if ! curl -fsSL \
@@ -627,7 +752,7 @@ GEARUNIT
 # RHEL/Rocky/Alma package installation
 function _install_packages_rhel {
 
-    dnf install -y epel-release
+    dnf install -y epel-release || packages_failed dnf
 
     # Enable powertools (v8) or crb (v9+)
     if [ "$OS_VERSION_MAJOR" -ge 9 ]; then
@@ -648,7 +773,8 @@ function _install_packages_rhel {
         # does not prevent PHP itself from being installed).
         dnf module reset php -y 2>/dev/null || true
         dnf module enable php:8.3 -y 2>/dev/null || true
-        dnf install -y php php-cli php-common php-devel php-mysqlnd php-pear php-yaml php-zip
+        dnf install -y php php-cli php-common php-devel php-mbstring php-mysqlnd php-pear php-yaml php-zip \
+            || packages_failed dnf
         # gearmand and libgearman are not in EPEL 10 — build from source so that
         # both the daemon and the headers needed for the PECL extension are available.
         if command -v gearmand &>/dev/null; then
@@ -676,15 +802,17 @@ function _install_packages_rhel {
             echo "WARNING: php-gearman PECL build failed; Gearman workers will not function"
         fi
     elif [ "$OS_VERSION_MAJOR" -ge 9 ]; then
-        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-9.rpm" || packages_failed dnf
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip \
+            || packages_failed dnf
     else
-        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
+        dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm" || packages_failed dnf
         dnf module reset php -y
         dnf module enable php:remi-8.2 -y
-        dnf install -y php php-cli php-common php-gearman php-mysqlnd php-yaml php-zip
+        dnf install -y php php-cli php-common php-gearman php-mbstring php-mysqlnd php-yaml php-zip \
+            || packages_failed dnf
     fi
 
     # On RHEL 9, enable the mysql:8.0 module stream if the system has one.
@@ -702,7 +830,7 @@ function _install_packages_rhel {
     _PYTHON_INSTALLED=false
     for _VER in ${SUPPORTED_PYTHON_VERSIONS}; do
         if dnf info "python${_VER}" > /dev/null 2>&1; then
-            dnf install -y "python${_VER}" "python${_VER}-devel"
+            dnf install -y "python${_VER}" "python${_VER}-devel" || packages_failed dnf
             _PYTHON_INSTALLED=true
             break
         fi
@@ -728,7 +856,8 @@ function _install_packages_rhel {
             mariadb-server nodejs npm \
             openssh-server policycoreutils-python-utils proj proj-devel \
             rsync samba samba-client samba-common samba-common-tools \
-            setroubleshoot sshpass supervisor unzip zlib-devel
+            setroubleshoot sshpass supervisor unzip zlib-devel \
+            || packages_failed dnf
         # gearmand was already built from source in the PHP section above
     else
         dnf -y install \
@@ -738,7 +867,8 @@ function _install_packages_rhel {
             openssh-server policycoreutils-python-utils proj proj-devel \
             python3-pyproj \
             rsync samba samba-client samba-common samba-common-tools \
-            setroubleshoot sshpass supervisor unzip zlib-devel
+            setroubleshoot sshpass supervisor unzip zlib-devel \
+            || packages_failed dnf
     fi
 
     # rclone is not in RHEL/AlmaLinux repos — install from official script
@@ -879,7 +1009,7 @@ EOF
 
     cat > "${SUPERVISOR_CONF_D}/openvdm.${SUPERVISOR_PROG_EXT}" << EOF
 [program:cruise]
-command=${VENV_BIN}/python server/workers/cruise.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/cruise.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/cruise.log
@@ -889,7 +1019,7 @@ autorestart=true
 stopsignal=INT
 
 [program:cruise_directory]
-command=${VENV_BIN}/python server/workers/cruise_directory.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/cruise_directory.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/cruiseDirectory.log
@@ -899,7 +1029,7 @@ autorestart=true
 stopsignal=INT
 
 [program:data_dashboard]
-command=${VENV_BIN}/python server/workers/data_dashboard.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/data_dashboard.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/dataDashboard.log
@@ -909,7 +1039,7 @@ autorestart=true
 stopsignal=INT
 
 [program:lowering]
-command=${VENV_BIN}/python server/workers/lowering.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/lowering.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/lowering.log
@@ -919,7 +1049,7 @@ autorestart=true
 stopsignal=INT
 
 [program:lowering_directory]
-command=${VENV_BIN}/python server/workers/lowering_directory.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/lowering_directory.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/lowering_directory.log
@@ -929,7 +1059,7 @@ autorestart=true
 stopsignal=INT
 
 [program:md5_summary]
-command=${VENV_BIN}/python server/workers/md5_summary.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/md5_summary.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/md5_summary.log
@@ -939,7 +1069,7 @@ autorestart=true
 stopsignal=INT
 
 [program:post_hooks]
-command=${VENV_BIN}/python server/workers/post_hooks.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/post_hooks.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/post_hooks.log
@@ -949,7 +1079,7 @@ autorestart=true
 stopsignal=INT
 
 [program:reboot_reset]
-command=${VENV_BIN}/python server/workers/reboot_reset.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/reboot_reset.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/reboot_reset.log
@@ -959,7 +1089,7 @@ autorestart=false
 stopsignal=INT
 
 [program:run_collection_system_transfer]
-command=${VENV_BIN}/python server/workers/run_collection_system_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_collection_system_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -972,7 +1102,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:run_cruise_data_transfer]
-command=${VENV_BIN}/python server/workers/run_cruise_data_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_cruise_data_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -985,7 +1115,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:run_ship_to_shore_transfer]
-command=${VENV_BIN}/python server/workers/run_ship_to_shore_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/run_ship_to_shore_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 process_name=%(program_name)s_%(process_num)s
 numprocs=2
@@ -998,7 +1128,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:scheduler]
-command=${VENV_BIN}/python server/workers/scheduler.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/scheduler.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/scheduler.log
@@ -1008,7 +1138,7 @@ autorestart=true
 stopsignal=INT
 
 [program:size_cacher]
-command=${VENV_BIN}/python server/workers/size_cacher.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/size_cacher.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/size_cacher.log
@@ -1018,7 +1148,7 @@ autorestart=true
 stopsignal=INT
 
 [program:stop_job]
-command=${VENV_BIN}/python server/workers/stop_job.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/stop_job.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/stop_job.log
@@ -1028,7 +1158,7 @@ autorestart=true
 stopsignal=INT
 
 [program:test_collection_system_transfer]
-command=${VENV_BIN}/python server/workers/test_collection_system_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/test_collection_system_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/test_collection_system_transfer.log
@@ -1039,7 +1169,7 @@ stopsignal=INT
 killasgroup=true
 
 [program:test_cruise_data_transfer]
-command=${VENV_BIN}/python server/workers/test_cruise_data_transfer.py
+command=${VENV_BIN}/python -m server.lib.worker_launcher server/workers/test_cruise_data_transfer.py
 directory=${INSTALL_ROOT}/openvdm
 redirect_stderr=true
 stdout_logfile=/var/log/openvdm/test_cruise_data_transfer.log
@@ -1121,9 +1251,9 @@ EOF
     cat > /etc/samba/openvdm.conf <<EOF
 # SMB Shares for OpenVDM
 
-[CruiseData]
-  comment=Cruise Data, read-only access to guest
-  path=${DATA_ROOT}/CruiseData
+[${CRUISEDATA_DIRNAME}]
+  comment=${CRUISE_NAME} Data, read-only access to guest
+  path=${DATA_ROOT}/${CRUISEDATA_DIRNAME}
   browsable = yes
   public = yes
   hide unreadable = yes
@@ -1246,8 +1376,8 @@ EOF
 
     cat >> "${VHOST_FILE}" <<EOF
 
-    Alias /CruiseData/ $DATA_ROOT/CruiseData/
-    <Directory "$DATA_ROOT/CruiseData">
+    Alias /${CRUISEDATA_DIRNAME}/ $DATA_ROOT/${CRUISEDATA_DIRNAME}/
+    <Directory "$DATA_ROOT/${CRUISEDATA_DIRNAME}">
       AllowOverride None
       Options +Indexes -FollowSymLinks +MultiViews
       Order allow,deny
@@ -1299,6 +1429,24 @@ EOF
 EOF
 
     if [ "$OS_FAMILY" = "debian" ]; then
+        # Ubuntu 26.04's apache2.service sets MemoryDenyWriteExecute, which
+        # stops PCRE's JIT compiler: the first preg_match() in each Apache
+        # child process then raises a warning, which fails the request.
+        # Turn the JIT off for Apache's PHP where the unit sets it (#662).
+        if [ "$(systemctl show -p MemoryDenyWriteExecute --value apache2 2>/dev/null)" = "yes" ]; then
+            for _php_conf_d in /etc/php/*/apache2/conf.d; do
+                [ -d "${_php_conf_d}" ] || continue
+                echo "Turning off PCRE JIT for Apache's PHP in ${_php_conf_d}"
+                cat > "${_php_conf_d}/99-openvdm.ini" <<'EOF'
+; Added by the OpenVDM installer: apache2.service sets MemoryDenyWriteExecute,
+; which PCRE's JIT compiler needs (#662)
+pcre.jit=0
+EOF
+            done
+        else
+            rm -f /etc/php/*/apache2/conf.d/99-openvdm.ini
+        fi
+
         echo "Enabling rewrite Module"
         a2enmod -q rewrite
 
@@ -1650,8 +1798,6 @@ function configure_directories {
     if [ ! -d $DATA_ROOT ]; then
         echo "Creating initial data directory structure starting at: $DATA_ROOT"
 
-        mkdir -p ${DATA_ROOT}/CruiseData
-
         if [ "$INSTALL_PUBLICDATA" = "yes" ]; then
             mkdir -p ${DATA_ROOT}/PublicData
             chmod -R 777 ${DATA_ROOT}/PublicData
@@ -1662,6 +1808,14 @@ function configure_directories {
         fi
 
         chown -R ${OPENVDM_USER}:${OPENVDM_USER} $DATA_ROOT/*
+    fi
+
+    # The cruise data directory, named after the cruises (#684), also when
+    # the data root already existed
+    if [ ! -d "${DATA_ROOT}/${CRUISEDATA_DIRNAME}" ]; then
+        echo "Creating the ${CRUISE_NAME} data directory: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+        mkdir -p "${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+        chown ${OPENVDM_USER}:${OPENVDM_USER} "${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
     fi
 
     if [ ! -d  /var/log/openvdm ]; then
@@ -1805,6 +1959,245 @@ function setup_ssh {
 ###########################################################################
 ###########################################################################
 # Install OpenVDM
+function _config_php_get {
+    # Print the value of define('$2', '...') in the Config.php file $1.
+    # Prints nothing if the file or the define is missing.
+    sed -n "s/^[[:space:]]*define('$2',[[:space:]]*'\(.*\)');.*/\1/p" "$1" 2>/dev/null | head -n 1
+}
+
+function _ask_name {
+    # Ask $1 with the default $2 until the answer is a name OpenVDM can use
+    # in Config.php and directory names: letters, digits, spaces and hyphens,
+    # starting with a letter or digit (#684). Sets NAME_RESULT
+    local answer
+    while true; do
+        read -r -p "$1 ($2) " answer
+        answer=${answer:-$2}
+        if [[ "$answer" =~ ^[A-Za-z0-9][A-Za-z0-9\ -]*$ ]]; then
+            NAME_RESULT=$answer
+            return
+        fi
+        echo "Use letters, digits, spaces and hyphens only, e.g. Voyage or Research Expedition."
+    done
+}
+
+function _yaml_block_get {
+    # Print the value of $3 in the top-level "$2:" block (e.g. vessel) of the
+    # openvdm.yaml file $1, unquoted. Prints nothing if the file, block or
+    # key is missing, or the key is commented out.
+    awk -v block="$2" -v key="$3" -v q="'" '
+        $0 ~ "^" block ":" { in_block = 1; next }
+        in_block && /^[^[:space:]#]/ { exit }
+        in_block && $0 ~ "^[[:space:]]+" key ":" {
+            value = $0
+            sub("^[[:space:]]+" key ":[[:space:]]*", "", value)
+            if (value ~ /^"/) {
+                sub(/^"/, "", value); sub(/"[[:space:]]*(#.*)?$/, "", value)
+                gsub(/\\"/, "\"", value); gsub(/\\\\/, "\\", value)
+            } else if (substr(value, 1, 1) == q) {
+                value = substr(value, 2); sub(q "[[:space:]]*(#.*)?$", "", value)
+                gsub(q q, q, value)
+            } else {
+                sub(/[[:space:]]+#.*$/, "", value); sub(/[[:space:]]+$/, "", value)
+            }
+            print value
+            exit
+        }' "$1" 2>/dev/null
+}
+
+# R2R's list of vessels, offered by the Vessel questions (#462)
+R2R_VESSEL_API=https://service.rvdata.us/api/vessel/
+
+# Print one line per vessel in R2R's vessel list file $1, sorted by name,
+# with these fields separated by \x1f: active (1 or 0), name, ICES code,
+# operator ID, operator name and UNOLS ID.
+_R2R_PARSE_VESSELS='
+import json, sys
+FIELDS = ("name", "ices_code", "operator_id", "operator_name", "unols_id")
+def clean(value):
+    return "" if value is None else " ".join(str(value).split())
+with open(sys.argv[1], encoding="utf-8") as f:
+    vessels = [v for v in json.load(f)["data"] if isinstance(v, dict) and clean(v.get("name"))]
+for v in sorted(vessels, key=lambda v: clean(v["name"]).lower()):
+    print("\x1f".join(["1" if v.get("is_active") else "0"] + [clean(v.get(f)) for f in FIELDS]))
+'
+
+function _r2r_fetch_vessels {
+    # Fill R2R_VESSELS with R2R's vessel list, one _R2R_PARSE_VESSELS line
+    # per vessel. Returns 1, saying why, if it can't be fetched or read
+    # (e.g. no network on the ship).
+    R2R_VESSELS=()
+    if ! command -v curl > /dev/null 2>&1 || ! command -v python3 > /dev/null 2>&1; then
+        echo "Can't fetch R2R's vessel list: it needs curl and python3."
+        return 1
+    fi
+    local tmp_dir lines=
+    tmp_dir=$(mktemp -d)
+    echo "Fetching R2R's vessel list from ${R2R_VESSEL_API}"
+    if curl -fsS --connect-timeout 10 --max-time 30 -o "${tmp_dir}/vessels.json" "$R2R_VESSEL_API"; then
+        lines=$(python3 -I -c "$_R2R_PARSE_VESSELS" "${tmp_dir}/vessels.json" 2>/dev/null)
+    fi
+    rm -rf "$tmp_dir"
+    if [ -z "$lines" ]; then
+        echo "Couldn't fetch R2R's vessel list."
+        return 1
+    fi
+    local line
+    while IFS= read -r line; do
+        R2R_VESSELS+=("$line")
+    done <<< "$lines"
+}
+
+function _r2r_choose_vessel {
+    # Ask which vessel in R2R_VESSELS this is, offering the one whose ICES
+    # code is $1 as the default. Sets R2R_RECORD to its fields, or to ()
+    # when it's not listed.
+    local show_all=no default choice n i detail
+    local -a shown fields
+    R2R_RECORD=()
+
+    # Start with the inactive vessels shown if the default is one of them
+    for i in "${!R2R_VESSELS[@]}"; do
+        IFS=$'\x1f' read -r -a fields <<< "${R2R_VESSELS[$i]}"
+        [ -n "$1" ] && [ "${fields[2]}" = "$1" ] && [ "${fields[0]}" != 1 ] && show_all=yes
+    done
+
+    while true; do
+        shown=()
+        default=m
+        echo
+        for i in "${!R2R_VESSELS[@]}"; do
+            IFS=$'\x1f' read -r -a fields <<< "${R2R_VESSELS[$i]}"
+            [ "$show_all" = yes ] || [ "${fields[0]}" = 1 ] || continue
+            shown+=("$i")
+            n=${#shown[@]}
+            [ -n "$1" ] && [ "${fields[2]}" = "$1" ] && default=$n
+            detail=${fields[2]}
+            [ -n "${fields[4]}" ] && detail="${detail:+$detail, }${fields[4]}"
+            printf '%4s) %s%s\n' "$n" "${fields[1]}" "${detail:+ ($detail)}"
+        done
+        [ "$show_all" = yes ] || echo "   a) Show all vessels, including ones no longer active"
+        echo "   m) Not listed: enter the vessel's details by hand"
+        read -r -p "Which vessel? ($default) " choice
+        choice=${choice:-$default}
+        case $choice in
+            [Aa] )
+                show_all=yes;;
+            [Mm] )
+                return;;
+            * )
+                if [[ $choice =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#shown[@]}" ]; then
+                    IFS=$'\x1f' read -r -a R2R_RECORD <<< "${R2R_VESSELS[${shown[$((choice - 1))]}]}"
+                    return
+                fi
+                echo "Please enter a number from the list, a or m.";;
+        esac
+    done
+}
+
+function _yaml_quote {
+    # Print $1 as a double-quoted YAML string
+    local value=${1//\\/\\\\}
+    printf '"%s"' "${value//\"/\\\"}"
+}
+
+function _set_yaml_block {
+    # Put the top-level block in file $3 (starting with its "$2:" line) into
+    # the openvdm.yaml file $1, in place of its "$2:" block, or at the end of
+    # the file after the comment lines in file $4 if it has none (files from
+    # before 2.17). The rest of the file is left as it is.
+    local yaml_file=$1 block=$2 block_file=$3 comment_file=$4
+
+    if grep -q "^${block}:" "$yaml_file"; then
+        # Replace the block: the "$2:" line and the indented, blank or
+        # commented-out lines after it, up to the next top-level line
+        awk -v block="$block" -v block_file="$block_file" '
+            $0 ~ "^" block ":" {
+                while ((getline line < block_file) > 0) print line
+                skipping = 1; blank = 0; next
+            }
+            skipping && /^([[:space:]]|$)/ { if ($0 ~ /^[[:space:]]*$/) blank = 1; next }
+            skipping { skipping = 0; if (blank) print "" }
+            { print }' "$yaml_file" > "${yaml_file}.new"
+    else
+        {
+            cat "$yaml_file"
+            [ -n "$(tail -c1 "$yaml_file")" ] && echo
+            echo
+            cat "$comment_file" "$block_file"
+        } > "${yaml_file}.new"
+    fi
+
+    # Keep the file's owner and permissions
+    cat "${yaml_file}.new" > "$yaml_file"
+    rm -f "${yaml_file}.new"
+
+    local venv_python=${INSTALL_ROOT}/openvdm/venv/bin/python
+    if [ -x "$venv_python" ] && ! "$venv_python" -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' "$yaml_file" 2>/dev/null; then
+        echo "WARNING: ${yaml_file} isn't valid YAML after setting the ${block}; please check it."
+    fi
+}
+
+function write_vessel_config {
+    # Write the "vessel:" block of the openvdm.yaml file $1 from the VESSEL_*
+    # and R2R_* answers
+    local yaml_file=$1
+    local block_file comment_file
+    block_file=$(mktemp)
+    comment_file=$(mktemp)
+
+    {
+        echo "vessel:"
+        echo "    name: $(_yaml_quote "$VESSEL_NAME")"
+        echo "    operator: $(_yaml_quote "$VESSEL_OPERATOR")  # the organization that operates it"
+        echo "    email: $(_yaml_quote "$VESSEL_EMAIL")     # the operator's contact email"
+        echo "    # Only for vessels that submit data to R2R (Rolling Deck to Repository)"
+        if [ "$VESSEL_R2R" = "yes" ]; then
+            echo "    r2r:"
+            echo "        vesselID: $(_yaml_quote "$R2R_VESSEL_ID")     # R2R vessel ID (ICES code), e.g. 33RR"
+            echo "        operatorID: $(_yaml_quote "$R2R_OPERATOR_ID")   # e.g. edu.ucsd.sio"
+            echo "        schedulerID: $(_yaml_quote "$R2R_SCHEDULER_ID")  # e.g. org.unols"
+        else
+            echo "    #r2r:"
+            echo "    #    vesselID: \"\"     # R2R vessel ID (ICES code), e.g. 33RR"
+            echo "    #    operatorID: \"\"   # e.g. edu.ucsd.sio"
+            echo "    #    schedulerID: \"\"  # e.g. org.unols"
+        fi
+    } > "$block_file"
+    {
+        echo "# The vessel this OpenVDM install is on. Saved in each cruise's config file"
+        echo "# and README, and read by QA tools (e.g. sbe-qa-processing). The installer"
+        echo "# asks for it; all fields are optional."
+    } > "$comment_file"
+
+    _set_yaml_block "$yaml_file" vessel "$block_file" "$comment_file"
+    rm -f "$block_file" "$comment_file"
+}
+
+function write_vehicle_config {
+    # Write the "vehicle:" block of the openvdm.yaml file $1 from the
+    # VEHICLE_* answers (#674); its fields are empty without a vehicle
+    local yaml_file=$1
+    local block_file comment_file
+    block_file=$(mktemp)
+    comment_file=$(mktemp)
+
+    {
+        echo "vehicle:"
+        echo "    name: $(_yaml_quote "$VEHICLE_NAME")"
+        echo "    operator: $(_yaml_quote "$VEHICLE_OPERATOR")  # the organization that operates it"
+        echo "    email: $(_yaml_quote "$VEHICLE_EMAIL")     # the operator's contact email"
+    } > "$block_file"
+    {
+        echo "# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings."
+        echo "# Saved in each lowering's config file and README. The installer asks for"
+        echo "# it; all fields are optional, and left empty without a vehicle."
+    } > "$comment_file"
+
+    _set_yaml_block "$yaml_file" vehicle "$block_file" "$comment_file"
+    rm -f "$block_file" "$comment_file"
+}
+
 function install_openvdm {
     # Expect the following shell variables to be appropriately set:
     # DATA_ROOT - path where data will be stored is
@@ -1833,6 +2226,11 @@ function install_openvdm {
             # npm rewrites www/package-lock.json during the build; that isn't a
             # site change, and it would block the update
             sudo -u ${OPENVDM_USER} git checkout -- www/package-lock.json 2>/dev/null
+            # www/composer.lock is tracked from 2.17 (#643); one the build
+            # replaced (below) would block the update too. An install from
+            # before 2.17 has its own, which .gitignore listed, so git
+            # replaces it with the tracked one
+            sudo -u ${OPENVDM_USER} git checkout -- www/composer.lock 2>/dev/null
             # Update to the branch (or tag) asked for, and stop if that fails.
             # A tag is checked out as is; a branch is then fast-forwarded.
             if ! sudo -u ${OPENVDM_USER} git fetch --tags origin \
@@ -1852,6 +2250,8 @@ function install_openvdm {
             chown -R ${OPENVDM_USER}:${OPENVDM_USER} ./openvdm
         fi
     fi
+
+    check_installer_version
 
     cd ${INSTALL_ROOT}/openvdm
 
@@ -1881,6 +2281,29 @@ EOSQL
             sed -i -e "/Visitor Information/d" ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql
         fi
 
+        # The default cruise starts on the install day (UTC) and lasts 30
+        # days, with the year in its ID (ODT<YY>01), and the default lowering
+        # starts with it, so a new install is within its cruise (#647). The
+        # sample data keeps ODT2601: its file names and filters use it
+        _CRUISE_ID="ODT$(date -u +%y)01"
+        [ "$INSTALL_SAMPLEDATA" = "yes" ] && _CRUISE_ID=ODT2601
+        _CRUISE_START="$(date -u +%Y/%m/%d) 00:00"
+        _CRUISE_END="$(date -u -d '+30 days' +%Y/%m/%d) 00:00"
+        cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
+
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_ID}' WHERE name = 'cruiseID';
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_START}' WHERE name IN ('cruiseStartDate', 'loweringStartDate');
+UPDATE OVDM_CoreVars SET value = '${_CRUISE_END}' WHERE name = 'cruiseEndDate';
+EOF
+
+        # A vehicle's dives are lowerings, so turn on lowering components (#674)
+        if [ "$VEHICLE" = "yes" ]; then
+            cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
+
+UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
+EOF
+        fi
+
         hashed_password=$(php -r "echo password_hash('${OPENVDM_DATABASE_PASSWORD}', PASSWORD_DEFAULT);")
         cat >> ${INSTALL_ROOT}/openvdm/database/openvdm_db_custom.sql <<EOF
 
@@ -1905,15 +2328,22 @@ EOF
     echo "Building web-app"
     cd ${INSTALL_ROOT}/openvdm/www
     chown -R ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/www
-    # composer.lock isn't tracked: each install writes its own, and it goes
-    # out of date when composer.json changes (e.g. after an upgrade), so
-    # Composer warns and installs from the old lock. The web app has no
-    # runtime dependencies to pin, so let Composer write a current one (#346)
+    # composer.lock is tracked (#643), so it matches composer.json after the
+    # update. One that doesn't (e.g. composer.json changed by hand) would make
+    # Composer warn and install from the old lock, leaving out new packages,
+    # so let Composer write a current one instead (#346)
     if [ -e composer.lock ] && ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer validate -q --no-check-publish --no-check-all > /dev/null 2>&1; then
         echo "Replacing the out-of-date www/composer.lock"
         rm -f composer.lock
     fi
-    sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer -q install --no-dev
+    # Not quiet, and stop if it fails: a missing PHP extension stops Composer
+    # (and post_composer.sh's npm install), which otherwise only showed when
+    # the web app broke (#650)
+    if ! sudo -H -u ${OPENVDM_USER} /usr/local/bin/composer install --no-dev; then
+        echo "ERROR: composer install failed (see its message above). Fix the problem"
+        echo "       (e.g. install the PHP extension it names) and re-run the installer."
+        exit_gracefully
+    fi
 
     if [ ! -e ${INSTALL_ROOT}/openvdm/www/.htaccess ] ; then
         cp ${INSTALL_ROOT}/openvdm/www/.htaccess.dist ${INSTALL_ROOT}/openvdm/www/.htaccess
@@ -1954,7 +2384,12 @@ EOF
 
     sed -s "s/define('DB_USER', 'openvdmDBUser');/define('DB_USER', '${OPENVDM_USER}');/" ${INSTALL_ROOT}/openvdm/www/app/Core/Config.php.dist | \
     sed -e "s/define('DB_PASS', 'oxhzbeY8WzgBL3');/define('DB_PASS', '${OPENVDM_DATABASE_PASSWORD}');/" | \
-    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/CruiseData');|" | \
+    sed -e "s|define('CRUISEDATA_BASEDIR', '/data/CruiseData');|define('CRUISEDATA_BASEDIR', '${DATA_ROOT}/${CRUISEDATA_DIRNAME}');|" | \
+    sed -e "s|define('CRUISEDATA_APACHEDIR', '/CruiseData');|define('CRUISEDATA_APACHEDIR', '/${CRUISEDATA_DIRNAME}');|" | \
+    sed -e "s|define('CRUISE_NAME', 'Cruise');|define('CRUISE_NAME', '${CRUISE_NAME}');|" | \
+    sed -e "s|define('CRUISE_NAME_PLURAL', 'Cruises');|define('CRUISE_NAME_PLURAL', '${CRUISE_NAME_PLURAL}');|" | \
+    sed -e "s|define('LOWERING_NAME', 'Lowering');|define('LOWERING_NAME', '${LOWERING_NAME}');|" | \
+    sed -e "s|define('LOWERING_NAME_PLURAL', 'Lowerings');|define('LOWERING_NAME_PLURAL', '${LOWERING_NAME_PLURAL}');|" | \
     sed -e "s|define('PUBLICDATA_DIR', '/data/PublicData');|define('PUBLICDATA_DIR', '${DATA_ROOT}/PublicData');|" | \
     sed -e "s/define('SHOW_PUBLICDATA', true);/define('SHOW_PUBLICDATA', ${_SHOW_PUBLICDATA});/" | \
     sed -e "s/define('WORKER_API_KEY', 'change-me-to-a-strong-random-value');/define('WORKER_API_KEY', '${WORKER_API_KEY}');/" \
@@ -2008,6 +2443,31 @@ EOF
         fi
     fi
 
+    # The cruise and lowering README templates (#431, #445). A copy that's
+    # already there is the site's own, so it's kept
+    for _README_TEMPLATE in cruise_readme.md.j2 lowering_readme.md.j2; do
+        if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE} ] ; then
+            echo "Building ${_README_TEMPLATE%%_*} README template"
+            cp ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}.dist ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}
+            chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/${_README_TEMPLATE}
+        fi
+    done
+
+    # The trackline hooks' position sources (#639). A copy that's already
+    # there is the site's own, so it's kept
+    for _POSITION_SOURCES in cruise_position_sources.yaml lowering_position_sources.yaml; do
+        if [ ! -e ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES} ] ; then
+            echo "Building ${_POSITION_SOURCES%%_*} position sources"
+            cp ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}.dist ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}
+            chown ${OPENVDM_USER}:${OPENVDM_USER} ${INSTALL_ROOT}/openvdm/server/etc/${_POSITION_SOURCES}
+        fi
+    done
+
+    echo "Setting the vessel in ${_YAML}"
+    write_vessel_config "${_YAML}"
+    echo "Setting the vehicle in ${_YAML}"
+    write_vehicle_config "${_YAML}"
+
     cd ${startingDir}
 }
 
@@ -2052,26 +2512,28 @@ function install_sample_data {
         fi
     fi
 
-    # Extract sample data files
+    # Extract sample data files. The archive was made on a Mac: without
+    # --no-same-owner, root's tar keeps its owner (501:staff) (#649)
     echo "Extracting sample data to ${SAMPLEDATA_ROOT}"
     mkdir -p "${SAMPLEDATA_ROOT}"
-    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}" --warning=no-unknown-keyword
-
-    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
-    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/auth_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/local_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/rsync_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssdw"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ssh_source"
+    tar xzf "${SAMPLEDATA_INSTALL_DIR}/sample_data.tgz" -C "${SAMPLEDATA_ROOT}" \
+        --no-same-owner --warning=no-unknown-keyword
     # Older sample_data.tgz archives don't include the FTP directories
     mkdir -p "${SAMPLEDATA_ROOT}/ftp_source" "${SAMPLEDATA_ROOT}/ftp_destination"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_source"
-    chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/ftp_destination"
+
+    # Only the archive's directories are chowned recursively, in case
+    # SAMPLEDATA_ROOT holds anything else. The archive's top directory is
+    # mode 700, which would keep the guest shares' users out
+    chown "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}"
+    chmod 755 "${SAMPLEDATA_ROOT}"
+    for _d in anon_source anon_destination auth_source auth_destination \
+              ftp_source ftp_destination local_source local_destination \
+              rsync_source rsync_destination ssdw ssh_source ssh_destination; do
+        [ -d "${SAMPLEDATA_ROOT}/${_d}" ] && \
+            chown -R "${OPENVDM_USER}:${OPENVDM_USER}" "${SAMPLEDATA_ROOT}/${_d}"
+    done
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_destination"
+    chmod -R 777 "${SAMPLEDATA_ROOT}/anon_source"
 
     if [ "$HAS_SELINUX" = true ]; then
         # Samba shares need samba_share_t; rsync daemon (rsync_t) needs
@@ -2113,12 +2575,21 @@ EOF
     rm -f /tmp/openvdm_sample_data_custom.sql
 
     # The sample data includes lowering-level transfers (e.g. ROV_OpenRVDAS),
-    # which only run with lowering components on. The post-install step sets
-    # up the sample lowering.
-    echo "Turning on lowering components for the sample data"
-    mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+    # which only run with lowering components on. With a vehicle, turn them
+    # on; the post-install step sets up the sample lowering. Without one, the
+    # sample is cruise-only: its lowering-level transfers are disabled (the
+    # rows stay, to turn on later), so no lowering is set up (#681)
+    if [ "$VEHICLE" = "yes" ]; then
+        echo "Turning on lowering components for the sample data"
+        mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
 UPDATE OVDM_CoreVars SET value = 'Yes' WHERE name = 'showLoweringComponents';
 EOF
+    else
+        echo "No vehicle: disabling the sample data's lowering-level transfers"
+        mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm 2>/dev/null <<EOF
+UPDATE OVDM_CollectionSystemTransfers SET enable = 0 WHERE cruiseOrLowering = 1;
+EOF
+    fi
 
     # Enable sample data plugins and the parsers they import (copy .dist files
     # only if active copy does not exist). The parsers are read from each
@@ -2163,9 +2634,10 @@ EOF
         || echo "WARNING: xbt-edf-qc not installed; the XBT plugin won't parse casts"
 
     # Show the sample lowering's data: uncomment the example Lowering tab at
-    # the end of the data dashboard config, unless it already has one (#272)
+    # the end of the data dashboard config, unless it already has one (#272).
+    # Only with a vehicle, since there's no sample lowering without one (#681)
     local DASHBOARD_YAML="${INSTALL_ROOT}/openvdm/www/etc/datadashboard.yaml"
-    if [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
+    if [ "$VEHICLE" = "yes" ] && [ -e "${DASHBOARD_YAML}" ] && grep -q '^#- title: Lowering$' "${DASHBOARD_YAML}" \
         && ! grep -qE '^ +page: lowering *$' "${DASHBOARD_YAML}"; then
         echo "Enabling the data dashboard's Lowering tab"
         sed -i -e '/^#- title: Lowering$/,/^$/s/^#//' "${DASHBOARD_YAML}"
@@ -2567,6 +3039,199 @@ fi
 echo
 
 #########################################################################
+# Names for cruises and lowerings (#684)
+echo "#####################################################################"
+echo "What your organization calls a cruise, e.g. Cruise, Expedition or"
+echo "Voyage. OpenVDM's web pages and READMEs use it, and on a new install"
+echo "the data directory, Samba share and web address are named after it"
+echo "(e.g. VoyageData)."
+echo
+
+# An existing Config.php's names win over the saved defaults, and its data
+# directory keeps its name, so an existing install's data and links don't move
+_EXISTING_CONFIG_PHP=${INSTALL_ROOT}/openvdm/www/app/Core/Config.php
+_EXISTING_BASEDIR=
+if [ -e "$_EXISTING_CONFIG_PHP" ]; then
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISE_NAME)
+    DEFAULT_CRUISE_NAME=${_value:-$DEFAULT_CRUISE_NAME}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISE_NAME_PLURAL)
+    DEFAULT_CRUISE_NAME_PLURAL=${_value:-$DEFAULT_CRUISE_NAME_PLURAL}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" LOWERING_NAME)
+    DEFAULT_LOWERING_NAME=${_value:-$DEFAULT_LOWERING_NAME}
+    _value=$(_config_php_get "$_EXISTING_CONFIG_PHP" LOWERING_NAME_PLURAL)
+    DEFAULT_LOWERING_NAME_PLURAL=${_value:-$DEFAULT_LOWERING_NAME_PLURAL}
+    _EXISTING_BASEDIR=$(_config_php_get "$_EXISTING_CONFIG_PHP" CRUISEDATA_BASEDIR)
+fi
+
+_ask_name "What is a cruise called?" "$DEFAULT_CRUISE_NAME"
+CRUISE_NAME=$NAME_RESULT
+# The plural's default is the saved one only if it's for the same name
+if [ "$CRUISE_NAME" != "$DEFAULT_CRUISE_NAME" ] || [ -z "$DEFAULT_CRUISE_NAME_PLURAL" ]; then
+    DEFAULT_CRUISE_NAME_PLURAL="${CRUISE_NAME}s"
+fi
+_ask_name "And more than one?" "$DEFAULT_CRUISE_NAME_PLURAL"
+CRUISE_NAME_PLURAL=$NAME_RESULT
+
+# Lowerings are named with the vehicle's questions; until then, the saved names
+LOWERING_NAME=$DEFAULT_LOWERING_NAME
+LOWERING_NAME_PLURAL=${DEFAULT_LOWERING_NAME_PLURAL:-${LOWERING_NAME}s}
+
+if [ -n "$_EXISTING_BASEDIR" ]; then
+    CRUISEDATA_DIRNAME=$(basename "$_EXISTING_BASEDIR")
+    if [ "$CRUISEDATA_DIRNAME" != "$(printf '%s' "$CRUISE_NAME" | tr -cd 'A-Za-z0-9')Data" ]; then
+        echo "The data directory keeps its name: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
+    fi
+else
+    CRUISEDATA_DIRNAME="$(printf '%s' "$CRUISE_NAME" | tr -cd 'A-Za-z0-9')Data"
+fi
+echo
+
+#########################################################################
+# Vessel
+echo "#####################################################################"
+echo "The vessel this OpenVDM install is on. It's saved with each cruise and"
+echo "used by QA tools. All of these are optional: press Enter to leave one"
+echo "blank and add it later in the vessel section of"
+echo "${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml. On a re-run, a blank"
+echo "answer keeps the value already in that file."
+echo
+
+# An existing openvdm.yaml's vessel settings win over the saved defaults,
+# so changes made there by hand are kept
+_EXISTING_YAML=${INSTALL_ROOT}/openvdm/server/etc/openvdm.yaml
+if [ -e "$_EXISTING_YAML" ] && grep -q '^vessel:' "$_EXISTING_YAML"; then
+    DEFAULT_VESSEL_NAME=$(_yaml_block_get "$_EXISTING_YAML" vessel name)
+    DEFAULT_VESSEL_OPERATOR=$(_yaml_block_get "$_EXISTING_YAML" vessel operator)
+    # contact.institution in an openvdm.yaml from an earlier 2.17 build (#693)
+    DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-$(_yaml_block_get "$_EXISTING_YAML" vessel institution)}
+    DEFAULT_VESSEL_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vessel email)
+    DEFAULT_R2R_VESSEL_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel vesselID)
+    DEFAULT_R2R_OPERATOR_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel operatorID)
+    DEFAULT_R2R_SCHEDULER_ID=$(_yaml_block_get "$_EXISTING_YAML" vessel schedulerID)
+    DEFAULT_VESSEL_R2R=no
+    if [ -n "$DEFAULT_R2R_VESSEL_ID$DEFAULT_R2R_OPERATOR_ID$DEFAULT_R2R_SCHEDULER_ID" ]; then
+        DEFAULT_VESSEL_R2R=yes
+    fi
+fi
+
+yes_no "Does this vessel submit data to R2R (Rolling Deck to Repository)? " $DEFAULT_VESSEL_R2R
+VESSEL_R2R=$YES_NO_RESULT
+
+# An R2R vessel can be picked from R2R's vessel list, whose record gives the
+# defaults for the questions below (#462)
+R2R_RECORD=()
+if [ "$VESSEL_R2R" = "yes" ]; then
+    if _r2r_fetch_vessels; then
+        _r2r_choose_vessel "$DEFAULT_R2R_VESSEL_ID"
+    else
+        echo "Enter the vessel's details by hand instead."
+    fi
+fi
+
+if [ ${#R2R_RECORD[@]} -gt 0 ]; then
+    # A different vessel from the one in openvdm.yaml: its record replaces
+    # the defaults. The same one: the record only fills in blanks, so edits
+    # made to openvdm.yaml are kept.
+    if [ "${R2R_RECORD[2]}" != "$DEFAULT_R2R_VESSEL_ID" ]; then
+        DEFAULT_VESSEL_NAME=
+        DEFAULT_VESSEL_OPERATOR=
+        DEFAULT_R2R_VESSEL_ID=
+        DEFAULT_R2R_OPERATOR_ID=
+        DEFAULT_R2R_SCHEDULER_ID=
+    fi
+    DEFAULT_VESSEL_NAME=${DEFAULT_VESSEL_NAME:-${R2R_RECORD[1]}}
+    DEFAULT_VESSEL_OPERATOR=${DEFAULT_VESSEL_OPERATOR:-${R2R_RECORD[4]}}
+    DEFAULT_R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID:-${R2R_RECORD[2]}}
+    DEFAULT_R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID:-${R2R_RECORD[3]}}
+    # R2R's record has no scheduler ID; UNOLS vessels are scheduled by UNOLS
+    if [ -z "$DEFAULT_R2R_SCHEDULER_ID" ] && [ -n "${R2R_RECORD[5]}" ]; then
+        DEFAULT_R2R_SCHEDULER_ID=org.unols
+    fi
+    echo
+    echo "Press Enter to keep R2R's value for each of these, or type a new one."
+fi
+
+echo
+read -r -p "Vessel name? ($DEFAULT_VESSEL_NAME) " VESSEL_NAME
+VESSEL_NAME=${VESSEL_NAME:-$DEFAULT_VESSEL_NAME}
+
+read -r -p "Vessel operator (the organization that operates it)? ($DEFAULT_VESSEL_OPERATOR) " VESSEL_OPERATOR
+VESSEL_OPERATOR=${VESSEL_OPERATOR:-$DEFAULT_VESSEL_OPERATOR}
+
+read -r -p "Vessel operator's contact email? ($DEFAULT_VESSEL_EMAIL) " VESSEL_EMAIL
+VESSEL_EMAIL=${VESSEL_EMAIL:-$DEFAULT_VESSEL_EMAIL}
+
+if [ "$VESSEL_R2R" = "yes" ]; then
+    echo
+    echo "Leave any of the R2R IDs blank to add them later in openvdm.yaml."
+    read -r -p "R2R vessel ID (ICES code, e.g. 33RR)? ($DEFAULT_R2R_VESSEL_ID) " R2R_VESSEL_ID
+    R2R_VESSEL_ID=${R2R_VESSEL_ID:-$DEFAULT_R2R_VESSEL_ID}
+
+    read -r -p "R2R operator ID (e.g. edu.ucsd.sio)? ($DEFAULT_R2R_OPERATOR_ID) " R2R_OPERATOR_ID
+    R2R_OPERATOR_ID=${R2R_OPERATOR_ID:-$DEFAULT_R2R_OPERATOR_ID}
+
+    read -r -p "R2R scheduler ID (e.g. org.unols)? ($DEFAULT_R2R_SCHEDULER_ID) " R2R_SCHEDULER_ID
+    R2R_SCHEDULER_ID=${R2R_SCHEDULER_ID:-$DEFAULT_R2R_SCHEDULER_ID}
+else
+    R2R_VESSEL_ID=${DEFAULT_R2R_VESSEL_ID}
+    R2R_OPERATOR_ID=${DEFAULT_R2R_OPERATOR_ID}
+    R2R_SCHEDULER_ID=${DEFAULT_R2R_SCHEDULER_ID}
+fi
+echo
+
+#########################################################################
+# Vehicle (#674)
+echo "#####################################################################"
+echo "A vehicle (ROV, HOV or AUV) whose dives OpenVDM manages as lowerings."
+echo "Its name, operator and contact email are saved with each lowering. On a"
+echo "new install, answering yes also turns on lowering components. With the"
+echo "sample data, yes also sets up its sample lowering; no installs it cruise-only."
+echo
+
+# An existing openvdm.yaml's vehicle settings win over the saved defaults,
+# so changes made there by hand are kept
+if [ -e "$_EXISTING_YAML" ] && grep -q '^vehicle:' "$_EXISTING_YAML"; then
+    DEFAULT_VEHICLE_NAME=$(_yaml_block_get "$_EXISTING_YAML" vehicle name)
+    DEFAULT_VEHICLE_OPERATOR=$(_yaml_block_get "$_EXISTING_YAML" vehicle operator)
+    DEFAULT_VEHICLE_EMAIL=$(_yaml_block_get "$_EXISTING_YAML" vehicle email)
+    DEFAULT_VEHICLE=no
+    if [ -n "$DEFAULT_VEHICLE_NAME$DEFAULT_VEHICLE_OPERATOR$DEFAULT_VEHICLE_EMAIL" ]; then
+        DEFAULT_VEHICLE=yes
+    fi
+fi
+
+yes_no "Will OpenVDM be used with a vehicle (ROV, HOV, AUV)? " $DEFAULT_VEHICLE
+VEHICLE=$YES_NO_RESULT
+
+if [ "$VEHICLE" = "yes" ]; then
+    read -r -p "Vehicle name? ($DEFAULT_VEHICLE_NAME) " VEHICLE_NAME
+    VEHICLE_NAME=${VEHICLE_NAME:-$DEFAULT_VEHICLE_NAME}
+
+    # Usually the vessel's operator, so offer its details until they're set
+    DEFAULT_VEHICLE_OPERATOR=${DEFAULT_VEHICLE_OPERATOR:-$VESSEL_OPERATOR}
+    DEFAULT_VEHICLE_EMAIL=${DEFAULT_VEHICLE_EMAIL:-$VESSEL_EMAIL}
+    read -r -p "Vehicle operator (the organization that operates it)? ($DEFAULT_VEHICLE_OPERATOR) " VEHICLE_OPERATOR
+    VEHICLE_OPERATOR=${VEHICLE_OPERATOR:-$DEFAULT_VEHICLE_OPERATOR}
+
+    read -r -p "Vehicle operator's contact email? ($DEFAULT_VEHICLE_EMAIL) " VEHICLE_EMAIL
+    VEHICLE_EMAIL=${VEHICLE_EMAIL:-$DEFAULT_VEHICLE_EMAIL}
+
+    # What its dives are called, e.g. Lowering, Dive or Deployment (#684)
+    _ask_name "What is one of the vehicle's dives called (e.g. Lowering, Dive or Deployment)?" "$DEFAULT_LOWERING_NAME"
+    LOWERING_NAME=$NAME_RESULT
+    if [ "$LOWERING_NAME" != "$DEFAULT_LOWERING_NAME" ] || [ -z "$DEFAULT_LOWERING_NAME_PLURAL" ]; then
+        DEFAULT_LOWERING_NAME_PLURAL="${LOWERING_NAME}s"
+    fi
+    _ask_name "And more than one?" "$DEFAULT_LOWERING_NAME_PLURAL"
+    LOWERING_NAME_PLURAL=$NAME_RESULT
+else
+    VEHICLE_NAME=
+    VEHICLE_OPERATOR=
+    VEHICLE_EMAIL=
+fi
+echo
+
+#########################################################################
 # Save defaults in a preferences file for the next time we run.
 save_default_variables
 
@@ -2666,7 +3331,7 @@ OVDM_LOWERING_ID=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe 
     "SELECT value FROM OVDM_CoreVars WHERE name='loweringID';" 2>/dev/null)
 OVDM_SHOW_LOWERING=$(mysql -u root -p"${NEW_ROOT_DATABASE_PASSWORD}" openvdm -sNe \
     "SELECT value FROM OVDM_CoreVars WHERE name='showLoweringComponents';" 2>/dev/null)
-OVDM_CRUISE_DIR="${DATA_ROOT}/CruiseData/${OVDM_CRUISE_ID}"
+OVDM_CRUISE_DIR="${DATA_ROOT}/${CRUISEDATA_DIRNAME}/${OVDM_CRUISE_ID}"
 OVDM_ROOT="${INSTALL_ROOT}/openvdm"
 
 export OVDM_CRUISE_ID OVDM_CRUISE_START_DATE OVDM_CST_IDS OVDM_CRUISE_DIR INSTALL_SAMPLEDATA
@@ -2733,10 +3398,11 @@ for label, task, timeout in cruise_steps:
         print(f'  Warning: {label} failed: {e}', file=sys.stderr)
 
 
-# The sample data turns on lowering components (#201); set up its lowering
+# With a vehicle, the sample data turns on lowering components (#201, #681); set up its lowering
 # the same way as the cruise, so the lowering-level sample transfers can run.
 lowering_ready = False
-if install_sampledata and show_lowering and lowering_id:
+# Not without enabled lowering-level transfers, as with no vehicle (#681)
+if install_sampledata and show_lowering and lowering_id and lowering_cst_ids:
     try:
         sys.path.insert(0, os.environ['OVDM_ROOT'])
         from server.lib.openvdm import OpenVDM
@@ -2791,7 +3457,7 @@ echo "#####################################################################"
 echo "OpenVDM Installation: Complete"
 echo "OpenVDM WebUI available at: http://${OPENVDM_SITEROOT}"
 echo "Login with user: ${OPENVDM_USER}, pass: ${OPENVDM_DATABASE_PASSWORD}"
-echo "Cruise Data will be stored at: ${DATA_ROOT}/CruiseData"
+echo "${CRUISE_NAME} data will be stored at: ${DATA_ROOT}/${CRUISEDATA_DIRNAME}"
 echo
 
 #########################################################################

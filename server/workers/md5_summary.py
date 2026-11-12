@@ -28,6 +28,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM, UPDATE_MD5_SUMMARY_TASK
+from server.lib.transfer_utils import redact_payload
 
 BUF_SIZE = 65536  # read files in 64kb chunks
 
@@ -233,18 +234,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         self.stop = False
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = (self._get_custom_task(current_job)
-            if self._get_custom_task(current_job) is not None
-            else self.ovdm.get_task_by_name(current_job.task)
-        )
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -434,6 +434,11 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
     worker.send_job_status(current_job, 2, 10)
 
     new_hashes = worker.build_md5_hashes(current_job, filelist)
+
+    # Stopped while hashing: leave the summary as it was, as a rebuild does (#579)
+    if worker.stop:
+        job_results['parts'].append({"partName": "Calculate Hashes", "result": "Fail", "reason": "Job was stopped by user"})
+        return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Calculate Hashes", "result": "Pass"})
 

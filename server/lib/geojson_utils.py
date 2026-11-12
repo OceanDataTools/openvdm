@@ -12,6 +12,34 @@ from datetime import datetime, timezone
 from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+
+def visualizer_entries(data: dict):
+    """Yield every ``visualizerData`` entry of a data dashboard file.
+
+    Reads both formats: the old one, with ``visualizerData`` at the top
+    level, and the one the data dashboard worker writes now, with an entry
+    per data type, e.g. ``{"gga": {"visualizerData": [...]}}``.
+
+    Args:
+        data: The dashboard file's parsed JSON.
+
+    Yields:
+        Each ``visualizerData`` entry, in order.
+    """
+
+    if not isinstance(data, dict):
+        return
+
+    # Old format
+    if isinstance(data.get("visualizerData"), list):
+        yield from data["visualizerData"]
+
+    # Current format: an entry per data type
+    for value in data.values():
+        if isinstance(value, dict) and isinstance(value.get("visualizerData"), list):
+            yield from value["visualizerData"]
+
+
 def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> Optional[dict]:
     """Combine GeoJSON LineString data from a list of OpenVDM dashboard files.
 
@@ -33,24 +61,6 @@ def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> O
         A GeoJSON ``FeatureCollection`` dict on success, or ``None`` if no
         usable GeoJSON track data was found or a file could not be parsed.
     """
-
-    def iter_visualizer_entries(data: dict):
-        """
-        Yield every visualizerData entry from legacy or new dashboard JSON.
-        """
-
-        # Legacy format
-        if "visualizerData" in data and isinstance(data["visualizerData"], list):
-            yield from data["visualizerData"]
-
-        # New format: multiple datatypes possible
-        for value in data.values():
-            if (
-                isinstance(value, dict)
-                and "visualizerData" in value
-                and isinstance(value["visualizerData"], list)
-            ):
-                yield from value["visualizerData"]
 
     # ------------------------------------------------------------------
 
@@ -84,7 +94,7 @@ def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> O
             with open(file, "r", encoding="utf-8") as f:
                 raw = json.load(f)
 
-            for entry in iter_visualizer_entries(raw):
+            for entry in visualizer_entries(raw):
                 # Only GeoJSON FeatureCollections are relevant
                 if (
                     not isinstance(entry, dict)
@@ -123,6 +133,89 @@ def combine_geojson_files(input_files: list, prefix: str, device_name: str) -> O
     return combined
 
 
+
+
+# Decimal places for extent edges (about 0.1 m)
+EXTENT_DECIMALS = 6
+
+
+def _positions(obj) -> list:
+    """Return every ``(longitude, latitude)`` in a GeoJSON object, of any type.
+
+    Args:
+        obj: A GeoJSON FeatureCollection, Feature or geometry, or a list of them.
+
+    Returns:
+        list[tuple[float, float]]: The positions; ones that aren't numbers or
+        are outside -180..180 / -90..90 are left out.
+    """
+
+    positions = []
+    if isinstance(obj, list):
+        for item in obj:
+            positions.extend(_positions(item))
+    elif isinstance(obj, dict):
+        if obj.get('type') == 'FeatureCollection':
+            positions.extend(_positions(obj.get('features', [])))
+        elif obj.get('type') == 'Feature':
+            positions.extend(_positions(obj.get('geometry')))
+        elif obj.get('type') == 'GeometryCollection':
+            positions.extend(_positions(obj.get('geometries', [])))
+        elif 'coordinates' in obj:
+            stack = [obj['coordinates']]
+            while stack:
+                item = stack.pop()
+                if isinstance(item, (list, tuple)) and len(item) >= 2 and \
+                        all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in item[:2]):
+                    lon, lat = float(item[0]), float(item[1])
+                    if -180 <= lon <= 180 and -90 <= lat <= 90:
+                        positions.append((lon, lat))
+                elif isinstance(item, (list, tuple)):
+                    stack.extend(item)
+    return positions
+
+
+def geojson_extent(geojson_obj) -> Optional[dict]:
+    """Return the bounding box of every position in a GeoJSON object.
+
+    Longitudes are treated as a circle: the box leaves out the largest gap
+    between them, so a track that crosses the antimeridian gives
+    ``westernmost`` > ``easternmost`` (R2R's convention), not a box around
+    the whole globe.
+
+    Args:
+        geojson_obj: A GeoJSON FeatureCollection, Feature or geometry, e.g.
+            from :func:`combine_geojson_files`.
+
+    Returns:
+        dict | None: ``westernmost``, ``easternmost``, ``southernmost`` and
+        ``northernmost`` in decimal degrees (``EXTENT_DECIMALS`` places), or
+        ``None`` if there are no valid positions.
+    """
+
+    positions = _positions(geojson_obj)
+    if not positions:
+        return None
+
+    longitudes = sorted({lon if lon != 180 else -180.0 for lon, _ in positions})
+    latitudes = [lat for _, lat in positions]
+
+    # The gap from the last longitude round to the first is the one a box
+    # from min to max leaves out; a bigger gap elsewhere means the track
+    # crosses the antimeridian, and the box runs east from that gap's end
+    west, east = longitudes[0], longitudes[-1]
+    largest_gap = longitudes[0] + 360 - longitudes[-1]
+    for before, after in zip(longitudes, longitudes[1:]):
+        if after - before > largest_gap:
+            largest_gap = after - before
+            west, east = after, before
+
+    return {
+        'westernmost': round(west, EXTENT_DECIMALS),
+        'easternmost': round(east, EXTENT_DECIMALS),
+        'southernmost': round(min(latitudes), EXTENT_DECIMALS),
+        'northernmost': round(max(latitudes), EXTENT_DECIMALS),
+    }
 
 
 def convert_to_kml(geojson_obj: dict) -> str:

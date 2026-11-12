@@ -44,7 +44,7 @@ use Helpers\Session;
         foreach($data['extraDirectories'] as $row){
 ?>
                     <tr>
-                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="name" title="<?php echo htmlspecialchars($row->description ?? '', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $row->longName; ?></td>
                         <td class="action">
                             <a href='<?php echo DIR; ?>config/extraDirectories/edit/<?php echo $row->extraDirectoryID; ?>'>Edit</a>
                             /
@@ -73,11 +73,11 @@ use Helpers\Session;
         </div>
         <div class="col-lg-5 col-md-12">
             <h3>Page Guide</h3>
-            <p>This page is for managing extra directories in the cruise data directory.  Extra directories are for holding files that can not be automatically transferred into the cruise data directory via Collection System Transfers.</p>
+            <p>This page is for managing extra directories in the <?php echo \Helpers\Terms::cruise(true); ?> data directory.  Extra directories are for holding files that can not be automatically transferred into the <?php echo \Helpers\Terms::cruise(true); ?> data directory via Collection System Transfers.</p>
             <p>Examples for having Extra Directories include storing data from collection systems that cannot be connected to via SMB or SSH/Rsync, or storing manually-created data products such as maps, and storing manually-created reports/summaries.</p>
             <p>Clicking an <strong class="text-primary">Edit</strong> link will redirect you to the corresponding "Edit Extra Directory Form" where you can modify the Extra Directory name and location.</p>
             <p>Clicking a <strong class="text-primary">Delete</strong> link will permanently delete the corresponding Extra Directory. There is a confirmation window so don't worry about accidental clicks.</p>
-            <p>The button in the <strong>Enabled</strong> column shows whether the directory will be created within the cruise data directory for the current cruise.  Click the button to toggle the enable/disable the cooresponding Extra Directory.  In accordance with OpenVDM data integrity policies, disabling an extra directory will not delete an existing directory.  The directly will simply not be created with in the cruise data directoy when a new cruise is initialized.</p>
+            <p>The button in the <strong>Enabled</strong> column shows whether the directory will be created within the <?php echo \Helpers\Terms::cruise(true); ?> data directory for the current <?php echo \Helpers\Terms::cruise(true); ?>.  Click the button to toggle the enable/disable the cooresponding Extra Directory.  In accordance with OpenVDM data integrity policies, disabling an extra directory will not delete an existing directory.  The directly will simply not be created with in the <?php echo \Helpers\Terms::cruise(true); ?> data directoy when a new <?php echo \Helpers\Terms::cruise(true); ?> is initialized.</p>
             <p>Click the <strong>Add New Directory</strong> button to add a new Extra Directory.</p>
         </div>
     </div>

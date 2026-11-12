@@ -1,0 +1,28 @@
+{
+  "visualizerData": [
+    {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -93.77267,
+              27.56283
+            ]
+          },
+          "properties": {
+            "cast": "ctd002",
+            "station": "05-01",
+            "start": "2012-04-28T12:35:00Z",
+            "end": "2012-04-28T12:35:40Z",
+            "bottom depth": "30"
+          }
+        }
+      ]
+    }
+  ],
+  "qualityTests": [],
+  "stats": []
+}

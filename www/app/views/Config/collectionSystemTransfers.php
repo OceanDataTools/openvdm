@@ -31,6 +31,9 @@ use Helpers\Session;
                 <a class="pull-right btn btn-sm btn-primary" href="<?php echo DIR; ?>config/collectionSystemTransfers/add">
                     Add New Transfer
                 </a>
+                <a class="pull-right btn btn-sm btn-default" style="margin-right: 6px" href="<?php echo DIR; ?>config/collectionSystemTransfers/fileNamingGuide">
+                    File Naming Guide
+                </a>
             </div>
             <table class='table table-striped table-hover table-bordered responsive'>
                 <thead>
@@ -46,7 +49,7 @@ use Helpers\Session;
         foreach($data['collectionSystemTransfers'] as $row){
 ?>
                     <tr>
-                        <td class="name"><?php echo $row->longName; ?></td>
+                        <td class="name" title="<?php echo htmlspecialchars($row->description ?? '', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $row->longName; ?></td>
                         <td class="actions">
                             <a href='<?php echo DIR; ?>config/collectionSystemTransfers/edit/<?php echo $row->collectionSystemTransferID; ?>'>Edit</a> /
                             <a href='#confirmDeleteModal' data-toggle="modal" data-item-name="Collection System Transfer" data-delete-url="<?php echo DIR; ?>config/collectionSystemTransfers/delete/<?php echo $row->collectionSystemTransferID; ?>">Delete</a> /

@@ -61,6 +61,14 @@ use Helpers\Form;
                             </div>
                         </div>
                         <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Description</label>
+                                    <?php echo Form::textBox(array('class'=>'form-control', 'name'=>'cruiseDescription', 'rows'=>'3', 'value'=>$data['cruiseDescription'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> Start Date/Time (UTC)</label>
@@ -123,19 +131,6 @@ use Helpers\Form;
     }
 ?>
                                 </table>
-                                <label>Other Options</label>
-                                <table class='table table-striped table-hover table-bordered responsive'>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th style='width:20px;'>Enabled</th>
-                                    </tr>
-                                    <tr>
-                                        <td>Show Lowering Components</td><td style='width:20px; text-align:center'><?php echo $data['showLoweringComponents'] === True ? Form::submit(array('name'=>'hideLoweringComponents', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'showLoweringComponents', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td>Ship-to-Shore Transfers</td><td style='width:20px; text-align:center'><?php echo $data['shipToShoreTransfersEnable'] === '1' ? Form::submit(array('name'=>'disableSSDW', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'enableSSDW', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
-                                    </tr>
-                                </table>
 
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Create')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
@@ -147,12 +142,12 @@ use Helpers\Form;
         </div>
         <div class="col-lg-6">
             <h3>Page Guide</h3>
-            <p>This page is for creating a new cruiseID and associated cruise data directory.  This page is NOT for configuring OpenVDM to use a previously created cruiseID.  If you are trying to configure OpenVDM to use a previously created cruiseID click <a href="<?php echo DIR; ?>config/editCruise">here</a>.</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> ID</strong> is the unique indentifier for the cruise (i.e. CS1801)</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Date/Time </strong> is the designated start/end date/time of the cruise. This is exported as part of the cruise finialization process and optionally used for identifying files that should be skipped during file transfers.  The required format of this date/time is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Port </strong> is the designated starting and ending ports of the cruise. This is exported as part of the cruise finialization process.</p>
-            <p>The <strong>Collection Systems</strong> table is for specifying what collection system will be used during the cruise.  These can always be changed later from the Collection System Transfers tab.</p>
-            <p>Click the <strong>Create</strong> button to save the change and exit back to the main configuration page.  If you enter a cruiseID for a cruise that already exists you will be asked to enter a different cruiseID.</p>
-            <p>Click the <strong>Cancel</strong> button to exit back to the main configuration page without creating a new cruise.</p>
+            <p>This page is for creating a new cruiseID and associated <?php echo \Helpers\Terms::cruise(true); ?> data directory.  This page is NOT for configuring OpenVDM to use a previously created cruiseID.  If you are trying to configure OpenVDM to use a previously created cruiseID click <a href="<?php echo DIR; ?>config/editCruise">here</a>.</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> ID</strong> is the unique indentifier for the <?php echo \Helpers\Terms::cruise(true); ?> (i.e. CS1801)</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Date/Time </strong> is the designated start/end date/time of the <?php echo \Helpers\Terms::cruise(true); ?>. This is exported as part of the <?php echo \Helpers\Terms::cruise(true); ?> finialization process and optionally used for identifying files that should be skipped during file transfers.  The required format of this date/time is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Port </strong> is the designated starting and ending ports of the <?php echo \Helpers\Terms::cruise(true); ?>. This is exported as part of the <?php echo \Helpers\Terms::cruise(true); ?> finialization process.</p>
+            <p>The <strong>Collection Systems</strong> table is for specifying what collection system will be used during the <?php echo \Helpers\Terms::cruise(true); ?>.  These can always be changed later from the Collection System Transfers tab.</p>
+            <p>Click the <strong>Create</strong> button to save the change and exit back to the main configuration page.  If you enter a cruiseID for a <?php echo \Helpers\Terms::cruise(true); ?> that already exists you will be asked to enter a different cruiseID.</p>
+            <p>Click the <strong>Cancel</strong> button to exit back to the main configuration page without creating a new <?php echo \Helpers\Terms::cruise(true); ?>.</p>
         </div>
     </div>

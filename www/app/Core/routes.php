@@ -29,6 +29,8 @@ Router::any('config/rebuildTransferLogSummary', '\Controllers\Config\Main@rebuil
 Router::any('config/rebuildCruiseDirectory', '\Controllers\Config\Main@rebuildCruiseDirectory');
 Router::any('config/rebuildLoweringDirectory', '\Controllers\Config\Main@rebuildLoweringDirectory');
 Router::any('config/rebuildDataDashboard', '\Controllers\Config\Main@rebuildDataDashboard');
+Router::any('config/rebuildCruiseReadme', '\Controllers\Config\Main@rebuildCruiseReadme');
+Router::any('config/rebuildLoweringReadme', '\Controllers\Config\Main@rebuildLoweringReadme');
 Router::any('config/editCruise', '\Controllers\Config\Main@editCruise');
 Router::any('config/editLowering', '\Controllers\Config\Main@editLowering');
 Router::any('config/editShipboardDataWarehouse', '\Controllers\Config\Main@editShipboardDataWarehouse');
@@ -50,11 +52,8 @@ Router::any('config/system/editShipToShoreBWLimit', '\Controllers\Config\System@
 Router::any('config/system/enableMD5FilesizeLimit', '\Controllers\Config\System@enableMD5FilesizeLimit');
 Router::any('config/system/disableMD5FilesizeLimit', '\Controllers\Config\System@disableMD5FilesizeLimit');
 Router::any('config/system/editMD5FilesizeLimit', '\Controllers\Config\System@editMD5FilesizeLimit');
-
-Router::any('config/system/editCruiseConfigFn', '\Controllers\Config\System@editCruiseConfigFn');
-Router::any('config/system/editLoweringConfigFn', '\Controllers\Config\System@editLoweringConfigFn');
-Router::any('config/system/editDataDashboardManifestFn', '\Controllers\Config\System@editDataDashboardManifestFn');
-Router::any('config/system/editMD5SummaryFns', '\Controllers\Config\System@editMD5SummaryFns');
+Router::any('config/system/showLoweringComponents', '\Controllers\Config\System@showLoweringComponents');
+Router::any('config/system/hideLoweringComponents', '\Controllers\Config\System@hideLoweringComponents');
 
 Router::any('config/system/addLink', '\Controllers\Config\System@addLink');
 Router::any('config/system/editLink/(:num)', '\Controllers\Config\System@editLink');
@@ -69,6 +68,7 @@ Router::any('config/users/edit/(:num)', '\Controllers\Config\Users@editUser');
 
 Router::any('config/collectionSystemTransfers', '\Controllers\Config\CollectionSystemTransfers@index');
 Router::any('config/collectionSystemTransfers/add', '\Controllers\Config\CollectionSystemTransfers@add');
+Router::any('config/collectionSystemTransfers/fileNamingGuide', '\Controllers\Config\CollectionSystemTransfers@fileNamingGuide');
 Router::any('config/collectionSystemTransfers/edit/(:num)', '\Controllers\Config\CollectionSystemTransfers@edit');
 Router::any('config/collectionSystemTransfers/delete/(:num)', '\Controllers\Config\CollectionSystemTransfers@delete');
 Router::any('config/collectionSystemTransfers/enable/(:num)', '\Controllers\Config\CollectionSystemTransfers@enable');
@@ -131,6 +131,9 @@ Router::any('api/warehouse/getCruiseStartPort', 'Controllers\Api\Warehouse@getCr
 Router::any('api/warehouse/getCruiseEndPort', 'Controllers\Api\Warehouse@getCruiseEndPort');
 Router::any('api/warehouse/getCruisePI', 'Controllers\Api\Warehouse@getCruisePI');
 Router::any('api/warehouse/getCruiseLocation', 'Controllers\Api\Warehouse@getCruiseLocation');
+Router::any('api/warehouse/getCruiseDescription', 'Controllers\Api\Warehouse@getCruiseDescription');
+Router::any('api/warehouse/getCruiseExtent', 'Controllers\Api\Warehouse@getCruiseExtent');
+Router::any('api/warehouse/getLoweringExtent', 'Controllers\Api\Warehouse@getLoweringExtent');
 Router::any('api/warehouse/getCruiseFinalizedDate', 'Controllers\Api\Warehouse@getCruiseFinalizedDate');
 Router::any('api/warehouse/getCruises', 'Controllers\Api\Warehouse@getCruises');
 Router::any('api/warehouse/getCruiseConfigFn', 'Controllers\Api\Warehouse@getCruiseConfigFn');
@@ -155,9 +158,12 @@ Router::any('api/warehouse/getShipboardDataWarehouseStatus', 'Controllers\Api\Wa
 Router::any('api/warehouse/getShipToShoreBWLimitStatus', 'Controllers\Api\Warehouse@getShipToShoreBWLimitStatus');
 Router::any('api/warehouse/getSystemStatus', 'Controllers\Api\Warehouse@getSystemStatus');
 Router::any('api/warehouse/getShowLoweringComponents', 'Controllers\Api\Warehouse@getShowLoweringComponents');
+Router::any('api/warehouse/getTerms', 'Controllers\Api\Warehouse@getTerms');
 Router::any('api/warehouse/getDataDashboardManifestFn', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::any('api/warehouse/getCruiseDataURL', 'Controllers\Api\Warehouse@getDataDashboardManifestFn');
 Router::post('api/warehouse/setCruiseSize', 'Controllers\Api\Warehouse@setCruiseSize');
+Router::post('api/warehouse/setCruiseExtent', 'Controllers\Api\Warehouse@setCruiseExtent');
+Router::post('api/warehouse/setLoweringExtent', 'Controllers\Api\Warehouse@setLoweringExtent');
 Router::post('api/warehouse/setLoweringSize', 'Controllers\Api\Warehouse@setLoweringSize');
 
 Router::any('api/collectionSystemTransfers/getCollectionSystemTransfers', 'Controllers\Api\CollectionSystemTransfers@getCollectionSystemTransfers');
@@ -226,6 +232,7 @@ Router::any('api/gearman/newJob/(:any)', 'Controllers\Api\Gearman@newJob');
 Router::any('api/gearman/getJobs', 'Controllers\Api\Gearman@getJobs');
 Router::any('api/gearman/getJob/(:num)', 'Controllers\Api\Gearman@getJob');
 Router::any('api/gearman/clearAllJobsFromDB', 'Controllers\Api\Gearman@clearAllJobsFromDB');
+Router::any('api/gearman/getWorkerStatus', 'Controllers\Api\Gearman@getWorkerStatus');
 
 Router::any('', 'Controllers\Welcome@index');
 /* Module routes. */

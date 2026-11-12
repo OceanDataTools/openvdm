@@ -13,6 +13,7 @@ class Main extends Controller {
     private $_collectionSystemTransfersModel;
     private $_extraDirectoriesModel;
     private $_cruiseDataTransfersModel;
+    private \Models\Config\Messages $_messagesModel;
 
     public function __construct(){
 
@@ -25,6 +26,7 @@ class Main extends Controller {
         $this->_collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
         $this->_extraDirectoriesModel = new \Models\Config\ExtraDirectories();
         $this->_cruiseDataTransfersModel = new \Models\Config\CruiseDataTransfers();
+        $this->_messagesModel = new \Models\Config\Messages();
     }
 
     /**
@@ -66,18 +68,19 @@ class Main extends Controller {
         $data['cruiseName'] = $this->_warehouseModel->getCruiseName();
         $data['cruisePI'] = $this->_warehouseModel->getCruisePI();
         $data['cruiseLocation'] = $this->_warehouseModel->getCruiseLocation();
+        $data['cruiseDescription'] = $this->_warehouseModel->getCruiseDescription();
         $data['cruiseStartDate'] = $this->_warehouseModel->getCruiseStartDate();
         $data['cruiseEndDate'] = $this->_warehouseModel->getCruiseEndDate();
         $data['cruiseStartPort'] = $this->_warehouseModel->getCruiseStartPort();
         $data['cruiseEndPort'] = $this->_warehouseModel->getCruiseEndPort();
         $data['cruises'] = $this->_warehouseModel->getCruises();
-        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         $error = [];
 
         if(isset($_POST['submit'])) {
 
             $cruiseID = null;
             $setLatestLowering = false;
+            $cruiseExtent = null;
 
             if (!empty($_POST['cruiseID'])) {
                 $cruiseID = $_POST['cruiseID'];
@@ -88,6 +91,7 @@ class Main extends Controller {
             $cruiseName = $_POST['cruiseName'] ?? '';
             $cruisePI = $_POST['cruisePI'] ?? '';
             $cruiseLocation = $_POST['cruiseLocation'] ?? '';
+            $cruiseDescription = $_POST['cruiseDescription'] ?? '';
 
             $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
             $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
@@ -100,6 +104,8 @@ class Main extends Controller {
                 $cruiseName = $this->_warehouseModel->getCruiseName($_POST['cruiseID']);
                 $cruisePI = $this->_warehouseModel->getCruisePI($_POST['cruiseID']);
                 $cruiseLocation = $this->_warehouseModel->getCruiseLocation($_POST['cruiseID']);
+                $cruiseDescription = $this->_warehouseModel->getCruiseDescription($_POST['cruiseID']);
+                $cruiseExtent = $this->_warehouseModel->getCruiseExtent($_POST['cruiseID']);
 
                 $cruiseDates = $this->_warehouseModel->getCruiseDates($_POST['cruiseID']);
                 $cruiseStartDate = $cruiseDates['cruiseStartDate'] ?? '';
@@ -144,11 +150,17 @@ class Main extends Controller {
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
+                $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
+                if ($setLatestLowering) {
+                    # Switching to another cruise: its extent, from its cruise config file
+                    $this->_warehouseModel->setCruiseExtent(array('value' => $cruiseExtent ? json_encode($cruiseExtent) : ''));
+                }
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
                 $this->_warehouseModel->setCruiseEndPort(array('value' => $cruiseEndPort));
 
+                $previousLoweringID = $this->_warehouseModel->getLoweringID();
                 $loweringID = $this->_warehouseModel->getLatestLowering();
 
                 if ($loweringID) {
@@ -158,10 +170,18 @@ class Main extends Controller {
 
                     $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringDates['loweringStartDate'] ?? ''));
                     $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringDates['loweringEndDate'] ?? ''));
+                    if ($setLatestLowering || strcmp($loweringID, $previousLoweringID) != 0) {
+                        # Another lowering: its extent, from its lowering config file.
+                        # The same lowering keeps the extent build_lowering_tracks set,
+                        # which can be newer than its lowering config file
+                        $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
+                        $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
+                    }
                 } else {
                     $this->_warehouseModel->setLoweringID(array('value' => ''));
                     $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
                     $this->_warehouseModel->setLoweringEndDate(array('value' => ''));
+                    $this->_warehouseModel->setLoweringExtent(array('value' => ''));
                 }
 
                 //$_warehouseModel = new \models\warehouse();
@@ -189,33 +209,12 @@ class Main extends Controller {
                 $data['cruiseName'] = $cruiseName;
                 $data['cruisePI'] = $cruisePI;
                 $data['cruiseLocation'] = $cruiseLocation;
+                $data['cruiseDescription'] = $cruiseDescription;
                 $data['cruiseStartDate'] = $cruiseStartDate;
                 $data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
                 $data['cruiseEndPort'] = $cruiseEndPort;
             }
-        } elseif(!empty($_POST)) {
-
-            if(isset($_POST['hideLoweringComponents'])) {
-                $this->_warehouseModel->hideLoweringComponents();
-            }
-
-            if(isset($_POST['showLoweringComponents'])) {
-                $this->_warehouseModel->showLoweringComponents();
-
-                # create the gearman client
-                $gmc= new \GearmanClient();
-
-                # add the default server (localhost)
-                $gmc->addServer();
-
-                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
-
-                #submit job to Gearman
-                $data['jobResults'] = json_decode($gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData)));
-            }
-
-            $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         }
 
         View::rendertemplate('header',$data);
@@ -292,6 +291,11 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => $loweringID));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringStartDate));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringEndDate));
+                if ($setLatestLowering) {
+                    # Switching to another lowering: its extent, from its lowering config file
+                    $loweringExtent = $this->_warehouseModel->getLoweringExtent($loweringID);
+                    $this->_warehouseModel->setLoweringExtent(array('value' => $loweringExtent ? json_encode($loweringExtent) : ''));
+                }
 
                 //$_warehouseModel = new \models\warehouse();
                 $gmData['loweringID'] = $this->_warehouseModel->getLoweringID();
@@ -429,19 +433,8 @@ class Main extends Controller {
 
         //$collectionSystemTransfersModel;
         //$collectionSystemTransfersModel = new \Models\Config\CollectionSystemTransfers();
-        $SSDW = null;
-
-        $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
-        foreach($requiredCruiseDataTransfers as $requiredCruiseDataTransfer) {
-            if(strcmp($requiredCruiseDataTransfer->name, 'SSDW') === 0) {
-                $SSDW = $requiredCruiseDataTransfer;
-                $data['shipToShoreTransfersEnable'] = $SSDW->enable;
-                break;
-            }
-        }
 
         $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
-        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
         $data['title'] = 'Configuration';
         $data['css'] = array('datetimepicker');
         $data['javascript'] = array('datetimepicker');
@@ -449,6 +442,7 @@ class Main extends Controller {
         $data['cruiseName'] = '';
         $data['cruisePI'] = '';
         $data['cruiseLocation'] = '';
+        $data['cruiseDescription'] = '';
         $data['cruiseStartDate'] = '';
         $data['cruiseEndDate'] = '';
         $data['cruiseStartPort'] = '';
@@ -460,6 +454,7 @@ class Main extends Controller {
             $cruiseName = $_POST['cruiseName'] ?? '';
             $cruisePI = $_POST['cruisePI'] ?? '';
             $cruiseLocation = $_POST['cruiseLocation'] ?? '';
+            $cruiseDescription = $_POST['cruiseDescription'] ?? '';
             $cruiseStartDate = $_POST['cruiseStartDate'] ?? '';
             $cruiseEndDate = $_POST['cruiseEndDate'] ?? '';
             $cruiseStartPort = $_POST['cruiseStartPort'] ?? '';
@@ -495,10 +490,18 @@ class Main extends Controller {
 
             if(!$error){
 
+                # Start the new cruise with no messages, so every message is
+                # about it. Cleared before the setupNewCruise job, so a message
+                # the job posts (e.g. that it failed) is kept (#403)
+                $this->_messagesModel->deleteAllMessages();
+
                 $this->_warehouseModel->setCruiseID(array('value' => $cruiseID));
                 $this->_warehouseModel->setCruiseName(array('value' => $cruiseName));
                 $this->_warehouseModel->setCruisePI(array('value' => $cruisePI));
                 $this->_warehouseModel->setCruiseLocation(array('value' => $cruiseLocation));
+                $this->_warehouseModel->setCruiseDescription(array('value' => $cruiseDescription));
+                # A new cruise has no track yet; build_cruise_tracks sets the extent
+                $this->_warehouseModel->setCruiseExtent(array('value' => ''));
                 $this->_warehouseModel->setCruiseStartDate(array('value' => $cruiseStartDate));
                 $this->_warehouseModel->setCruiseEndDate(array('value' => $cruiseEndDate));
                 $this->_warehouseModel->setCruiseStartPort(array('value' => $cruiseStartPort));
@@ -507,6 +510,7 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => ''));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => ''));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => ''));
+                $this->_warehouseModel->setLoweringExtent(array('value' => ''));
 
                 $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
 
@@ -538,6 +542,7 @@ class Main extends Controller {
                 $data['cruiseName'] = $cruiseName;
                 $data['cruisePI'] = $cruisePI;
                 $data['cruiseLocation'] = $cruiseLocation;
+                $data['cruiseDescription'] = $cruiseDescription;
                 $data['cruiseStartDate'] = $cruiseStartDate;
                 $data['cruiseEndDate'] = $cruiseEndDate;
                 $data['cruiseStartPort'] = $cruiseStartPort;
@@ -548,36 +553,12 @@ class Main extends Controller {
             $data['cruiseName'] = $_POST['cruiseName'] ?? '';
             $data['cruisePI'] = $_POST['cruisePI'] ?? '';
             $data['cruiseLocation'] = $_POST['cruiseLocation'] ?? '';
+            $data['cruiseDescription'] = $_POST['cruiseDescription'] ?? '';
             $data['cruiseStartDate'] = $_POST['cruiseStartDate'] ?? '';
             $data['cruiseEndDate'] = $_POST['cruiseEndDate'] ?? '';
             $data['cruiseStartPort'] = $_POST['cruiseStartPort'] ?? '';
             $data['cruiseEndPort'] = $_POST['cruiseEndPort'] ?? '';
 
-
-            if(isset($_POST['hideLoweringComponents'])) {
-                $this->_warehouseModel->hideLoweringComponents();
-            }
-
-            if(isset($_POST['showLoweringComponents'])) {
-                $this->_warehouseModel->showLoweringComponents();
-
-                # Rebuild the current cruise's directory so it gets the lowering
-                # base directory, as Edit Cruise does
-                $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
-                if (!empty($gmData['cruiseID'])) {
-                    $gmc= new \GearmanClient();
-                    $gmc->addServer();
-                    $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
-                }
-            }
-
-            if(isset($_POST['disableSSDW'])) {
-                $this->_cruiseDataTransfersModel->disableCruiseDataTransfer($SSDW->cruiseDataTransferID);
-            }
-
-            if(isset($_POST['enableSSDW'])) {
-                $this->_cruiseDataTransfersModel->enableCruiseDataTransfer($SSDW->cruiseDataTransferID);
-            }
 
             foreach($data['collectionSystemTransfers'] as $row) {
                 if(isset($_POST['enableCS' . $row->collectionSystemTransferID])) {
@@ -591,8 +572,6 @@ class Main extends Controller {
             }
 
             $data['collectionSystemTransfers'] = $this->_collectionSystemTransfersModel->getCruiseOnlyCollectionSystemTransfers();
-            $data['shipToShoreTransfersEnable'] = $this->_cruiseDataTransfersModel->getCruiseDataTransfer($SSDW->cruiseDataTransferID)[0]->enable;
-            $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
 
         }
 
@@ -656,6 +635,8 @@ class Main extends Controller {
                 $this->_warehouseModel->setLoweringID(array('value' => $loweringID));
                 $this->_warehouseModel->setLoweringStartDate(array('value' => $loweringStartDate));
                 $this->_warehouseModel->setLoweringEndDate(array('value' => $loweringEndDate));
+                # A new lowering has no track yet; build_lowering_tracks sets the extent
+                $this->_warehouseModel->setLoweringExtent(array('value' => ''));
                 $gmData['loweringID'] = $this->_warehouseModel->getLoweringID();
 
                 # create the gearman client
@@ -785,6 +766,48 @@ class Main extends Controller {
         $data = array_merge($data, $this->mainPageData());
 
         $data['jobName'] = 'Export OpenVDM Configuration';
+
+        View::rendertemplate('header',$data);
+        View::render('Config/main',$data);
+        View::rendertemplate('footer',$data);
+    }
+
+    public function rebuildCruiseReadme() {
+
+        $gmData = (object) array();
+
+        # create the gearman client
+        $gmc= new \GearmanClient();
+
+        # add the default server (localhost)
+        $gmc->addServer();
+
+        #submit job to Gearman, wait for results
+        $data['jobResults'] = json_decode($gmc->doNormal("rebuildCruiseReadme", json_encode($gmData)));
+        $data = array_merge($data, $this->mainPageData());
+
+        $data['jobName'] = 'Rebuild ' . CRUISE_NAME . ' README';
+
+        View::rendertemplate('header',$data);
+        View::render('Config/main',$data);
+        View::rendertemplate('footer',$data);
+    }
+
+    public function rebuildLoweringReadme() {
+
+        $gmData = (object) array();
+
+        # create the gearman client
+        $gmc= new \GearmanClient();
+
+        # add the default server (localhost)
+        $gmc->addServer();
+
+        #submit job to Gearman, wait for results
+        $data['jobResults'] = json_decode($gmc->doNormal("rebuildLoweringReadme", json_encode($gmData)));
+        $data = array_merge($data, $this->mainPageData());
+
+        $data['jobName'] = 'Rebuild ' . LOWERING_NAME . ' README';
 
         View::rendertemplate('header',$data);
         View::render('Config/main',$data);

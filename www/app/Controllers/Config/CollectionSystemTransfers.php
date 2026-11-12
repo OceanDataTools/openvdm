@@ -8,6 +8,9 @@ use Helpers\Session;
 use Helpers\PendingPasswords;
 use Helpers\FtpFields;
 use Helpers\TransferFields;
+use Helpers\DirectoryFields;
+use Helpers\DescriptionTemplates;
+use Helpers\FileNamingGuide;
 
 class CollectionSystemTransfers extends Controller {
 
@@ -135,11 +138,58 @@ class CollectionSystemTransfers extends Controller {
         View::rendertemplate('footer',$data);
     }
 
+    // File Naming Guide (#451): what each collection system's files must be
+    // called to be transferred, from its filters. ?all=1 includes disabled
+    // transfers, ?id=N shows one transfer. Lowering-level transfers are only
+    // shown when lowerings are used.
+    public function fileNamingGuide(){
+        $warehouseModel = new \Models\Warehouse();
+        $showLowerings = $warehouseModel->getShowLoweringComponents();
+        $showAll = !empty($_GET['all']);
+        $onlyID = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+        $context = array(
+            'cruiseID' => (string) $warehouseModel->getCruiseID(),
+            'loweringID' => $showLowerings ? (string) $warehouseModel->getLoweringID() : '',
+            'cruiseStartDate' => (string) $warehouseModel->getCruiseStartDate(),
+            'cruiseEndDate' => (string) $warehouseModel->getCruiseEndDate(),
+            'loweringStartDate' => (string) $warehouseModel->getLoweringStartDate(),
+            'loweringEndDate' => (string) $warehouseModel->getLoweringEndDate(),
+            'now' => time(),
+        );
+        $typeNames = $this->_buildTransferTypesOptions();
+
+        $guides = array();
+        foreach ($this->_collectionSystemTransfersModel->getCollectionSystemTransfers("longName") as $cst) {
+            if ($onlyID && (int) $cst->collectionSystemTransferID !== $onlyID) {
+                continue;
+            }
+            if (!$onlyID && !$showAll && (int) $cst->enable !== 1) {
+                continue;
+            }
+            if (!$showLowerings && (int) $cst->cruiseOrLowering === 1) {
+                continue;
+            }
+            $guides[] = FileNamingGuide::guideFor($cst, $typeNames[$cst->transferType] ?? '', $context);
+        }
+
+        $data['title'] = 'File Naming Guide';
+        $data['guides'] = $guides;
+        $data['context'] = $context;
+        $data['placeholders'] = FileNamingGuide::placeholderKey($context);
+        $data['showAll'] = $showAll;
+        $data['onlyID'] = $onlyID;
+
+        View::rendertemplate('header',$data);
+        View::render('Config/fileNamingGuide',$data);
+        View::rendertemplate('footer',$data);
+    }
+
     public function add(){
         $_warehouseModel = new \Models\Warehouse();
 
         $data['title'] = 'Add Collection System Transfers';
-        $data['javascript'] = array('collectionSystemTransfersFormHelper');
+        $data['javascript'] = array('directoryFields', 'collectionSystemTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['stalenessOptions'] = $this->_buildStalenessOptions();
@@ -157,9 +207,11 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
-            $sourceDir = $_POST['sourceDir'] ?? '';
-            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            // As the form's scripts leave them, in case they didn't run (#630)
+            $sourceDir = DirectoryFields::absolute($_POST['sourceDir'] ?? '');
+            $destDir = DirectoryFields::relative($_POST['destDir'] ?? '');
             $staleness = (($_POST['staleness'] ?? '') != "0" && ($_POST['customStaleness'] ?? '') != "0") ? ($_POST['customStaleness'] ?? '') : "0";
             $removeSourceFiles = (($_POST['staleness'] ?? '') != "0" && $transferType != '2') ? ($_POST['removeSourceFiles'] ?? '') : "0";
             $useStartDate = $_POST['useStartDate'] ?? '';
@@ -289,6 +341,7 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -331,9 +384,11 @@ class CollectionSystemTransfers extends Controller {
         } else if(isset($_POST['inlineTest'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
-            $sourceDir = $_POST['sourceDir'] ?? '';
-            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            // As the form's scripts leave them, in case they didn't run (#630)
+            $sourceDir = DirectoryFields::absolute($_POST['sourceDir'] ?? '');
+            $destDir = DirectoryFields::relative($_POST['destDir'] ?? '');
             $staleness = $_POST['staleness'] ?? '';
             $removeSourceFiles = $_POST['removeSourceFiles'] ?? '';
             $useStartDate = $_POST['useStartDate'] ?? '';
@@ -445,6 +500,7 @@ class CollectionSystemTransfers extends Controller {
                    # 'collectionSystemTransferID' => '0',
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -501,7 +557,7 @@ class CollectionSystemTransfers extends Controller {
         $_warehouseModel = new \Models\Warehouse();
 
         $data['title'] = 'Collection System Transfers';
-        $data['javascript'] = array('collectionSystemTransfersFormHelper');
+        $data['javascript'] = array('directoryFields', 'collectionSystemTransfersFormHelper');
         $data['filter'] = $_GET['filter'] ?? '';
         $data['transferTypeOptions'] = $this->_buildTransferTypesOptions();
         $data['useStartDateOptions'] = $this->_buildUseStartDateOptions();
@@ -527,9 +583,11 @@ class CollectionSystemTransfers extends Controller {
         if(isset($_POST['submit'])){
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
-            $sourceDir = $_POST['sourceDir'] ?? '';
-            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            // As the form's scripts leave them, in case they didn't run (#630)
+            $sourceDir = DirectoryFields::absolute($_POST['sourceDir'] ?? '');
+            $destDir = DirectoryFields::relative($_POST['destDir'] ?? '');
             $staleness = (($_POST['staleness'] ?? '') != "0" && ($_POST['customStaleness'] ?? '') != "0") ? ($_POST['customStaleness'] ?? '') : "0";
             $removeSourceFiles = (($_POST['staleness'] ?? '') != "0" && $transferType != '2') ? ($_POST['removeSourceFiles'] ?? '') : "0";
             $useStartDate = $_POST['useStartDate'] ?? '';
@@ -665,6 +723,7 @@ class CollectionSystemTransfers extends Controller {
                 $postdata = array(
                     'name' => $name,
                     'longName' => $longName,
+                    'description' => $description,
                     'transferType' => (int)$transferType,
                     'sourceDir' => $sourceDir,
                     'destDir' => $destDir,
@@ -713,6 +772,7 @@ class CollectionSystemTransfers extends Controller {
 
                 $data['row'][0]->name = $name;
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->description = $description;
                 $data['row'][0]->transferType = $transferType;
                 $data['row'][0]->sourceDir = $sourceDir;
                 $data['row'][0]->destDir = $destDir;
@@ -743,9 +803,11 @@ class CollectionSystemTransfers extends Controller {
 
             $name = $_POST['name'] ?? '';
             $longName = $_POST['longName'] ?? '';
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::collectionSystem());
             $transferType = $_POST['transferType'] ?? '';
-            $sourceDir = $_POST['sourceDir'] ?? '';
-            $destDir = (strcmp($_POST['destDir'] ?? '', '/') == 0) ? ($_POST['destDir'] ?? '') : ltrim($_POST['destDir'] ?? '', '/');
+            // As the form's scripts leave them, in case they didn't run (#630)
+            $sourceDir = DirectoryFields::absolute($_POST['sourceDir'] ?? '');
+            $destDir = DirectoryFields::relative($_POST['destDir'] ?? '');
             $staleness = $_POST['staleness'] ?? '';
             $removeSourceFiles = $_POST['removeSourceFiles'] ?? '';
             $useStartDate = $_POST['useStartDate'] ?? '';
@@ -867,6 +929,7 @@ class CollectionSystemTransfers extends Controller {
 
                 $gmData['collectionSystemTransfer']->name = $name;
                 $gmData['collectionSystemTransfer']->longName = $longName;
+                $gmData['collectionSystemTransfer']->description = $description;
                 $gmData['collectionSystemTransfer']->transferType = (int)$transferType;
                 $gmData['collectionSystemTransfer']->sourceDir = $sourceDir;
                 $gmData['collectionSystemTransfer']->destDir = $destDir;
@@ -913,6 +976,7 @@ class CollectionSystemTransfers extends Controller {
             #additional data needed for view
             $data['row'][0]->name = $name;
             $data['row'][0]->longName = $longName;
+            $data['row'][0]->description = $description;
             $data['row'][0]->transferType = $transferType;
             $data['row'][0]->sourceDir = $sourceDir;
             $data['row'][0]->destDir = $destDir;

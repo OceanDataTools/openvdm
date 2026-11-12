@@ -5,8 +5,6 @@ use Core\Model;
 
 class Warehouse extends Model {
 
-    // const CONFIG_FN = 'ovdmConfig.json';
-    // const LOWERING_CONFIG_FN = 'loweringConfig.json';
     // const MANIFEST_FN = 'manifest.json';
 
     private $_lowerings;
@@ -306,6 +304,16 @@ class Warehouse extends Model {
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
+    public function setCruiseExtent($data) {
+        $where = array('name' => 'cruiseExtent');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
+    public function setCruiseDescription($data) {
+        $where = array('name' => 'cruiseDescription');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
     public function setCruiseStartDate($data) {
         $where = array('name' => 'cruiseStartDate');
         $this->db->update(PREFIX."CoreVars",$data, $where);
@@ -352,6 +360,11 @@ class Warehouse extends Model {
 
     public function setLoweringEndDate($data) {
         $where = array('name' => 'loweringEndDate');
+        $this->db->update(PREFIX."CoreVars",$data, $where);
+    }
+
+    public function setLoweringExtent($data) {
+        $where = array('name' => 'loweringExtent');
         $this->db->update(PREFIX."CoreVars",$data, $where);
     }
 
@@ -493,7 +506,7 @@ class Warehouse extends Model {
 
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -520,7 +533,7 @@ class Warehouse extends Model {
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -547,7 +560,7 @@ class Warehouse extends Model {
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -565,6 +578,43 @@ class Warehouse extends Model {
         }
     }
 
+    // A cruise's description: the current one, or another cruise's from its
+    // cruise config file. Empty when there's none, including for cruises from
+    // before 2.17 or without a config file, so an error text is never saved
+    // as the description.
+    public function getCruiseDescription($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseDescription'");
+            return $row[0]->value ?? '';
+        }
+
+        $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn();
+        if (!is_file($configFile)) {
+            return '';
+        }
+        $ovdmConfigJSON = json_decode(file_get_contents($configFile), true);
+        return $ovdmConfigJSON['cruiseDescription'] ?? '';
+    }
+
+    // A cruise's bounding box (#366): the current one (cruiseExtent, set by
+    // build_cruise_tracks through api/warehouse/setCruiseExtent), or another
+    // cruise's from its cruise config file. An array with westernmost,
+    // easternmost, southernmost and northernmost, or null if there's none.
+    public function getCruiseExtent($cruiseID = '') {
+        if (strcmp($cruiseID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'cruiseExtent'");
+            $extent = json_decode($row[0]->value ?? '', true);
+        } else {
+            $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID . DIRECTORY_SEPARATOR . $this->getCruiseConfigFn();
+            if (!is_file($configFile)) {
+                return null;
+            }
+            $ovdmConfigJSON = json_decode(file_get_contents($configFile), true);
+            $extent = $ovdmConfigJSON['cruiseExtent'] ?? null;
+        }
+        return is_array($extent) ? $extent : null;
+    }
+
     public function getCruiseDates($cruiseID = '') {
         if (strcmp($cruiseID, '') == 0 ) {
             $cruiseID = $this->getCruiseID();
@@ -573,7 +623,7 @@ class Warehouse extends Model {
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -599,7 +649,7 @@ class Warehouse extends Model {
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -625,7 +675,7 @@ class Warehouse extends Model {
         $cruiseDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $cruiseID;
         if (is_dir($cruiseDir)) {
 
-            //Check cruise Directory for ovdmConfig.json
+            //Check cruise Directory for the cruise config file
             $cruiseFileList = scandir($cruiseDir);
             foreach ($cruiseFileList as $cruiseKey => $cruiseValue) {
                 if (in_array($cruiseValue,array($this->getCruiseConfigFn()))) {
@@ -648,6 +698,26 @@ class Warehouse extends Model {
         return isset($lowerings[0]) ? $lowerings[0] : null;
     }
 
+    // A lowering's bounding box (#399): the current one (loweringExtent, set
+    // by build_lowering_tracks through api/warehouse/setLoweringExtent), or
+    // another lowering of the current cruise's from its lowering config file.
+    // An array with westernmost, easternmost, southernmost and northernmost,
+    // or null if there's none.
+    public function getLoweringExtent($loweringID = '') {
+        if (strcmp($loweringID, '') == 0 ) {
+            $row = $this->db->select("SELECT * FROM ".PREFIX."CoreVars WHERE name = 'loweringExtent'");
+            $extent = json_decode($row[0]->value ?? '', true);
+        } else {
+            $configFile = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $this->getCruiseID() . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir() . DIRECTORY_SEPARATOR . $loweringID . DIRECTORY_SEPARATOR . $this->getLoweringConfigFn();
+            if (!is_file($configFile)) {
+                return null;
+            }
+            $loweringConfigJSON = json_decode(file_get_contents($configFile), true);
+            $extent = $loweringConfigJSON['loweringExtent'] ?? null;
+        }
+        return is_array($extent) ? $extent : null;
+    }
+
     public function getLoweringDates($loweringID = '') {
         if (strcmp($loweringID, '') == 0 ) {
             $loweringID = $this->getLoweringID();
@@ -656,7 +726,7 @@ class Warehouse extends Model {
         $loweringDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $this->getCruiseID() . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir() . DIRECTORY_SEPARATOR . $loweringID;
         if (is_dir($loweringDir)) {
 
-            //Check lowering Directory for ovdmConfig.json
+            //Check lowering Directory for the lowering config file
             $loweringFileList = scandir($loweringDir);
             foreach ($loweringFileList as $loweringKey => $loweringValue) {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {
@@ -682,7 +752,7 @@ class Warehouse extends Model {
         $loweringDir = $this->getShipboardDataWarehouseBaseDir() . DIRECTORY_SEPARATOR . $this->getCruiseID() . DIRECTORY_SEPARATOR . $this->getLoweringDataBaseDir() . DIRECTORY_SEPARATOR . $loweringID;
         if (is_dir($loweringDir)) {
 
-            //Check lowering Directory for ovdmConfig.json
+            //Check lowering Directory for the lowering config file
             $loweringFileList = scandir($loweringDir);
             foreach ($loweringFileList as $loweringKey => $loweringValue) {
                 if (in_array($loweringValue,array($this->getLoweringConfigFn()))) {

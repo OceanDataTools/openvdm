@@ -5,6 +5,8 @@ use Core\Controller;
 use Core\View;
 use Helpers\Session;
 use Helpers\Url;
+use Helpers\DescriptionTemplates;
+use Helpers\DirectoryFields;
 
 class System extends Controller {
 
@@ -65,6 +67,7 @@ class System extends Controller {
         $data['shipToShoreBWLimitStatus'] = $this->_warehouseModel->getShipToShoreBWLimitStatus();
         $data['md5FilesizeLimit'] = $this->_warehouseModel->getMd5FilesizeLimit();
         $data['md5FilesizeLimitStatus'] = $this->_warehouseModel->getMd5FilesizeLimitStatus();
+        $data['showLoweringComponents'] = $this->_warehouseModel->getShowLoweringComponents();
 
 
         $requiredCruiseDataTransfers = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
@@ -132,7 +135,7 @@ class System extends Controller {
     public function editShoresideDataWarehouse(){
 
         $data['title'] = 'Configuration';
-        $data['javascript'] = array('SSDWFormHelper');
+        $data['javascript'] = array('directoryFields', 'SSDWFormHelper');
         $data['useSSHKeyOptions'] = $this->_buildUseSSHKeyOptions();
         $data['requiredCruiseDataTransfers'] = $this->_cruiseDataTransfersModel->getRequiredCruiseDataTransfers();
         $data['shoresideDataWarehouseConfig'] = array();
@@ -156,7 +159,8 @@ class System extends Controller {
             $sshUser = $_POST['sshUser'] ?? '';
             $sshUseKey = $_POST['sshUseKey'] ?? '';
             $sshPass = $_POST['sshPass'] ?? '';
-            $destDir = $_POST['destDir'] ?? '';
+            // As the form's script leaves it, in case it didn't run (#630)
+            $destDir = DirectoryFields::ssdwDestDir($_POST['destDir'] ?? '');
 
             if ($sshPass === '' && $storedSshPass !== '') {
                 $sshPass = $storedSshPass;
@@ -215,6 +219,7 @@ class System extends Controller {
 
         if(isset($_POST['submit'])){
             $longName = $_POST['longName'] ?? '';
+            $description = DescriptionTemplates::clean($_POST['description'] ?? '', DescriptionTemplates::extraDirectory());
             $destDir = $_POST['destDir'] ?? '';
 
             if($longName == ''){
@@ -228,6 +233,7 @@ class System extends Controller {
             if(!$error){
                 $postdata = array(
                     'longName' => $longName,
+                    'description' => $description,
                     'destDir' => $destDir,
                 );
 
@@ -239,6 +245,7 @@ class System extends Controller {
             } else {
 
                 $data['row'][0]->longName = $longName;
+                $data['row'][0]->description = $description;
                 $data['row'][0]->destDir = $destDir;
             }
         }
@@ -404,6 +411,28 @@ class System extends Controller {
     public function disableMD5FilesizeLimit() {
 
         $this->_warehouseModel->disableMd5FilesizeLimit();
+        Url::redirect('config/system');
+    }
+
+    public function showLoweringComponents() {
+
+        $this->_warehouseModel->showLoweringComponents();
+
+        # Rebuild the current cruise's directory so it gets the lowering
+        # base directory, as the cruise forms' switch did before #676
+        $gmData['cruiseID'] = $this->_warehouseModel->getCruiseID();
+        if (!empty($gmData['cruiseID'])) {
+            $gmc= new \GearmanClient();
+            $gmc->addServer();
+            $gmc->doBackground("rebuildCruiseDirectory", json_encode($gmData));
+        }
+
+        Url::redirect('config/system');
+    }
+
+    public function hideLoweringComponents() {
+
+        $this->_warehouseModel->hideLoweringComponents();
         Url::redirect('config/system');
     }
 

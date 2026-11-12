@@ -29,6 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_utils import redact_payload
 
 # Gearman task names this worker registers.
 TASK_NAMES = {
@@ -200,7 +201,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         Replaces placeholder tokens in each command argument with runtime
         values (cruise ID, lowering ID, transfer ID/name, new/updated file
-        lists).  Empty arguments produced by substitution are dropped.
+        lists).  Empty arguments produced by substitution are dropped. A
+        command that uses a placeholder from the API with no value (e.g.
+        ``{loweringID}`` without a current lowering) gets a ``missing`` list
+        of those placeholders instead, and isn't run (#586).
 
         Args:
             command_list: List of command dicts, each with ``name`` and
@@ -234,15 +238,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             '{collectionSystemTransferName}':
                 cst_cfg.get('name') if isinstance(cst_cfg, dict) else None,
 
-            '{newFiles}': ' '.join(self.files.get('new', [])) if self.files else None,
-            '{updatedFiles}': ' '.join(self.files.get('updated', [])) if self.files else None
+            '{newFiles}': ' '.join((self.files or {}).get('new') or []),
+            '{updatedFiles}': ' '.join((self.files or {}).get('updated') or [])
         }
 
-        # Remove only None (not empty strings)
-        replacements = {k: v for k, v in replacements.items() if v is not None}
+        # The placeholders from the API that have no value; the file lists are
+        # just empty without files
+        missing = [k for k, v in replacements.items() if not v and k not in ('{newFiles}', '{updatedFiles}')]
+        replacements = {k: v for k, v in replacements.items() if k not in missing}
 
         for command in command_list:
             logging.debug("Raw Command: %s", json.dumps(command))
+            used = [token for token in missing if any(token in arg for arg in command['command'])]
+            if used:
+                command['missing'] = used
+                continue
             command['command'] = [
                 _replace_tokens(arg, replacements) for arg in command['command']
             ]
@@ -305,17 +315,19 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+        if not self.task:
+            return self._fail_job(current_job, "Retrieve task", "Task not found")
+
         try:
             self.job_data = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
-        if not self.task:
-            return self._fail_job(current_job, "Retrieve task", "Task not found")
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -409,7 +421,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         if final_verdict == "Fail":
             reason = final_part.get('reason', 'Unknown failure')
-            if int(self.task['taskID']) > 0:
+            if not self.task:
+                # Not a task OpenVDM knows, so there's no status to set (#544)
+                self.ovdm.send_msg(f"{current_job.task} failed", reason)
+            elif int(self.task['taskID']) > 0:
                 self.ovdm.set_error_task(self.task['taskID'], reason)
             else:
                 self.ovdm.send_msg(f"{self.task['longName']} failed", reason)
@@ -508,6 +523,12 @@ def task_post_hook(worker: OVDMGearmanWorker, current_job) -> str:
     cmd_length = len(output_results['commandList'])
     for idx, cmd in enumerate(output_results['commandList']):
         worker.send_job_status(current_job, int(80 * (idx+1)/cmd_length) + 20, 100)
+
+        if cmd.get('missing'):
+            reason = f"{cmd['name']}: not run, no value for {', '.join(cmd['missing'])}"
+            logging.error(reason)
+            reasons.append(reason)
+            continue
 
         logging.info("Executing: %s", cmd['name'])
         output_results = worker._run_command(cmd)

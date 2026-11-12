@@ -43,6 +43,7 @@ CREATE TABLE `OVDM_CollectionSystemTransfers` (
   `collectionSystemTransferID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` text,
+  `description` text,
   `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0',
   `sourceDir` tinytext,
   `destDir` tinytext,
@@ -91,7 +92,7 @@ DROP TABLE IF EXISTS `OVDM_CoreVars`;
 CREATE TABLE `OVDM_CoreVars` (
   `coreVarID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
-  `value` tinytext,
+  `value` text,
   PRIMARY KEY (`coreVarID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -120,9 +121,12 @@ VALUES
   (18,'loweringSizeUpdated','2026/01/01 00:00:00'),
   (19,'systemStatus','Off'),
   (20,'shipToShoreBWLimitStatus','Off'),
-  (21,'md5FilesizeLimit','10'),
-  (22,'md5FilesizeLimitStatus','On'),
-  (23,'showLoweringComponents','No');
+  (21,'md5FilesizeLimit','100'),
+  (22,'md5FilesizeLimitStatus','Off'),
+  (23,'showLoweringComponents','No'),
+  (24,'cruiseDescription','Sample cruise for exploring OpenVDM with its sample data.'),
+  (25,'cruiseExtent',''),
+  (26,'loweringExtent','');
 
 /*!40000 ALTER TABLE `OVDM_CoreVars` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -193,6 +197,7 @@ CREATE TABLE `OVDM_ExtraDirectories` (
   `extraDirectoryID` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `name` tinytext NOT NULL,
   `longName` tinytext,
+  `description` text,
   `cruiseOrLowering` int(1) unsigned NOT NULL DEFAULT '0',
   `destDir` tinytext,
   `enable` tinyint(1) DEFAULT '0',
@@ -203,10 +208,10 @@ CREATE TABLE `OVDM_ExtraDirectories` (
 LOCK TABLES `OVDM_ExtraDirectories` WRITE;
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` DISABLE KEYS */;
 
-INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
+INSERT INTO `OVDM_ExtraDirectories` (`extraDirectoryID`, `name`, `longName`, `description`, `cruiseOrLowering`, `destDir`, `enable`, `required`)
 VALUES
-  (1,'Dashboard_Data','Dashboard Data',0,'OpenVDM/DashboardData',1,1),
-  (2,'From_PublicData','Files copied from PublicData share',0,'From_PublicData',1,1);
+  (1,'Dashboard_Data','Dashboard Data',CONCAT('The files OpenVDM''s Data Dashboard is built from: the data and quality test results its plugins extract from the collection systems'' raw files. Written by OpenVDM.', CHAR(10), CHAR(10), '**Files:**', CHAR(10), '- `*.json`: the data and quality test results extracted from one raw file', CHAR(10), '- the manifest (JSON): the list of these files that the Data Dashboard reads', CHAR(10), CHAR(10), '**Sub-directories:**', CHAR(10), '- the same folders as the raw files in the cruise directory, for the files extracted from them', CHAR(10), '- each lowering''s files and manifest are under its lowering''s folder'),0,'OpenVDM/DashboardData',1,1),
+  (2,'From_PublicData','Files copied from PublicData share',CONCAT('Files from the ship''s PublicData share, where scientists and crew share files during the cruise, copied here when the cruise is finalized.', CHAR(10), CHAR(10), '**Files:**', CHAR(10), '- any type, as saved on the share', CHAR(10), CHAR(10), '**Sub-directories:**', CHAR(10), '- the same folders as on the PublicData share'),0,'From_PublicData',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ExtraDirectories` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -253,7 +258,8 @@ VALUES
   ('Supervisord','http://{hostIP}:9001',1,1),
   ('Public Data','http://{hostIP}/PublicData/',1,0),
   ('Visitor Information','http://{hostIP}/VisitorInformation/',1,0),
-  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0);
+  ('Cruise Data','http://{hostIP}/CruiseData/{cruiseID}/',1,0),
+  ('File Naming Guide','/config/collectionSystemTransfers/fileNamingGuide',1,1);
 
 /*!40000 ALTER TABLE `OVDM_Links` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -298,8 +304,8 @@ LOCK TABLES `OVDM_ShipToShoreTransfers` WRITE;
 INSERT INTO `OVDM_ShipToShoreTransfers` (`shipToShoreTransferID`, `name`, `longName`, `priority`, `collectionSystem`, `extraDirectory`, `includeFilter`, `enable`, `required`)
 VALUES
   (1,'DashboardData','Dashboard Data',1,0,1,'*',1,1),
-  (3,'MD5Summary','MD5 Summary',1,0,0,'{md5_summary_fn},{md5_summary_md5_fn}',1,1),
-  (4,'OVDM_Config','OpenVDM Configuration',1,0,0,'{cruise_config_fn}',1,1);
+  (2,'MD5Summary','MD5 Summary',1,0,0,'{md5_summary_fn},{md5_summary_md5_fn}',1,1),
+  (3,'OVDM_Config','OpenVDM Configuration',1,0,0,'{cruise_config_fn}',1,1);
 
 /*!40000 ALTER TABLE `OVDM_ShipToShoreTransfers` ENABLE KEYS */;
 UNLOCK TABLES;
@@ -338,7 +344,9 @@ VALUES
   (8,'setupNewLowering','Setup New {lowering_name}',1,2,1,0),
   (9,'finalizeCurrentLowering','Finalize Current {lowering_name}',1,2,1,0),
   (10,'rebuildLoweringDirectory','Rebuild {lowering_name} Directory',1,2,1,0),
-  (11,'exportLoweringConfig','Re-export the {lowering_name} Configuration',1,2,1,0);
+  (11,'exportLoweringConfig','Re-export the {lowering_name} Configuration',1,2,1,0),
+  (12,'rebuildCruiseReadme','Rebuild the {cruise_name} README',0,2,1,0),
+  (13,'rebuildLoweringReadme','Rebuild the {lowering_name} README',1,2,1,0);
 
 /*!40000 ALTER TABLE `OVDM_Tasks` ENABLE KEYS */;
 UNLOCK TABLES;

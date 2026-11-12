@@ -164,7 +164,7 @@ def check_darwin(cfg):
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         return any(line.strip() == 'Darwin' for line in proc.stdout.splitlines())
     except (subprocess.SubprocessError, OSError) as exc:
-        logging.error("SSH command to check for Dawin (MacOS) failed: %s", str(exc))
+        logging.error("SSH command to check for Darwin (macOS) failed: %s", str(exc))
         return False
 
 
@@ -822,10 +822,11 @@ def build_rclone_config_for_ssh(cfg, rclone_config):
                 f"~/.ssh/{', '.join(DEFAULT_SSH_IDENTITIES)} exists")
         out[rclone_remote]["key_file"] = identity_file
 
-    # Print for debugging
+    # Print for debugging; the obscured password can be revealed with
+    # "rclone reveal", so it's masked (#430)
     logging.debug(f"[{rclone_remote}]")
     for k, v in out[rclone_remote].items():
-        logging.debug(f"{k} = {v}")
+        logging.debug(f"{k} = {'****' if k == 'pass' else v}")
 
     # Write config, overwriting existing file
     with open(rclone_config, "w") as f:
@@ -1077,7 +1078,7 @@ def _rfc3339_to_epoch(value: str) -> float:
 
 
 def list_ftp_source(rclone_config: str, remote: str, source_dir: str,
-                    exclude_patterns: Optional[list] = None) -> tuple:
+                    exclude_patterns: Optional[list] = None, with_dirs: bool = False) -> tuple:
     """List every file under an FTP source directory with one ``rclone lsjson -R``.
 
     Listing through the rclone mount would ``stat`` each file over FTP, and
@@ -1092,14 +1093,18 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str,
         source_dir: Directory on the FTP server to list, e.g. ``/data``.
         exclude_patterns: rclone ``--exclude`` patterns; excluded folders
             aren't listed (#265).
+        with_dirs: Also list the directories, with ``None`` as their size,
+            for a transfer that creates empty directories (#659).
 
     Returns:
         tuple[bool, list | str]: ``(True, files)`` with ``(path, size, mtime)``
         tuples (*path* relative to *source_dir*, *mtime* in seconds since the
         epoch), or ``(False, detail)`` with rclone's error.
     """
-    cmd = ['rclone', 'lsjson', '-R', '--files-only', '--no-mimetype', '--config', rclone_config,
+    cmd = ['rclone', 'lsjson', '-R', '--no-mimetype', '--config', rclone_config,
            f"{remote}:{source_dir}", '--contimeout', '15s', '--timeout', '30s']
+    if not with_dirs:
+        cmd.insert(3, '--files-only')
     cmd += [f'--exclude={pattern}' for pattern in exclude_patterns or []]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -1109,7 +1114,8 @@ def list_ftp_source(rclone_config: str, remote: str, source_dir: str,
         return False, _ftp_rclone_error(exc.stderr)
 
     try:
-        return True, [(entry['Path'], int(entry['Size']), _rfc3339_to_epoch(entry['ModTime']))
+        return True, [(entry['Path'], None if entry.get('IsDir') else int(entry['Size']),
+                       _rfc3339_to_epoch(entry['ModTime']))
                       for entry in json.loads(proc.stdout)]
     except (ValueError, KeyError, TypeError) as exc:
         return False, f"Unreadable rclone lsjson output: {exc}"
@@ -1863,7 +1869,8 @@ def test_cst_source(cst_cfg, source_dir):
 
             mnt_success, mnt_detail = mount_smb_share(cst_cfg, mntpoint, smb_version)
             if not mnt_success:
-                reason = f"Could not connect to SMB server: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
+                # The server answered: it's the share that failed (#520)
+                reason = f"Could not connect to SMB share: {cst_cfg['smbServer']} as {cst_cfg['smbUser']}"
                 if mnt_detail:
                     reason += f" — {mnt_detail}"
                 results.extend([

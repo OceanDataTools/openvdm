@@ -27,6 +27,7 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
         $cruise_meta['cruiseName'] = $_warehouseModel->getCruiseName();
         $cruise_meta['cruisePI'] = $_warehouseModel->getCruisePI();
         $cruise_meta['cruiseLocation'] = $_warehouseModel->getCruiseLocation();
+        $cruise_meta['cruiseDescription'] = $_warehouseModel->getCruiseDescription();
         $cruise_meta['cruiseStartDate'] = $_warehouseModel->getCruiseStartDate();
         $cruise_meta['cruiseEndDate'] = $_warehouseModel->getCruiseEndDate();
         $cruise_meta['cruiseStartPort'] = $_warehouseModel->getCruiseStartPort();
@@ -36,6 +37,9 @@ foreach($data['requiredCruiseDataTransfers'] as $row){
             <div class="panel-heading"><?php echo CRUISE_NAME; ?> Information</div>
             <div class="panel-body">
                 <strong>Name:</strong> <?php echo $cruise_meta['cruiseName']; ?><br/>
+<?php if ($cruise_meta['cruiseDescription'] !== '') { ?>
+                <strong>Description:</strong> <?php echo nl2br(htmlspecialchars($cruise_meta['cruiseDescription'])); ?><br/>
+<?php } ?>
                 <strong>Chief Scientist:</strong> <?php echo $cruise_meta['cruisePI']; ?><br/>
                 <strong>Location:</strong> <?php echo $cruise_meta['cruiseLocation']; ?><br/>
                 <strong>Dates:</strong> <?php echo "{$cruise_meta['cruiseStartDate']} - {$cruise_meta['cruiseEndDate']}"; ?><br/>

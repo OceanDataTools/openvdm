@@ -23,23 +23,27 @@ The tracklines go to an OpenVDM extra directory: ``Tracklines``, or the one
 named with ``-e``. They're given to OpenVDM's warehouse user (the installer's
 OpenVDM user) and added to the cruise's MD5 summary. ``-o OUTPUTDIR`` writes
 them to a folder instead, owned by whoever runs the script and not added to
-the MD5 summary; ``-e`` and ``-o`` can't be used together. ``-u USERNAME``
-gives ``-o`` output to that user.
+the MD5 summary; ``-e`` and ``-o`` can't be used together.
 
-The 2.16.0 options ``--no_combine``, ``--kml_only``, ``--geojson_only``,
-``--config_file`` and ``-u/--username`` still work, but print a warning: they
-are deprecated and will be removed in OpenVDM 2.17. Use ``--no-combine``,
-``--kml-only``, ``--geojson-only`` and ``--position-sources``; 2.17 has no
-``-u`` (``-o`` output keeps whoever wrote it).
+It also sets the current cruise's bounding box in OpenVDM (``cruiseExtent``,
+read by QA tools) from one position source's combined track: the one marked
+``extent: true`` in the position sources, else the first. The whole track is used
+on every run, so the extent is recomputed, not merged with the last one. It's
+only set when the cruise is OpenVDM's current cruise, and not with
+``--no-set-extent``. If nav-qa-processing's OpenVDM hook sets the extent from
+its quality-checked fixes, add ``--no-set-extent`` to this script's hook so the
+quick-look extent doesn't overwrite it.
 
-The shared trackline code is in ``server/lib/tracks.py``; this script adds
-the cruise's ID, manifest location and default position sources.
+The shared trackline code, including picking the extent's position source
+and computing the extent, is in ``server/lib/tracks.py``; this script adds the
+cruise's ID, manifest location and default position sources, and stores the
+cruise extent.
 
 Usage::
 
     build_cruise_tracks.py [-h] [-v ...] [-n] [-k | -g] [-c CRUISEID]
-                           [-e EXTRA_DIRECTORY | -o OUTPUTDIR] [-u USERNAME]
-                           [--position-sources FILE]
+                           [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
+                           [--position-sources FILE] [--no-set-extent]
                            collectionSystem
 """
 
@@ -47,17 +51,15 @@ import argparse
 import logging
 import os
 import sys
+
 from os.path import dirname, realpath
-
-import requests
-
 sys.path.append(dirname(dirname(realpath(__file__))))
 
 from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
 from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-position
-    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, get_position_sources, load_manifest,
-    process_position_source, queue_md5_update, resolve_extra_directory, resolve_manifest_path,
-    setup_logging,
+    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, extent_position_source, get_position_sources,
+    load_manifest, process_position_source, queue_md5_update, resolve_extra_directory,
+    resolve_manifest_path, setup_logging, track_extent,
 )
 
 # ----------------------------------------------------------------------
@@ -66,7 +68,8 @@ from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-posi
 
 # Position sources used when no --position-sources is given; edit to match this ship.
 # They apply to the collection system the hook names; add
-# "CollectionSystem: <name>" to tie them to one.
+# "CollectionSystem: <name>" to tie them to one. Add "extent: true" to the
+# source the cruise's bounding box should come from (default: the first).
 DEFAULT_POSITION_SOURCES_YAML = """
 PositionSources:
   - device: POSMV
@@ -74,71 +77,41 @@ PositionSources:
 """
 
 # ----------------------------------------------------------------------
-# Deprecated 2.16.0 options
+# Cruise extent
 # ----------------------------------------------------------------------
 
-# Title of the OpenVDM message about deprecated options in this script's hook
-DEPRECATION_MESSAGE_TITLE = "build_cruise_tracks.py uses deprecated options"
+def update_cruise_extent(openvdm, position_source, combined, manifest, cruise_base_dir, cruise_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Set the current cruise's bounding box in OpenVDM from a position source's track.
 
-
-class DeprecatedOption(argparse.Action):
-    """An option's 2.16.0 name, which still works but warns that 2.17 removes it.
-
-    For a flag (``nargs=0``) the destination is set to ``True``; otherwise to
-    the option's value. The warning is printed on stderr and added to the
-    namespace's ``deprecated_options`` list, for
-    :func:`report_deprecated_options`.
-    """
-
-    def __init__(self, option_strings, dest, instead, **kwargs):
-        """Create the action.
-
-        Args:
-            option_strings: The deprecated option's names.
-            dest: The attribute it sets, shared with its replacement.
-            instead: The end of the warning, after "removed in OpenVDM
-                2.17;", e.g. ``"use --no-combine"``.
-            **kwargs: Other :class:`argparse.Action` arguments. Unless given,
-                the option is left out of ``--help`` and sets no default (its
-                replacement's applies).
-        """
-        kwargs.setdefault("help", argparse.SUPPRESS)
-        kwargs.setdefault("default", argparse.SUPPRESS)
-        super().__init__(option_strings, dest, **kwargs)
-        self.instead = instead
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        """Warn on stderr, record the warning and set the destination."""
-        warning = f"{option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}"
-        print(f"Warning: {warning}", file=sys.stderr)
-        namespace.deprecated_options.append(warning)
-        setattr(namespace, self.dest, True if self.nargs == 0 else values)
-
-
-def report_deprecated_options(openvdm, warnings):
-    """Post the deprecation warnings as an OpenVDM message.
-
-    A hook's warnings on stderr aren't shown in OpenVDM when it succeeds, so
-    they're posted as a message too. Nothing is posted if an unread message
-    with the same title is among OpenVDM's 10 most recent unread messages, so
-    a hook that runs after every data dashboard update doesn't fill the list.
-    A failure to check or post is logged and otherwise ignored.
+    Nothing is set if *cruise_id* isn't OpenVDM's current cruise (e.g. with
+    ``-c`` for an old cruise), or if the source has no positions yet.
 
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
-        warnings: The warnings (from :class:`DeprecatedOption`).
+        position_source: The position source (from
+            :func:`~server.lib.tracks.extent_position_source`).
+        combined: Its combined trackline from
+            :func:`~server.lib.tracks.process_position_source`, or ``None`` to
+            combine its dashboard files here (``--no-combine``).
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        cruise_id: The cruise being processed.
+
+    Raises:
+        Exception: If OpenVDM refuses the extent or can't be reached.
     """
-    if not warnings:
+
+    if cruise_id != openvdm.get_cruise_id():
+        logging.info("%s isn't the current cruise; not setting its extent", cruise_id)
         return
-    try:
-        response = requests.get(f"{openvdm.config['siteRoot']}api/messages/getRecentMessages", timeout=5)
-        response.raise_for_status()
-        if any(msg.get("messageTitle") == DEPRECATION_MESSAGE_TITLE for msg in response.json()):
-            return
-        openvdm.send_msg(DEPRECATION_MESSAGE_TITLE,
-                         "\n".join(warnings) + "\nUpdate this script's hook in openvdm.yaml before upgrading.")
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        logging.warning("Unable to post the deprecation warning to OpenVDM: %s", err)
+
+    extent = track_extent(position_source, combined, manifest, cruise_base_dir, cruise_id)
+    if extent is None:
+        logging.warning("No positions from %s yet; the cruise extent isn't set", position_source["device"])
+        return
+
+    logging.info("Setting the cruise extent from %s: %s", position_source["device"], extent)
+    openvdm.set_cruise_extent(extent)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
@@ -150,12 +123,12 @@ def resolve_cruise_and_dirs(openvdm, args):
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
         args: Parsed ``argparse.Namespace`` containing ``cruiseID``,
-            ``collectionSystem``, ``outputDir``, ``extraDirectory`` and
-            ``username`` attributes.
+            ``collectionSystem``, ``outputDir`` and ``extraDirectory``
+            attributes.
 
     Returns:
         A 4-tuple of ``(cruise_id, cruise_base_dir, trackline_dir, output_user)``;
-        for ``-o`` output *output_user* is ``-u``'s user, or ``None``.
+        *output_user* is ``None`` for ``-o`` output.
 
     Raises:
         RuntimeError: If the cruise ID cannot be determined, the collection
@@ -183,8 +156,8 @@ def resolve_cruise_and_dirs(openvdm, args):
     )
 
     # Files in an extra directory belong to OpenVDM's warehouse user; -o
-    # output keeps whoever wrote it, unless -u is given
-    output_user = args.username if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
+    # output keeps whoever wrote it
+    output_user = None if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
 
     return cruise_id, cruise_base_dir, trackline_dir, output_user
 
@@ -196,36 +169,25 @@ def main():  # pylint: disable=too-many-locals
         description="build cruise tracklines post-dashboard processing"
     )
     parser.add_argument("-v", "--verbosity", default=0, action="count")
-    parser.add_argument("-n", "--no-combine", dest="no_combine", action="store_true")
-    parser.add_argument("-k", "--kml-only", dest="kml_only", action="store_true")
-    parser.add_argument("-g", "--geojson-only", dest="geojson_only", action="store_true")
+    parser.add_argument("-n", "--no-combine", action="store_true")
+    parser.add_argument("-k", "--kml-only", action="store_true")
+    parser.add_argument("-g", "--geojson-only", action="store_true")
     parser.add_argument("-c", dest="cruiseID")
     add_output_arguments(parser)
     parser.add_argument("--position-sources", dest="position_sources_file")
-
-    # 2.16.0 names, removed in 2.17
-    for old, new, dest in (("--no_combine", "--no-combine", "no_combine"),
-                           ("--kml_only", "--kml-only", "kml_only"),
-                           ("--geojson_only", "--geojson-only", "geojson_only")):
-        parser.add_argument(old, dest=dest, action=DeprecatedOption, nargs=0, instead=f"use {new}")
-    parser.add_argument("--config_file", dest="position_sources_file", action=DeprecatedOption,
-                        instead="use --position-sources")
-    parser.add_argument("-u", "--username", action=DeprecatedOption, default=None,
-                        instead="-o output will keep whoever wrote it",
-                        help="owner of the files written with -o (deprecated, removed in 2.17)")
+    parser.add_argument("--no-set-extent", action="store_true",
+                        help="don't set the cruise's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
-
-    parser.set_defaults(deprecated_options=[])
 
     args = parser.parse_args()
     setup_logging(args.verbosity)
 
     openvdm = OpenVDM()
-    report_deprecated_options(openvdm, args.deprecated_options)
 
     try:
         cruise_id, cruise_base_dir, trackline_dir, output_user = resolve_cruise_and_dirs(openvdm, args)
         position_sources = get_position_sources(args, DEFAULT_POSITION_SOURCES_YAML)
+        extent_source = extent_position_source(position_sources)
 
         manifest_path = resolve_manifest_path(openvdm, cruise_base_dir, cruise_id)
         manifest = load_manifest(manifest_path)
@@ -235,17 +197,30 @@ def main():  # pylint: disable=too-many-locals
 
     logging.info("Using manifest: %s", manifest_path)
 
+    extent_track = None
     written = []
     for position_source in position_sources:
-        process_position_source(position_source, manifest, cruise_base_dir, cruise_id,
-                                trackline_dir, args, output_user, written)
+        combined = process_position_source(position_source, manifest, cruise_base_dir, cruise_id,
+                                           trackline_dir, args, output_user, written)
+        if position_source is extent_source:
+            extent_track = combined
+
+    failures = []
+    if not args.no_set_extent:
+        try:
+            update_cruise_extent(openvdm, extent_source, extent_track, manifest, cruise_base_dir, cruise_id)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            failures.append(f"Unable to set the cruise extent: {err}")
 
     # Files in an extra directory are part of the cruise; -o folders aren't
     if written and not args.outputDir:
         message = queue_md5_update(openvdm, written, cruise_id)
         if message:
-            print(message, file=sys.stderr)
-            sys.exit(1)
+            failures.append(message)
+
+    if failures:
+        print("\n".join(failures), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
