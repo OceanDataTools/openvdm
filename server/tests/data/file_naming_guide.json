@@ -1,0 +1,27 @@
+{
+  "_comment": "The File Naming Guide's explanations, checked from both sides (#451): www/tests/Helpers/FileNamingGuideTest.php checks the guide gives each pattern's example and warning; server/tests/test_file_naming_guide.py checks run_collection_system_transfer.py's build_filters() and classify_file() accept each example, by the path its transfer type is matched by, and that a pattern the guide says never matches doesn't. Types: 1 local, 2 rsync, 3 SMB, 4 SSH, 5 FTP.",
+  "context": {"cruiseID": "RR2601", "loweringID": "DIVE07", "now": 1792758896},
+  "patterns": [
+    {"pattern": "*/{cruiseID}_{YYYY}{mm}{DD}.raw", "type": 1, "example": "RR2601_20261023.raw", "never_matches": false},
+    {"pattern": "*{cruiseID}_SCS.txt", "type": 1, "example": "RR2601_SCS.txt", "never_matches": false},
+    {"pattern": "/data/scs/{cruiseID}/nav.txt", "type": 1, "example": "data/scs/RR2601/nav.txt", "never_matches": false},
+    {"pattern": "nav.txt", "type": 1, "example": "nav.txt", "never_matches": true},
+    {"pattern": "*{cruiseID}.csv", "type": 5, "example": "RR2601.csv", "never_matches": false},
+    {"pattern": "data.raw", "type": 5, "example": "data.raw", "never_matches": true},
+    {"pattern": "*/EM124_{YY}{mm}{DD}_{HH}{MM}{SS}.all", "type": 3, "example": "EM124_261023_123456.all", "never_matches": false},
+    {"pattern": "EM124.all", "type": 3, "example": "EM124.all", "never_matches": true},
+    {"pattern": "nav/{YY}{mm}{DD}_{HH}{MM}{SS}.log", "type": 4, "example": "nav/261023_123456.log", "never_matches": false},
+    {"pattern": "*{cruiseID}_{loweringID}.dat", "type": 4, "example": "RR2601_DIVE07.dat", "never_matches": false},
+    {"pattern": "/abs/path.log", "type": 4, "example": "abs/path.log", "never_matches": true},
+    {"pattern": "raw/{cruiseID}.dat", "type": 2, "example": "raw/RR2601.dat", "never_matches": false},
+    {"pattern": "*.raw", "type": 2, "example": "", "never_matches": false},
+    {"pattern": "*[0-9][0-9].log", "type": 2, "example": "", "never_matches": false},
+    {"pattern": "/data/raw.log", "type": 2, "example": "data/raw.log", "never_matches": true}
+  ],
+  "rules": {
+    "case_sensitive": {"pattern": "*.raw", "name": "FILE.RAW"},
+    "star_crosses_folders": {"pattern": "*.raw", "name": "sub/folder/a.raw"},
+    "always_skipped": [".DS_Store", "._ping.raw", "Thumbs.db", "desktop.ini", "~$report.docx", ".~lock.report.odt#",
+                       "lost+found/a.raw", "$RECYCLE.BIN/a.raw", ".Trashes/a.raw", ".snapshot/a.raw"]
+  }
+}

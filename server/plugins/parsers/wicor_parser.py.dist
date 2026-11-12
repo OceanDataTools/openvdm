@@ -247,7 +247,7 @@ class WICORParser(OpenVDMCSVParser):
         invalid_counts = {}
 
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='WICOR'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='WICOR'):
                 try:
                     if not _checksum_ok(remainder.strip()):
                         raise ValueError("bad checksum")
@@ -330,8 +330,10 @@ class WICORParser(OpenVDMCSVParser):
         # -------------------------
         # Visualization
         # -------------------------
-        df = self.resample_data(df[columns], angle_cols=[col for col in columns if _base_tag(col) in DIRECTION_FIELDS])
-        df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns}).set_index('date_time')
+        angle_cols = [col for col in columns if _base_tag(col) in DIRECTION_FIELDS]
+        df = self.resample_data(df[columns], angle_cols=angle_cols)
+        df = self.round_data(df, {col: FIELDS[_base_tag(col)][2] for col in columns},
+                             angle_cols=angle_cols).set_index('date_time')
         for col in columns:
             series = df[col].dropna()
             if series.empty:  # never valid in this file; its Validity stat says so

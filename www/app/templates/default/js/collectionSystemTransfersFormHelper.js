@@ -76,32 +76,6 @@ $(function () {
         return val.trim();
     }
 
-    function normalizeSourceDir(val) {
-        val = val.trim();
-        // Replace backslashes with forward slashes
-        val = val.replace(/\\/g, '/');
-        // Strip Windows drive letter (e.g. C:/ → /)
-        val = val.replace(/^[A-Za-z]:/, '');
-        // Ensure leading slash
-        if (val.length > 0 && !val.startsWith('/')) {
-            val = '/' + val;
-        }
-        // Strip trailing slash unless the entire value is just "/"
-        if (val.length > 1) {
-            val = val.replace(/\/+$/, '');
-        }
-        return val;
-    }
-
-    function normalizeDestDir(val) {
-        val = val.trim();
-        // Replace backslashes with forward slashes
-        val = val.replace(/\\/g, '/');
-        // Strip leading and trailing slashes (dest dir is relative within cruise dir)
-        val = val.replace(/^\/+/, '').replace(/\/+$/, '');
-        return val;
-    }
-
     // ---------------------------------------------------------------------------
     // Apply normalization based on the currently selected transfer type
     // ---------------------------------------------------------------------------
@@ -126,8 +100,8 @@ $(function () {
             break;
         }
 
-        $('input[name=sourceDir]').val(normalizeSourceDir($('input[name=sourceDir]').val()));
-        $('input[name=destDir]').val(normalizeDestDir($('input[name=destDir]').val()));
+        $('input[name=sourceDir]').val(normalizeAbsolutePath($('input[name=sourceDir]').val()));
+        $('input[name=destDir]').val(normalizeRelativePath($('input[name=destDir]').val()));
     }
 
     // ---------------------------------------------------------------------------
@@ -191,6 +165,28 @@ $(function () {
     })
 
     // ---------------------------------------------------------------------------
+    // Description template (#449): the "Use template" button fills an empty
+    // Description with it, and is only enabled while the Description is empty
+    // ---------------------------------------------------------------------------
+
+    function setDescriptionTemplateButton() {
+        $('.use-description-template').prop('disabled', $('textarea[name=description]').val().trim() !== '');
+    }
+
+    $('.use-description-template').on('click', function () {
+        var description = $('textarea[name=description]');
+        if (description.val().trim() === '') {
+            description.val($(this).attr('data-template')).trigger('focus');
+            setDescriptionTemplateButton();
+        }
+    });
+
+    $('textarea[name=description]').on('input', setDescriptionTemplateButton);
+    if ($('textarea[name=description]').length) {
+        setDescriptionTemplateButton();
+    }
+
+    // ---------------------------------------------------------------------------
     // Normalize on blur (immediate feedback) and on submit (safety net)
     // ---------------------------------------------------------------------------
 
@@ -231,11 +227,11 @@ $(function () {
     });
 
     $('input[name=sourceDir]').on('blur', function () {
-        $(this).val(normalizeSourceDir($(this).val()));
+        $(this).val(normalizeAbsolutePath($(this).val()));
     });
 
     $('input[name=destDir]').on('blur', function () {
-        $(this).val(normalizeDestDir($(this).val()));
+        $(this).val(normalizeRelativePath($(this).val()));
     });
 
     $('form').on('keydown', 'input', function (e) {

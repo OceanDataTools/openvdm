@@ -18,7 +18,8 @@ import requests
 try:
     from yaml import load, YAMLError, FullLoader
 except ModuleNotFoundError:
-    pass
+    class YAMLError(Exception):
+        """Stands in for PyYAML's, so read_config() reports PyYAML missing (#503)."""
 
 # OpenVDM server config file (server/etc/openvdm.yaml).
 DEFAULT_CONFIG_FILE = join(dirname(dirname(dirname(realpath(__file__)))), 'server/etc/openvdm.yaml')
@@ -28,6 +29,29 @@ TIMEOUT = 5
 
 # Gearman task that adds files to the cruise's MD5 summary (server/workers/md5_summary.py).
 UPDATE_MD5_SUMMARY_TASK = 'updateMD5Summary'
+
+# openvdm.yaml.dist's workerApiKey: public, so the API never accepts it (#605).
+WORKER_API_KEY_PLACEHOLDER = 'change-me-to-a-strong-random-value'
+
+# What cruises and lowerings are called when the web app doesn't say (#684).
+DEFAULT_TERMS = {'cruise': 'Cruise', 'cruises': 'Cruises', 'lowering': 'Lowering', 'lowerings': 'Lowerings'}
+
+
+def _settings_block(block) -> dict:
+    """Return an ``openvdm.yaml`` settings block as strings, unset fields left out.
+
+    Used for the ``vessel`` and ``vehicle`` blocks. Empty values, and
+    sub-blocks with nothing set, are left out; ``{}`` if the block is
+    missing or isn't a mapping.
+    """
+
+    def prune(value):
+        if isinstance(value, dict):
+            pruned = {key: prune(item) for key, item in value.items()}
+            return {key: item for key, item in pruned.items() if item not in ('', {})}
+        return '' if value is None else str(value).strip()
+
+    return prune(block) if isinstance(block, dict) else {}
 
 class OpenVDM():
     """Python wrapper around the OpenVDM REST API and YAML configuration file.
@@ -40,6 +64,9 @@ class OpenVDM():
         config: Parsed contents of the OpenVDM YAML configuration file.
     """
 
+    # Whether the placeholder worker key has been warned about (#605)
+    _warned_placeholder_key = False
+
     def __init__(self, config_file: str = DEFAULT_CONFIG_FILE) -> None:
         """Initialise the wrapper by loading *config_file*.
 
@@ -49,7 +76,9 @@ class OpenVDM():
                 repository root.
 
         Raises:
+            FileNotFoundError: If the configuration file doesn't exist.
             IOError: If the configuration file cannot be opened.
+            ValueError: If the file is empty or isn't a mapping of settings.
             yaml.YAMLError: If the file content is not valid YAML.
             ImportError: If PyYAML is not installed.
         """
@@ -67,7 +96,11 @@ class OpenVDM():
             Parsed configuration as a nested dict.
 
         Raises:
+            FileNotFoundError: If the file doesn't exist; the message says
+                to copy its ``.dist`` when there is one (#503).
             IOError: If the file cannot be opened.
+            ValueError: If the file is empty or isn't a mapping of settings
+                (#503).
             yaml.YAMLError: If the file content is not valid YAML.
             ImportError: If PyYAML is not installed.
         """
@@ -83,9 +116,6 @@ class OpenVDM():
                 raise ImportError('No YAML module available. Please ensure that '
                                   'PyYAML or equivalent is installed (e.g. via '
                                   '"pip3 install PyYAML"') from name_error
-            except YAMLError as exc:
-                logging.error("Unable to parse configuration file: %s", source)
-                raise exc
             except Exception as exc: # handle other exceptions such as attribute errors
                 raise exc
 
@@ -93,12 +123,28 @@ class OpenVDM():
 
         try:
             with open(filename, mode='r', encoding="utf-8") as file:
-                return _parse_yaml(file)
+                config = _parse_yaml(file)
+        except YAMLError as exc:
+            logging.error("Unable to parse configuration file %s: %s", filename, exc)
+            raise exc
+        except FileNotFoundError as exc:
+            reason = f"OpenVDM configuration file not found: {filename}"
+            if os.path.isfile(filename + '.dist'):
+                reason += f". Copy {os.path.basename(filename)}.dist to it, or re-run the installer."
+            logging.error(reason)
+            raise FileNotFoundError(reason) from exc
         except IOError as exc:
             logging.error("Unable to open configuration file: %s", filename)
             raise exc
-        except Exception as exc: # handle other exceptions such as attribute errors
-            raise exc
+
+        # An empty file is parsed as None, which would fail later with a
+        # TypeError far from the cause
+        if not isinstance(config, dict):
+            problem = "is empty" if config is None else "isn't a mapping of settings"
+            reason = f"OpenVDM configuration file {problem}: {filename}"
+            logging.error(reason)
+            raise ValueError(reason)
+        return config
 
 
     def _worker_headers(self) -> dict:
@@ -106,26 +152,37 @@ class OpenVDM():
 
         Includes the ``X-Worker-Token`` header when ``workerApiKey`` is present
         in the YAML config, allowing the PHP API to return credential fields that
-        are otherwise stripped from public responses.
+        are otherwise stripped from public responses. The ``openvdm.yaml.dist``
+        placeholder isn't sent, since the API refuses it; a warning says to
+        set a real key, once per process (#605).
 
         Returns:
             A dict suitable for passing as *headers* to :mod:`requests` calls.
         """
         token = self.config.get('workerApiKey', '')
+        if token == WORKER_API_KEY_PLACEHOLDER:
+            if not OpenVDM._warned_placeholder_key:
+                logging.warning("workerApiKey in openvdm.yaml is still the placeholder, which the OpenVDM API "
+                                "refuses: set it and WORKER_API_KEY in www/app/Core/Config.php to the same "
+                                "random value (e.g. from openssl rand -hex 32)")
+                OpenVDM._warned_placeholder_key = True
+            return {}
         if token:
             return {'X-Worker-Token': token}
         return {}
 
 
     def clear_gearman_jobs_from_db(self):
-        """
-        Clear the current Gearman job request queue.
+        """Clear the current Gearman job request queue.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/gearman/clearAllJobsFromDB"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear Gearman Jobs from OpenVDM API")
             raise exc
@@ -180,6 +237,36 @@ class OpenVDM():
         except Exception as exc:
             logging.error("Unable to retrieve 'showLoweringComponents' flag from OpenVDM API")
             raise exc
+
+
+    def get_terms(self) -> dict:
+        """Return what this install calls cruises and lowerings (#684).
+
+        ``CRUISE_NAME``, ``LOWERING_NAME`` and their plurals in the web app's
+        ``Config.php``, which the installer sets (e.g. Voyage, Dive).
+
+        Returns:
+            dict: ``cruise``, ``cruises``, ``lowering`` and ``lowerings``, e.g.
+            ``{'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'Dive',
+            'lowerings': 'Dives'}``. :data:`DEFAULT_TERMS`' value is used for
+            any the API leaves out.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or returns invalid
+                JSON.
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/getTerms"
+
+        try:
+            req = requests.get(url, timeout=TIMEOUT)
+            terms = json.loads(req.text)
+        except Exception as exc:
+            logging.error("Unable to retrieve the cruise and lowering names from OpenVDM API")
+            raise exc
+
+        terms = terms if isinstance(terms, dict) else {}
+        return {key: str(terms.get(key) or default) for key, default in DEFAULT_TERMS.items()}
 
 
     def get_cruise_config(self):
@@ -248,6 +335,38 @@ class OpenVDM():
         """
 
         return self.config['siteRoot']
+
+
+    def get_vessel_config(self) -> dict:
+        """Return the vessel settings (the ``vessel`` block of ``openvdm.yaml``).
+
+        Unset fields are left out: empty values, and sub-blocks with nothing
+        set. Values are strings, so an R2R ID such as ``3301`` keeps its
+        form.
+
+        Returns:
+            dict: e.g. ``{'name': 'Roger Revelle', 'operator': ..., 'email':
+            ..., 'r2r': {'vesselID': '33RR', 'operatorID': ..., 'schedulerID':
+            ...}}``; ``{}`` if nothing is set. ``r2r`` is only there for
+            vessels that submit data to R2R (#693).
+        """
+
+        return _settings_block(self.config.get('vessel'))
+
+
+    def get_vehicle_config(self) -> dict:
+        """Return the vehicle settings (the ``vehicle`` block of ``openvdm.yaml``).
+
+        The vehicle (ROV, HOV, AUV) whose dives are the lowerings (#674).
+        Unset fields are left out, as by :meth:`get_vessel_config`.
+
+        Returns:
+            dict: e.g. ``{'name': 'Jason', 'operator': 'Woods Hole
+            Oceanographic Institution', 'email': ...}``; ``{}`` if nothing is
+            set, as without a vehicle.
+        """
+
+        return _settings_block(self.config.get('vehicle'))
 
 
     def get_transfer_public_data(self):
@@ -818,7 +937,10 @@ class OpenVDM():
 
 
     def get_required_extra_directory(self, extra_directory_id):
-        """Return the required extra directory with the given ID from the OpenVDM API.
+        """Return the required extra directory with the given ID.
+
+        The API has no endpoint for one required extra directory, so it's
+        found in ``get_required_extra_directories()`` (#592).
 
         Args:
             extra_directory_id: The required extra directory's ID.
@@ -832,15 +954,8 @@ class OpenVDM():
                 JSON.
         """
 
-        url = f"{self.config['siteRoot']}api/extraDirectories/getRequiredExtraDirectory/{extra_directory_id}"
-
-        try:
-            req = requests.get(url, timeout=TIMEOUT)
-            return_obj = json.loads(req.text)
-            return next(iter(return_obj), None)
-        except Exception as exc:
-            logging.error("Unable to retrieve required extra directory: %s from OpenVDM API", extra_directory_id)
-            raise exc
+        return next((d for d in self.get_required_extra_directories()
+                     if str(d['extraDirectoryID']) == str(extra_directory_id)), None)
 
 
     def get_required_extra_directory_by_name(self, extra_directory_name):
@@ -924,7 +1039,11 @@ class OpenVDM():
 
 
     def get_ship_to_shore_transfer(self, ship_to_shore_transfer_id):
-        """Return the ship-to-shore transfer with the given ID from the OpenVDM API.
+        """Return the ship-to-shore transfer with the given ID, required or not.
+
+        The API has no endpoint for one ship-to-shore transfer, so it's found
+        in ``get_ship_to_shore_transfers()`` and
+        ``get_required_ship_to_shore_transfers()`` (#592).
 
         Args:
             ship_to_shore_transfer_id: The ship-to-shore transfer's ID.
@@ -938,15 +1057,8 @@ class OpenVDM():
                 JSON.
         """
 
-        url = f"{self.config['siteRoot']}api/shipToShoreTransfers/getShipToShoreTransfer/{ship_to_shore_transfer_id}"
-
-        try:
-            req = requests.get(url, timeout=TIMEOUT)
-            return_obj = json.loads(req.text)
-            return next(iter(return_obj), None)
-        except Exception as exc:
-            logging.error("Unable to retrieve ship-to-shore transfer: %s from OpenVDM API", ship_to_shore_transfer_id)
-            raise exc
+        return next((t for t in self.get_ship_to_shore_transfers() + self.get_required_ship_to_shore_transfers()
+                     if str(t['shipToShoreTransferID']) == str(ship_to_shore_transfer_id)), None)
 
 
     def get_ship_to_shore_transfers(self):
@@ -1379,14 +1491,14 @@ class OpenVDM():
             message_body: The message body.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/messages/newMessage"
 
         try:
             payload = {'messageTitle': message_title, 'messageBody':message_body}
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to send message: \"%s: %s\" with OpenVDM API", message_title, message_body)
             raise exc
@@ -1403,7 +1515,7 @@ class OpenVDM():
                 running, ``2`` idle, ``3`` error).
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         if job_status != 3:
@@ -1413,7 +1525,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear error status for collection system transfer: %s with OpenVDM API", collection_system_transfer_id)
             raise exc
@@ -1430,7 +1542,7 @@ class OpenVDM():
                 running, ``2`` idle, ``3`` error).
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         # Ignore request if transfer does not have a error status
@@ -1440,7 +1552,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to clear error status for cruise data transfer: %s with OpenVDM API", cruise_data_transfer_id)
             raise exc
@@ -1458,7 +1570,8 @@ class OpenVDM():
 
         task = self.get_task(task_id)
 
-        if task and task['status'] == '3':
+        # The API sends the status as a number; int() also takes a string (#593)
+        if task and int(task['status']) == 3:
             self.set_idle_task(task_id)
 
 
@@ -1473,7 +1586,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1485,7 +1598,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setErrorCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1505,7 +1618,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1518,7 +1631,7 @@ class OpenVDM():
 
         try:
             if set_status:
-                requests.get(url, timeout=TIMEOUT)
+                requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set test status of collection system transfer: %s to error with OpenVDM API", collection_system_transfer_id)
@@ -1536,7 +1649,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1548,7 +1661,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setErrorCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
@@ -1568,7 +1681,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1581,7 +1694,7 @@ class OpenVDM():
 
         try:
             if set_status:
-                requests.get(url, timeout=TIMEOUT)
+                requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set status of cruise data transfer: %s to error with OpenVDM API", cruise_data_transfer_id)
@@ -1599,7 +1712,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no task with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         task = self.get_task(task_id)
@@ -1611,7 +1724,7 @@ class OpenVDM():
         url = f"{self.config['siteRoot']}api/tasks/setErrorTask/{task_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
             self.send_msg(title, reason)
         except Exception as exc:
             logging.error("Unable to set error status of task: %s with OpenVDM API", task_id)
@@ -1625,13 +1738,13 @@ class OpenVDM():
             collection_system_transfer_id: The collection system transfer's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/collectionSystemTransfers/setIdleCollectionSystemTransfer/{collection_system_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set collection system transfer: %s to idle with OpenVDM API", collection_system_transfer_id)
             raise exc
@@ -1644,13 +1757,13 @@ class OpenVDM():
             cruise_data_transfer_id: The cruise data transfer's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/cruiseDataTransfers/setIdleCruiseDataTransfer/{cruise_data_transfer_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set cruise data transfer: %s to idle with OpenVDM API", cruise_data_transfer_id)
             raise exc
@@ -1663,13 +1776,13 @@ class OpenVDM():
             task_id: The task's ID.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/tasks/setIdleTask/{task_id}"
 
         try:
-            requests.get(url, timeout=TIMEOUT)
+            requests.get(url, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set task: %s to idle with OpenVDM API", task_id)
             raise exc
@@ -1685,7 +1798,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no collection system transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         collection_system_transfer = self.get_collection_system_transfer(collection_system_transfer_id)
@@ -1698,7 +1811,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
@@ -1744,7 +1857,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no cruise data transfer with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         cruise_data_transfer = self.get_cruise_data_transfer(cruise_data_transfer_id)
@@ -1757,7 +1870,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(msg, job_pid, job_handle)
@@ -1803,7 +1916,7 @@ class OpenVDM():
 
         Raises:
             ValueError: If there's no task with that ID.
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         task = self.get_task(task_id)
@@ -1815,7 +1928,7 @@ class OpenVDM():
         payload = {'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
 
             # Add to gearman job tracker
             self.track_gearman_job(task.get('longName', 'Unknown Task????'), job_pid, job_handle)
@@ -1833,14 +1946,14 @@ class OpenVDM():
             job_handle: The Gearman job handle.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/gearman/newJob/{job_handle}"
         payload = {'jobName': job_name, 'jobPid': job_pid}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to add new gearman task tracking with OpenVDM API, Task: %s", job_name)
             raise exc
@@ -1853,16 +1966,72 @@ class OpenVDM():
             size_in_bytes: Size of the cruise directory, in bytes.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/warehouse/setCruiseSize"
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set cruise size with OpenVDM API")
+            raise exc
+
+
+    def set_cruise_extent(self, extent):
+        """Record the current cruise's bounding box in OpenVDM (``cruiseExtent``).
+
+        The API only accepts it with the worker key (``workerApiKey``), since
+        the value ends up in QA reports.
+
+        Args:
+            extent: ``westernmost``, ``easternmost``, ``southernmost`` and
+                ``northernmost`` in decimal degrees (e.g. from
+                :func:`server.lib.geojson_utils.geojson_extent`), or ``None``
+                to clear it.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or refuses the
+                extent (e.g. a wrong worker key).
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/setCruiseExtent"
+        payload = {'extent': json.dumps(extent) if extent else ''}
+
+        try:
+            req = requests.post(url, data=payload, headers=self._worker_headers(), timeout=TIMEOUT)
+            req.raise_for_status()
+        except Exception as exc:
+            logging.error("Unable to set cruise extent with OpenVDM API")
+            raise exc
+
+
+    def set_lowering_extent(self, extent):
+        """Record the current lowering's bounding box in OpenVDM (``loweringExtent``).
+
+        The API only accepts it with the worker key (``workerApiKey``), as for
+        :meth:`set_cruise_extent`.
+
+        Args:
+            extent: ``westernmost``, ``easternmost``, ``southernmost`` and
+                ``northernmost`` in decimal degrees (e.g. from
+                :func:`server.lib.geojson_utils.geojson_extent`), or ``None``
+                to clear it.
+
+        Raises:
+            Exception: If the OpenVDM API can't be reached or refuses the
+                extent (e.g. a wrong worker key).
+        """
+
+        url = f"{self.config['siteRoot']}api/warehouse/setLoweringExtent"
+        payload = {'extent': json.dumps(extent) if extent else ''}
+
+        try:
+            req = requests.post(url, data=payload, headers=self._worker_headers(), timeout=TIMEOUT)
+            req.raise_for_status()
+        except Exception as exc:
+            logging.error("Unable to set lowering extent with OpenVDM API")
             raise exc
 
 
@@ -1873,14 +2042,14 @@ class OpenVDM():
             size_in_bytes: Size of the lowering directory, in bytes.
 
         Raises:
-            Exception: If the OpenVDM API can't be reached.
+            Exception: If the OpenVDM API can't be reached or answers with an error (#594).
         """
 
         url = f"{self.config['siteRoot']}api/warehouse/setLoweringSize"
         payload = {'bytes': size_in_bytes}
 
         try:
-            requests.post(url, data=payload, timeout=TIMEOUT)
+            requests.post(url, data=payload, timeout=TIMEOUT).raise_for_status()
         except Exception as exc:
             logging.error("Unable to set lowering size with OpenVDM API")
             raise exc

@@ -10,6 +10,7 @@
  */
 namespace Helpers;
 
+use Core\Logger;
 use PDO;
 use PDOException;
 

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Gearman worker that initializes and finalizes OpenVDM lowerings.
 
-Registers three Gearman tasks:
+Registers four Gearman tasks:
 
 - ``setupNewLowering`` — create the lowering directory tree, initialize the
   MD5 summary for the lowering, set directory permissions, and export the
-  lowering configuration.
+  lowering configuration and README.
 - ``finalizeCurrentLowering`` — run pre-finalize hooks, update the MD5
-  summary, apply directory permissions, export the lowering config, and run
-  post-finalize hooks.
+  summary, apply directory permissions, export the lowering config and
+  README, and run post-finalize hooks.
 - ``exportLoweringConfig`` — write the current lowering configuration as JSON
-  into the lowering directory.
+  into the lowering directory, and the lowering README.
+- ``rebuildLoweringReadme`` — rebuild the lowering README from its template.
 """
 
 import argparse
@@ -22,6 +23,7 @@ import sys
 import subprocess
 import traceback
 from os.path import dirname, realpath
+import jinja2
 import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
@@ -30,6 +32,9 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
+from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_lowering_readme_context, readme_filename,
+                               readme_settings, render_readme, write_readme)
+from server.lib.transfer_utils import redact_payload
 from server.lib.transfer_jobs import report_missed, run_transfer_jobs
 from server.lib.transfer_lock import CST
 
@@ -37,7 +42,8 @@ from server.lib.transfer_lock import CST
 TASK_NAMES = {
     'CREATE_LOWERING': 'setupNewLowering',
     'FINALIZE_LOWERING': 'finalizeCurrentLowering',
-    'EXPORT_LOWERING_CONFIG': 'exportLoweringConfig'
+    'EXPORT_LOWERING_CONFIG': 'exportLoweringConfig',
+    'REBUILD_LOWERING_README': 'rebuildLoweringReadme'
 }
 
 class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-many-instance-attributes
@@ -82,8 +88,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
     def export_lowering_config(self, finalize=False):
         """Write the current lowering configuration to the lowering config file.
 
-        When the file already exists, its ``loweringFinalizedOn`` value is
-        kept. Queues an MD5 summary update for the file.
+        Collection system transfer entries are reduced to their name, long
+        name, description and destination directory (no credentials), the
+        vehicle settings from ``openvdm.yaml`` are added as ``vehicle`` when
+        any are set, and ``loweringExtent`` is left out while it isn't set. When
+        the file already exists, its ``loweringFinalizedOn`` value is kept.
+        Queues an MD5 summary update for the file.
 
         Args:
             finalize: Mark the configuration as finalized (sets
@@ -106,10 +116,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             try:
                 with open(lowering_config_filepath, mode='r', encoding='utf-8') as f:
                     existing_data = json.load(f)
-                    lowering_config['loweringFinalizedOn'] = existing_data.get('loweringFinalizedOn')
-            except OSError as exc:
-                reason = f"Unable to read configuration file: {lowering_config_fn}"
-                logging.error("%s: %s", str(exc))
+                # Not JSON (e.g. truncated) fails the export rather than losing the finalized date (#548)
+                if not isinstance(existing_data, dict):
+                    raise ValueError("not a JSON object")
+                lowering_config['loweringFinalizedOn'] = existing_data.get('loweringFinalizedOn')
+            except (OSError, ValueError) as exc:
+                reason = f"Unable to read the existing configuration file {lowering_config_fn}: {exc}"
+                logging.error(reason)
                 return {'verdict': False, 'reason': reason}
 
         logging.debug(json.dumps(lowering_config))
@@ -117,12 +130,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         def _scrub_transfers(transfer_list):
             for transfer in transfer_list:
 
-                allowed_keys = ['name', 'longName', 'destDir']
+                allowed_keys = ['name', 'longName', 'description', 'destDir']
                 for key in list(transfer.keys()):
                     if key not in allowed_keys:
                         transfer.pop(key)
 
         _scrub_transfers(lowering_config.get('collectionSystemTransfersConfig', []))
+
+        # The vehicle that made the dive, from openvdm.yaml (#674), left out without one
+        vehicle = self.ovdm.get_vehicle_config()
+        if vehicle:
+            lowering_config['vehicle'] = vehicle
+
+        # The lowering's bounding box (#399), left out until build_lowering_tracks sets it
+        if not lowering_config.get('loweringExtent'):
+            lowering_config.pop('loweringExtent', None)
 
         results = output_json_data_to_file(lowering_config_filepath, lowering_config)
         if not results['verdict']:
@@ -134,6 +156,77 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         self.ovdm.update_md5_summary(updated=[lowering_config_relfilepath], cruise_id=self.cruise_id,
                                       background=False)
+
+        return {'verdict': True}
+
+
+    def build_lowering_readme(self):  # pylint: disable=too-many-locals,too-many-return-statements
+        """Write the lowering README from its template (#445).
+
+        Run after :meth:`export_lowering_config`: the lowering's details come
+        from the config file it wrote, so the README matches it. The settings
+        are the ``loweringReadme`` block of ``openvdm.yaml``
+        (:func:`server.lib.readme.readme_settings`). A file with the README's
+        name that OpenVDM didn't write is left alone. Queues an MD5 summary
+        update for the README.
+
+        Returns:
+            dict: ``{'verdict': True}``, with ``'skipped': True`` when the
+            README is turned off; or ``{'verdict': False, 'reason': ...}``.
+        """
+
+        try:
+            settings = readme_settings(self.ovdm.config, 'loweringReadme', DEFAULT_LOWERING_TEMPLATE)
+        except ValueError as exc:
+            return {'verdict': False, 'reason': str(exc)}
+
+        if not settings['enable']:
+            logging.info("The lowering README is turned off (loweringReadme in openvdm.yaml)")
+            return {'verdict': True, 'skipped': True}
+
+        try:
+            readme_fn = readme_filename(settings['filename'], self.cruise_id, self.lowering_id)
+        except ValueError as exc:
+            return {'verdict': False, 'reason': str(exc)}
+
+        lowering_config_filepath = os.path.join(self.cruise_dir, self.lowering_dir,
+                                                self.shipboard_data_warehouse_config['loweringConfigFn'])
+        try:
+            with open(lowering_config_filepath, 'r', encoding='utf-8') as f:
+                lowering_config = json.load(f)
+        except (OSError, ValueError) as exc:
+            return {'verdict': False, 'reason': f"Unable to read the lowering config file: {exc}"}
+        lowering_config['loweringID'] = self.lowering_id
+
+        try:
+            cruise_config = self.ovdm.get_cruise_config()
+            collection_systems = self.ovdm.get_collection_system_transfers()
+            extra_directories = self.ovdm.get_extra_directories()
+            terms = self.ovdm.get_terms()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            return {'verdict': False, 'reason': f"Unable to get the configuration from OpenVDM: {exc}"}
+
+        context = build_lowering_readme_context(
+            lowering_config, cruise_config, collection_systems, extra_directories,
+            self.ovdm.get_vessel_config(), readme_fn, terms=terms)
+
+        try:
+            text = render_readme(settings['template'], context)
+        except (jinja2.TemplateError, OSError) as exc:
+            line = f", line {exc.lineno}" if getattr(exc, 'lineno', None) else ''
+            return {'verdict': False, 'reason': f"Unable to build the README from {settings['template']}{line}: {exc}"}
+
+        readme_relpath = os.path.join(self.lowering_dir, readme_fn)
+        readme_path = os.path.join(self.cruise_dir, readme_relpath)
+        written, reason = write_readme(readme_path, text)
+        if not written:
+            return {'verdict': False, 'reason': reason}
+
+        results = set_owner_group_permissions(self.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], readme_path)
+        if not results['verdict']:
+            return {'verdict': False, 'reason': results['reason']}
+
+        self.ovdm.update_md5_summary(updated=[readme_relpath], cruise_id=self.cruise_id, background=False)
 
         return {'verdict': True}
 
@@ -157,15 +250,22 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(LOGGING_FORMAT))
 
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self.ovdm.get_task_by_name(current_job.task)
+
+        # Clear the last job's lowering, so a job that fails before reading its
+        # own doesn't pass that one to the hook tasks (#552)
+        self.cruise_id = self.lowering_id = None
+        self.lowering_start_date = self.lowering_end_date = None
+
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
             return self._fail_job(current_job, "Retrieve job data", reason)
-
-        self.task = self.ovdm.get_task_by_name(current_job.task)
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -285,7 +385,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         no status in OpenVDM.
 
         After a lowering is set up or finalized, submits the hook tasks
-        configured for that task in ``openvdm.yaml``.
+        configured for that task in ``openvdm.yaml``, unless the job has no
+        lowering ID.
 
         Args:
             current_job: The Gearman job.
@@ -306,40 +407,48 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 'loweringEndDate': self.lowering_end_date
             }
 
+            # Hook tasks need the lowering: skip them for a job without one, e.g.
+            # one whose payload couldn't be parsed (#552)
+            if not self.lowering_id:
+                logging.warning("No lowering ID, skipping post-hook tasks.")
+                hook_tasks = []
+            else:
+                hook_tasks = self.ovdm.get_tasks_for_hook(current_job.task)
+
             # Collect pre-finalize jobs
             post_hook_jobs = []
-            for task in self.ovdm.get_tasks_for_hook(current_job.task):
+            for task in hook_tasks:
                 logging.info("Adding post-hook task: %s", task)
                 post_hook_jobs.append({"task": task, "data": json.dumps(gm_data)})
 
+            # Without hook tasks, go on to complete the job (#547)
             if not post_hook_jobs:
                 logging.info("No post-hook tasks found, skipping.")
-                return super().on_job_execute(current_job)
+            else:
+                # Submit jobs to Gearman
+                gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
-            # Submit jobs to Gearman
-            gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
+                try:
+                    submitted_job_requests = gm_client.submit_multiple_jobs(
+                        post_hook_jobs,
+                        background=False,
+                        wait_until_complete=False,  # we'll handle completion below
+                    )
 
-            try:
-                submitted_job_requests = gm_client.submit_multiple_jobs(
-                    post_hook_jobs,
-                    background=False,
-                    wait_until_complete=False,  # we'll handle completion below
-                )
+                    # Wait until all jobs complete
+                    gm_client.wait_until_jobs_completed(submitted_job_requests)
 
-                # Wait until all jobs complete
-                gm_client.wait_until_jobs_completed(submitted_job_requests)
+                    # Log results
+                    for job in submitted_job_requests:
+                        if job.complete:
+                            logging.info("Task %s completed successfully", job.job.unique)
+                        elif job.timed_out:
+                            logging.error("Task %s timed out", job.job.unique)
+                        else:
+                            logging.error("Task %s failed: %s", job.job.unique, job.exception)
 
-                # Log results
-                for job in submitted_job_requests:
-                    if job.complete:
-                        logging.info("Task %s completed successfully", job.job.unique)
-                    elif job.timed_out:
-                        logging.error("Task %s timed out", job.job.unique)
-                    else:
-                        logging.error("Task %s failed: %s", job.job.unique, job.exception)
-
-            except Exception as e:
-                logging.exception("Error while submitting or running post-hook jobs: %s", e)
+                except Exception as e:
+                    logging.exception("Error while submitting or running post-hook jobs: %s", e)
 
         parts = results.get('parts', [])
         final_verdict = parts[-1] if parts else None
@@ -389,10 +498,38 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         }))
 
 
+def _add_readme_part(worker, job_results):
+    """Write the lowering README and add the result to *job_results*.
+
+    Nothing is added when the README is turned off. The README comes after
+    the config export, the last step these tasks report, so a failure here
+    is the task's outcome: its status and reason say what went wrong.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        job_results: The job's results; a ``Write lowering README`` part is
+            appended.
+    """
+
+    logging.info("Writing the lowering README")
+    output_results = worker.build_lowering_readme()
+
+    if output_results.get('skipped'):
+        return
+
+    if output_results['verdict']:
+        job_results['parts'].append({"partName": "Write lowering README", "result": "Pass"})
+        return
+
+    logging.error("Unable to write the lowering README: %s", output_results['reason'])
+    job_results['parts'].append({"partName": "Write lowering README", "result": "Fail", "reason": output_results['reason']})
+
+
 def task_setup_new_lowering(worker, current_job):
     """Gearman task: set up a new lowering.
 
-    Creates the lowering directory structure and exports the lowering config.
+    Creates the lowering directory structure, and exports the lowering config
+    and writes the lowering README.
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -436,6 +573,8 @@ def task_setup_new_lowering(worker, current_job):
 
     job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
+    _add_readme_part(worker, job_results)
+
     logging.info("Updating lowering size")
     worker.send_job_status(current_job, 9, 10)
 
@@ -453,10 +592,10 @@ def task_finalize_current_lowering(worker, current_job):
     """Gearman task: finalize the current lowering.
 
     Checks the lowering directory exists, runs the lowering's collection system
-    transfers one last time, and exports the finalized lowering config. A
-    transfer that another job is running gets its last run once that job
-    ends; one still running after an hour is reported in an OpenVDM message
-    and skipped (#480).
+    transfers one last time, exports the finalized lowering config, and writes
+    the lowering README. A transfer that another job is running gets its last
+    run once that job ends; one still running after an hour is reported in an
+    OpenVDM message and skipped (#480).
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -536,15 +675,18 @@ def task_finalize_current_lowering(worker, current_job):
 
     job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
 
+    _add_readme_part(worker, job_results)
+
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
 
 
 def task_export_lowering_config(worker, current_job):
-    """Gearman task: write the lowering config file.
+    """Gearman task: write the lowering config file and the lowering README.
 
     Exports the current lowering configuration to the lowering's config file
-    (``loweringConfigFn``) and queues an MD5 summary update for it.
+    (``loweringConfigFn``), writes the lowering README (#445), and queues MD5
+    summary updates for both.
 
     Args:
         worker: The worker, set up by ``on_job_execute()``.
@@ -567,6 +709,45 @@ def task_export_lowering_config(worker, current_job):
         return json.dumps(job_results)
 
     job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
+
+    _add_readme_part(worker, job_results)
+
+    worker.send_job_status(current_job, 10, 10)
+    return json.dumps(job_results)
+
+
+def task_rebuild_lowering_readme(worker, current_job):
+    """Gearman task: rebuild the lowering README from its template (#445).
+
+    For changes the README would otherwise only pick up at the next config
+    export, e.g. an edited template or a directory's new description. A
+    README that OpenVDM didn't write is still left alone. When the README is
+    turned off in ``openvdm.yaml``, the task fails and says so, since nothing
+    was rebuilt.
+
+    Args:
+        worker: The worker, set up by ``on_job_execute()``.
+        current_job: The Gearman job.
+
+    Returns:
+        str: JSON job results: ``parts`` (each with ``partName``, ``result``
+        and, on failure, ``reason``).
+    """
+
+    job_results = {'parts':[]}
+
+    logging.info("Rebuilding the lowering README")
+    worker.send_job_status(current_job, 1, 10)
+
+    output_results = worker.build_lowering_readme()
+
+    if output_results.get('skipped'):
+        job_results['parts'].append({"partName": "Write lowering README", "result": "Fail",
+                                     "reason": "The lowering README is turned off (loweringReadme in openvdm.yaml)"})
+    elif not output_results['verdict']:
+        job_results['parts'].append({"partName": "Write lowering README", "result": "Fail", "reason": output_results['reason']})
+    else:
+        job_results['parts'].append({"partName": "Write lowering README", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
@@ -637,6 +818,9 @@ if __name__ == "__main__":
 
     logging.info("\tTask: %s", TASK_NAMES['EXPORT_LOWERING_CONFIG'])
     new_worker.register_task(TASK_NAMES['EXPORT_LOWERING_CONFIG'], task_export_lowering_config)
+
+    logging.info("\tTask: %s", TASK_NAMES['REBUILD_LOWERING_README'])
+    new_worker.register_task(TASK_NAMES['REBUILD_LOWERING_README'], task_rebuild_lowering_readme)
 
     logging.info("Waiting for jobs...")
     new_worker.work()

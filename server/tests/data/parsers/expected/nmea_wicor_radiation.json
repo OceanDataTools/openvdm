@@ -1,0 +1,126 @@
+{
+  "visualizerData": [
+    {
+      "data": [
+        [
+          1790812800000,
+          2334.5
+        ],
+        [
+          1790812860000,
+          2334.5
+        ],
+        [
+          1790812920000,
+          2334.5
+        ],
+        [
+          1790812980000,
+          2334.5
+        ],
+        [
+          1790813100000,
+          2334.5
+        ]
+      ],
+      "unit": "uE/s/m^2",
+      "label": "Surface PAR"
+    }
+  ],
+  "qualityTests": [
+    {
+      "testName": "Rows",
+      "results": "Passed"
+    },
+    {
+      "testName": "DeltaT",
+      "results": "Passed"
+    },
+    {
+      "testName": "Short Wave Radiation",
+      "results": "Failed"
+    },
+    {
+      "testName": "Long Wave Radiation",
+      "results": "Failed"
+    },
+    {
+      "testName": "Surface PAR",
+      "results": "Passed"
+    }
+  ],
+  "stats": [
+    {
+      "statName": "Row Validity",
+      "statType": "rowValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        4
+      ]
+    },
+    {
+      "statName": "Temporal Bounds",
+      "statType": "timeBounds",
+      "statUnit": "seconds",
+      "statValue": [
+        "2026-10-01T00:00:00+00:00",
+        "2026-10-01T00:04:55+00:00"
+      ]
+    },
+    {
+      "statName": "DeltaT Bounds",
+      "statType": "bounds",
+      "statUnit": "seconds",
+      "statValue": [
+        5.0,
+        95.0
+      ]
+    },
+    {
+      "statName": "DeltaT Validity (<= 60 s)",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        40,
+        1
+      ]
+    },
+    {
+      "statName": "Short Wave Radiation Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        0,
+        42
+      ]
+    },
+    {
+      "statName": "Long Wave Radiation Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        0,
+        42
+      ]
+    },
+    {
+      "statName": "Surface PAR Bounds",
+      "statType": "bounds",
+      "statUnit": "uE/s/m^2",
+      "statValue": [
+        2334.5,
+        2334.5
+      ]
+    },
+    {
+      "statName": "Surface PAR Validity",
+      "statType": "valueValidity",
+      "statUnit": "",
+      "statValue": [
+        42,
+        0
+      ]
+    }
+  ]
+}

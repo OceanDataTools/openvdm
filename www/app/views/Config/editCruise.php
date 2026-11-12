@@ -77,6 +77,14 @@ use Helpers\Form;
                             </div>
                         </div>
                         <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label><?php echo CRUISE_NAME; ?> Description</label>
+                                    <?php echo Form::textBox(array('class'=>'form-control', 'name'=>'cruiseDescription', 'rows'=>'3', 'value'=>$data['cruiseDescription'])); ?>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label><?php echo CRUISE_NAME; ?> Start Date/Time (UTC)</label>
@@ -112,20 +120,6 @@ use Helpers\Form;
                         </div>
                         <div class="row">
                             <div class="col-lg-12">
-                                <label>Other Options</label>
-                                <table class='table table-striped table-hover table-bordered responsive'>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th style='width:20px;'>Enabled</th>
-                                    </tr>
-                                    <tr>
-                                        <td>Show <?php echo LOWERING_NAME; ?> Components</td><td style='width:20px; text-align:center'><?php echo $data['showLoweringComponents'] === True ? Form::submit(array('name'=>'hideLoweringComponents', 'class'=>'btn btn-xs btn-success', 'value'=>'On')): Form::submit(array('name'=>'showLoweringComponents', 'class'=>'btn btn-xs btn-danger', 'value'=>'Off')); ?></td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-lg-12">
                                 <?php echo Form::submit(array('name'=>'submit', 'class'=>'btn btn-primary', 'value'=>'Update')); ?>
                                 <a href="<?php echo DIR; ?>config" class="btn btn-danger">Cancel</a>
                             </div>
@@ -136,11 +130,11 @@ use Helpers\Form;
         </div>
         <div class="col-lg-6">
             <h3>Page Guide</h3>
-            <p>This page is for configuring OpenVDM to use a previously created cruiseID.  This page is NOT for creating a new cruiseID (and associated cruise data directory).  If you are trying to create a new cruiseID (and cruise data directory) click <a href="<?php echo DIR; ?>config/setupNewCruise">here</a>.</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> ID</strong> is the unique indentifier for the cruise (i.e. CS1801)</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Date/Time </strong> is the designated start/end date/time of the cruise. This is exported as part of the cruise finialization process and optionally used for identifying files that should be skipped during file transfers.  The required format of this date/time is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
-            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Port </strong> is the designated starting and ending ports of the cruise. This is exported as part of the cruise finialization process.</p>
-            <p>Click the <strong>Update</strong> button to save the change and exit back to the main configuration page.  If you enter a cruiseID for a cruise that does not exist you will be asked to enter a different cruiseID.</p>
+            <p>This page is for configuring OpenVDM to use a previously created cruiseID.  This page is NOT for creating a new cruiseID (and associated <?php echo \Helpers\Terms::cruise(true); ?> data directory).  If you are trying to create a new cruiseID (and <?php echo \Helpers\Terms::cruise(true); ?> data directory) click <a href="<?php echo DIR; ?>config/setupNewCruise">here</a>.</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> ID</strong> is the unique indentifier for the <?php echo \Helpers\Terms::cruise(true); ?> (i.e. CS1801)</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Date/Time </strong> is the designated start/end date/time of the <?php echo \Helpers\Terms::cruise(true); ?>. This is exported as part of the <?php echo \Helpers\Terms::cruise(true); ?> finialization process and optionally used for identifying files that should be skipped during file transfers.  The required format of this date/time is yyyy/mm/dd HH:MM (i.e. 2018/01/01 00:00).</p>
+            <p>The <strong><?php echo CRUISE_NAME; ?> Start/End Port </strong> is the designated starting and ending ports of the <?php echo \Helpers\Terms::cruise(true); ?>. This is exported as part of the <?php echo \Helpers\Terms::cruise(true); ?> finialization process.</p>
+            <p>Click the <strong>Update</strong> button to save the change and exit back to the main configuration page.  If you enter a cruiseID for a <?php echo \Helpers\Terms::cruise(true); ?> that does not exist you will be asked to enter a different cruiseID.</p>
             <p>Click the <strong>Cancel</strong> button to revert back to the previous cruiseID and exit back to the main configuration page.</p>
         </div>
     </div>

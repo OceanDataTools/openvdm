@@ -33,11 +33,12 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file, start_orphan_cleanup
 from server.lib import transfer_utils
-from server.lib.transfer_utils import TransferCommandError
+from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.connection_utils import build_rclone_command, build_rclone_options, build_rsync_command, build_rsync_options, check_darwin, normalize_transfer_config, rclone_concurrency, sshpass_command, test_cdt_destination, test_cdt_rclone_destination
 from server.lib.openvdm import OpenVDM
+from server.lib.placeholders import fill_placeholders
 
 
 # Gearman task names this worker registers.
@@ -139,8 +140,10 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         def _keyword_replace_and_split(raw_filter):
-            """
-            Replace any wildcards in the provided filters
+            """Fill in the placeholders and split the comma-separated filters.
+
+            ``{cruiseID}`` and the OpenVDM file names the required transfers
+            use (#679); ``{loweringID}`` is filled in for each lowering later.
             """
 
             def _expand_placeholders(template: str, context: dict) -> str:
@@ -149,12 +152,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 return template
 
 
+            warehouse = self.shipboard_data_warehouse_config
             context = {
-                '{cruiseID}': self.cruise_id
-                #'{loweringID}': self.lowering_id or '{loweringID}'
+                '{cruiseID}': self.cruise_id,
+                '{cruise_config_fn}': warehouse['cruiseConfigFn'],
+                '{md5_summary_fn}': warehouse['md5SummaryFn'],
+                '{md5_summary_md5_fn}': warehouse['md5SummaryMd5Fn'],
             }
 
-            return _expand_placeholders(raw_filter, context).split(',')
+            return [flt.strip() for flt in _expand_placeholders(raw_filter, context).split(',')
+                    if flt.strip()]
 
         transfers = (
             self.ovdm.get_required_ship_to_shore_transfers()
@@ -183,7 +190,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     cs = self.ovdm.get_collection_system_transfer(t['collectionSystem'])
                     if int(cs.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
-                    path_prefix = f"{base_path}/{cs['destDir']}"
+                    # {cruiseID} and {loweringDataBaseDir} filled in, {loweringID} for each lowering below (#635)
+                    path_prefix = os.path.join(base_path, fill_placeholders(
+                        cs['destDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir']).strip('/')).rstrip('/')
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if transfer is from an ed
@@ -191,7 +200,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     ed = self.ovdm.get_extra_directory(t['extraDirectory'])
                     if int(ed.get('cruiseOrLowering', 0)) == 1:
                         base_path = f"{base_path}/{self.shipboard_data_warehouse_config['loweringDataBaseDir']}/{{loweringID}}"
-                    path_prefix = f"{base_path}/{ed['destDir']}"
+                    # {cruiseID} and {loweringDataBaseDir} filled in, {loweringID} for each lowering below (#635)
+                    path_prefix = os.path.join(base_path, fill_placeholders(
+                        ed['destDir'], self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir']).strip('/')).rstrip('/')
                     rare_filters.extend([f"{path_prefix}/{f}" for f in raw_filters])
 
                 #if neither
@@ -362,10 +373,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             current_job: The Gearman job.
 
         Returns:
-            str: The job result from :meth:`_run_job`.
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
         """
         try:
             return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
         finally:
             release_transfer_lock(self.transfer_lock)
             self.transfer_lock = None
@@ -394,7 +411,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("Payload: %s", json.dumps(payload_obj, indent=2))
+            logging.debug("Payload: %s", redact_payload(payload_obj, indent=2))
 
             self.cruise_data_transfer = self.ovdm.get_required_cruise_data_transfer_by_name("SSDW")
 
@@ -489,7 +506,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cdt_id = self.cruise_data_transfer.get('cruiseDataTransferID')
 
         if cdt_id:
-            self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            try:
+                self.ovdm.set_error_cruise_data_transfer(cdt_id, f'Worker crashed: {reason}')
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -543,8 +564,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             The result of ``GearmanWorker.shutdown()``.
         """
         logging.info("Shutdown requested: signaling current job to stop...")
-        self.ovdm.set_idle_cruise_data_transfer(self.cruise_data_transfer.get('cruiseDataTransferID'))
-        self._stop_requested = True
+        # Before its first job the worker has no transfer to mark idle (#526)
+        cdt_id = (self.cruise_data_transfer or {}).get('cruiseDataTransferID')
+        if cdt_id:
+            self.ovdm.set_idle_cruise_data_transfer(cdt_id)
+        # run_transfer_command() polls this to stop the copy
+        self.stop = True
         return super().shutdown(*args, **kwargs)
 
 

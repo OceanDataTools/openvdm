@@ -41,7 +41,7 @@ class FluoroParser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 try:
                     # remainder is the tab-separated data blob; 4th field is chlorophyll
                     _, _, _, chlorophyll_str, _ = remainder.split('\t')
@@ -83,11 +83,12 @@ class FluoroParser(OpenVDMCSVParser):
                                       len(df[df['deltaT'] > self.MAX_DELTA_T])], 'DeltaT Validity')
         self.add_bounds_stat([int(df['chlorophyll_signal'].min()),
                               int(df['chlorophyll_signal'].max())], 'Chlorophyll Bounds', 'counts')
+        # [in range, out of range], like every Validity stat (#567)
         self.add_value_validity_stat(
-            [len(df[(df['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) |
-                    (df['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)]),
-             len(df[(df['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS) &
-                    (df['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)])],
+            [len(df[(df['chlorophyll_signal'] >= MIN_CHLOROPHYLL_COUNTS) &
+                    (df['chlorophyll_signal'] <= MAX_CHLOROPHYLL_COUNTS)]),
+             len(df[(df['chlorophyll_signal'] < MIN_CHLOROPHYLL_COUNTS) |
+                    (df['chlorophyll_signal'] > MAX_CHLOROPHYLL_COUNTS)])],
             'Chlorophyll Validity')
 
         for name, total, bad in [

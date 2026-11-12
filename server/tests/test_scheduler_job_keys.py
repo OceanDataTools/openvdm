@@ -28,13 +28,13 @@ def _ovdm():
     return ovdm
 
 
-def _run_one_cycle(monkeypatch, locked=()):
+def _run_one_cycle(monkeypatch, locked=(), purge=None):
     """Run the scheduler until its end-of-cycle sleep; return the submit_job calls."""
     ovdm = _ovdm()
     gm_client = Mock()
     monkeypatch.setattr(scheduler, 'OpenVDM', lambda: ovdm)
     monkeypatch.setattr(scheduler, 'GearmanClient', lambda servers: gm_client)
-    monkeypatch.setattr(scheduler, 'purge_old_files', Mock())
+    monkeypatch.setattr(scheduler, 'purge_old_files', purge or Mock())
     monkeypatch.setattr(scheduler, 'transfer_locked',
                         lambda kind, transfer_id: (kind, transfer_id) in locked)
 
@@ -81,3 +81,11 @@ def test_key_format() -> None:
     """Keys name the scheduler, the lock kind and the transfer."""
     assert scheduler.scheduler_job_key(scheduler.CST, 7) == 'scheduler-cst-7'
     assert scheduler.scheduler_job_key(scheduler.CDT, '7') == 'scheduler-cdt-7'
+
+
+def test_a_failed_log_purge_doesnt_stop_scheduling(monkeypatch, caplog) -> None:
+    """An error purging old transfer logs is logged, and the cycle's jobs still go out (#540)."""
+    calls = _run_one_cycle(monkeypatch, purge=Mock(side_effect=OSError('No such directory')))
+    assert len(calls) == 4
+    assert 'Unable to purge old transfer logs: No such directory' in caplog.text
+

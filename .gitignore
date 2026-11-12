@@ -14,6 +14,10 @@ bin/*.py
 server/plugins/*.py
 server/plugins/parsers/*.py
 server/etc/openvdm.yaml
+server/etc/cruise_readme.md.j2
+server/etc/lowering_readme.md.j2
+server/etc/cruise_position_sources.yaml
+server/etc/lowering_position_sources.yaml
 www/app/Core/Config.php
 www/app/templates/default/js/chartColors.js
 www/app/templates/default/js/dataDashboardMainCustom.js
@@ -21,7 +25,13 @@ www/bower_components
 www/etc/datadashboard.yaml
 www/vendor
 www/.htaccess
-www/composer.lock
 www/errorlog.html
+www/.phpunit.cache
 www/node_modules
 www/overlay_layers.json
+
+# Coverage output (#506)
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

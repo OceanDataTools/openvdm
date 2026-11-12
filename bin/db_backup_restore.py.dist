@@ -146,6 +146,10 @@ def backup(output_dir: str, creds: dict) -> int:
     ``CREATE TABLE`` statements are still present but no ``INSERT`` rows are
     written.
 
+    The backup has the transfers' passwords, so only its owner can read it
+    (mode 0600), and a backup folder this creates is the owner's only (0700)
+    (#603). An existing file is never overwritten.
+
     Args:
         output_dir: Directory in which to create the backup file.  Created
             automatically if it does not exist.
@@ -155,7 +159,7 @@ def backup(output_dir: str, creds: dict) -> int:
     Returns:
         ``0`` on success, ``1`` on failure.
     """
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, mode=0o700, exist_ok=True)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     backup_path = os.path.join(output_dir, f"{creds['name']}_{timestamp}.sql")
@@ -193,7 +197,9 @@ def backup(output_dir: str, creds: dict) -> int:
 
             sql_output += "\n" + result_struct.stdout
 
-        with open(backup_path, "w", encoding="utf-8") as f:
+        # Owner-only from the start, whatever the umask (#603)
+        fd = os.open(backup_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(sql_output)
 
         size_kb = os.path.getsize(backup_path) / 1024

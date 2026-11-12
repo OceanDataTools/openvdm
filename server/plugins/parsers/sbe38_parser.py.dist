@@ -7,11 +7,8 @@ and returns the JSON-formatted plugin data used by OpenVDM's Data Dashboard.
 
 import sys
 import logging
-from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
-import numpy as np
-import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
@@ -34,7 +31,7 @@ class SBE38Parser(OpenVDMCSVParser):
     MAX_DELTA_T = pd.Timedelta('10 seconds')
 
     def __init__(self, start_dt=None, stop_dt=None, time_format=None,
-                 skip_header=False, use_openvdm_api=False, sbe38=False):
+                 skip_header=False, use_openvdm_api=False):
 
         super().__init__(None, PROC_COLS, start_dt=start_dt, stop_dt=stop_dt,
                          time_format=time_format, skip_header=skip_header,
@@ -49,7 +46,7 @@ class SBE38Parser(OpenVDMCSVParser):
         # Read and parse lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS

@@ -28,6 +28,7 @@ import yaml
 from os.path import dirname, realpath
 sys.path.append(dirname(dirname(realpath(__file__))))
 
+from server.lib.geojson_utils import visualizer_entries
 from server.lib.openvdm import OpenVDM
 
 # Name of the extra directory holding the data dashboard files and manifest.
@@ -209,7 +210,10 @@ def process_geotiff_source(source: dict, dashboard_data_dir: str, openVDM) -> li
 
     Looks up the named collection system, globs for matching dashboard JSON
     files inside its dashboard data subdirectory, and converts each file's
-    ``visualizerData`` entry into a TiTiler-backed Leaflet overlay descriptor.
+    GeoTIFF ``visualizerData`` entries (those with a ``tileURL`` and a
+    ``label``, in either dashboard file format, see
+    :func:`~server.lib.geojson_utils.visualizer_entries`) into TiTiler-backed
+    Leaflet overlay descriptors.
 
     Args:
         source: GeoTIFF source dict with ``CollectionSystem``, ``device``, and
@@ -263,21 +267,27 @@ def process_geotiff_source(source: dict, dashboard_data_dir: str, openVDM) -> li
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            tile_url = data["visualizerData"][0]["tileURL"]
-            label = data["visualizerData"][0]["label"]
-        except (OSError, KeyError, IndexError, json.JSONDecodeError) as err:
+        except (OSError, json.JSONDecodeError) as err:
             logging.error("Invalid dashboard file %s: %s", filename, err)
             continue
 
-        params = {"url": tile_url}
-        results.append({
-            "name": label,
-            "url": (
-                TITILER_URL
-                + "/cog/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?"
-                + urllib.parse.urlencode(params)
-            ),
-        })
+        # The GeoTIFF parser's entries, in either dashboard file format (#602)
+        layers = [entry for entry in visualizer_entries(data)
+                  if isinstance(entry, dict) and entry.get("tileURL") and entry.get("label")]
+        if not layers:
+            logging.error("Invalid dashboard file %s: no GeoTIFF layer (tileURL and label)", filename)
+            continue
+
+        for entry in layers:
+            params = {"url": entry["tileURL"]}
+            results.append({
+                "name": entry["label"],
+                "url": (
+                    TITILER_URL
+                    + "/cog/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?"
+                    + urllib.parse.urlencode(params)
+                ),
+            })
 
     return results
 

@@ -41,7 +41,7 @@ class O2Parser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 field_data = dict(zip(FIELDS, fields))
                 try:
                     abs_value = float(field_data['abs_value']) if field_data.get('abs_value') else None

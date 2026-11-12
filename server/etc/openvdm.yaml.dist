@@ -22,6 +22,27 @@ siteRoot: "http://127.0.0.1/"
 # Change this to a strong random value before deploying (e.g. openssl rand -hex 32).
 workerApiKey: "change-me-to-a-strong-random-value"
 
+# The vessel this OpenVDM install is on. Saved in each cruise's config file
+# and README, and read by QA tools (e.g. sbe-qa-processing). The installer
+# asks for it; all fields are optional.
+vessel:
+    name: ""
+    operator: ""  # the organization that operates it
+    email: ""     # the operator's contact email
+    # Only for vessels that submit data to R2R (Rolling Deck to Repository)
+    #r2r:
+    #    vesselID: ""     # R2R vessel ID (ICES code), e.g. 33RR
+    #    operatorID: ""   # e.g. edu.ucsd.sio
+    #    schedulerID: ""  # e.g. org.unols
+
+# The vehicle (ROV, HOV, AUV) whose dives OpenVDM manages as lowerings.
+# Saved in each lowering's config file and README. The installer asks for
+# it; all fields are optional, and left empty without a vehicle.
+vehicle:
+    name: ""
+    operator: ""  # the organization that operates it
+    email: ""     # the operator's contact email
+
 # The transferInterval defines the interval for performing collectionSystemTransfer.
 # The unit is in minutes.
 transferInterval: 5
@@ -54,8 +75,37 @@ showOnlyCurrentCruiseDir: False
 # directory. (True|False)
 transferPublicData: True
 
-# maximum age of transfer log files to retain. String must conform with the python
-# datetime.timedelta standard
+# The cruise README: a description of the cruise and its directory layout, at
+# the top of the cruise directory. It's rebuilt whenever the cruise config is
+# exported (Setup New Cruise, Edit Cruise, Finalize and Export OpenVDM
+# Config). The template is a Jinja2 file, server/etc/cruise_readme.md.j2,
+# which the installer copies from its .dist; edit the copy to change the
+# README. Without it, the README isn't written. A relative template
+# path is relative to the OpenVDM directory. The filename may use {cruiseID},
+# so the README is still identifiable once it's separated from its folder
+# (e.g. RR2601_README.md); keep the quotes, since a name starting with "{" is
+# a YAML error without them. OpenVDM won't replace a file of that name that it
+# didn't write.
+cruiseReadme:
+    enable: True
+    filename: "{cruiseID}_README.md"
+    template: server/etc/cruise_readme.md.j2
+
+# The lowering README: the same for each lowering's directory, rebuilt
+# whenever the lowering config is exported (Setup New Lowering, Finalize
+# Lowering and Export Lowering Config). Its template is
+# server/etc/lowering_readme.md.j2, copied from its .dist like the cruise one.
+# The filename may use {cruiseID} and {loweringID} (with the quotes), e.g.
+# RR2601_J2-1601_README.md.
+loweringReadme:
+    enable: True
+    filename: "{cruiseID}_{loweringID}_README.md"
+    template: server/etc/lowering_readme.md.j2
+
+# maximum age of transfer log files to retain (default 12 hours): pairs of a
+# number and a unit (weeks, days, hours, minutes or seconds), e.g. "12 hours",
+# "3 days" or "1 week 2 days". A value that can't be read is logged and no logs
+# are purged.
 # logfilePurgeTimedelta: "12 hours"
 
 # The plugins section defines where the plugins processing scripts reside
@@ -99,12 +149,23 @@ hooks:
 # after the successful completion of the primary OpenVDM Gearman task.  Any subsequent
 # tasks called with be called as background Gearman tasks so to not interfere with
 # OpenVDM's primary operation.
+#
+# A command's arguments may use these placeholders: {cruiseID}, {loweringID},
+# {collectionSystemTransferID} and {collectionSystemTransferName} (in the
+# postCollectionSystemTransfer and postDataDashboard hooks), and {newFiles} and
+# {updatedFiles} (the job's files, in one argument separated by spaces; dropped
+# when there are none). A command that uses one of the first four when it has no
+# value (e.g. {loweringID} without a current lowering) isn't run, and the hook
+# reports it.
 postHookCommands:
     postCollectionSystemTransfer:
-        # Plot new and updated CTD casts into the CTD_Plots extra directory
-        # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
+        # Only a transfer's first entry is used, so the CTD transfer's two commands share
+        # one entry: to use either command, or both, remove the first "#" from the entry's
+        # first two lines and from each line of the commands you want
         #- collectionSystemTransferName: CTD
         #  commandList:
+        # Plot new and updated CTD casts into the CTD_Plots extra directory
+        # (bin/plot_ctd_casts.py, copied from its .dist; needs matplotlib)
         #  - name: "Plot CTD casts"
         #    command:
         #    - /opt/openvdm/venv/bin/python
@@ -112,14 +173,79 @@ postHookCommands:
         #    - --extra-directory=CTD_Plots
         #    - "{newFiles}"
         #    - "{updatedFiles}"
+        # CTD QA (sbe-qa-processing, installed in /opt/sbe-qa-processing with its site
+        # TOML; see its INSTALL.md): after a transfer of new or updated CTD files, assess
+        # the cruise's casts so far and write the reports to the CTD_QA extra directory,
+        # replacing the previous run's. Its area check uses the cruise's bounding box
+        # (set by the cruise tracklines or navigation QA hook). Optional arguments:
+        # --execute-notebook, --theme=PATH, and --site-config=PATH for a site TOML
+        # elsewhere than /opt/sbe-qa-processing/configs/site.toml
+        #  - name: "SBE 9 QA report"
+        #    command:
+        #    - /opt/sbe-qa-processing/.venv/bin/sbe-qa-processing
+        #    - openvdm
+        #    - "{collectionSystemTransferName}"
+        #    - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #    - "--changed-files={newFiles}"
+        #    - "--changed-files={updatedFiles}"
+        # Navigation QA (nav-qa-processing, installed in /opt/nav-qa-processing with its
+        # site TOML; see its INSTALL.md): reassess the cruise's GNSS feed after a transfer
+        # of new or updated nav files, at most every 6 hours (--min-interval). OpenRVDAS is
+        # the transfer that carries the feed. It writes its reports and GeoCSV products to
+        # an extra directory. It also sets the cruise's bounding box, as the cruise
+        # tracklines hook (postDataDashboard) does: give one of the two --no-set-extent
+        #- collectionSystemTransferName: OpenRVDAS
+        #  commandList:
+        #  - name: "Navigation QA"
+        #    command:
+        #    - /opt/nav-qa-processing/.venv/bin/nav-qa-processing
+        #    - openvdm
+        #    - "{collectionSystemTransferName}"
+        #    - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #    - "--site-config=/opt/nav-qa-processing/configs/site.toml"
+        #    - "--changed-files={newFiles}"
+        #    - "--changed-files={updatedFiles}"
+        #    - "--min-interval=6h"
     postDataDashboard:
+        # Tracklines: after each data dashboard update or rebuild for a collection
+        # system, write a GeoJSON and a KML trackline per position source to the
+        # Tracklines extra directory (owned by the warehouse user and added to the
+        # cruise's MD5 summary). bin/build_cruise_tracks.py and
+        # bin/build_lowering_tracks.py are copied from their .dist files.
+        # To use a block, remove the first "#" from each of its lines; to use an
+        # option, also remove the "#" before its "-":
+        #   --position-sources  a PositionSources YAML file, instead of editing the
+        #                       script's embedded default. The installer copies
+        #                       server/etc/cruise_position_sources.yaml and
+        #                       lowering_position_sources.yaml from their .dist
+        #                       files, which match the sample data
+        #   --extra-directory   another extra directory for the files
+        #   --no-set-extent     don't set the cruise's or lowering's bounding box
+        #                       (cruiseExtent, loweringExtent); add it when another
+        #                       hook (e.g. nav-qa-processing's) sets the extent
+        #
+        # Cruise tracklines, which also set the cruise's bounding box for QA tools
         #- collectionSystemTransferName: OpenRVDAS
         #  commandList:
         #  - name: "Build cruise tracks"
         #    command:
         #    - /opt/openvdm/venv/bin/python
         #    - /opt/openvdm/bin/build_cruise_tracks.py
-        #    - OpenRVDAS
+        #    #- --position-sources=/opt/openvdm/server/etc/cruise_position_sources.yaml
+        #    #- --extra-directory=Tracklines
+        #    #- --no-set-extent
+        #    - "{collectionSystemTransferName}"
+        # Lowering tracklines, which also set the current lowering's bounding box
+        #- collectionSystemTransferName: ROV_OpenRVDAS
+        #  commandList:
+        #  - name: "Build lowering tracks"
+        #    command:
+        #    - /opt/openvdm/venv/bin/python
+        #    - /opt/openvdm/bin/build_lowering_tracks.py
+        #    #- --position-sources=/opt/openvdm/server/etc/lowering_position_sources.yaml
+        #    #- --extra-directory=Tracklines
+        #    #- --no-set-extent
+        #    - "{collectionSystemTransferName}"
     postSetupNewCruise:
         #commandList:
         #- name: "Setup Remote Cruise Directories"
@@ -141,12 +267,24 @@ postHookCommands:
         #  - "-s"
         #  - "-l"
     preFinalizeCurrentCruise:
+        # This hook has one commandList: to use either command, or both, remove the first
+        # "#" from the commandList line and from each line of the commands you want
         #commandList:
         #- name: "Export Sealog data for current cruise"
         #  command:
         #  - ssh
         #  - survey@192.168.0.22
         #  - "/opt/sealog-server/venv/bin/python /opt/sealog-server/misc/sealog_data_export.py"
+        # Navigation QA (nav-qa-processing, as in postCollectionSystemTransfer): the cruise's
+        # final reports, in the finalized cruise's MD5 summary. The transfer is named, not
+        # {collectionSystemTransferName}, which has no value in this hook
+        #- name: "Navigation QA"
+        #  command:
+        #  - /opt/nav-qa-processing/.venv/bin/nav-qa-processing
+        #  - openvdm
+        #  - OpenRVDAS
+        #  - "--openvdm-config=/opt/openvdm/server/etc/openvdm.yaml"
+        #  - "--site-config=/opt/nav-qa-processing/configs/site.toml"
     postFinalizeCurrentCruise:
         #commandList:
         #- name: "Export Sealog data for current cruise"

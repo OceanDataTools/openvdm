@@ -9,6 +9,7 @@ $(function () {
 		$("input[name=cruiseEndPort]").prop('disabled', true);
 		$("input[name=cruisePI]").prop('disabled', true);
 		$("input[name=cruiseLocation]").prop('disabled', true);
+		$("textarea[name=cruiseDescription]").prop('disabled', true);
     });
 
 	$('input[name=cruiseName]').on('input', function () {
@@ -44,6 +45,10 @@ $(function () {
 	});
 
 	$('input[name=cruiseLocation]').on('input', function () {
+		$("select[name=cruiseID]").prop('disabled', true);
+	});
+
+	$('textarea[name=cruiseDescription]').on('input', function () {
 		$("select[name=cruiseID]").prop('disabled', true);
 	});
 

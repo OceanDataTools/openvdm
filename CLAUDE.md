@@ -25,15 +25,18 @@ OpenVDM is a 3-tier distributed system:
 - Connection utilities: `server/lib/connection_utils.py` — handles local, rsync, SMB, SSH, FTP, and rclone transfers
 - Plugin base classes: `server/lib/openvdm_plugin.py` — `OpenVDMPlugin` and `OpenVDMParserQualityTest`
 - File utilities: `server/lib/file_utils.py`, `server/lib/geojson_utils.py`
-- Transfer commands: `server/lib/transfer_utils.py` — `run_transfer_command()` runs rsync/rclone for all transfer workers, collects new/updated/deleted files (rsync `-i`, rclone `-v`) and raises `TransferCommandError` on failure (rsync codes 24, and 23 for vanished listed files, count as success); callers must turn that into a failed transfer (#230)
+- Destination directory placeholders: `server/lib/placeholders.py`'s `fill_placeholders()` fills in `{cruiseID}`, `{loweringDataBaseDir}` and `{loweringID}` for code that reads a `destDir` from the configuration outside the transfer and directory workers, which have their own `keyword_replace()` (#635)
+- Cruise README: `server/lib/readme.py` renders the Jinja2 template (`server/etc/cruise_readme.md.j2`, copied from its `.dist` by the installer; the `.dist` is never used in its place, #501; `cruiseReadme` in `openvdm.yaml`) into the cruise directory after each cruise config export and on the `rebuildCruiseReadme` task (`build_cruise_readme()` in `cruise.py`). It only passes the template whitelisted directory fields (no credentials) and never replaces a README it didn't write (#431). The lowering README is the same for each lowering's directory: `lowering_readme.md.j2`, `loweringReadme`, `build_lowering_readme()` in `lowering.py` after each lowering config export and on `rebuildLoweringReadme`, with the lowering's details read back from its lowering config file (`lowering_config.json`) (#445)
+- Trackline building: `server/lib/tracks.py` holds the code shared by `bin/build_cruise_tracks.py` and `bin/build_lowering_tracks.py` (position sources, manifest, combining, GeoJSON/KML output, ownership, MD5 update, extra directory resolution). The scripts keep only their ID, manifest location, default position sources and, for cruises, the extent (#394, #401). Their default position sources match `server/etc/cruise_position_sources.yaml.dist` and `lowering_position_sources.yaml.dist` (the hooks' `--position-sources` files, copied by the installer), which list the sample data's sources; `test_bin_tracks.py` checks both against the sample plugins' data types (#639)
+- Transfer commands: `server/lib/transfer_utils.py` — `run_transfer_command()` runs rsync/rclone for all transfer workers, collects new/updated/deleted files (rsync `-i`, rclone `-v`) and raises `TransferCommandError` on failure (rsync codes 24, and 23 for vanished listed files, and rclone code 6 for files that changed while being copied, count as success, #668); callers must turn that into a failed transfer (#230)
 - Transfer locks: `server/lib/transfer_lock.py` — a transfer job holds an `flock()` on `/run/openvdm/<cst|cdt>-<id>.lock` (ship-to-shore shares the `cdt` lock) for as long as it runs; the kernel drops it when the worker exits or is killed. Whether a transfer is running is whether its lock is held: the transfer workers ignore a job they can't lock, and the scheduler, Stop, Test Setup and `reboot_reset` check `transfer_locked()`. A transfer's `status` only drives the UI, so don't use it to decide whether a job may run. Assumes all transfer workers run on one host (#478). The scheduler submits transfer jobs with `scheduler_job_key()` as their Gearman unique key, so gearmand merges one still queued or running with the next cycle's (#479). Don't use those keys for a manual Run or finalize: a merged job keeps the first payload, and theirs differ. Finalize runs its transfers with `run_transfer_jobs()` (`server/lib/transfer_jobs.py`), which reruns a job ignored as in progress (`IN_PROGRESS_REASON`, shared with the workers) once the transfer's lock is free, giving up after an hour (#480)
-- Trackline building: `server/lib/tracks.py` holds the code shared by `bin/build_cruise_tracks.py` and `bin/build_lowering_tracks.py` (position sources, manifest, combining, GeoJSON/KML output, ownership, MD5 update, extra directory resolution). The scripts keep only their ID, manifest location and default position sources (#394, #401)
 
 **Tier 3 — Gearman Workers (async task queue)**
 - Location: `server/workers/`
 - Each worker registers one or more Gearman task handlers (e.g. `runCollectionSystemTransfer`, `updateDataDashboard`, `setupNewCruise`)
 - Key workers: `run_collection_system_transfer.py`, `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, `data_dashboard.py`, `md5_summary.py`, `cruise.py`, `lowering.py`, `scheduler.py`
-- Workers are managed by Supervisor in production
+- Workers are managed by Supervisor in production, started through `server/lib/worker_launcher.py` (`python -m server.lib.worker_launcher server/workers/<worker>.py`), which runs the worker as `__main__` and posts an OpenVDM message when it raises, at most once an hour per failure (#503)
+- `Helpers\GearmanStatus::WORKERS` lists the Gearman functions each worker registers, by Supervisor program, for the Configuration page's warning about workers that aren't running (gearmand's `status`). Update it when adding a worker or a `register_task()` call; `server/tests/test_gearman_worker_list.py` fails until it matches (#503)
 
 **Plugin System**
 - Location: `server/plugins/`
@@ -45,6 +48,11 @@ OpenVDM is a 3-tier distributed system:
 - Server config: `server/etc/openvdm.yaml` (copy from `openvdm.yaml.dist`)
 - Web config: `www/app/Core/Config.php` (copy from `Config.php.dist`)
 - Hooks in `openvdm.yaml` map Gearman task names to downstream tasks; `postHookCommands` run shell commands after task completion
+- `openvdm.yaml`'s `vessel` block (name, operator, email, optional `r2r` IDs; flat like the `vehicle` block, #693) is set by the installer and read with `OpenVDM.get_vessel_config()`; the cruise worker copies it into each cruise config file (`cruise_config.json`) (#365). The `vehicle` block (name, operator, email) is the same for the vehicle whose dives are the lowerings: `OpenVDM.get_vehicle_config()`, copied by the lowering worker into each lowering config file (`lowering_config.json`), from which the lowering README reads it (#674)
+- File Naming Guide (`config/collectionSystemTransfers/fileNamingGuide`): `Helpers\FileNamingGuide` explains each transfer's filters in words. Its explanations must follow how `run_collection_system_transfer.py` applies them (`classify_file()` order, `fnmatch` against the whole path, `build_filters()` placeholders, and the path each transfer type is matched by), so change it with that code (#451). `server/tests/data/file_naming_guide.json` lists example names and "never matches" warnings that `www/tests/Helpers/FileNamingGuideTest.php` checks against the guide and `server/tests/test_file_naming_guide.py` against the transfer's filters (#515). Descriptions on it are rendered as Markdown by `Helpers\Markdown` (league/commonmark, which needs PHP's `mbstring`; HTML escaped, unsafe links dropped, single line breaks kept) to match the READMEs (#460). Without either, they're shown as escaped plain text and the page says what's missing (`Markdown::alert()`, #643)
+- Names for cruises and lowerings: `CRUISE_NAME`, `LOWERING_NAME`, `CRUISE_NAME_PLURAL` and `LOWERING_NAME_PLURAL` in `Config.php`, set by the installer (e.g. Voyage, Dive). Views use the constants, or `Helpers\Terms` for plurals (defaults for a `Config.php` without them) and for running text (`Terms::cruise(true)`: lower case except words in capitals). Workers get them from `api/warehouse/getTerms` (`OpenVDM.get_terms()`), and the README templates as `terms` (`terms.cruise`, `terms.cruise_lower`, ...). A new install names the data directory, Samba share and web alias after the cruise name (`VoyageData`); a re-run keeps the existing `CRUISEDATA_BASEDIR`'s name (#684)
+- Description templates for new collection system transfers and extra directories: `CST_DESCRIPTION_TEMPLATE` and `EXTRA_DIRECTORY_DESCRIPTION_TEMPLATE` in `Config.php`, read through `Helpers\DescriptionTemplates` (defaults when undefined), which also renders the Description field (`formGroup()`) and cleans descriptions on save (`clean()`: drops unfilled `<...>` prompt lines and template section labels left empty, turns headings into bold text) (#449). A description is Markdown in a standard structure that the READMEs put under the folder's `####` heading: a source (or contents) paragraph, a `**Files:**` list, and an optional `**Sub-directories:**` list, with no headings. The required extra directories' defaults in `database/` follow it (#499)
+- `cruiseExtent` (CoreVar, JSON with westernmost/easternmost/southernmost/northernmost; westernmost > easternmost across the antimeridian) is set by `bin/build_cruise_tracks.py` through the worker-only `api/warehouse/setCruiseExtent` (`OpenVDM.set_cruise_extent()`, `geojson_utils.geojson_extent()`) and returned by `getCruiseConfig` (#366). `loweringExtent` is the same for the current lowering: set by `bin/build_lowering_tracks.py` through `api/warehouse/setLoweringExtent` (`OpenVDM.set_lowering_extent()`), returned by `getLoweringConfig` and so kept in each lowering config file (`lowering_config.json`); `Config/Main.php` reloads it from there when the current lowering changes. Both scripts use `extent_position_source()`/`track_extent()` in `server/lib/tracks.py` (#399)
 - `rcloneConcurrency` in `openvdm.yaml` limits each rclone copy job of the cruise data and ship-to-shore workers: `local` (local directories and SMB mounts; defaults `RCLONE_LOCAL_CONCURRENCY`, 1/2/0) and `remote` (SSH, FTP and `remote:path` destinations, ship-to-shore; rclone's defaults unless set). The workers pick the section with `rclone_destination()` and read it with `rclone_concurrency()` in `connection_utils.py` (#465)
 
 ## Development Setup
@@ -61,6 +69,8 @@ cd www/
 composer install            # includes PHPStan; production installs use --no-dev
 bash ./post_composer.sh
 ```
+The development packages (PHPUnit, PHPStan) need PHP's `dom` extension (`php8.x-xml` on Debian/Ubuntu, `php-xml` on RHEL), which the installer doesn't install (#650).
+`www/composer.lock` is tracked and resolved for PHP 8.2 (`config.platform` in `composer.json`), so every install gets the same packages (#643). After changing `composer.json`, run `composer update` (or `composer update <package>`) in `www/` and commit the lock with it; CI fails when they don't match.
 
 JavaScript dependencies:
 ```bash
@@ -70,15 +80,18 @@ npm install
 
 ## Common Commands
 
-**Checks to run before submitting a PR:**
+**Checks to run before submitting a PR** (CI runs the same on PRs to `dev`, `2.17` and `master`, `.github/workflows/checks.yml`):
 ```bash
 source ./venv/bin/activate
-python -m pytest server                  # only the known false-positive errors are expected (see Testing)
+pip install -r requirements-dev.txt      # once: pytest and pytest-cov
+python -m pytest --cov                   # fails below .coveragerc's fail_under (see Testing)
 ruff check server/
 pre-commit run --all-files               # ruff, ESLint, php -l and PHPStan
+(cd www && vendor/bin/phpunit)           # the PHP tests (composer install in www/ first)
+(cd www && npm test)                     # the JavaScript tests (npm install in www/ first)
 ```
 
-There is no automated test suite for the PHP or JavaScript. Changes to the web UI need a manual check in a browser.
+The PHP tests (PHPUnit, a Composer dev dependency) are in `www/tests/`, configured by `www/phpunit.xml`; they cover the helpers in `www/app/Helpers/` that don't need a database (#515). CI runs them on PHP 8.2 to 8.5, from the oldest PHP `composer.json` allows to the newest the distros ship (#643). `www/tests/bootstrap.php` declares the `Config.php.dist` constants as PHPStan's bootstrap does, with a test worker key. Controllers and models need MySQL and aren't tested; pure logic in a controller is easier to test moved into a helper. The JavaScript tests (`node --test`, with jsdom as an npm dev dependency) are in `www/tests/js/`: each form helper is loaded unchanged into a jsdom page built from a small HTML fixture of its form, with jQuery, and driven through its events (#516). `checkFixture()` checks a fixture's field names and classes are in the form's PHP view (or its controller or helper), so a renamed field fails; `knownBug()` is the tests' strict xfail. `post_composer.sh` installs the npm packages with `--omit=dev`, so run `npm install` in `www/` for the tests. Layout and styling still need a manual check in a browser.
 
 **Lint Python code:**
 ```bash
@@ -138,9 +151,21 @@ All Python files (including `.py.dist` templates) must use **pdoc-compatible inl
 
 ## Testing
 
-### Known false-positive pytest errors
+Tests live in `server/tests/` (`pytest.ini`'s `testpaths`; the repository root is on the import path, so they run from any directory). The root `conftest.py` keeps the Test Setup workers (`server/workers/test_*.py`) and the connection-testing functions they import (`test_cst_source`, `test_cdt_destination`, `test_cdt_rclone_destination`) out of collection: their names match pytest's but they aren't tests (#506). The unit-test plan is #505.
 
-`test_cst_source`, `test_cdt_destination`, and `test_cdt_rclone_destination` in `server/lib/connection_utils.py` are **not pytest tests** — they are OpenVDM connection-testing functions whose names happen to match pytest's default collection pattern. pytest will report them as errors (missing fixture) when running the full suite. These errors are pre-existing and expected; they do not indicate a regression.
+**Shared fixtures** (`server/tests/conftest.py`; the code is in `server/tests/helpers.py`, which tests import instead of conftest.py):
+- `load_dist`: import a `.py.dist` parser, plugin or `bin/` script by path (removed from `sys.modules` after the test)
+- `warehouse`: a temporary warehouse with a cruise directory, and the shipboard data warehouse config for it
+- `fake_ovdm`: an autospecced `OpenVDM` (unknown methods and wrong arguments fail) with `openvdm.yaml.dist` as its `config`; the methods that only read `config` run for real (`CONFIG_METHODS`), the rest record calls
+- `fake_gearman`: a Gearman client that records jobs (`jobs`, `tasks()`) and returns scripted `results` (default `PASS`); also what `python3_gearman.GearmanClient()` returns during the test
+- `fake_run`: replaces `subprocess.run`; script results with `on(*prefix, returncode=, stdout=, stderr=, raises=, effect=)`, matched on the command's first arguments (raises `CalledProcessError` under `check=True`, as the real one does). Each call records `cmd`, `kwargs` and `files`, the contents of files the command names (e.g. a credentials or password file) read when it runs; `assert_not_in_commands(secret)` checks a password never reaches a command line (#508)
+- `expected`: compares a parser's output with its saved expected output (`server/tests/data/parsers/expected/<name>.json`). After a change to a parser's output that's intended, `pytest --update-expected` saves the new output, so the change shows in the diff. The parsers' small input files are in `server/tests/data/parsers/` (#513). The XBT parser tests need xbt-edf-qc, which `requirements.txt` doesn't install: CI installs it as `xbt_parser.py.dist` says, and the tests are skipped without it. The GDAL GeoTIFF parser's tests use a fake `osgeo.gdal` and `fake_run`; one runs real GDAL, skipped without it. The plugin tests load the `.dist` parsers as `server.plugins.parsers.<name>_parser`, the names the plugins import
+
+**Worker tests:** `server/tests/cst_helpers.py` builds a real `OVDMGearmanWorker` for the collection system transfer worker with `fake_ovdm` and `warehouse`, set up as `_run_job()` leaves it (#510); other workers' tests follow the same pattern. Tests that need real rsync are marked to skip without GNU rsync 3 (macOS has openrsync), so they run in CI.
+
+**API wrapper tests:** `server/tests/test_openvdm_api.py` replaces `requests` with a fake API and checks each `OpenVDM` method's URL, HTTP method, payload and worker token. Its route check requests every URL `openvdm.py` builds and fails unless each matches a route in `www/app/Core/routes.php` (with its HTTP method), so a new method needs its route, and a renamed endpoint fails CI. A new API method also needs a row in the test's tables (`GETTERS`, `API_CALLS`); the route check fails for a URL template no test requests (#509).
+
+**Coverage:** `.coveragerc` measures `server/`, `bin/` and `utils/`, excluding the tests, the sample data's FTP server, a site's own copies of `.dist` files, and `if __name__ == "__main__":` blocks (how Supervisor starts a worker). `fail_under` is the floor: raise it when tests add coverage, never lower it. coverage.py only finds `.py` files no test ran, so a `.py.dist` file counts once a test loads it.
 
 ## Git Workflow
 
@@ -173,7 +198,11 @@ Low-level connection test functions (`mount_smb_share`, `detect_smb_version`, `t
 
 ### rclone destination convention
 
-A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). For cruise data transfers this only applies to the Local Directory type: the CDT form rejects a `:` in the destination directory of any other type, and the workers route Test Setup to `test_cdt_rclone_destination()` on the `:`, so don't relax that check without routing by transfer type. This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+A `:` character in a destination directory field signals an rclone remote path (`remote:path` format). For cruise data transfers this only applies to the Local Directory type: the CDT form rejects a `:` in the destination directory of any other type, and the workers route Test Setup to `test_cdt_rclone_destination()` on the `:`, so don't relax that check without routing by transfer type. This affects path normalization (no leading slash on the remote name) and UI behavior in the form helpers. A Windows path (`C:\data`) isn't a remote: the forms drop its drive letter. Relevant to `run_cruise_data_transfer.py`, `run_ship_to_shore_transfer.py`, and the CDT/SSDW form helpers.
+
+### Directory field normalization
+
+The CST Source and Destination Directories, the CDT Destination Directory and the SSDW Destination Directory are cleaned up by `directoryFields.js` in the forms (on blur and on submit; the controllers list it before the form helper in `$data['javascript']`) and by `Helpers\DirectoryFields` in the controllers when they're saved or tested, so a value posted without the scripts gets the same rules (#630). Backslashes become slashes and runs of slashes collapse; absolute paths get a leading slash and lose the trailing one, relative ones lose both, and `/` stays `/` in both. Change the two together: `www/tests/data/directory_fields.json` holds the cases both are tested against (PHPUnit and `npm test`).
 
 ### CDT destDir semantics
 
@@ -210,4 +239,4 @@ The `Api/CollectionSystemTransfers`, `Api/CruiseDataTransfers` and `Api/Warehous
 - The same value must be set as `workerApiKey` in `server/etc/openvdm.yaml`.
 - Python workers send the header automatically via `OpenVDM._worker_headers()`, which reads the key from the YAML config.
 - `hash_equals()` is used for the comparison to prevent timing attacks.
-- When deploying, change the placeholder value (`change-me-to-a-strong-random-value`) to a strong random string in both files (e.g. `openssl rand -hex 32`).
+- When deploying, change the placeholder value (`change-me-to-a-strong-random-value`) to a strong random string in both files (e.g. `openssl rand -hex 32`); the installer does this. The placeholder is never a valid key: `TransferCredentials::isWorkerToken()` refuses it, and `_worker_headers()` doesn't send it and logs a warning once (#605).

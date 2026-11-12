@@ -29,21 +29,25 @@ named with ``-e``. A lowering-level extra directory is inside the lowering
 installer's OpenVDM user) and added to the cruise's MD5 summary.
 ``-o OUTPUTDIR`` writes them to a folder instead, owned by whoever runs the
 script and not added to the MD5 summary; ``-e`` and ``-o`` can't be used
-together. ``-u USERNAME`` gives ``-o`` output to that user.
+together.
 
-The 2.16.0 options ``--gps-sources`` and ``-u/--username`` still work, but
-print a warning: they are deprecated and will be removed in OpenVDM 2.17. Use
-``--position-sources``; 2.17 has no ``-u`` (``-o`` output keeps whoever wrote
-it).
+It also sets the current lowering's bounding box in OpenVDM
+(``loweringExtent``, saved in each lowering's config file) from one position
+source's combined track: the one marked ``extent: true`` in the position
+sources, else the first. The whole track is used on every run, so the extent
+is recomputed, not merged with the last one. It's only set when the lowering
+is OpenVDM's current lowering, and not with ``--no-set-extent``.
 
-The shared trackline code is in ``server/lib/tracks.py``; this script adds
-the lowering's ID, manifest location and default position sources.
+The shared trackline code, including picking the extent's position source
+and computing the extent, is in ``server/lib/tracks.py``; this script adds the
+lowering's ID, manifest location and default position sources, and stores the
+lowering extent.
 
 Usage::
 
     build_lowering_tracks.py [-h] [-v ...] [-n] [-k | -g] [-l LOWERINGID]
-                             [-e EXTRA_DIRECTORY | -o OUTPUTDIR] [-u USERNAME]
-                             [--position-sources FILE]
+                             [-e EXTRA_DIRECTORY | -o OUTPUTDIR]
+                             [--position-sources FILE] [--no-set-extent]
                              collectionSystem
 """
 
@@ -51,17 +55,15 @@ import argparse
 import logging
 import os
 import sys
+
 from os.path import dirname, realpath
-
-import requests
-
 sys.path.append(dirname(dirname(realpath(__file__))))
 
 from server.lib.openvdm import OpenVDM  # noqa: E402  pylint: disable=wrong-import-position
 from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-position
-    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, get_position_sources, load_manifest,
-    process_position_source, queue_md5_update, resolve_extra_directory, resolve_manifest_path,
-    setup_logging,
+    TRACKLINE_EXTRA_DIR_NAME, add_output_arguments, extent_position_source, get_position_sources,
+    load_manifest, process_position_source, queue_md5_update, resolve_extra_directory,
+    resolve_manifest_path, setup_logging, track_extent,
 )
 
 # ----------------------------------------------------------------------
@@ -70,83 +72,56 @@ from server.lib.tracks import (  # noqa: E402  pylint: disable=wrong-import-posi
 
 # Position sources used when no --position-sources file is given; edit to match this vehicle.
 # They apply to the collection system the hook names; add
-# "CollectionSystem: <name>" to tie them to one.
+# "CollectionSystem: <name>" to tie them to one. Add "extent: true" to the
+# source the lowering's bounding box should come from (default: the first).
+# The types are the data types rov_openrvdas_plugin.py gives the sample data's
+# files, as in server/etc/lowering_position_sources.yaml.dist (#639).
 DEFAULT_POSITION_SOURCES_YAML = """
 PositionSources:
   - device: USBL-PRI
-    type: usbl_pri_gga
+    type: rov-usbl-pri
   - device: USBL-SEC
-    type: usbl_sec_gga
+    type: rov-usbl-sec
   - device: SPRINT
-    type: sprint
+    type: rov-sprint
 """
 
 # ----------------------------------------------------------------------
-# Deprecated 2.16.0 options
+# Lowering extent
 # ----------------------------------------------------------------------
 
-# Title of the OpenVDM message about deprecated options in this script's hook
-DEPRECATION_MESSAGE_TITLE = "build_lowering_tracks.py uses deprecated options"
+def update_lowering_extent(openvdm, position_source, combined, manifest, cruise_base_dir, lowering_id):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Set the current lowering's bounding box in OpenVDM from a position source's track.
 
-
-class DeprecatedOption(argparse.Action):
-    """An option's 2.16.0 name, which still works but warns that 2.17 removes it.
-
-    For a flag (``nargs=0``) the destination is set to ``True``; otherwise to
-    the option's value. The warning is printed on stderr and added to the
-    namespace's ``deprecated_options`` list, for
-    :func:`report_deprecated_options`.
-    """
-
-    def __init__(self, option_strings, dest, instead, **kwargs):
-        """Create the action.
-
-        Args:
-            option_strings: The deprecated option's names.
-            dest: The attribute it sets, shared with its replacement.
-            instead: The end of the warning, after "removed in OpenVDM
-                2.17;", e.g. ``"use --no-combine"``.
-            **kwargs: Other :class:`argparse.Action` arguments. Unless given,
-                the option is left out of ``--help`` and sets no default (its
-                replacement's applies).
-        """
-        kwargs.setdefault("help", argparse.SUPPRESS)
-        kwargs.setdefault("default", argparse.SUPPRESS)
-        super().__init__(option_strings, dest, **kwargs)
-        self.instead = instead
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        """Warn on stderr, record the warning and set the destination."""
-        warning = f"{option_string} is deprecated and will be removed in OpenVDM 2.17; {self.instead}"
-        print(f"Warning: {warning}", file=sys.stderr)
-        namespace.deprecated_options.append(warning)
-        setattr(namespace, self.dest, True if self.nargs == 0 else values)
-
-
-def report_deprecated_options(openvdm, warnings):
-    """Post the deprecation warnings as an OpenVDM message.
-
-    A hook's warnings on stderr aren't shown in OpenVDM when it succeeds, so
-    they're posted as a message too. Nothing is posted if an unread message
-    with the same title is among OpenVDM's 10 most recent unread messages, so
-    a hook that runs after every data dashboard update doesn't fill the list.
-    A failure to check or post is logged and otherwise ignored.
+    Nothing is set if *lowering_id* isn't OpenVDM's current lowering (e.g.
+    with ``-l`` for an earlier one), or if the source has no positions yet.
 
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
-        warnings: The warnings (from :class:`DeprecatedOption`).
+        position_source: The position source (from
+            :func:`~server.lib.tracks.extent_position_source`).
+        combined: Its combined trackline from
+            :func:`~server.lib.tracks.process_position_source`, or ``None`` to
+            combine its dashboard files here (``--no-combine``).
+        manifest: Loaded manifest list.
+        cruise_base_dir: Warehouse base directory.
+        lowering_id: The lowering being processed.
+
+    Raises:
+        Exception: If OpenVDM refuses the extent or can't be reached.
     """
-    if not warnings:
+
+    if lowering_id != openvdm.get_lowering_id():
+        logging.info("%s isn't the current lowering; not setting its extent", lowering_id)
         return
-    try:
-        response = requests.get(f"{openvdm.config['siteRoot']}api/messages/getRecentMessages", timeout=5)
-        response.raise_for_status()
-        if any(msg.get("messageTitle") == DEPRECATION_MESSAGE_TITLE for msg in response.json()):
-            return
-        openvdm.send_msg(DEPRECATION_MESSAGE_TITLE,
-                         "\n".join(warnings) + "\nUpdate this script's hook in openvdm.yaml before upgrading.")
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        logging.warning("Unable to post the deprecation warning to OpenVDM: %s", err)
+
+    extent = track_extent(position_source, combined, manifest, cruise_base_dir, lowering_id)
+    if extent is None:
+        logging.warning("No positions from %s yet; the lowering extent isn't set", position_source["device"])
+        return
+
+    logging.info("Setting the lowering extent from %s: %s", position_source["device"], extent)
+    openvdm.set_lowering_extent(extent)
 
 # ----------------------------------------------------------------------
 # Setup & entry point
@@ -158,13 +133,13 @@ def resolve_lowering_and_dirs(openvdm, args) -> tuple:
     Args:
         openvdm: Active :class:`~server.lib.openvdm.OpenVDM` instance.
         args: Parsed ``argparse.Namespace`` containing ``loweringID``,
-            ``collectionSystem``, ``outputDir``, ``extraDirectory`` and
-            ``username`` attributes.
+            ``collectionSystem``, ``outputDir`` and ``extraDirectory``
+            attributes.
 
     Returns:
         A 6-tuple of ``(cruise_id, lowering_id, cruise_base_dir,
-        lowering_base_dir, trackline_dir, output_user)``; for ``-o`` output
-        *output_user* is ``-u``'s user, or ``None``.
+        lowering_base_dir, trackline_dir, output_user)``; *output_user* is
+        ``None`` for ``-o`` output.
 
     Raises:
         RuntimeError: If the cruise or lowering ID cannot be determined, the
@@ -185,7 +160,8 @@ def resolve_lowering_and_dirs(openvdm, args) -> tuple:
     if not collection_system:
         raise RuntimeError(f"Collection System not found: {args.collectionSystem}")
 
-    if collection_system["cruiseOrLowering"] != "1":
+    # The API returns cruiseOrLowering as a number (#600)
+    if str(collection_system["cruiseOrLowering"]) != "1":
         raise RuntimeError(f"Collection System: {args.collectionSystem} is not related to a lowering")
 
     warehouse_cfg = openvdm.get_shipboard_data_warehouse_config()
@@ -201,8 +177,8 @@ def resolve_lowering_and_dirs(openvdm, args) -> tuple:
     )
 
     # Files in an extra directory belong to OpenVDM's warehouse user; -o
-    # output keeps whoever wrote it, unless -u is given
-    output_user = args.username if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
+    # output keeps whoever wrote it
+    output_user = None if args.outputDir else warehouse_cfg["shipboardDataWarehouseUsername"]
 
     return cruise_id, lowering_id, cruise_base_dir, lowering_base_dir, trackline_dir, output_user
 
@@ -222,28 +198,21 @@ def main() -> None:  # pylint: disable=too-many-locals
     parser.add_argument("-l", dest="loweringID")
     add_output_arguments(parser)
     parser.add_argument("--position-sources", dest="position_sources_file")
-
-    # 2.16.0 names, removed in 2.17
-    parser.add_argument("--gps-sources", dest="position_sources_file", action=DeprecatedOption,
-                        instead="use --position-sources")
-    parser.add_argument("-u", "--username", action=DeprecatedOption, default=None,
-                        instead="-o output will keep whoever wrote it",
-                        help="owner of the files written with -o (deprecated, removed in 2.17)")
+    parser.add_argument("--no-set-extent", action="store_true",
+                        help="don't set the lowering's bounding box in OpenVDM")
     parser.add_argument("collectionSystem")
-
-    parser.set_defaults(deprecated_options=[])
 
     args = parser.parse_args()
     setup_logging(args.verbosity)
 
     openvdm = OpenVDM()
-    report_deprecated_options(openvdm, args.deprecated_options)
 
     try:
         cruise_id, lowering_id, cruise_base_dir, lowering_base_dir, trackline_dir, output_user = (
             resolve_lowering_and_dirs(openvdm, args)
         )
         position_sources = get_position_sources(args, DEFAULT_POSITION_SOURCES_YAML)
+        extent_source = extent_position_source(position_sources)
 
         manifest_path = resolve_manifest_path(
             openvdm, cruise_base_dir, cruise_id, os.path.join(lowering_base_dir, lowering_id)
@@ -255,17 +224,30 @@ def main() -> None:  # pylint: disable=too-many-locals
 
     logging.info("Using manifest: %s", manifest_path)
 
+    extent_track = None
     written = []
     for position_source in position_sources:
-        process_position_source(position_source, manifest, cruise_base_dir, lowering_id,
-                                trackline_dir, args, output_user, written)
+        combined = process_position_source(position_source, manifest, cruise_base_dir, lowering_id,
+                                           trackline_dir, args, output_user, written)
+        if position_source is extent_source:
+            extent_track = combined
+
+    failures = []
+    if not args.no_set_extent:
+        try:
+            update_lowering_extent(openvdm, extent_source, extent_track, manifest, cruise_base_dir, lowering_id)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            failures.append(f"Unable to set the lowering extent: {err}")
 
     # Files in an extra directory are part of the cruise; -o folders aren't
     if written and not args.outputDir:
         message = queue_md5_update(openvdm, written, cruise_id)
         if message:
-            print(message, file=sys.stderr)
-            sys.exit(1)
+            failures.append(message)
+
+    if failures:
+        print("\n".join(failures), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

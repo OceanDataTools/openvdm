@@ -196,10 +196,27 @@ $(function () {
         });
     }
 
+    // Warn about OpenVDM workers that aren't running (#503)
+    function updateWorkerStatus(workerStatus) {
+        var workerStatusURL = siteRoot + 'api/gearman/getWorkerStatus';
+        $.getJSON(workerStatusURL, function (data, status) {
+            if (status === 'success' && data !== null) {
+                $(workerStatus).html(data.alert);
+            }
+        }).always(function () {
+            setTimeout(function () {
+                updateWorkerStatus(workerStatus);
+            }, 15000);
+        });
+    }
+
     updateCollectionSystemTransferStatusList('#collectionSystemTransferStatusList');
     updateOptionalCruiseDataTransferStatusList('#optionalCruiseDataTransfers');
     updateRequiredCruiseDataTransferStatusList('#requiredCruiseDataTransfers');
     updateTaskStatusList('#taskStatusList');
+    setTimeout(function () {
+        updateWorkerStatus('#workerStatus');
+    }, 15000);
 
     $('#jobResultsModal').on('hidden.bs.modal', function () {
         window.location.replace(siteRoot + 'config');

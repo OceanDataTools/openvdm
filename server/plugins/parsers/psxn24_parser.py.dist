@@ -57,7 +57,7 @@ class PSXN24Parser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='PSXN,24'):
                 field_data = dict(zip(FIELDS, fields))
                 try:
                     self.check_nmea_sentence(remainder, fields, 6, self.require_checksum)
@@ -133,7 +133,7 @@ class PSXN24Parser(OpenVDMCSVParser):
             ('yaw_rate', 'deg/s', 'Yaw Rate'),
             ('pitch_rate', 'deg/s', 'Pitch Rate'),
             ('roll_rate', 'deg/s', 'Roll Rate'),
-            ('heave_velocity', 'm', 'Heave Velocity'),
+            ('heave_velocity', 'm/s', 'Heave Velocity'),
         ]:
             viz = {'data': [], 'unit': unit, 'label': label}
             for ts, row in df.iterrows():

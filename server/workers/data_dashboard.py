@@ -32,6 +32,8 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, output_json_data_to_file, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+from server.lib.placeholders import fill_placeholders
+from server.lib.transfer_utils import redact_payload
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
@@ -238,7 +240,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 continue
 
             if not out_obj or out_obj.get('error'):
-                msg = out_obj.get('error', f"No output from plugin for file: {filename}")
+                # a plugin may return None for a file without data (#581)
+                msg = (out_obj or {}).get('error') or f"No output from plugin for file: {filename}"
                 logging.warning(msg)
                 self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
                 continue
@@ -313,13 +316,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             The job's result, or a failed-job result if its payload can't be read.
         """
         self.stop = False
+        # The task comes from the job, not its payload: look it up first, so a
+        # payload that can't be parsed fails this task (#544)
+        self.task = self.get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
+
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             return self._fail_job(current_job, "Retrieve job data", "Failed to parse current job payload")
-
-        self.task = self.get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
 
         # Configure logging
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(
@@ -339,7 +344,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
         self.lowering_dir = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['loweringDataBaseDir'], self.lowering_id) if self.lowering_id else None
         self.collection_system_transfer = self.ovdm.get_collection_system_transfer(payload_obj.get('collectionSystemTransferID')) if 'collectionSystemTransferID' in payload_obj else None
-        self.data_dashboard_dir = os.path.join(self.cruise_dir, self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'])
+        dashboard_dest_dir = fill_placeholders(self.ovdm.get_required_extra_directory_by_name('Dashboard_Data')['destDir'],
+                                               self.cruise_id, self.shipboard_data_warehouse_config['loweringDataBaseDir'])
+        self.data_dashboard_dir = os.path.join(self.cruise_dir, dashboard_dest_dir.strip('/'))
         self.data_dashboard_manifest_file_path = os.path.join(self.data_dashboard_dir, self.shipboard_data_warehouse_config['dataDashboardManifestFn'])
 
         if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD'] and not self.collection_system_transfer:
@@ -408,12 +415,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             The base ``GearmanWorker`` completion result.
         """
         try:
-            payload_obj = json.loads(current_job.data)
             results = json.loads(job_result)
         except Exception as exc:
-            logging.error("Failed to parse job data or results: %s", exc)
+            logging.error("Failed to parse job results: %s", exc)
             results = {'parts': [], 'files': {}}
-            payload_obj = {}
+
+        # Parsed separately, so a payload that can't be parsed still fails the
+        # task; its job runs no hook tasks (#544)
+        try:
+            payload_obj = json.loads(current_job.data)
+        except Exception:
+            payload_obj = None
 
         job_data = {
             'cruiseID': self.cruise_id,
@@ -424,7 +436,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         gm_client = python3_gearman.GearmanClient([self.ovdm.get_gearman_server()])
 
         # Handle task-specific post-processing
-        if current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
+        if payload_obj is None:
+            logging.info("No post-tasks: the job's payload couldn't be parsed")
+        elif current_job.task == TASK_NAMES['UPDATE_DATA_DASHBOARD']:
             job_data['collectionSystemTransferID'] = payload_obj.get('collectionSystemTransferID')
             for task in self.ovdm.get_tasks_for_hook(current_job.task):
                 logging.info("Adding post-task: %s", task)
@@ -476,6 +490,35 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 # -------------------------
 # Gearman task definitions
 # -------------------------
+class ManifestError(Exception):
+    """The data dashboard manifest exists but can't be read."""
+
+
+def _read_manifest(path: str) -> list:
+    """Return the data dashboard manifest's entries; none if it doesn't exist yet.
+
+    Args:
+        path: The manifest file's path.
+
+    Returns:
+        list: The manifest's entries.
+
+    Raises:
+        ManifestError: If the manifest can't be read or isn't a list of
+            entries, e.g. after a write cut short (#582).
+    """
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError) as exc:
+        raise ManifestError(f"Unable to read the dashboard manifest {path}: {exc}") from exc
+    if not isinstance(entries, list):
+        raise ManifestError(f"The dashboard manifest {path} isn't a list of entries")
+    return entries
+
+
 def task_update_data_dashboard(worker, current_job):
     """Update the data dashboard for a collection system transfer's new and updated files.
 
@@ -515,15 +558,18 @@ def task_update_data_dashboard(worker, current_job):
         return json.dumps(job_results)
     job_results['parts'].append({"partName": "Retrieve file list", "result": "Pass"})
 
+    # Load the existing manifest first: one that can't be read is left as it
+    # is, as replacing it would drop every other file from the dashboard (#582)
+    try:
+        existing_entries = _read_manifest(worker.data_dashboard_manifest_file_path)
+    except ManifestError as exc:
+        reason = f"{exc}. Run Rebuild Data Dashboard to rebuild it"
+        logging.error(reason)
+        job_results['parts'].append({"partName": "Read dashboard manifest file", "result": "Fail", "reason": reason})
+        return json.dumps(job_results)
+
     new_entries, remove_entries = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start=15, end=90,
                                                            get_source_files=get_source_files)
-
-    # Load existing manifest
-    try:
-        with open(worker.data_dashboard_manifest_file_path, 'r', encoding='utf-8') as f:
-            existing_entries = json.load(f)
-    except Exception:
-        existing_entries = []
 
     # Remove obsolete entries (a raw file may have multiple manifest entries,
     # one per data type; remove all of them together)
@@ -536,6 +582,13 @@ def task_update_data_dashboard(worker, current_job):
             dd_json_path = os.path.join(base_dir, rm['dd_json'])
             if os.path.isfile(dd_json_path):
                 os.remove(dd_json_path)
+
+    # Drop the entries for data types a reprocessed file no longer has (#583)
+    new_types = {}
+    for entry in new_entries:
+        new_types.setdefault(entry['raw_data'], set()).add(entry['type'])
+    existing_entries = [e for e in existing_entries
+                        if e['raw_data'] not in new_types or e['type'] in new_types[e['raw_data']]]
 
     # Update/add new entries (dedupe on raw_data + type so a file with
     # multiple data types keeps a manifest entry for each type)
@@ -562,6 +615,34 @@ def task_update_data_dashboard(worker, current_job):
 
     worker.send_job_status(current_job, 100, 100)
     return json.dumps(job_results)
+
+
+def _transfer_dirs(worker, cst):
+    """Return the directories a transfer's files are in, relative to the cruise directory.
+
+    Placeholders in ``destDir`` are filled in as the transfer does: a lowering
+    transfer, or a cruise transfer whose ``destDir`` has ``{loweringID}``, has
+    a directory for each lowering (#635). A ``destDir`` of ``/`` is the cruise
+    (or lowering) directory itself (#629).
+
+    Args:
+        worker: The worker, set up for the job.
+        cst: The collection system transfer's configuration.
+
+    Returns:
+        list[str]: The directories, ``''`` for the cruise directory itself.
+    """
+    lowering_base = worker.shipboard_data_warehouse_config['loweringDataBaseDir']
+    dest_dir = cst['destDir']
+
+    def fill(lowering_id=None):
+        return fill_placeholders(dest_dir, worker.cruise_id, lowering_base, lowering_id).strip('/')
+
+    if int(cst['cruiseOrLowering']) == 1:
+        return [os.path.join(lowering_base, lowering, fill(lowering)) for lowering in worker.ovdm.get_lowerings()]
+    if '{loweringID}' in dest_dir:
+        return [fill(lowering) for lowering in worker.ovdm.get_lowerings()]
+    return [fill()]
 
 
 def task_rebuild_data_dashboard(worker, current_job):
@@ -591,7 +672,7 @@ def task_rebuild_data_dashboard(worker, current_job):
     manifest_entries = []
     plugin_load_failures = []
     active_csts = worker.ovdm.get_active_collection_system_transfers()
-    for idx, cst in enumerate(active_csts, 1):
+    for idx, cst in enumerate(active_csts):
         # A plugin that won't load fails its own transfer; the rest are still rebuilt
         try:
             plugin_callable, get_source_files = worker._get_plugin_functions(cfg=cst)
@@ -605,17 +686,12 @@ def task_rebuild_data_dashboard(worker, current_job):
             continue
 
         # Build file list
-        if cst['cruiseOrLowering'] == 0:
-            cst_dir = os.path.join(worker.cruise_dir, cst['destDir'])
-            filelist = build_filelist(cst_dir).get('include', [])
-            filelist = [os.path.join(cst['destDir'], f) for f in filelist]
-        else:
-            filelist = []
-            lowerings = worker.ovdm.get_lowerings()
-            for lowering in lowerings:
-                cst_dir = os.path.join(worker.cruise_dir, worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'])
-                filelist.extend([os.path.join(worker.shipboard_data_warehouse_config['loweringDataBaseDir'], lowering, cst['destDir'], f) for f in build_filelist(cst_dir).get('include', [])])
+        filelist = []
+        for rel_dir in _transfer_dirs(worker, cst):
+            filelist.extend(os.path.join(rel_dir, f)
+                            for f in build_filelist(os.path.join(worker.cruise_dir, rel_dir)).get('include', []))
 
+        # the transfers share 10-90%, in order (#584)
         start = int(80 * idx / len(active_csts) + 10)
         end = int(80 * (idx + 1) / len(active_csts) + 10)
         new_entries, _ = worker._process_filelist(current_job, filelist, plugin_callable, job_results, start, end,

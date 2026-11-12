@@ -117,6 +117,12 @@ const templateGlobals = {
     openvdmTileLayer: 'readonly',
     openvdmProfileChartConfig: 'readonly', // dashboardCharts.js
     openvdmInvertTimeChart: 'readonly',
+    normalizeAbsolutePath: 'readonly', // directoryFields.js
+    normalizeRelativePath: 'readonly',
+    isRclonePath: 'readonly',
+    normalizeRclonePath: 'readonly',
+    normalizeCdtDestDir: 'readonly',
+    normalizeSsdwDestDir: 'readonly',
 };
 
 export default [
@@ -138,6 +144,19 @@ export default [
                 ...footerGlobals,
                 ...templateGlobals,
             },
+        },
+        linterOptions: {
+            reportUnusedDisableDirectives: 'error',
+        },
+        rules: bugRules,
+    },
+    {
+        // The JavaScript tests (#516): Node modules
+        files: ['www/tests/js/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: {console: 'readonly', process: 'readonly', URL: 'readonly'},
         },
         linterOptions: {
             reportUnusedDisableDirectives: 'error',

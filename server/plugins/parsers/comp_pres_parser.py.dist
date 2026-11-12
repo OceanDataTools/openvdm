@@ -43,7 +43,7 @@ class CompPresParser(OpenVDMCSVParser):
         raw_data = {col: [] for col in self.proc_cols}
         errors = []
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors):
                 field_data = dict(zip(FIELDS, fields))
                 try:
                     comp1 = float(field_data['comp1']) if field_data.get('comp1') else None

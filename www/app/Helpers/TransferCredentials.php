@@ -21,14 +21,38 @@ class TransferCredentials
     const FIELDS = array('rsyncPass', 'smbPass', 'sshPass', 'ftpPass');
 
     /**
+     * Config.php.dist's worker key, which is public, so never a worker's (#605).
+     *
+     * @var string
+     */
+    const PLACEHOLDER = 'change-me-to-a-strong-random-value';
+
+    /**
      * Whether the request carries the worker key (WORKER_API_KEY in Config.php).
      *
      * @return bool
      */
     public static function isWorkerRequest(): bool
     {
-        $token = $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '';
-        return defined('WORKER_API_KEY') && WORKER_API_KEY !== '' && hash_equals(WORKER_API_KEY, $token);
+        return defined('WORKER_API_KEY')
+            && self::isWorkerToken(WORKER_API_KEY, $_SERVER['HTTP_X_WORKER_TOKEN'] ?? '');
+    }
+
+    /**
+     * Whether a token is the worker key.
+     *
+     * A key that's empty, or still Config.php.dist's placeholder, matches no
+     * token: the placeholder is public, so a site that never set its key
+     * would give the passwords to anyone (#605).
+     *
+     * @param string $key   the worker key
+     * @param string $token the request's X-Worker-Token
+     *
+     * @return bool
+     */
+    public static function isWorkerToken(string $key, string $token): bool
+    {
+        return $key !== '' && $key !== self::PLACEHOLDER && hash_equals($key, $token);
     }
 
     /**

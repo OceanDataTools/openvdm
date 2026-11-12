@@ -95,17 +95,23 @@ def size_cacher(interval: int) -> None:
             loop_delay(start, interval)
             continue
 
-        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id)
-        lowering_dir = join(cruise_dir, warehouse_config['loweringDataBaseDir'], lowering_id) if lowering_id else None
+        # Without a current cruise (e.g. a new install) there's nothing to measure (#588)
+        cruise_dir = join(warehouse_config['shipboardDataWarehouseBaseDir'], cruise_id) if cruise_id else None
+        lowering_dir = join(cruise_dir, warehouse_config['loweringDataBaseDir'], lowering_id) \
+            if cruise_dir and lowering_id else None
 
         logging.debug("Cruise Directory: %s", cruise_dir)
         logging.debug("Lowering Directory: %s", lowering_dir)
 
-        cruise_size = get_dir_size(cruise_dir)
+        cruise_size = get_dir_size(cruise_dir) if cruise_dir else None
         lowering_size = get_dir_size(lowering_dir) if lowering_dir else None
 
-        ovdm.set_cruise_size(cruise_size)
-        ovdm.set_lowering_size(lowering_size)
+        try:
+            ovdm.set_cruise_size(cruise_size)
+            ovdm.set_lowering_size(lowering_size)
+        except Exception as e:
+            # an API error is logged, and the next pass tries again (#588)
+            logging.error("Unable to store the cruise and lowering sizes with the OpenVDM API: %s", e)
 
         if cruise_size:
             logging.info("Cruise Size: %s", cruise_size)

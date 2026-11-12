@@ -21,6 +21,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.transfer_utils import redact_payload
 from server.lib.file_utils import start_orphan_cleanup
 from server.lib.transfer_lock import CST, transfer_locked
 from server.lib.connection_utils import normalize_transfer_config, test_cst_source
@@ -136,6 +137,25 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
     def on_job_execute(self, current_job):
+        """Run a job for this worker's task.
+
+        Args:
+            current_job: The Gearman job.
+
+        Returns:
+            str: The job result from :meth:`_run_job`, or :meth:`on_job_exception`'s
+            if it raises.
+        """
+        try:
+            return self._run_job(current_job)
+        except Exception:
+            # An error outside the task handler, e.g. the OpenVDM API failing
+            # while the job is set up or its status is set, fails the job
+            # instead of ending the worker (#661)
+            return self.on_job_exception(current_job, sys.exc_info())
+
+
+    def _run_job(self, current_job):
         """Set up and run a job for this worker's task.
 
         Reads the job's JSON payload (``collectionSystemTransfer``,
@@ -152,10 +172,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         """
 
         self.stop = False
+        # Not the previous job's transfer: a job that fails before its own is
+        # known must not change another transfer's status (#528)
+        self.collection_system_transfer = {}
 
         try:
             payload_obj = json.loads(current_job.data)
-            logging.debug("payload: %s", current_job.data)
+            logging.debug("payload: %s", redact_payload(current_job.data))
         except Exception:
             reason = "Failed to parse current job payload"
             logging.exception(reason)
@@ -165,12 +188,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         cst_id = cst_cfg.get('collectionSystemTransferID')
 
         if cst_id:
-            self.collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
+            collection_system_transfer = self.ovdm.get_collection_system_transfer(cst_id)
 
-            if self.collection_system_transfer is None:
+            if collection_system_transfer is None:
                 return self._fail_job(current_job, "Locate collection system transfer Data",
                                       "Could not find collection system transfer config to use for connection test")
 
+            self.collection_system_transfer = collection_system_transfer
             self.collection_system_transfer.update(cst_cfg)
 
         elif not cst_cfg:
@@ -241,11 +265,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             [{"partName": "Worker crashed", "result": "Fail", "reason": reason}]
         ))
 
-        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
+        cst_id = (self.collection_system_transfer or {}).get('collectionSystemTransferID')
 
         if cst_id:
-            self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
-                                                                set_status=not transfer_locked(CST, cst_id))
+            try:
+                self.ovdm.set_error_collection_system_transfer_test(cst_id, f'Worker crashed: {reason}',
+                                                                    set_status=not transfer_locked(CST, cst_id))
+            except Exception:
+                # The API may be what failed (#661)
+                logging.exception("Unable to set the transfer's status")
 
         return super().on_job_exception(current_job, exc_info)
 
@@ -269,7 +297,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         results = json.loads(job_result)
         parts = results.get('parts', [])
         final_verdict = parts[-1] if len(parts) else None
-        cst_id = self.collection_system_transfer.get('collectionSystemTransferID')
+        cst_id = (self.collection_system_transfer or {}).get('collectionSystemTransferID')
 
         logging.debug("Job Results: %s", json.dumps(results, indent=2))
         logging.info("Job Completed: %s ", current_job.handle)

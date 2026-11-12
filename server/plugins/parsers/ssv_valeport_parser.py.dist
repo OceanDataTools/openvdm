@@ -50,7 +50,7 @@ class SSVValeportParser(OpenVDMCSVParser):  # pylint: disable=too-few-public-met
         errors = []
 
         try:
-            for lineno, timestamp_str, remainder, _ in self.read_lines_with_timestamps(filepath):
+            for lineno, timestamp_str, remainder, _ in self.read_lines_with_timestamps(filepath, errors=errors):
                 values = remainder.split()
                 try:
                     if len(values) != len(FIELDS):

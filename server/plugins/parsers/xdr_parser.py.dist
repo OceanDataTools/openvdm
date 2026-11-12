@@ -4,15 +4,19 @@
 Parses timestamped log files containing NMEA XDR sentences (barometric
 pressure, air temperature and relative humidity) and returns the JSON-formatted
 plugin data used by OpenVDM's Data Dashboard.
+
+XDR sentences have no fixed layout, and this parser reads one instrument's
+fields by position (``FIELDS``): ``$WIXDR,P,1.01320,B,0,C,22.00,C,H,60.00,P,1,FAN,0*hh``,
+the pressure in bar, then the temperature (with no ID after it), then the
+humidity. Other layouts, such as the usual type, value, unit and ID for each
+sensor, are all bad rows: for those, copy the parser and change ``FIELDS``
+(#561).
 """
 
 import sys
 import logging
-from datetime import datetime
 from os.path import dirname, realpath
 import pandas as pd
-import numpy as np
-import json
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
@@ -86,7 +90,7 @@ class XDRParser(OpenVDMCSVParser):
         # Read and parse XDR lines
         # -------------------------
         try:
-            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, nmea_filter='XDR'):
+            for lineno, timestamp_str, remainder, fields in self.read_lines_with_timestamps(filepath, errors=errors, nmea_filter='XDR'):
                 logging.debug(f"{timestamp_str}{self.timestamp_separator}{remainder}")
 
                 # Map fields to FIELDS
