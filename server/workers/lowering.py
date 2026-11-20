@@ -32,6 +32,7 @@ from server.lib.file_utils import output_json_data_to_file, set_owner_group_perm
 from server.workers.run_collection_system_transfer import TASK_NAMES as RUN_CDT_TASK_NAMES
 from server.workers.lowering_directory import TASK_NAMES as LOWERING_DIR_TASK_NAMES
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import Terms, fetch_terms
 from server.lib.readme import (DEFAULT_LOWERING_TEMPLATE, build_lowering_readme_context, readme_filename,
                                readme_settings, render_readme, write_readme)
 from server.lib.transfer_utils import redact_payload
@@ -64,6 +65,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
+        self.terms = Terms()
         self.cruise_id = None
         self.lowering_id = None
         self.lowering_start_date = None
@@ -195,7 +197,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             with open(lowering_config_filepath, 'r', encoding='utf-8') as f:
                 lowering_config = json.load(f)
         except (OSError, ValueError) as exc:
-            return {'verdict': False, 'reason': f"Unable to read the lowering config file: {exc}"}
+            return {'verdict': False, 'reason': f"Unable to read the {self.terms.lowering_lower} config file: {exc}"}
         lowering_config['loweringID'] = self.lowering_id
 
         try:
@@ -252,6 +254,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # The task comes from the job, not its payload: look it up first, so a
         # payload that can't be parsed fails this task (#544)
+        # The install's names for cruises and lowerings, for this job's messages (#685)
+        self.terms = fetch_terms(self.ovdm)
         self.task = self.ovdm.get_task_by_name(current_job.task)
 
         # Clear the last job's lowering, so a job that fails before reading its
@@ -280,7 +284,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.lowering_id = payload_obj.get('loweringID', self.ovdm.get_lowering_id())
 
         if not self.lowering_id:
-            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
+            return self._fail_job(current_job, f"Verify {self.terms.lowering_lower} ID", f"{self.terms.lowering} ID is undefined")
 
         self.lowering_start_date = payload_obj.get('loweringStartDate', self.ovdm.get_lowering_start_date())
         self.lowering_end_date = payload_obj.get('loweringEndDate', self.ovdm.get_lowering_end_date())
@@ -518,11 +522,11 @@ def _add_readme_part(worker, job_results):
         return
 
     if output_results['verdict']:
-        job_results['parts'].append({"partName": "Write lowering README", "result": "Pass"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.lowering_lower} README", "result": "Pass"})
         return
 
     logging.error("Unable to write the lowering README: %s", output_results['reason'])
-    job_results['parts'].append({"partName": "Write lowering README", "result": "Fail", "reason": output_results['reason']})
+    job_results['parts'].append({"partName": f"Write {worker.terms.lowering_lower} README", "result": "Fail", "reason": output_results['reason']})
 
 
 def task_setup_new_lowering(worker, current_job):
@@ -556,10 +560,10 @@ def task_setup_new_lowering(worker, current_job):
 
     if results['parts'][-1]['result'] == "Fail": # Final Verdict
         logging.error("Failed to create lowering data directory")
-        job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Fail", "reason": results['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": f"Create {worker.terms.lowering_lower} data directory structure", "result": "Fail", "reason": results['parts'][-1]['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Create lowering data directory structure", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Create {worker.terms.lowering_lower} data directory structure", "result": "Pass"})
 
 
     logging.info("Exporting lowering configuration")
@@ -568,10 +572,10 @@ def task_setup_new_lowering(worker, current_job):
     output_results = worker.export_lowering_config()
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Pass"})
 
     _add_readme_part(worker, job_results)
 
@@ -614,12 +618,12 @@ def task_finalize_current_lowering(worker, current_job):
     full_lowering_dir = os.path.join(worker.cruise_dir, worker.lowering_dir)
 
     if not os.path.exists(full_lowering_dir):
-        reason = f"Lowering directory does not exist: {worker.lowering_dir}"
+        reason = f"{worker.terms.lowering} directory does not exist: {worker.lowering_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": f"Verify {worker.terms.lowering_lower} directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify lowering directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Verify {worker.terms.lowering_lower} directory exists", "result": "Pass"})
 
     logging.info("Queuing collection system transfers jobs")
     worker.send_job_status(current_job, 2, 10)
@@ -670,10 +674,10 @@ def task_finalize_current_lowering(worker, current_job):
     output_results = worker.export_lowering_config(finalize=True)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Pass"})
 
     _add_readme_part(worker, job_results)
 
@@ -705,10 +709,10 @@ def task_export_lowering_config(worker, current_job):
     output_results = worker.export_lowering_config()
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export lowering config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.lowering_lower} config data to file", "result": "Pass"})
 
     _add_readme_part(worker, job_results)
 
@@ -742,12 +746,12 @@ def task_rebuild_lowering_readme(worker, current_job):
     output_results = worker.build_lowering_readme()
 
     if output_results.get('skipped'):
-        job_results['parts'].append({"partName": "Write lowering README", "result": "Fail",
-                                     "reason": "The lowering README is turned off (loweringReadme in openvdm.yaml)"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.lowering_lower} README", "result": "Fail",
+                                     "reason": f"The {worker.terms.lowering_lower} README is turned off (loweringReadme in openvdm.yaml)"})
     elif not output_results['verdict']:
-        job_results['parts'].append({"partName": "Write lowering README", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Write {worker.terms.lowering_lower} README", "result": "Fail", "reason": output_results['reason']})
     else:
-        job_results['parts'].append({"partName": "Write lowering README", "result": "Pass"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.lowering_lower} README", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)

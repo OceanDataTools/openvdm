@@ -21,6 +21,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import fetch_terms
 from server.lib.transfer_utils import redact_payload
 from server.lib.file_utils import start_orphan_cleanup
 from server.lib.transfer_lock import CST, transfer_locked
@@ -222,7 +223,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             self.lowering_id = None
 
         if self.collection_system_transfer['cruiseOrLowering'] == 1 and self.lowering_id is None:
-            return self._fail_job(current_job, "Verify lowering ID", "Lowering ID is undefined")
+            terms = fetch_terms(self.ovdm)
+            return self._fail_job(current_job, f"Verify {terms.lowering_lower} ID", f"{terms.lowering} ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 

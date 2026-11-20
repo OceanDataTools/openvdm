@@ -20,6 +20,7 @@ import pytest
 
 from server.lib import file_utils as fu
 from server.lib import readme
+from server.lib import terms
 from server.lib import transfer_utils as tu
 
 
@@ -174,7 +175,29 @@ def test_lowering_readme_context_vehicle() -> None:
     ('Sea-Trial', 'sea-trial'), ('A Dive', 'a dive')])
 def test_lower_term(name, expected) -> None:
     """Lower case for a sentence, except words in capitals, as Helpers\\Terms::lower() (#684)."""
-    assert readme.lower_term(name) == expected
+    assert terms.lower_term(name) == expected
+
+
+def test_terms_attributes_and_defaults() -> None:
+    """Each name, its _lower form, and the defaults for missing names or no dict (#685)."""
+    names = terms.Terms({'cruise': 'Voyage', 'lowering': 'ROV Dive', 'lowerings': ''})
+    assert (names.cruise, names.cruise_lower, names.cruises, names.lowering_lower, names.lowerings) == \
+        ('Voyage', 'voyage', 'Cruises', 'ROV dive', 'Lowerings')
+    assert terms.Terms(None).as_dict() == {'cruise': 'Cruise', 'cruise_lower': 'cruise', 'cruises': 'Cruises',
+                                           'cruises_lower': 'cruises', 'lowering': 'Lowering',
+                                           'lowering_lower': 'lowering', 'lowerings': 'Lowerings',
+                                           'lowerings_lower': 'lowerings'}
+
+
+def test_fetch_terms_falls_back_to_the_defaults(caplog) -> None:
+    """An API error is logged, and the default names used (#685)."""
+    api = SimpleNamespace(get_terms=lambda: {'cruise': 'Voyage'})
+    assert terms.fetch_terms(api).cruise == 'Voyage'
+    def failing():
+        raise ConnectionError('API down')
+    with caplog.at_level(logging.WARNING):
+        assert terms.fetch_terms(SimpleNamespace(get_terms=failing)).cruise == 'Cruise'
+    assert 'API down' in caplog.text
 
 
 def test_readme_context_terms() -> None:

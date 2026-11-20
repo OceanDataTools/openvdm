@@ -21,6 +21,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import fetch_terms
 from server.lib.transfer_utils import redact_payload
 from server.lib.file_utils import start_orphan_cleanup
 from server.lib.transfer_lock import CDT, transfer_locked
@@ -101,15 +102,17 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             cruise_data_transfer = self.ovdm.get_cruise_data_transfer(cdt_id)
 
             if cruise_data_transfer is None:
-                return self._fail_job(current_job, "Locate Cruise Data Transfer Data",
-                                      "Could not find cruise data transfer config to use for connection test")
+                terms = fetch_terms(self.ovdm)
+                return self._fail_job(current_job, f"Locate {terms.cruise} Data Transfer Data",
+                                      f"Could not find {terms.cruise_lower} data transfer config to use for connection test")
 
             self.cruise_data_transfer = cruise_data_transfer
             self.cruise_data_transfer.update(cdt_cfg)
 
         elif not cdt_cfg:
-            return self._fail_job(current_job, "Locate Cruise Data Transfer Data",
-                                  "Could not find cruise data transfer config to use for connection test")
+            terms = fetch_terms(self.ovdm)
+            return self._fail_job(current_job, f"Locate {terms.cruise} Data Transfer Data",
+                                  f"Could not find {terms.cruise_lower} data transfer config to use for connection test")
 
         else:
             self.cruise_data_transfer = cdt_cfg
@@ -141,11 +144,12 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             checks' (#529).
         """
 
+        terms = fetch_terms(self.ovdm)
         if not os.path.isdir(self.cruise_dir):
-            return [{"partName": "Verify cruise data directory exists", "result": "Fail",
-                     "reason": f"Unable to find cruise data directory: {self.cruise_dir}"}]
+            return [{"partName": f"Verify {terms.cruise_lower} data directory exists", "result": "Fail",
+                     "reason": f"Unable to find {terms.cruise_lower} data directory: {self.cruise_dir}"}]
 
-        return [{"partName": "Verify cruise data directory exists", "result": "Pass"}]
+        return [{"partName": f"Verify {terms.cruise_lower} data directory exists", "result": "Pass"}]
 
 
     def on_job_exception(self, current_job, exc_info):

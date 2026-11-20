@@ -29,6 +29,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import Terms, fetch_terms
 from server.lib.transfer_utils import redact_payload
 
 # Gearman task names this worker registers.
@@ -63,32 +64,32 @@ CUSTOM_TASKS = [
     {
         "taskID": 0,
         "name": TASK_NAMES['POST_CREATE_CRUISE_HOOK'],
-        "longName": "Post setup new cruise",
+        "longName": "Post setup new {cruise_lower}",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['POST_CREATE_LOWERING_HOOK'],
-        "longName": "Post setup new lowering",
+        "longName": "Post setup new {lowering_lower}",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['PRE_FINALIZE_CRUISE_HOOK'],
-        "longName": "Pre-finalize current cruise",
+        "longName": "Pre-finalize current {cruise_lower}",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['POST_FINALIZE_CRUISE_HOOK'],
-        "longName": "Post-finalize current cruise",
+        "longName": "Post-finalize current {cruise_lower}",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['PRE_FINALIZE_LOWERING_HOOK'],
-        "longName": "Pre-finalize current lowering",
+        "longName": "Pre-finalize current {lowering_lower}",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['POST_FINALIZE_LOWERING_HOOK'],
-        "longName": "Post-finalize current lowering",
+        "longName": "Post-finalize current {lowering_lower}",
     }
 ]
 
@@ -114,6 +115,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
+        self.terms = Terms()
         self.files = None
         self.cruise_id = None
         self.lowering_id = None
@@ -124,13 +126,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
-    @staticmethod
-    def _get_custom_task(current_job):
-        """
-        Fetch task metadata
+    def _get_custom_task(self, current_job):
+        """Return the job's task from ``CUSTOM_TASKS``, or ``None``.
+
+        Its long name is worded with the install's names for cruises and
+        lowerings (``self.terms``, #685).
         """
 
-        return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        task = next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        return {**task, 'longName': task['longName'].format(**self.terms.as_dict())} if task else None
 
 
     @staticmethod
@@ -317,6 +321,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # The task comes from the job, not its payload: look it up first, so a
         # payload that can't be parsed fails this task (#544)
+        # The install's names for cruises and lowerings, for this job's messages (#685)
+        self.terms = fetch_terms(self.ovdm)
         self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
         if not self.task:
             return self._fail_job(current_job, "Retrieve task", "Task not found")

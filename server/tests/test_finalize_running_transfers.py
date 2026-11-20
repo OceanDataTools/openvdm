@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from server.lib import transfer_jobs
+from server.lib.terms import Terms
 from server.lib.transfer_jobs import IN_PROGRESS_REASON, ignored_as_in_progress, run_transfer_jobs
 from server.workers import cruise, lowering
 
@@ -122,7 +123,7 @@ def test_ignored_as_in_progress(result, expected) -> None:
 def test_lowering_finalize_warns_and_completes(monkeypatch, tmp_path) -> None:
     """A transfer that never got its final pass is reported, and finalize still exports."""
     (tmp_path / 'L1').mkdir()
-    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False)
+    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False, terms=Terms())
     worker.ovdm.get_active_collection_system_transfers.return_value = [
         {'collectionSystemTransferID': 1, 'name': 'SCS'},
         {'collectionSystemTransferID': 2, 'name': 'Sonar'}]
@@ -148,7 +149,7 @@ def test_lowering_finalize_warns_and_completes(monkeypatch, tmp_path) -> None:
 
 def test_cruise_finalize_runs_both_kinds_and_completes(monkeypatch, tmp_path) -> None:
     """Collection system and cruise data transfers each get the wait; finalize still completes."""
-    worker = Mock(cruise_dir=str(tmp_path), cruise_id='C1', stop=False)
+    worker = Mock(cruise_dir=str(tmp_path), cruise_id='C1', stop=False, terms=Terms())
     worker.ovdm.get_active_collection_system_transfers.return_value = [
         {'collectionSystemTransferID': 1, 'name': 'SCS'}]
     worker.ovdm.get_active_cruise_data_transfers.return_value = [
@@ -193,7 +194,7 @@ def test_stop_ends_the_wait(monkeypatch, clock) -> None:
 def test_stopped_lowering_finalize_ends_before_exporting(monkeypatch, tmp_path) -> None:
     """A finalize stopped during the final pass ends there, with an Ignore, so the task goes Idle."""
     (tmp_path / 'L1').mkdir()
-    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False)
+    worker = Mock(cruise_dir=str(tmp_path), lowering_dir='L1', lowering_id='L1', stop=False, terms=Terms())
     worker.ovdm.get_active_collection_system_transfers.return_value = [
         {'collectionSystemTransferID': 1, 'name': 'SCS'}]
 

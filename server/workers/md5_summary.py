@@ -28,6 +28,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import build_filelist, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM, UPDATE_MD5_SUMMARY_TASK
+from server.lib.terms import Terms, fetch_terms
 from server.lib.transfer_utils import redact_payload
 
 BUF_SIZE = 65536  # read files in 64kb chunks
@@ -67,6 +68,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
+        self.terms = Terms()
         self.cruise_id = None
         self.cruise_dir = None
         self.md5_summary_filepath = None
@@ -76,13 +78,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
-    @staticmethod
-    def _get_custom_task(current_job):
-        """
-        Fetch task metadata by name from CUSTOM_TASKS
+    def _get_custom_task(self, current_job):
+        """Return the job's task from ``CUSTOM_TASKS``, or ``None``.
+
+        Its long name is worded with the install's names for cruises and
+        lowerings (``self.terms``, #685).
         """
 
-        return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        task = next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        return {**task, 'longName': task['longName'].format(**self.terms.as_dict())} if task else None
 
     @staticmethod
     def hash_file(filepath):
@@ -236,6 +240,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # The task comes from the job, not its payload: look it up first, so a
         # payload that can't be parsed fails this task (#544)
+        # The install's names for cruises and lowerings, for this job's messages (#685)
+        self.terms = fetch_terms(self.ovdm)
         self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
 
         try:
@@ -422,7 +428,7 @@ def task_update_md5_summary(worker, current_job): # pylint: disable=too-many-bra
         rebuild_results['parts'].insert(0, {
             "partName": "Reading pre-existing MD5 Summary file",
             "result": "Pass",
-            "reason": "None yet; built it for the whole cruise"
+            "reason": f"None yet; built it for the whole {worker.terms.cruise_lower}"
         })
         return json.dumps(rebuild_results)
 
@@ -558,12 +564,12 @@ def task_rebuild_md5_summary(worker, current_job): # pylint: disable=too-many-st
 
     logging.debug("Pre-tasks checks")
     if not os.path.exists(worker.cruise_dir):
-        reason = f"Unable to locate the cruise directory: {worker.cruise_dir}"
+        reason = f"Unable to locate the {worker.terms.cruise_lower} directory: {worker.cruise_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify Cruise Directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Pass"})
 
     logging.info("Building filelist")
     worker.send_job_status(current_job, 15, 100)

@@ -38,6 +38,7 @@ import python3_gearman
 
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib import transfer_utils
+from server.lib.terms import fetch_terms
 from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.transfer_lock import CST, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
@@ -1268,8 +1269,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
 
         # fail if lowering ID is required but not found
         if (self.collection_system_transfer.get('cruiseOrLowering') == 1  or '{loweringID}' in self.collection_system_transfer.get('destDir')) and self.lowering_id is None:
-            return self._fail_job(current_job, "Verify lowering ID",
-                                    "Lowering ID is undefined")
+            terms = fetch_terms(self.ovdm)
+            return self._fail_job(current_job, f"Verify {terms.lowering_lower} ID",
+                                  f"{terms.lowering} ID is undefined")
 
         self.shipboard_data_warehouse_config = self.ovdm.get_shipboard_data_warehouse_config()
 

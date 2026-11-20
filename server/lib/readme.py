@@ -27,7 +27,7 @@ from typing import Optional
 
 import jinja2
 
-from server.lib.openvdm import DEFAULT_TERMS
+from server.lib.terms import Terms
 
 # The OpenVDM checkout: server/lib/readme.py -> the repository root
 OPENVDM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -191,33 +191,15 @@ def _extent(value) -> Optional[dict]:
     return value if isinstance(value, dict) and value else None
 
 
-def lower_term(name: str) -> str:
-    """Return a cruise or lowering name as it reads in a sentence (#684).
-
-    Each word in lower case, except one in capitals, such as an acronym, as
-    ``Helpers\\Terms::lower()`` does in the web app: "ROV Dive" gives
-    "ROV dive".
-
-    Args:
-        name: The name, e.g. ``'Voyage'``.
-
-    Returns:
-        str: e.g. ``'voyage'``.
-    """
-    return re.sub(r'[^\s-]+', lambda m: m.group(0) if len(m.group(0)) > 1 and m.group(0).isupper()
-                  else m.group(0).lower(), name)
-
-
 def _terms(terms) -> dict:
     """Return the cruise and lowering names for a template (#684).
 
     The names in *terms* (``OpenVDM.get_terms()``), with
     :data:`server.lib.openvdm.DEFAULT_TERMS`' for any missing, and each also
-    as ``<name>_lower`` (:func:`lower_term`) for the middle of a sentence.
+    as ``<name>_lower`` (:func:`server.lib.terms.lower_term`) for the middle
+    of a sentence.
     """
-    terms = terms if isinstance(terms, dict) else {}
-    names = {key: str(terms.get(key) or default) for key, default in DEFAULT_TERMS.items()}
-    return {**names, **{f'{key}_lower': lower_term(value) for key, value in names.items()}}
+    return Terms(terms).as_dict()
 
 
 def build_cruise_readme_context(cruise_config: dict, collection_systems: list,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals

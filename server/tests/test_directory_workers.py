@@ -23,6 +23,8 @@ REQUIRED = [{'name': 'Dashboard_Data', 'destDir': 'OpenVDM/DashboardData', 'requ
             {'name': 'From_PublicData', 'destDir': 'From_PublicData', 'required': 1}]
 EXTRA = {'name': 'Products', 'destDir': 'Products/{cruiseID}', 'required': 0}
 EXTRA_PER_LOWERING = {'name': 'Dive_Logs', 'destDir': 'Dive_Logs/{loweringID}', 'required': 0}
+# What an install might call cruises and lowerings (#685)
+VOYAGE = {'cruise': 'Voyage', 'cruises': 'Voyages', 'lowering': 'ROV Dive', 'lowerings': 'ROV Dives'}
 
 
 def _job(task, **payload):
@@ -183,7 +185,7 @@ def test_create_cruise_directory(cruise_worker, api, warehouse, perms) -> None:
     result = _run_cruise(cruise_worker, cruise_directory.task_create_cruise_directory,
                          'createCruiseDirectory')
     assert _parts(result) == [('Verify base directory exists', 'Pass'),
-                              ('Verify cruise directory does not exists', 'Pass'),
+                              ('Verify cruise directory does not exist', 'Pass'),
                               ('Build directory list', 'Pass'), ('Create directories', 'Pass'),
                               ('Set cruise directory ownership/permissions', 'Pass')]
     for directory in ('SCS', 'From_PublicData', 'OpenVDM/DashboardData', 'Products/TEST001'):
@@ -207,12 +209,12 @@ def test_create_cruise_directory_locks_down_others(cruise_worker, api, warehouse
 
 @pytest.mark.parametrize('setup, part', [
     (lambda w, a, p: w.base_dir.rename(w.base_dir.with_name('moved')), 'Verify base directory exists'),
-    (lambda w, a, p: None, 'Verify cruise directory does not exists'),
+    (lambda w, a, p: None, 'Verify cruise directory does not exist'),
     (lambda w, a, p: (w.cruise_dir.rmdir(), a.get_required_extra_directories.configure_mock(return_value=[]),
                       a.get_active_collection_system_transfers.configure_mock(return_value=[]),
                       a.get_active_extra_directories.configure_mock(return_value=[])),
      'Build directory list'),
-    (lambda w, a, p: (w.cruise_dir.rmdir(), w.cruise_dir.write_text('a file')), 'Verify cruise directory does not exists'),
+    (lambda w, a, p: (w.cruise_dir.rmdir(), w.cruise_dir.write_text('a file')), 'Verify cruise directory does not exist'),
     (lambda w, a, p: (w.cruise_dir.rmdir(), a.config.update(showOnlyCurrentCruiseDir=True),
                       setattr(p, 'lockdown_fail', 'denied')),
      'Clear CruiseData directory read permissions'),
@@ -231,6 +233,19 @@ def test_create_cruise_directory_failures(cruise_worker, api, warehouse, perms, 
     api.send_msg.assert_called_once_with('Creating cruise directory failed',
                                          json.loads(result)['parts'][-1]['reason'])
     api.set_error_task.assert_not_called()
+
+
+def test_cruise_messages_use_the_install_names(cruise_worker, api, warehouse, perms) -> None:
+    """Part names, reasons and the custom task's message use the install's names (#685)."""
+    api.get_terms.return_value = VOYAGE
+    result = _run_cruise(cruise_worker, cruise_directory.task_create_cruise_directory,
+                         'createCruiseDirectory')
+    part = json.loads(result)['parts'][-1]
+    assert part == {'partName': 'Verify voyage directory does not exist', 'result': 'Fail',
+                    'reason': f'Voyage directory {warehouse.cruise_dir} already exists'}
+
+    cruise_worker.on_job_complete(_job('createCruiseDirectory'), result)
+    api.send_msg.assert_called_once_with('Creating voyage directory failed', part['reason'])
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason='root can write to a read-only directory')
@@ -393,6 +408,16 @@ def test_lowering_job_setup(lowering_worker, warehouse) -> None:
     assert lowering_worker.lowering_id == 'DIVE01'
 
 
+def test_lowering_messages_use_the_install_names(lowering_worker, api) -> None:
+    """No lowering: the part, reason and message use the install's names (#685)."""
+    api.get_terms.return_value = VOYAGE
+    api.get_lowering_id.return_value = None
+    result = lowering_worker.on_job_execute(_job('createLoweringDirectory', loweringID=''))
+    assert json.loads(result)['parts'] == [{'partName': 'Verify ROV dive ID', 'result': 'Fail',
+                                            'reason': 'ROV Dive ID is undefined'}]
+    api.send_msg.assert_called_once_with('Creating ROV dive directory failed', 'ROV Dive ID is undefined')
+
+
 @pytest.mark.parametrize('data', ['not json', json.dumps({'loweringID': ''})])
 def test_lowering_job_needs_a_payload_and_lowering(lowering_worker, api, data) -> None:
     """A bad payload, or no lowering, fails the job."""
@@ -422,7 +447,7 @@ def test_create_lowering_directory(lowering_worker, api, warehouse, perms) -> No
                            'createLoweringDirectory')
     assert _parts(result) == [('Verify cruise directory exists', 'Pass'),
                               ('Verify lowering base directory exists', 'Pass'),
-                              ('Verify lowering directory does not exists', 'Pass'),
+                              ('Verify lowering directory does not exist', 'Pass'),
                               ('Build Directory List', 'Pass'), ('Create Directories', 'Pass'),
                               ('Set lowering directory ownership/permissions', 'Pass')]
     lowering_dir = warehouse.cruise_dir / 'Vehicle' / 'DIVE01'
@@ -438,7 +463,7 @@ def test_create_lowering_directory(lowering_worker, api, warehouse, perms) -> No
     (lambda w, p: w.cruise_dir.joinpath('Vehicle').rmdir() or w.cruise_dir.rmdir(),
      'Verify cruise directory exists'),
     (lambda w, p: w.cruise_dir.joinpath('Vehicle').rmdir(), 'Verify lowering base directory exists'),
-    (lambda w, p: w.cruise_dir.joinpath('Vehicle', 'DIVE01').mkdir(), 'Verify lowering directory does not exists'),
+    (lambda w, p: w.cruise_dir.joinpath('Vehicle', 'DIVE01').mkdir(), 'Verify lowering directory does not exist'),
     (lambda w, p: w.cruise_dir.joinpath('Video').write_text('a file in the way'), 'Create Directories'),
     (lambda w, p: setattr(p, 'owner_fail', 'denied'), 'Set lowering directory ownership/permissions'),
 ], ids=['no cruise directory', 'no lowering base directory', 'lowering exists', 'create fails',

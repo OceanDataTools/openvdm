@@ -26,6 +26,7 @@ sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 
 from server.lib.file_utils import create_directories, lockdown_directory, set_owner_group_permissions
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import Terms, fetch_terms
 from server.lib.transfer_utils import redact_payload
 
 # Gearman task names this worker registers.
@@ -40,12 +41,12 @@ CUSTOM_TASKS = [
     {
         "taskID": 0,
         "name": TASK_NAMES['CREATE_CRUISE_DIRECTORY'],
-        "longName": "Creating cruise directory",
+        "longName": "Creating {cruise_lower} directory",
     },
     {
         "taskID": 0,
         "name": TASK_NAMES['SET_CRUISEDATA_PERMISSIONS'],
-        "longName": "Setting CruiseData directory permissions",
+        "longName": "Setting {cruise_lower} data directory permissions",
     }
 ]
 
@@ -67,6 +68,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
+        self.terms = Terms()
         self.cruise_id = None
         self.cruise_dir = None
         self.lowering_id = None
@@ -75,13 +77,15 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
         super().__init__(host_list=[self.ovdm.get_gearman_server()])
 
 
-    @staticmethod
-    def _get_custom_task(current_job):
-        """
-        Fetch task metadata
+    def _get_custom_task(self, current_job):
+        """Return the job's task from ``CUSTOM_TASKS``, or ``None``.
+
+        Its long name is worded with the install's names for cruises and
+        lowerings (``self.terms``, #685).
         """
 
-        return next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        task = next((task for task in CUSTOM_TASKS if task['name'] == current_job.task), None)
+        return {**task, 'longName': task['longName'].format(**self.terms.as_dict())} if task else None
 
 
     def keyword_replace(self, s: str) -> str:
@@ -199,6 +203,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         # The task comes from the job, not its payload: look it up first, so a
         # payload that can't be parsed fails this task (#544)
+        # The install's names for cruises and lowerings, for this job's messages (#685)
+        self.terms = fetch_terms(self.ovdm)
         self.task = self._get_custom_task(current_job) or self.ovdm.get_task_by_name(current_job.task)
 
         try:
@@ -365,10 +371,10 @@ def task_create_cruise_directory(worker, current_job):
     job_results['parts'].append({"partName": "Verify base directory exists", "result": "Pass"})
 
     if os.path.exists(worker.cruise_dir):
-        job_results['parts'].append({"partName": "Verify cruise directory does not exists", "result": "Fail", "reason": f"Cruise directory {worker.cruise_dir} already exists"})
+        job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory does not exist", "result": "Fail", "reason": f"{worker.terms.cruise} directory {worker.cruise_dir} already exists"})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify cruise directory does not exists", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory does not exist", "result": "Pass"})
 
     logging.info("Building directory list")
     worker.send_job_status(current_job, 2, 10)
@@ -412,10 +418,10 @@ def task_create_cruise_directory(worker, current_job):
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.cruise_dir)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Set {worker.terms.cruise_lower} directory ownership/permissions", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Set cruise directory ownership/permissions", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Set {worker.terms.cruise_lower} directory ownership/permissions", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
@@ -458,18 +464,18 @@ def task_set_cruisedata_directory_permissions(worker, current_job):
     worker.send_job_status(current_job, 6, 10)
 
     if not os.path.isdir(worker.cruise_dir):
-        reason = "Cruise directory not found"
+        reason = f"{worker.terms.cruise} directory not found"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Set directory permissions for current cruise", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": f"Set directory permissions for current {worker.terms.cruise_lower}", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
     output_results = set_owner_group_permissions(worker.shipboard_data_warehouse_config['shipboardDataWarehouseUsername'], worker.cruise_dir)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Set directory permissions for current cruise", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Set directory permissions for current {worker.terms.cruise_lower}", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Set directory permissions for current cruise", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Set directory permissions for current {worker.terms.cruise_lower}", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
@@ -497,12 +503,12 @@ def task_rebuild_cruise_directory(worker, current_job):
     worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.cruise_dir):
-        reason = f"Unable to locate the cruise directory: {worker.cruise_dir}"
+        reason = f"Unable to locate the {worker.terms.cruise_lower} directory: {worker.cruise_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Pass"})
 
     if worker.ovdm.show_only_current_cruise_dir() is True:
         logging.info("Clear CruiseData Directory Read Permissions")
