@@ -26,6 +26,7 @@ from unittest.mock import create_autospec
 import pytest
 import yaml
 
+from server.lib import transfer_utils
 from server.lib.openvdm import OpenVDM
 from server.tests.helpers import (CONFIG_METHODS, ROOT, FakeGearmanClient, FakeRun, check_expected,
                                   load_dist_file)
@@ -135,10 +136,12 @@ def fake_run(monkeypatch) -> FakeRun:
     """A :class:`~server.tests.helpers.FakeRun` in place of ``subprocess.run``.
 
     Script results with ``fake_run.on('rclone', 'lsjson', stdout=...)``; check
-    commands with ``fake_run.commands()`` and ``fake_run.calls``.
+    commands with ``fake_run.commands()`` and ``fake_run.calls``. Also replaces
+    ``transfer_utils.run_listing_command()`` (#689).
     """
     run = FakeRun()
     monkeypatch.setattr(subprocess, 'run', run)
+    monkeypatch.setattr(transfer_utils, 'run_listing_command', run.run_listing_command)
     return run
 
 

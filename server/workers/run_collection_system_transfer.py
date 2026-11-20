@@ -322,6 +322,20 @@ def _add_files(all_files: dict, dest_name: Optional[str], files: dict) -> None:
                               else files[key])
 
 
+def _listing_time_limit_reason(message: str, time_limit: int) -> str:
+    """Return the failure reason for a source listing ended by its time limit (#689).
+
+    Args:
+        message: What was ended, e.g. ``"Listing source directory /data"``.
+        time_limit: The limit, in seconds.
+
+    Returns:
+        *message*, the limit, and the setting that changes it.
+    """
+    return (f"{message} took longer than {time_limit} s and was ended "
+            "(sourceListing timeLimit in openvdm.yaml)")
+
+
 def _rsync_listing_error(message: str, proc: subprocess.CompletedProcess) -> str:
     """Return the failure reason for an rsync source listing that failed.
 
@@ -590,12 +604,21 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 return []
             return [(os.path.join(parent, os.path.basename(m)), os.path.basename(m)) for m in matched]
 
+        # A listing that stalls fails instead of holding the transfer (#689)
+        limits = transfer_utils.source_listing_limits(self.ovdm.config)
+
         if transfer_type == 'rsync':
-            rsync_flags = ['--no-motd']
+            rsync_flags = ['--no-motd', f"--timeout={limits['ioTimeout']}"]
             if password_file is not None:
                 rsync_flags.append(f'--password-file={password_file}')
             cmd = ['rsync'] + rsync_flags + [f"rsync://{cst_cfg['rsyncUser']}@{cst_cfg['rsyncServer']}{parent}/"]
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            proc, ended = transfer_utils.run_listing_command(cmd, lambda: self.stop, limits['timeLimit'])
+            if ended == 'stopped':
+                return []
+            if ended:
+                logging.warning("%s", _listing_time_limit_reason(
+                    f"Listing {parent} to expand wildcard {pattern}", limits['timeLimit']))
+                return []
             if proc.returncode != 0:
                 logging.warning("Unable to list %s to expand wildcard: %s", parent, proc.stderr.strip())
                 return []
@@ -616,11 +639,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
         if transfer_type == 'ssh':
             user = cst_cfg['sshUser']
             host = cst_cfg['sshServer']
-            cmd = ['rsync', '-e', 'ssh', f"{user}@{host}:{parent}/"]
+            cmd = ['rsync', f"--timeout={limits['ioTimeout']}", '-e', transfer_utils.SSH_LISTING_COMMAND,
+                   f"{user}@{host}:{parent}/"]
             if not is_darwin:
                 cmd.insert(1, '--protect-args')
             with sshpass_command(cmd, cst_cfg) as cmd:
-                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                proc, ended = transfer_utils.run_listing_command(cmd, lambda: self.stop, limits['timeLimit'])
+            if ended == 'stopped':
+                return []
+            if ended:
+                logging.warning("%s", _listing_time_limit_reason(
+                    f"Listing {parent} to expand wildcard {pattern}", limits['timeLimit']))
+                return []
             if proc.returncode != 0:
                 logging.warning("Unable to list %s to expand wildcard: %s", parent, proc.stderr.strip())
                 return []
@@ -748,7 +778,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                 for exc in walk_errors:
                     logging.warning("Skipping unreadable source path: %s", exc)
         else:
-            command = ['rsync', '-r']
+            # A listing that stalls fails instead of holding the transfer (#689)
+            limits = transfer_utils.source_listing_limits(self.ovdm.config)
+            command = ['rsync', '-r', f"--timeout={limits['ioTimeout']}"]
             if cst_cfg.get('skipEmptyFiles') == 1:
                 command.append('--min-size=1')
 
@@ -763,7 +795,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
                             f"{cst_cfg['rsyncServer']}"
                             f"{raw_source_dir}/"]
             elif transfer_type == 'ssh':
-                command += ['-e', 'ssh',
+                command += ['-e', transfer_utils.SSH_LISTING_COMMAND,
                             f"{cst_cfg['sshUser']}@"
                             f"{cst_cfg['sshServer']}:{raw_source_dir}/"]
                 if not is_darwin:
@@ -772,7 +804,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             # The SSH password goes to sshpass in a file, not on the command line (#426)
             with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
                 logging.debug("File list Command: %s", ' '.join(run_cmd))
-                proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
+                proc, ended = transfer_utils.run_listing_command(run_cmd, lambda: self.stop,
+                                                                 limits['timeLimit'])
+            if ended == 'stopped':
+                return stopped
+            if ended:
+                return {'verdict': False, 'reason': _listing_time_limit_reason(
+                    f"Listing source directory {raw_source_dir}", limits['timeLimit'])}
             # A failed or partial listing looks like missing files, and
             # with syncFromSource those are deleted from the destination (#238)
             reason = _rsync_listing_failure(f"Error listing source directory {raw_source_dir}",
@@ -856,7 +894,13 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             else:
                 # A password file of its own: the listing's was deleted when it finished (#688)
                 with sshpass_command(command, cst_cfg) if transfer_type == 'ssh' else nullcontext(command) as run_cmd:
-                    proc = subprocess.run(run_cmd, capture_output=True, text=True, check=False)
+                    proc, ended = transfer_utils.run_listing_command(run_cmd, lambda: self.stop,
+                                                                     limits['timeLimit'])
+                if ended == 'stopped':
+                    return stopped
+                if ended:
+                    return {'verdict': False, 'reason': _listing_time_limit_reason(
+                        f"Re-listing source directory {raw_source_dir}", limits['timeLimit'])}
                 # Otherwise the staleness check is silently skipped (#238)
                 reason = _rsync_listing_failure(f"Error re-listing source directory {raw_source_dir}",
                                                 proc, cst_cfg['syncFromSource'] == 1)
@@ -1006,13 +1050,18 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):  # pylint: disable=too-m
             # Enumerate source directories (expands wildcards if present)
             source_pairs = self._enumerate_sources(transfer_type, source_dir, prefix, password_file, is_darwin, mount_base)
 
-            if not source_pairs:
-                return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
-
             all_files = {'new': [], 'updated': [], 'exclude': []}
             dirs_created = 0
             if cst_cfg['syncFromSource'] == 1:
                 all_files['deleted'] = []
+
+            # Stopped while expanding the wildcard (#689)
+            if self.stop:
+                logging.warning("Stopped while listing %s; nothing was copied", source_dir)
+                return {'verdict': True, 'stopped': True, 'files': all_files}
+
+            if not source_pairs:
+                return {'verdict': False, 'reason': f'No source directories found matching: {source_dir}', 'files': []}
 
             rsync_flags = build_rsync_options(cst_cfg, mode='real', is_darwin=is_darwin)
 

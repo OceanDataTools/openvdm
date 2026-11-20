@@ -6,7 +6,9 @@ running a transfer command while reporting progress and collecting the new,
 updated and deleted files. A command that fails raises
 :class:`TransferCommandError`, so the caller can fail the transfer instead of
 reporting it as successful (#230). Also the helpers that mask passwords in
-what the workers log (:func:`redact_command`, :func:`redact_payload`).
+what the workers log (:func:`redact_command`, :func:`redact_payload`), and
+the limits on listing a collection system transfer's rsync or SSH source
+(:func:`source_listing_limits`, :func:`run_listing_command`, #689).
 """
 
 import json
@@ -14,6 +16,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from collections import deque
 from typing import Any, Callable, Optional, Union
 
@@ -37,6 +40,15 @@ RCLONE_FILE_RE = re.compile(
 # rsync exit codes that don't mean the transfer failed: 24 is "some source
 # files vanished before they could be transferred", normal for live data
 RSYNC_OK_CODES = (0, 24)
+
+# Limits on listing a collection system transfer's rsync or SSH source, in
+# seconds, for those openvdm.yaml's sourceListing block doesn't set (#689):
+# rsync's --timeout (no data from the source) and the whole listing's time
+SOURCE_LISTING_DEFAULTS = {'ioTimeout': 300, 'timeLimit': 3600}
+
+# The ssh that lists an SSH source: it gives up connecting after 30 s, and on
+# a connection that stops answering 4 keepalives 15 s apart (#689)
+SSH_LISTING_COMMAND = 'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
 
 # A file listed for the transfer (--files-from) but gone by the time rsync
 # looks for it gives code 23 with only this error; that's also a vanished file
@@ -327,3 +339,78 @@ def run_transfer_command(cmd: list, file_count: int,
                         tool, returncode, error_detail(tool, recent))
 
     return result
+
+
+def source_listing_limits(config: dict) -> dict:
+    """Return the limits on listing an rsync or SSH source, from ``openvdm.yaml``.
+
+    The ``sourceListing`` block's ``ioTimeout`` (rsync's ``--timeout``: how
+    long the source may send nothing) and ``timeLimit`` (how long the whole
+    listing may take), in seconds; 0 turns a limit off. An unset or invalid
+    value uses :data:`SOURCE_LISTING_DEFAULTS`; an invalid one is logged (#689).
+
+    Args:
+        config: The ``openvdm.yaml`` settings, e.g. ``OpenVDM.config``.
+
+    Returns:
+        dict: ``{'ioTimeout': int, 'timeLimit': int}``.
+    """
+    block = config.get('sourceListing')
+    if not isinstance(block, dict):
+        block = {}
+    limits = dict(SOURCE_LISTING_DEFAULTS)
+    for key, default in SOURCE_LISTING_DEFAULTS.items():
+        value = block.get(key)
+        if value in (None, ''):
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            logging.warning("openvdm.yaml: sourceListing %s must be a whole number of seconds "
+                            "(0 for no limit), not %r; using %d", key, value, default)
+            continue
+        limits[key] = value
+    return limits
+
+
+def run_listing_command(cmd: list, should_stop: Optional[Callable[[], bool]] = None,
+                        time_limit: int = 0,
+                        poll_interval: float = 1.0) -> tuple[subprocess.CompletedProcess, Optional[str]]:
+    """Run a source listing command, ending it on Stop or when it takes too long.
+
+    Like ``subprocess.run(cmd, capture_output=True, text=True)``, but checks
+    *should_stop* and the time every *poll_interval* seconds, and ends the
+    command (``terminate``, then ``kill`` if it's still running 10 s later)
+    when the job is stopped or *time_limit* has passed (#689).
+
+    Args:
+        cmd: The listing command, e.g. ``rsync -r ...`` or ``sshpass ... rsync ...``.
+        should_stop: Returns ``True`` when the job has been stopped.
+        time_limit: Seconds the command may run; 0 for no limit.
+        poll_interval: Seconds between checks.
+
+    Returns:
+        tuple: The finished command (``CompletedProcess``, with its output so
+        far if it was ended), and ``None`` if it ran to the end, ``'stopped'``
+        or ``'timed out'``.
+    """
+    started = time.monotonic()
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as proc:
+        while True:
+            try:
+                stdout, stderr = proc.communicate(timeout=poll_interval)
+                return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr), None
+            except subprocess.TimeoutExpired:
+                pass
+            if should_stop and should_stop():
+                ended = 'stopped'
+            elif time_limit and time.monotonic() - started >= time_limit:
+                ended = 'timed out'
+            else:
+                continue
+            logging.info("Ending the listing: %s", ended)
+            proc.terminate()
+            try:
+                stdout, stderr = proc.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+            return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr), ended

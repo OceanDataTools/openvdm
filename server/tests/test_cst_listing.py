@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+from server.lib import transfer_utils
 from server.tests.cst_helpers import make_worker
 from server.workers import run_collection_system_transfer as cst_run
 
@@ -110,8 +111,9 @@ def test_enumerate_rsync_wildcard(worker, fake_run) -> None:
     fake_run.on('rsync', stdout=LISTING)
     pairs = worker(transferType=2)._enumerate_sources('rsync', '/data/run*', password_file='/tmp/pw')  # pylint: disable=protected-access
     assert pairs == [('/data/run01', 'run01'), ('/data/run02', 'run02')]
-    assert fake_run.calls[0].cmd == ['rsync', '--no-motd', '--password-file=/tmp/pw',
+    assert fake_run.calls[0].cmd == ['rsync', '--no-motd', '--timeout=300', '--password-file=/tmp/pw',
                                      'rsync://survey@host/module/data/']
+    assert fake_run.calls[0].kwargs['time_limit'] == 3600
 
 
 def test_enumerate_ssh_wildcard(worker, fake_run) -> None:
@@ -120,7 +122,8 @@ def test_enumerate_ssh_wildcard(worker, fake_run) -> None:
     w = worker(transferType=4)
     assert w._enumerate_sources('ssh', '/data/run0[12]') == [('/data/run01', 'run01'), ('/data/run02', 'run02')]  # pylint: disable=protected-access
     cmd = fake_run.calls[0].cmd
-    assert cmd[:2] == ['sshpass', '-f'] and cmd[3:] == ['rsync', '--protect-args', '-e', 'ssh', 'survey@host:/data/']
+    assert cmd[:2] == ['sshpass', '-f'] and cmd[3:] == ['rsync', '--protect-args', '--timeout=300', '-e',
+                                                        transfer_utils.SSH_LISTING_COMMAND, 'survey@host:/data/']
     fake_run.assert_not_in_commands('ssh-pw')
 
     w._enumerate_sources('ssh', '/data/run*', is_darwin=True)  # pylint: disable=protected-access
@@ -283,7 +286,8 @@ def test_rsync_file_list(worker, fake_run) -> None:
 
     assert sorted(result['files']['include']) == ['a.raw', 'sub/b.raw'] and result['files']['exclude'] == ['c.csv']
     cmd = fake_run.calls[0].cmd
-    assert cmd[:4] == ['rsync', '-r', '--min-size=1', '-m']
+    assert cmd[:5] == ['rsync', '-r', '--timeout=300', '--min-size=1', '-m']
+    assert fake_run.calls[0].kwargs['time_limit'] == 3600
     assert any(arg.startswith('--exclude=') for arg in cmd)
     assert cmd[-3:] == ['--password-file=/tmp/pw', '--no-motd', 'rsync://survey@host/module/data/']
 
@@ -308,7 +312,8 @@ def test_ssh_file_list(worker, fake_run) -> None:
     w = worker(transferType=4)
     assert len(w.build_cst_filelist()['files']['include']) == 3
     cmd = fake_run.calls[0].cmd
-    assert cmd[:2] == ['sshpass', '-f'] and '--protect-args' in cmd and cmd[-3:] == ['-e', 'ssh', 'survey@host:/data/']
+    assert cmd[:2] == ['sshpass', '-f'] and '--protect-args' in cmd and cmd[-3:] == [
+        '-e', transfer_utils.SSH_LISTING_COMMAND, 'survey@host:/data/']
     fake_run.assert_not_in_commands('ssh-pw')
 
     w.build_cst_filelist(is_darwin=True)
@@ -360,6 +365,51 @@ def test_rsync_staleness_relisting_fails(worker, fake_run, monkeypatch) -> None:
     fake_run.on('rsync', stdout=RSYNC_LISTING)
     result = worker(transferType=2, staleness=10).build_cst_filelist(rsync_password_filepath='/p')
     assert result['reason'].startswith('Error re-listing source directory /data: rsync exited with code 10')
+
+
+# --- Listing limits and Stop (#689) ---------------------------------------------
+
+def test_listing_limits_from_openvdm_yaml(worker, fake_run, fake_ovdm) -> None:
+    """sourceListing's ioTimeout is rsync's --timeout, and its timeLimit the listing's."""
+    fake_ovdm.config['sourceListing'] = {'ioTimeout': 60, 'timeLimit': 0}
+    fake_run.on('rsync', stdout=RSYNC_LISTING)
+    worker(transferType=2).build_cst_filelist(rsync_password_filepath='/p')
+    assert '--timeout=60' in fake_run.calls[0].cmd and fake_run.calls[0].kwargs['time_limit'] == 0
+
+
+@pytest.mark.parametrize('transfer_type, prefix', [(2, 'rsync'), (4, 'sshpass')])
+def test_stuck_listing_fails_at_its_time_limit(worker, fake_run, transfer_type, prefix) -> None:
+    """A listing that never ends fails the transfer with the limit and its setting."""
+    fake_run.on(prefix, hangs=True)
+    result = worker(transferType=transfer_type).build_cst_filelist(rsync_password_filepath='/p')
+    assert result == {'verdict': False, 'reason': 'Listing source directory /data took longer than 3600 s '
+                                                  'and was ended (sourceListing timeLimit in openvdm.yaml)'}
+
+
+@pytest.mark.parametrize('transfer_type, prefix', [(2, 'rsync'), (4, 'sshpass')])
+def test_stop_ends_a_stuck_listing(worker, fake_run, transfer_type, prefix) -> None:
+    """Stop ends an rsync or SSH listing, which copies and deletes nothing (#473)."""
+    fake_run.on(prefix, hangs=True)
+    w = worker(transferType=transfer_type, syncFromSource=1)
+    w.stop = True
+    result = w.build_cst_filelist(rsync_password_filepath='/p')
+    assert result['verdict'] and result['stopped'] and result['files']['include'] == []
+
+
+def test_stuck_staleness_relisting(worker, fake_run, monkeypatch) -> None:
+    """The staleness re-listing has the same limit."""
+    monkeypatch.setattr(cst_run.time, 'sleep', lambda seconds: fake_run.on('rsync', hangs=True))
+    fake_run.on('rsync', stdout=RSYNC_LISTING)
+    result = worker(transferType=2, staleness=10).build_cst_filelist(rsync_password_filepath='/p')
+    assert result['reason'].startswith('Re-listing source directory /data took longer than 3600 s')
+
+
+def test_stuck_wildcard_listing(worker, fake_run, caplog) -> None:
+    """A wildcard listing that never ends matches nothing, and the log says why."""
+    fake_run.on('rsync', hangs=True)
+    with caplog.at_level(logging.WARNING):
+        assert worker(transferType=2)._enumerate_sources('rsync', '/data/run*') == []  # pylint: disable=protected-access
+    assert 'Listing /data to expand wildcard run* took longer than 3600 s' in caplog.text
 
 
 # --- File lists: FTP ----------------------------------------------------------
