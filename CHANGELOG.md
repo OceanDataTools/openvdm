@@ -8,6 +8,9 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 **Upgrading:** optionally, copy the `sourceListing` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689).
 
+### Changed
+- **Worker messages use the install's names for cruises and lowerings:** an install that calls them something else, e.g. Voyage and Dive (#684), now sees those names in the workers' task steps (shown on the Configuration page after a task), failure reasons and OpenVDM messages too, e.g. "Verify voyage directory exists" and "Creating voyage directory failed". The workers fetch the names once per task job, and a transfer worker only when a message needs them; if the API can't be reached, the default names are used. Log messages still say cruise and lowering. A few step names now read "does not exist" instead of "does not exists" (#685).
+
 ### Fixed
 - **A collection system transfer stuck listing its source:** listing an rsync or SSH source had no time limit, so a connection that stalled, or an `ssh` waiting for an answer it would never get, left the transfer Running until its worker was restarted, and Stop had no effect while it listed (#688 was one cause). Now:
   - the listing gives up when the source sends nothing for 5 minutes (rsync's `--timeout`), and an SSH listing when the connection can't be made in 30 s or stops answering for a minute (`ConnectTimeout`, `ServerAliveInterval`);

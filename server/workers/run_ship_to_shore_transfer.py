@@ -33,6 +33,7 @@ import python3_gearman
 sys.path.append(dirname(dirname(dirname(realpath(__file__)))))
 from server.lib.file_utils import is_ascii, is_default_ignore, output_json_data_to_file, set_owner_group_permissions, temporary_directory, write_list_file, start_orphan_cleanup
 from server.lib import transfer_utils
+from server.lib.terms import fetch_terms
 from server.lib.transfer_utils import TransferCommandError, redact_payload
 from server.lib.transfer_lock import CDT, acquire_transfer_lock, release_transfer_lock
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
@@ -420,8 +421,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                     'name': "UNKNOWN"
                 }
 
-                return self._fail_job(current_job, "Located Cruise Data Transfer Data",
-                                      "Could not find configuration data for cruise data transfer")
+                terms = fetch_terms(self.ovdm)
+                return self._fail_job(current_job, f"Located {terms.cruise} Data Transfer Data",
+                                      f"Could not find configuration data for {terms.cruise_lower} data transfer")
 
             self.cruise_data_transfer.update(payload_obj.get('cruiseDataTransfer', {}))
 
@@ -431,8 +433,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         except Exception:
             logging.exception("Failed to retrieve cruise data transfer config")
-            return self._fail_job(current_job, "Located Cruise Data Transfer Data",
-                                  "Could not retrieve data for cruise data transfer from OpenVDM API")
+            terms = fetch_terms(self.ovdm)
+            return self._fail_job(current_job, f"Located {terms.cruise} Data Transfer Data",
+                                  f"Could not retrieve data for {terms.cruise_lower} data transfer from OpenVDM API")
 
         # Set logging format with cruise transfer name
         logging.getLogger().handlers[0].setFormatter(logging.Formatter(

@@ -232,7 +232,7 @@ def test_rebuild(worker, cruise, perms) -> None:
     cruise.summary.write_text('old summary\n')
     cruise.summary_md5.write_text('old md5')
     assert _parts(_rebuild(worker)) == [
-        ('Verify Cruise Directory exists', 'Pass'), ('Retrieve Filelist', 'Pass'), ('Calculate Hashes', 'Pass'),
+        ('Verify cruise directory exists', 'Pass'), ('Retrieve Filelist', 'Pass'), ('Calculate Hashes', 'Pass'),
         ('Writing MD5 Summary file', 'Pass'), ('Set MD5 Summary file ownership/permissions', 'Pass'),
         ('Writing MD5 Summary MD5 file', 'Pass'), ('Set MD5 Summary MD5 file ownership/permissions', 'Pass')]
     assert _summary(cruise) == _expected(cruise)
@@ -252,7 +252,7 @@ def test_rebuild_no_cruise_directory(worker, cruise) -> None:
     """Without the cruise directory, the rebuild fails."""
     worker.cruise_dir = str(cruise.dir / 'missing')
     result = json.loads(_rebuild(worker))
-    assert result['parts'] == [{'partName': 'Verify Cruise Directory exists', 'result': 'Fail',
+    assert result['parts'] == [{'partName': 'Verify cruise directory exists', 'result': 'Fail',
                                 'reason': f"Unable to locate the cruise directory: {cruise.dir / 'missing'}"}]
 
 

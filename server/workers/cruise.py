@@ -45,6 +45,7 @@ from server.workers.data_dashboard import TASK_NAMES as DATA_DASHBOARD_TASK_NAME
 from server.workers.md5_summary import TASK_NAMES as MD5_TASK_NAMES
 
 from server.lib.openvdm import OpenVDM
+from server.lib.terms import Terms, fetch_terms
 from server.lib.readme import build_cruise_readme_context, readme_filename, readme_settings, render_readme, write_readme
 
 # Gearman task names this worker registers.
@@ -73,6 +74,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         self.stop = False
         self.ovdm = OpenVDM()
         self.task = None
+        self.terms = Terms()
         self.cruise_id = None
         self.cruise_dir = None
         self.cruise_start_date = None
@@ -228,7 +230,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             show_lowerings = self.ovdm.get_show_lowering_components()
             terms = self.ovdm.get_terms()
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            return {'verdict': False, 'reason': f"Unable to get the cruise configuration from OpenVDM: {exc}"}
+            return {'verdict': False, 'reason': f"Unable to get the {self.terms.cruise_lower} configuration from OpenVDM: {exc}"}
 
         finalized_on = None
         cruise_config_file_path = os.path.join(self.cruise_dir, self.shipboard_data_warehouse_config['cruiseConfigFn'])
@@ -399,6 +401,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
         # The task comes from the job, not its payload: look it up first, so a
         # payload that can't be parsed fails this task (#544)
+        # The install's names for cruises and lowerings, for this job's messages (#685)
+        self.terms = fetch_terms(self.ovdm)
         self.task = self.ovdm.get_task_by_name(current_job.task)
 
         # Clear the last job's cruise, so a job that fails before reading its
@@ -655,13 +659,13 @@ def _add_readme_part(worker, job_results, notify):
         return
 
     if output_results['verdict']:
-        job_results['parts'].append({"partName": "Write cruise README", "result": "Pass"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.cruise_lower} README", "result": "Pass"})
         return
 
     logging.error("Unable to write the cruise README: %s", output_results['reason'])
-    job_results['parts'].append({"partName": "Write cruise README", "result": "Fail", "reason": output_results['reason']})
+    job_results['parts'].append({"partName": f"Write {worker.terms.cruise_lower} README", "result": "Fail", "reason": output_results['reason']})
     if notify:
-        worker.ovdm.send_msg("Cruise README not written", output_results['reason'])
+        worker.ovdm.send_msg(f"{worker.terms.cruise} README not written", output_results['reason'])
 
 
 def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-return-statements,too-many-statements
@@ -708,10 +712,10 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
 
     if results['parts'][-1]['result'] == "Fail": # Final Verdict
         logging.error("Failed to create cruise data directory")
-        job_results['parts'].append({"partName": "Create cruise data directory structure", "result": "Fail", "reason": results['parts'][-1]['reason']})
+        job_results['parts'].append({"partName": f"Create {worker.terms.cruise_lower} data directory structure", "result": "Fail", "reason": results['parts'][-1]['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Create cruise data directory structure", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Create {worker.terms.cruise_lower} data directory structure", "result": "Pass"})
 
     logging.info("Creating MD5 summary files")
     worker.send_job_status(current_job, 5, 10)
@@ -733,10 +737,10 @@ def task_setup_new_cruise(worker, current_job): # pylint: disable=too-many-retur
     output_results = worker.export_cruise_config()
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Pass"})
 
     _add_readme_part(worker, job_results, notify=True)
 
@@ -809,12 +813,12 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     worker.send_job_status(current_job, 1, 10)
 
     if not os.path.exists(worker.cruise_dir):
-        reason = f"Cruise directory does not exist: {worker.cruise_dir}"
+        reason = f"{worker.terms.cruise} directory does not exist: {worker.cruise_dir}"
         logging.error(reason)
-        job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Fail", "reason": reason})
+        job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Fail", "reason": reason})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Verify cruise directory exists", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Verify {worker.terms.cruise_lower} directory exists", "result": "Pass"})
 
     logging.info("Queuing collection system transfers jobs")
     worker.send_job_status(current_job, 2, 10)
@@ -877,10 +881,10 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     output_results = worker.export_cruise_config(finalize=True)
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Pass"})
 
     _add_readme_part(worker, job_results, notify=True)
 
@@ -927,16 +931,16 @@ def task_finalize_current_cruise(worker, current_job): # pylint: disable=too-man
     if worker.stop:
         # Stopped during the transfers' final pass: end here, so the task
         # goes back to Idle without going on to the next steps (#487)
-        job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Ignore", "reason": "Stopped"})
+        job_results['parts'].append({"partName": f"Run {worker.terms.cruise_lower} data transfers jobs", "result": "Ignore", "reason": "Stopped"})
         return json.dumps(job_results)
 
     # Before the Pass part: the last part decides the job's outcome
     if missed:
-        report_missed(worker.ovdm, job_results, f"Finalizing {worker.cruise_id}: cruise data transfers still running",
-                      "Final pass of cruise data transfers",
+        report_missed(worker.ovdm, job_results, f"Finalizing {worker.cruise_id}: {worker.terms.cruise_lower} data transfers still running",
+                      f"Final pass of {worker.terms.cruise_lower} data transfers",
                       [cdt['name'] for cdt in cruise_data_transfers if cdt['cruiseDataTransferID'] in missed])
 
-    job_results['parts'].append({"partName": "Run cruise data transfers jobs", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Run {worker.terms.cruise_lower} data transfers jobs", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)
@@ -997,10 +1001,10 @@ def task_export_cruise_config(worker, current_job):
     output_results = worker.export_cruise_config()
 
     if not output_results['verdict']:
-        job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Fail", "reason": output_results['reason']})
         return json.dumps(job_results)
 
-    job_results['parts'].append({"partName": "Export cruise config data to file", "result": "Pass"})
+    job_results['parts'].append({"partName": f"Export {worker.terms.cruise_lower} config data to file", "result": "Pass"})
 
     # The README is this task's last part, so a failure fails the task
     _add_readme_part(worker, job_results, notify=False)
@@ -1035,12 +1039,12 @@ def task_rebuild_cruise_readme(worker, current_job):
     output_results = worker.build_cruise_readme()
 
     if output_results.get('skipped'):
-        job_results['parts'].append({"partName": "Write cruise README", "result": "Fail",
-                                     "reason": "The cruise README is turned off (cruiseReadme in openvdm.yaml)"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.cruise_lower} README", "result": "Fail",
+                                     "reason": f"The {worker.terms.cruise_lower} README is turned off (cruiseReadme in openvdm.yaml)"})
     elif not output_results['verdict']:
-        job_results['parts'].append({"partName": "Write cruise README", "result": "Fail", "reason": output_results['reason']})
+        job_results['parts'].append({"partName": f"Write {worker.terms.cruise_lower} README", "result": "Fail", "reason": output_results['reason']})
     else:
-        job_results['parts'].append({"partName": "Write cruise README", "result": "Pass"})
+        job_results['parts'].append({"partName": f"Write {worker.terms.cruise_lower} README", "result": "Pass"})
 
     worker.send_job_status(current_job, 10, 10)
     return json.dumps(job_results)

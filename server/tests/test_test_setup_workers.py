@@ -339,6 +339,11 @@ def test_cdt_cruise_dir_check(cdt_worker, warehouse, fake_ovdm) -> None:
     assert cdt_worker.test_cruise_dir() == [{'partName': 'Verify cruise data directory exists', 'result': 'Pass'}]
     cdt_worker.cruise_dir = str(warehouse.base_dir / 'missing')
     assert cdt_worker.test_cruise_dir()[0]['result'] == 'Fail'
+    # Worded with the install's names (#685)
+    fake_ovdm.get_terms.return_value = {'cruise': 'Voyage'}
+    assert cdt_worker.test_cruise_dir() == [{
+        'partName': 'Verify voyage data directory exists', 'result': 'Fail',
+        'reason': f"Unable to find voyage data directory: {warehouse.base_dir / 'missing'}"}]
     fake_ovdm.set_error_cruise_data_transfer_test.assert_not_called()
 
 
