@@ -4,6 +4,18 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ---
 
+## [2.18.0] – Unreleased
+
+**Upgrading:** optionally, copy the `sourceListing` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689).
+
+### Fixed
+- **A collection system transfer stuck listing its source:** listing an rsync or SSH source had no time limit, so a connection that stalled, or an `ssh` waiting for an answer it would never get, left the transfer Running until its worker was restarted, and Stop had no effect while it listed (#688 was one cause). Now:
+  - the listing gives up when the source sends nothing for 5 minutes (rsync's `--timeout`), and an SSH listing when the connection can't be made in 30 s or stops answering for a minute (`ConnectTimeout`, `ServerAliveInterval`);
+  - a listing, the staleness check's re-listing included, that takes longer than an hour fails the transfer, saying so;
+  - Stop ends an rsync or SSH listing, as it does a local or SMB one (#473), and nothing is copied or deleted.
+  
+  The new `sourceListing` block in `openvdm.yaml` sets the two limits (`ioTimeout`, `timeLimit`, in seconds; 0 turns one off): raise `timeLimit` for a source that legitimately takes longer to list (#689).
+
 ## [2.17.0] – 2026-11-12
 
 **Upgrading:** follow "Upgrading from 2.16.3" in [INSTALL.md](INSTALL.md) (from 2.14 or 2.15, its "From 2.14 or 2.15"). In short:

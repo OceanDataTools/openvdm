@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import stat
+import sys
 import time
 from datetime import datetime
 from types import SimpleNamespace
@@ -459,6 +460,44 @@ def test_stop_terminates_the_command(tmp_path) -> None:
                                            then='exec sleep 30'), 2, should_stop=lambda: next(lines, True))
     assert result == {'new': ['a.txt'], 'updated': [], 'deleted': [], 'stopped': True}
     assert time.monotonic() - started < 10
+
+
+# --- Transfers: source listing limits (#689) ----------------------------------
+
+def test_source_listing_limits_defaults_and_settings(caplog) -> None:
+    """Unset values use the defaults; invalid ones are logged and use them too."""
+    assert tu.source_listing_limits({}) == {'ioTimeout': 300, 'timeLimit': 3600}
+    assert tu.source_listing_limits(
+        {'sourceListing': {'ioTimeout': 0, 'timeLimit': 7200}}) == {'ioTimeout': 0, 'timeLimit': 7200}
+    with caplog.at_level(logging.WARNING):
+        assert tu.source_listing_limits(
+            {'sourceListing': {'ioTimeout': -1, 'timeLimit': '1h'}}) == {'ioTimeout': 300, 'timeLimit': 3600}
+    assert 'sourceListing ioTimeout' in caplog.text and "not '1h'" in caplog.text
+    assert tu.source_listing_limits({'sourceListing': None}) == {'ioTimeout': 300, 'timeLimit': 3600}
+
+
+def test_run_listing_command_runs_to_the_end() -> None:
+    """A command that finishes returns its output, as subprocess.run would."""
+    proc, ended = tu.run_listing_command(
+        [sys.executable, '-c', 'import sys; print("listed"); sys.stderr.write("warn")'], poll_interval=0.05)
+    assert ended is None and proc.returncode == 0
+    assert proc.stdout == 'listed\n' and proc.stderr == 'warn'
+
+
+def test_run_listing_command_stopped() -> None:
+    """Stop ends a command that would run on."""
+    started = time.monotonic()
+    proc, ended = tu.run_listing_command(['sleep', '30'], lambda: True, poll_interval=0.05)
+    assert ended == 'stopped' and proc.returncode != 0 and time.monotonic() - started < 10
+
+
+def test_run_listing_command_time_limit() -> None:
+    """The time limit ends a command that runs too long; 0 is no limit."""
+    started = time.monotonic()
+    proc, ended = tu.run_listing_command(['sleep', '30'], time_limit=0.2, poll_interval=0.05)
+    assert ended == 'timed out' and proc.returncode != 0 and time.monotonic() - started < 10
+    _, ended = tu.run_listing_command(['sleep', '0.2'], time_limit=0, poll_interval=0.05)
+    assert ended is None
 
 
 # --- Files: listing and list files --------------------------------------------

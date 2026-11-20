@@ -136,7 +136,9 @@ class FakeRun:
     command's first arguments, the most recently added first; a command no
     rule matches succeeds with no output. As ``subprocess.run`` does, a
     failing result raises ``CalledProcessError`` when the call passed
-    ``check=True``.
+    ``check=True``. It also stands in for
+    :func:`server.lib.transfer_utils.run_listing_command` (:meth:`run_listing_command`),
+    where a rule with ``hangs=True`` is a listing that never ends (#689).
 
     Attributes:
         calls: The recorded calls (``cmd``, ``kwargs``, ``files``), in order.
@@ -148,7 +150,7 @@ class FakeRun:
 
     def on(self, *prefix: str, returncode: int = 0, stdout: str = '', stderr: str = '',  # pylint: disable=too-many-arguments
            raises: Optional[BaseException] = None,
-           effect: Optional[Callable[[list, dict], None]] = None) -> 'FakeRun':
+           effect: Optional[Callable[[list, dict], None]] = None, hangs: bool = False) -> 'FakeRun':
         """Script the result of commands starting with *prefix*.
 
         Args:
@@ -161,12 +163,15 @@ class FakeRun:
             effect: Called with the command and keyword arguments before the
                 result is returned, e.g. to write to a file the command was
                 given.
+            hangs: For :meth:`run_listing_command`: the command never ends, so
+                it's ended by Stop or its time limit.
 
         Returns:
             FakeRun: This object, so calls can be chained.
         """
         self._rules.append((list(prefix), SimpleNamespace(
-            returncode=returncode, stdout=stdout, stderr=stderr, raises=raises, effect=effect)))
+            returncode=returncode, stdout=stdout, stderr=stderr, raises=raises, effect=effect,
+            hangs=hangs)))
         return self
 
     @staticmethod
@@ -182,11 +187,7 @@ class FakeRun:
     def __call__(self, cmd, **kwargs) -> subprocess.CompletedProcess:
         cmd = [str(arg) for arg in cmd]
         self.calls.append(SimpleNamespace(cmd=cmd, kwargs=kwargs, files=self._files(cmd)))
-        result = SimpleNamespace(returncode=0, stdout='', stderr='', raises=None, effect=None)
-        for prefix, scripted in reversed(self._rules):
-            if cmd[:len(prefix)] == prefix:
-                result = scripted
-                break
+        result = self._result(cmd)
         if result.effect:
             result.effect(cmd, kwargs)
         if result.raises is not None:
@@ -195,6 +196,36 @@ class FakeRun:
             raise subprocess.CalledProcessError(result.returncode, cmd, output=result.stdout,
                                                 stderr=result.stderr)
         return subprocess.CompletedProcess(cmd, result.returncode, result.stdout, result.stderr)
+
+    def _result(self, cmd: list) -> SimpleNamespace:
+        """The scripted result of the most recently added rule matching *cmd*."""
+        for prefix, scripted in reversed(self._rules):
+            if cmd[:len(prefix)] == prefix:
+                return scripted
+        return SimpleNamespace(returncode=0, stdout='', stderr='', raises=None, effect=None,
+                               hangs=False)
+
+    def run_listing_command(self, cmd, should_stop=None, time_limit=0,
+                            poll_interval=1.0):  # pylint: disable=unused-argument
+        """Stand in for ``transfer_utils.run_listing_command()``, recording the call.
+
+        A command scripted with ``hangs=True`` is ended as the real one ends
+        it: ``'stopped'`` if *should_stop* returns ``True``, otherwise
+        ``'timed out'`` if there's a *time_limit*.
+
+        Returns:
+            tuple: The ``CompletedProcess`` and how it ended (``None``,
+            ``'stopped'`` or ``'timed out'``).
+        """
+        if self._result([str(arg) for arg in cmd]).hangs:
+            cmd = [str(arg) for arg in cmd]
+            self.calls.append(SimpleNamespace(cmd=cmd, kwargs={'time_limit': time_limit},
+                                              files=self._files(cmd)))
+            if should_stop and should_stop():
+                return subprocess.CompletedProcess(cmd, -15, '', ''), 'stopped'
+            assert time_limit, f"{cmd} hangs with no Stop and no time limit"
+            return subprocess.CompletedProcess(cmd, -15, '', ''), 'timed out'
+        return self(cmd, capture_output=True, text=True, check=False, time_limit=time_limit), None
 
     def commands(self, *prefix: str) -> List[list]:
         """Return the recorded commands, or only those starting with *prefix*."""
