@@ -94,7 +94,7 @@ def test_ship_to_shore_uses_remote_limits(
 
     assert result['verdict'] is True
     assert result['files']['new'] == ['video.mp4']
-    _, command, file_count = worker.run_transfer_command.call_args.args
+    command, file_count = worker.run_transfer_command.call_args.args[1:3]
     assert command[:4] == ['rclone', 'copy', '/data/', 'shore:archive/']
     limits = [part for i, part in enumerate(command)
               if part in CONCURRENCY_FLAGS or (i and command[i - 1] in CONCURRENCY_FLAGS)]

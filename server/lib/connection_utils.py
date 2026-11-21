@@ -1441,7 +1441,7 @@ def build_rclone_options(
     return copy_sync, flags
 
 
-def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
+def build_rsync_options(cfg, mode='dry-run', is_darwin=False, io_timeout=0):
     """Return the rsync options for a transfer.
 
     Dry runs use ``-trinv --dry-run --stats``; real transfers use ``-triv
@@ -1456,6 +1456,9 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
             value for a real transfer.
         is_darwin: The remote end runs macOS, whose rsync doesn't support
             ``--protect-args`` (see :func:`check_darwin`).
+        io_timeout: For a real transfer, rsync's ``--timeout``: seconds with
+            nothing received before it gives up; 0 for none. Given for copies
+            to or from another host (#711).
 
     Returns:
         list[str]: The rsync options.
@@ -1482,6 +1485,9 @@ def build_rsync_options(cfg, mode='dry-run', is_darwin=False):
     else:
         if transfer_type == 'rsync':
             flags.append('--no-motd')
+
+        if io_timeout:
+            flags.append(f'--timeout={io_timeout}')
 
         if cfg.get('bandwidthLimit') not in (None, 0):
             flags.insert(1, f"--bwlimit={cfg['bandwidthLimit']}")

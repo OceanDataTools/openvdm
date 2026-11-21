@@ -15,6 +15,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from server.lib import transfer_utils
 from server.lib.transfer_jobs import IN_PROGRESS_REASON
 from server.lib.transfer_utils import TransferCommandError
 from server.tests.cst_helpers import CST_DEFAULTS, make_worker
@@ -37,10 +38,12 @@ class FakeCopy:  # pylint: disable=too-few-public-methods
 
     def __init__(self):
         self.commands = []
+        self.idle_timeouts = []
         self.fail = None
 
-    def __call__(self, worker, current_job, cmd, file_count, dest_dir):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __call__(self, worker, current_job, cmd, file_count, dest_dir, idle_timeout=0):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self.commands.append(cmd)
+        self.idle_timeouts.append(idle_timeout)
         files_from = next(arg.split('=', 1)[1] for arg in cmd if arg.startswith('--files-from='))
         with open(files_from, encoding='utf-8') as file:
             listed = [line.rstrip('\n') for line in file if line.strip()]
@@ -90,6 +93,8 @@ def test_local_transfer(worker, fake_copy, tmp_path) -> None:
     assert (tmp_path / 'src' / 'a.raw').read_text() == Path(os.path.join(w.dest_dir, 'a.raw')).read_text(encoding='utf-8')
     cmd = fake_copy.commands[0]
     assert cmd[0] == 'rsync' and cmd[-2:] == [f"{tmp_path / 'src'}/", w.dest_dir]
+    assert not any(arg.startswith('--timeout') for arg in cmd), 'a local copy has no I/O timeout (#711)'
+    assert fake_copy.idle_timeouts == [0]
 
 
 def test_local_transfer_syncs_deletions(worker, fake_copy, tmp_path) -> None:
@@ -260,7 +265,8 @@ def test_rsync_transfer(worker, fake_copy, fake_run) -> None:
     cmd = fake_copy.commands[0]
     password_arg = next(arg for arg in cmd if arg.startswith('--password-file='))
     assert fake_run.calls[0].files[password_arg.split('=', 1)[1]] == 'rsync-pw'
-    assert cmd[-2] == 'rsync://survey@host/module/data/'
+    assert cmd[-2] == 'rsync://survey@host/module/data/' and '--timeout=300' in cmd
+    assert fake_copy.idle_timeouts == [300]
     fake_run.assert_not_in_commands('rsync-pw')
 
 
@@ -277,7 +283,7 @@ def test_rsync_password_file_cant_be_written(worker, monkeypatch) -> None:
 
 
 def test_ssh_transfer(worker, fake_copy, fake_run, monkeypatch) -> None:
-    """Copied with rsync -e ssh through sshpass; macOS servers are detected first."""
+    """Copied with rsync over ssh through sshpass, with the I/O timeout and ssh's (#711)."""
     monkeypatch.setattr(cst_run, 'check_darwin', lambda cfg: False)
     fake_run.on('sshpass', stdout='-rw-r--r--  10 2026/10/22 10:00:00 a.raw\n')
     w = worker(transferType=4)
@@ -285,7 +291,8 @@ def test_ssh_transfer(worker, fake_copy, fake_run, monkeypatch) -> None:
 
     assert w.transfer_from_source(None)['files']['new'] == ['a.raw']
     cmd = fake_copy.commands[0]
-    assert cmd[:2] == ['sshpass', '-f'] and ['-e', 'ssh'] == cmd[cmd.index('-e'):cmd.index('-e') + 2]
+    assert cmd[:2] == ['sshpass', '-f'] and cmd[cmd.index('-e') + 1] == transfer_utils.SSH_COMMAND
+    assert '--timeout=300' in cmd and fake_copy.idle_timeouts == [300]
     assert cmd[-2] == 'survey@host:/data/'
 
 

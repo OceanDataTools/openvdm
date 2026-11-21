@@ -117,6 +117,13 @@ def test_build_rsync_options_all_settings() -> None:
                               '--protect-args', '--progress', '--no-motd'}
 
 
+def test_build_rsync_options_io_timeout() -> None:
+    """A real transfer gets --timeout when given one; a dry run, which is local, doesn't (#711)."""
+    assert '--timeout=60' in cu.build_rsync_options(_cst(), mode='real', io_timeout=60)
+    assert not any(flag.startswith('--timeout') for flag in cu.build_rsync_options(_cst(), mode='real'))
+    assert not any(flag.startswith('--timeout') for flag in cu.build_rsync_options(_cst(), io_timeout=60))
+
+
 def test_build_rsync_options_darwin_has_no_protect_args() -> None:
     """macOS's rsync doesn't support --protect-args."""
     assert '--protect-args' not in cu.build_rsync_options(_cst(), is_darwin=True)

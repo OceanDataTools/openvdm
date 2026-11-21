@@ -7,15 +7,18 @@ updated and deleted files. A command that fails raises
 :class:`TransferCommandError`, so the caller can fail the transfer instead of
 reporting it as successful (#230). Also the helpers that mask passwords in
 what the workers log (:func:`redact_command`, :func:`redact_payload`), and
-the limits on listing a collection system transfer's rsync or SSH source
-(:func:`source_listing_limits`, :func:`run_listing_command`, #689).
+the limits on rsync over the network: its I/O timeout for listings and
+copies, and the time limit on listing a collection system transfer's rsync
+or SSH source (:func:`rsync_timeouts`, :func:`run_listing_command`, #689, #711).
 """
 
 import json
 import logging
 import os
+import queue
 import re
 import subprocess
+import threading
 import time
 from collections import deque
 from typing import Any, Callable, Optional, Union
@@ -41,14 +44,14 @@ RCLONE_FILE_RE = re.compile(
 # files vanished before they could be transferred", normal for live data
 RSYNC_OK_CODES = (0, 24)
 
-# Limits on listing a collection system transfer's rsync or SSH source, in
-# seconds, for those openvdm.yaml's sourceListing block doesn't set (#689):
-# rsync's --timeout (no data from the source) and the whole listing's time
-SOURCE_LISTING_DEFAULTS = {'ioTimeout': 300, 'timeLimit': 3600}
+# Limits on rsync over the network, in seconds, for those openvdm.yaml's
+# rsyncTimeouts block doesn't set: rsync's --timeout (nothing received) for
+# listings and copies (#689, #711), and the time a source listing may take
+RSYNC_TIMEOUT_DEFAULTS = {'ioTimeout': 300, 'listingTimeLimit': 3600}
 
-# The ssh that lists an SSH source: it gives up connecting after 30 s, and on
-# a connection that stops answering 4 keepalives 15 s apart (#689)
-SSH_LISTING_COMMAND = 'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
+# The ssh that rsync lists and copies over: it gives up connecting after 30 s,
+# and on a connection that stops answering 4 keepalives 15 s apart (#689, #711)
+SSH_COMMAND = 'ssh -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
 
 # A file listed for the transfer (--files-from) but gone by the time rsync
 # looks for it gives code 23 with only this error; that's also a vanished file
@@ -77,12 +80,24 @@ class TransferCommandError(Exception):
             returns them (#239).
     """
 
-    def __init__(self, command: str, returncode: int, detail: str, files: Optional[dict] = None):
+    def __init__(self, command: str, returncode: int, detail: str, files: Optional[dict] = None,
+                 message: Optional[str] = None):
+        """Record the failure.
+
+        Args:
+            command: The tool, e.g. ``'rsync'``.
+            returncode: Its exit code.
+            detail: Its most specific error line.
+            files: What it transferred before failing.
+            message: The error's text, in place of "<command> exited with
+                code <returncode>: <detail>", e.g. for a command OpenVDM
+                ended (#711).
+        """
         self.returncode = returncode
         self.detail = detail
         self.files = files if files is not None else {'new': [], 'updated': [], 'deleted': []}
-        super().__init__(f"{command} exited with code {returncode}"
-                         + (f": {detail}" if detail else ""))
+        super().__init__(message or (f"{command} exited with code {returncode}"
+                                     + (f": {detail}" if detail else "")))
 
 
 def redact_command(cmd: list) -> str:
@@ -202,9 +217,60 @@ def error_detail(tool: str, lines: list) -> str:
     return re.sub(r'^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\s+)?([A-Z]+\s*:\s*)?', '', matches[-1])
 
 
-def run_transfer_command(cmd: list, file_count: int,
+def _rsync_bytes_read(pid: int) -> Optional[int]:
+    """Return the bytes read so far by the rsync processes of a command (#711).
+
+    The sum of ``rchar`` in ``/proc/<pid>/io`` over the ``rsync`` processes
+    among *pid* and its descendants. It grows while rsync receives anything,
+    file list entries and checksums included, so it shows a copy is still
+    working when rsync prints nothing (it prints nothing for unchanged
+    files). ``ssh`` isn't counted: its keepalive replies keep arriving after
+    the other end's rsync has stopped.
+
+    Args:
+        pid: The command's process ID, e.g. ``sshpass`` or ``rsync``.
+
+    Returns:
+        int | None: The bytes read, or ``None`` without ``/proc`` (e.g. on
+        macOS) or once the command has exited.
+    """
+    if not os.path.isdir(f'/proc/{pid}'):
+        return None
+    parents = {}
+    names = {}
+    for entry in os.listdir('/proc'):
+        if not entry.isdigit():
+            continue
+        try:
+            with open(f'/proc/{entry}/stat', encoding='utf-8') as stat:
+                fields = stat.read()
+        except OSError:
+            continue
+        # "<pid> (<comm>) <state> <ppid> ...": comm may contain spaces
+        name = fields[fields.find('(') + 1:fields.rfind(')')]
+        names[int(entry)] = name
+        parents[int(entry)] = int(fields[fields.rfind(')') + 2:].split()[1])
+    tree, todo = set(), [pid]
+    while todo:
+        current = todo.pop()
+        tree.add(current)
+        todo.extend(child for child, parent in parents.items() if parent == current and child not in tree)
+    total = 0
+    for member in tree:
+        if names.get(member) != 'rsync':
+            continue
+        try:
+            with open(f'/proc/{member}/io', encoding='utf-8') as io:
+                total += next(int(line.split()[1]) for line in io if line.startswith('rchar:'))
+        except (OSError, StopIteration, ValueError):
+            continue
+    return total
+
+
+def run_transfer_command(cmd: list, file_count: int,  # pylint: disable=too-many-arguments,too-many-positional-arguments
                          progress_callback: Optional[Callable[[int], None]] = None,
-                         should_stop: Optional[Callable[[], bool]] = None) -> dict:
+                         should_stop: Optional[Callable[[], bool]] = None,
+                         idle_timeout: int = 0, poll_interval: float = 1.0) -> dict:
     """Run an rsync or rclone transfer command and collect the files it transferred.
 
     Streams the command's output, reporting progress from rsync's ``to-chk=``
@@ -216,8 +282,16 @@ def run_transfer_command(cmd: list, file_count: int,
             such as ``sshpass``, followed by one of them).
         file_count: Number of files expected; with ``0`` the command isn't run.
         progress_callback: Called with the percentage (0–100) when it changes.
-        should_stop: Polled for each output line; when it returns ``True``, the
-            command is terminated and the files so far are returned.
+        should_stop: Polled every *poll_interval* seconds, and for each output
+            line; when it returns ``True``, the command is terminated and the
+            files so far are returned. It's checked even while the command
+            prints nothing, e.g. a copy that has stalled (#711).
+        idle_timeout: For rsync to or from another host: seconds the
+            command's rsync processes may read nothing and print nothing
+            before the command is ended and fails (#711); 0 for none. It
+            backs up rsync's ``--timeout``, which doesn't end a pull whose
+            other end hangs. It needs ``/proc`` (Linux), and is off without it.
+        poll_interval: Seconds between those checks.
 
     Returns:
         dict: ``new``, ``updated`` and ``deleted`` (lists of paths relative to
@@ -225,7 +299,7 @@ def run_transfer_command(cmd: list, file_count: int,
 
     Raises:
         TransferCommandError: If the command exits with an error, unless it
-            was stopped. For rsync, code 24 (source files vanished), and code
+            was stopped, or is ended by *idle_timeout*. For rsync, code 24 (source files vanished), and code
             23 when its only errors are listed files that no longer exist,
             aren't errors; for rclone, code 6 when its only errors are files
             that changed while being copied (#668).
@@ -250,13 +324,47 @@ def run_transfer_command(cmd: list, file_count: int,
     changed = {}          # rclone: files that changed while being copied, in order
     deletions_skipped = False
 
+    timed_out = False     # ended for reading nothing for idle_timeout seconds (#711)
+
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
-        for line in proc.stdout:
+        # The output is read in a thread, so Stop and the idle timeout are
+        # checked even while the command prints nothing (#711)
+        lines = queue.Queue()
+
+        def _read_output():
+            for output_line in proc.stdout:
+                lines.put(output_line)
+            lines.put(None)
+
+        threading.Thread(target=_read_output, daemon=True).start()
+        last_read = _rsync_bytes_read(proc.pid) if idle_timeout else None
+        last_active = time.monotonic()
+
+        while True:
+            try:
+                line = lines.get(timeout=poll_interval)
+            except queue.Empty:
+                line = ''
+            if line is None:
+                break
+
             if should_stop and should_stop():
                 logging.info("Stopping")
                 proc.terminate()
                 result['stopped'] = True
                 break
+
+            if idle_timeout and last_read is not None:
+                read = _rsync_bytes_read(proc.pid)
+                now = time.monotonic()
+                if line or (read is not None and read != last_read):
+                    last_active = now
+                    last_read = read if read is not None else last_read
+                elif now - last_active >= idle_timeout:
+                    logging.error("%s read nothing for %d s; ending it", tool, idle_timeout)
+                    proc.terminate()
+                    timed_out = True
+                    break
 
             line = line.strip()
             if not line:
@@ -309,10 +417,22 @@ def run_transfer_command(cmd: list, file_count: int,
                         progress_callback(percent)
                     last_percent = percent
 
-        returncode = proc.wait()
+        try:
+            returncode = proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            returncode = proc.wait()
 
     if result['stopped']:
         return result
+
+    if timed_out:
+        error = TransferCommandError(
+            tool, returncode, '', {key: result[key] for key in ('new', 'updated', 'deleted')},
+            message=f"{tool} received nothing for {idle_timeout} s and was ended "
+                    "(rsyncTimeouts ioTimeout in openvdm.yaml)")
+        logging.error("Transfer failed: %s", error)
+        raise error
 
     ok_codes = RSYNC_OK_CODES if tool == 'rsync' else (0,)
     if tool == 'rsync' and returncode == 23 and vanished_count and not error_count:
@@ -341,30 +461,31 @@ def run_transfer_command(cmd: list, file_count: int,
     return result
 
 
-def source_listing_limits(config: dict) -> dict:
-    """Return the limits on listing an rsync or SSH source, from ``openvdm.yaml``.
+def rsync_timeouts(config: dict) -> dict:
+    """Return the limits on rsync over the network, from ``openvdm.yaml``.
 
-    The ``sourceListing`` block's ``ioTimeout`` (rsync's ``--timeout``: how
-    long the source may send nothing) and ``timeLimit`` (how long the whole
-    listing may take), in seconds; 0 turns a limit off. An unset or invalid
-    value uses :data:`SOURCE_LISTING_DEFAULTS`; an invalid one is logged (#689).
+    The ``rsyncTimeouts`` block's ``ioTimeout`` (rsync's ``--timeout``: how
+    long a listing or copy may receive nothing, #689, #711) and
+    ``listingTimeLimit`` (how long listing a collection system transfer's
+    source may take), in seconds; 0 turns a limit off. An unset or invalid
+    value uses :data:`RSYNC_TIMEOUT_DEFAULTS`; an invalid one is logged.
 
     Args:
         config: The ``openvdm.yaml`` settings, e.g. ``OpenVDM.config``.
 
     Returns:
-        dict: ``{'ioTimeout': int, 'timeLimit': int}``.
+        dict: ``{'ioTimeout': int, 'listingTimeLimit': int}``.
     """
-    block = config.get('sourceListing')
+    block = config.get('rsyncTimeouts')
     if not isinstance(block, dict):
         block = {}
-    limits = dict(SOURCE_LISTING_DEFAULTS)
-    for key, default in SOURCE_LISTING_DEFAULTS.items():
+    limits = dict(RSYNC_TIMEOUT_DEFAULTS)
+    for key, default in RSYNC_TIMEOUT_DEFAULTS.items():
         value = block.get(key)
         if value in (None, ''):
             continue
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            logging.warning("openvdm.yaml: sourceListing %s must be a whole number of seconds "
+            logging.warning("openvdm.yaml: rsyncTimeouts %s must be a whole number of seconds "
                             "(0 for no limit), not %r; using %d", key, value, default)
             continue
         limits[key] = value
