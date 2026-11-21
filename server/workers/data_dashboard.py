@@ -17,6 +17,9 @@ expose a class that subclasses
 """
 
 import argparse
+import ctypes
+import ctypes.util
+import gc
 import importlib.util
 import json
 import logging
@@ -34,6 +37,30 @@ from server.lib.file_utils import build_filelist, output_json_data_to_file, set_
 from server.lib.openvdm import OpenVDM
 from server.lib.placeholders import fill_placeholders
 from server.lib.transfer_utils import redact_payload
+
+def _libc_malloc_trim():
+    """Return glibc's ``malloc_trim``, or ``None`` where the C library has none (e.g. macOS)."""
+    try:
+        return ctypes.CDLL(ctypes.util.find_library('c')).malloc_trim
+    except (AttributeError, OSError, TypeError):
+        return None
+
+
+MALLOC_TRIM = _libc_malloc_trim()
+
+
+def release_memory() -> None:
+    """Give the memory the last file's plugin freed back to the system (#658).
+
+    A parser builds large lists and DataFrames for a file. Python and glibc
+    keep the memory they free for later use, so without this the worker held
+    on to its largest file's memory for as long as it ran. ``malloc_trim(0)``
+    returns it, on Linux; elsewhere only the garbage is collected.
+    """
+    gc.collect()
+    if MALLOC_TRIM is not None:
+        MALLOC_TRIM(0)
+
 
 # PYTHON_BINARY = os.path.join(dirname(dirname(dirname(realpath(__file__)))), 'venv/bin/python')
 
@@ -234,6 +261,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 logging.info("Processing file: %s", filename)
                 out_obj = plugin_callable(raw_path)
             except Exception as exc:
+                release_memory()
                 logging.error("Error processing file %s: %s", filename, str(exc))
                 job_results['parts'].append({"partName": f"Processing file: {filename}", "result": "Fail", "reason": str(exc)})
                 self._remove_manifest_entry(remove_manifest_entries, json_path, raw_path, base_dir)
@@ -247,6 +275,9 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 continue
 
             result = output_json_data_to_file(json_path, out_obj)
+            data_types = list(out_obj.keys()) or ['unknown']
+            out_obj = None
+            release_memory()
             if result['verdict']:
                 job_results['parts'].append({"partName": f"Write dashboard file: {filename}", "result": "Pass"})
             else:
@@ -255,7 +286,6 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
                 job_results['parts'].append({"partName": f"Write dashboard file: {filename}", "result": "Fail", "reason": result['reason']})
                 continue
 
-            data_types = list(out_obj.keys()) or ['unknown']
             for dtype in data_types:
                 self._add_manifest_entry(new_manifest_entries, dtype, json_path, raw_path, base_dir)
 

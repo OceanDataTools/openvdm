@@ -290,6 +290,22 @@ def test_update(worker, cruise, perms) -> None:
     assert perms.paths == [str(cruise.dashboard)]
 
 
+def test_memory_released_after_each_file(worker, monkeypatch) -> None:
+    """After each file, the garbage is collected and glibc gives freed memory back (#658)."""
+    trims = []
+    monkeypatch.setattr(data_dashboard, 'MALLOC_TRIM', trims.append)
+    _update(worker, new=['SCS/raw/nav.gga'], updated=['SCS/raw/heading.hdt'])
+    assert trims == [0, 0]
+
+
+def test_release_memory_without_malloc_trim(monkeypatch) -> None:
+    """Where the C library has no malloc_trim (e.g. macOS), only the garbage is collected."""
+    monkeypatch.setattr(data_dashboard, 'MALLOC_TRIM', None)
+    data_dashboard.release_memory()
+    monkeypatch.setattr(data_dashboard.ctypes, 'CDLL', lambda name: object())
+    assert data_dashboard._libc_malloc_trim() is None  # pylint: disable=protected-access
+
+
 def test_update_again(worker, cruise) -> None:
     """Updating a file again rewrites its dashboard file; its manifest entry is reported updated."""
     _update(worker, new=['SCS/raw/nav.gga'])

@@ -6,12 +6,19 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.18.0] – Unreleased
 
-**Upgrading:** optionally, copy the `rsyncTimeouts` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689, #711).
+**Upgrading:**
+- Optionally, copy the `rsyncTimeouts` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689, #711).
+- If you use the GGA or Sprint parsers, copy `gga_parser.py.dist` and `sprint_parser.py.dist` in `server/plugins/parsers/` over your copies, for their lower memory use. A copy that isn't updated still works (#658).
 
 ### Changed
 - **Worker messages use the install's names for cruises and lowerings:** an install that calls them something else, e.g. Voyage and Dive (#684), now sees those names in the workers' task steps (shown on the Configuration page after a task), failure reasons and OpenVDM messages too, e.g. "Verify voyage directory exists" and "Creating voyage directory failed". The workers fetch the names once per task job, and a transfer worker only when a message needs them; if the API can't be reached, the default names are used. Log messages still say cruise and lowering. A few step names now read "does not exist" instead of "does not exists" (#685). The README errors and the trackline hooks' per-lowering extra directory error use them too, and a lowering README that can't replace a file now names the lowering's directory and `loweringReadme`, not the cruise directory and `cruiseReadme` (#712).
 
 ### Fixed
+- **The data dashboard worker killed for memory:** on a 2 GB server, the kernel killed it repeatedly while it built the sample data's dashboard. Measured on the sample data:
+  - **Peak memory:** a 42 MB GPS (GGA) log took the worker to 528 MB. The GGA and Sprint parsers built a geopy `Point` for every position, row by row, to work out distances and speeds. They now compute them on whole columns, with the same formula and earth radius (`distances_nm()` in `openvdm_plugin.py`; identical results). That file now peaks at 296 MB, and parses in 3.6 s instead of 21 s.
+  - **Memory between files:** the worker kept the memory its largest file had used for as long as it ran (about 180 MB). It now collects the garbage and gives freed memory back to the system after each file (glibc's `malloc_trim`), returning to about 100 MB.
+  
+  4 GB is still the minimum memory for OpenVDM (#657, #658).
 - **A collection system transfer stuck listing its source:** listing an rsync or SSH source had no time limit, so a connection that stalled, or an `ssh` waiting for an answer it would never get, left the transfer Running until its worker was restarted, and Stop had no effect while it listed (#688 was one cause). Now:
   - the listing gives up when the source sends nothing for 5 minutes (rsync's `--timeout`), and an SSH listing when the connection can't be made in 30 s or stops answering for a minute (`ConnectTimeout`, `ServerAliveInterval`);
   - a listing, the staleness check's re-listing included, that takes longer than an hour fails the transfer, saying so;

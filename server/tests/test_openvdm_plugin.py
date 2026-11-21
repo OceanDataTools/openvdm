@@ -31,6 +31,18 @@ def test_format_iso8601(value, expected) -> None:
     assert op.format_iso8601(value) == expected
 
 
+def test_distances_nm_matches_geopy() -> None:
+    """The same distances as geopy's great_circle, including across the antimeridian and
+    from a pole; NaN first and next to a missing position (#658)."""
+    from geopy.distance import great_circle  # pylint: disable=import-outside-toplevel
+    lat = pd.Series([30.0, 30.01, 29.99, np.nan, -45.5, -45.5, 89.9, 0.0, 0.0])
+    lon = pd.Series([-88.5, -88.49, -88.52, 10.0, 179.99, -179.99, 0.0, 0.0, 180.0])
+    result = op.distances_nm(lat, lon)
+    assert np.isnan(result[0]) and np.isnan(result[3]) and np.isnan(result[4])
+    for i in (1, 2, 5, 6, 7, 8):
+        assert result[i] == pytest.approx(great_circle((lat[i - 1], lon[i - 1]), (lat[i], lon[i])).nm, abs=1e-9)
+
+
 @pytest.mark.parametrize('numbers, expected', [
     ([1, 2, 3, 5, 7, 8, 9], ['1-3', '5', '7-9']),
     ([9, 3, 1, 2], ['1-3', '9']),

@@ -26,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
+from geopy.distance import EARTH_RADIUS
+
 from server.lib.openvdm import OpenVDM
 from server.lib.condense_to_ranges import condense_to_ranges
 from server.lib.file_utils import NpEncoder
@@ -53,6 +55,33 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO8601 Format, OpenRVDAS style
 
 # ISO 8601 UTC to the second, for times shown to people (e.g. map popups)
 ISO8601_SECONDS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def distances_nm(latitude: pd.Series, longitude: pd.Series) -> pd.Series:
+    """Return the great-circle distance from each position to the one before it, in nautical miles.
+
+    The same spherical formula and earth radius as ``geopy.distance.great_circle``,
+    computed on whole columns at once. Building a geopy ``Point`` per row with
+    ``DataFrame.apply`` took about 20 s and hundreds of MB for a day of 1 Hz
+    positions, which got the data dashboard worker killed for memory (#658).
+
+    Args:
+        latitude: Latitudes in decimal degrees.
+        longitude: Longitudes in decimal degrees, with the same index.
+
+    Returns:
+        pd.Series: The distances, with the same index; NaN for the first
+        position, and where either position is missing.
+    """
+    lat1, lng1 = np.radians(latitude.shift(1)), np.radians(longitude.shift(1))
+    lat2, lng2 = np.radians(latitude), np.radians(longitude)
+    dlng = lng2 - lng1
+    sin_lat1, cos_lat1 = np.sin(lat1), np.cos(lat1)
+    sin_lat2, cos_lat2 = np.sin(lat2), np.cos(lat2)
+    central_angle = np.arctan2(
+        np.sqrt((cos_lat2 * np.sin(dlng)) ** 2 + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * np.cos(dlng)) ** 2),
+        sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * np.cos(dlng))
+    return central_angle * EARTH_RADIUS / 1.852
 
 
 def format_iso8601(value):

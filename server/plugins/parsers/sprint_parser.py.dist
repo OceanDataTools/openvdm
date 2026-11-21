@@ -11,12 +11,10 @@ import sys
 from os.path import dirname, realpath
 import numpy as np
 import pandas as pd
-from geopy import Point
-from geopy.distance import great_circle
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
 
-from server.lib.openvdm_plugin import OpenVDMCSVParser
+from server.lib.openvdm_plugin import OpenVDMCSVParser, distances_nm
 
 FIELDS = [
     'hdr', 'roll', 'pitch', 'heading', 'orientation_status',
@@ -95,15 +93,9 @@ class SprintParser(OpenVDMCSVParser):
         df = df.set_index('date_time')
         df['deltaT'] = df.index.to_series().diff()
 
-        # Compute distance and velocity between consecutive fixes
-        df['point'] = df.apply(
-            lambda row: Point(latitude=row['latitude'], longitude=row['longitude']), axis=1)
-        df['point_next'] = df['point'].shift(1)
-        df.loc[df['point_next'].isna(), 'point_next'] = None
-        df['distance'] = df.apply(
-            lambda row: great_circle(row['point'], row['point_next']).nm
-            if row['point_next'] is not None else float('nan'), axis=1)
-        df = df.drop(columns=['point_next', 'point'])
+        # Compute distance and velocity between consecutive fixes, on whole
+        # columns: a geopy Point per row took hundreds of MB (#658)
+        df['distance'] = distances_nm(df['latitude'], df['longitude'])
         df['velocity'] = df['distance'] / (df['deltaT'].dt.total_seconds() / 3600)
 
         self.add_row_validity_stat([len(df), len(errors)])

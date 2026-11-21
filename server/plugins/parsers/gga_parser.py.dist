@@ -10,13 +10,11 @@ import re
 import sys
 import logging
 from os.path import dirname, realpath
-from geopy import Point
-from geopy.distance import great_circle
 import numpy as np
 import pandas as pd
 
 sys.path.append(dirname(dirname(dirname(dirname(realpath(__file__))))))
-from server.lib.openvdm_plugin import OpenVDMCSVParser
+from server.lib.openvdm_plugin import OpenVDMCSVParser, distances_nm
 
 PROC_COLS = ['date_time','latitude','longitude','num_satellites','hdop','altitude','height_wgs84']
 
@@ -191,14 +189,9 @@ class GGAParser(OpenVDMCSVParser):
         # -------------------------
         # Compute  distance, velocity
         # -------------------------
-        df['point'] = df.apply(lambda row: Point(latitude=row['latitude'], longitude=row['longitude']), axis=1)
-        df['point_next'] = df['point'].shift(1)
-        df['distance'] = df.apply(
-            lambda row: great_circle(row['point'], row['point_next']).nm if row['point_next'] is not None else np.nan,
-            axis=1
-        )
+        # On whole columns: a geopy Point per row took hundreds of MB (#658)
+        df['distance'] = distances_nm(df['latitude'], df['longitude'])
         df['velocity'] = df['distance'] / (df['deltaT'].dt.total_seconds() / 3600)
-        df = df.drop(['point', 'point_next'], axis=1)
 
         # -------------------------
         # Statistics
