@@ -219,7 +219,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return {'verdict': True, 'skipped': True}
 
         try:
-            readme_fn = readme_filename(settings['filename'], self.cruise_id)
+            readme_fn = readme_filename(settings['filename'], self.cruise_id, terms=self.terms)
         except ValueError as exc:
             return {'verdict': False, 'reason': str(exc)}
 
@@ -251,7 +251,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             return {'verdict': False, 'reason': f"Unable to build the README from {settings['template']}{line}: {exc}"}
 
         readme_path = os.path.join(self.cruise_dir, readme_fn)
-        written, reason = write_readme(readme_path, text)
+        written, reason = write_readme(readme_path, text, terms)
         if not written:
             return {'verdict': False, 'reason': reason}
 

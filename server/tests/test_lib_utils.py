@@ -49,6 +49,20 @@ def test_readme_filename_errors(filename, cruise, lowering) -> None:
         readme.readme_filename(filename, cruise, lowering)
 
 
+def test_readme_messages_use_the_install_names(tmp_path) -> None:
+    """The README errors use the install's names and the README's own directory and setting (#712)."""
+    voyage = terms.Terms({'cruise': 'Voyage', 'lowering': 'ROV Dive'})
+    with pytest.raises(ValueError, match="The voyage README's filename can't use"):
+        readme.readme_filename('{loweringID}.md', 'RR2601', terms=voyage)
+
+    path = tmp_path / 'README.md'
+    path.write_text('My own notes\n')
+    _, reason = readme.write_readme(str(path), 'text', {'cruise': 'Voyage'})
+    assert 'already exists in the voyage directory' in reason and 'another cruiseReadme filename' in reason
+    _, reason = readme.write_readme(str(path), 'text', voyage, lowering=True)
+    assert 'already exists in the ROV dive directory' in reason and 'another loweringReadme filename' in reason
+
+
 def test_readme_settings(tmp_path, monkeypatch) -> None:
     """Defaults without a block; enable as text; the template must exist (#501)."""
     monkeypatch.setattr(readme, 'OPENVDM_ROOT', str(tmp_path))
@@ -177,6 +191,11 @@ def test_lowering_readme_context_vehicle() -> None:
 def test_lower_term(name, expected) -> None:
     """Lower case for a sentence, except words in capitals, as Helpers\\Terms::lower() (#684)."""
     assert terms.lower_term(name) == expected
+
+
+def test_terms_from_another_terms() -> None:
+    """A Terms can be made from another, as from OpenVDM.get_terms()'s dict (#712)."""
+    assert terms.Terms(terms.Terms({'cruise': 'Voyage'})).cruise_lower == 'voyage'
 
 
 def test_terms_attributes_and_defaults() -> None:
