@@ -23,6 +23,7 @@ import yaml
 
 from server.lib.file_utils import output_json_data_to_file, set_owner_group_permissions
 from server.lib.geojson_utils import combine_geojson_files, convert_to_kml, geojson_extent
+from server.lib.terms import fetch_terms
 
 # Name of the extra directory the trackline files are written to by default.
 TRACKLINE_EXTRA_DIR_NAME = "Tracklines"
@@ -479,7 +480,8 @@ def resolve_extra_directory(openvdm, name: str, cruise_dir: str, cruise_id: str,
 
     dest_dir = extra_dir.get("destDir") or ""
     if lowering_id is None and "{loweringID}" in dest_dir:
-        raise RuntimeError(f"The {name} extra directory is per lowering ({dest_dir}), which isn't supported")
+        raise RuntimeError(f"The {name} extra directory is per {fetch_terms(openvdm).lowering_lower} "
+                           f"({dest_dir}), which isn't supported")
     dest_dir = dest_dir.replace("{cruiseID}", cruise_id) \
                        .replace("{loweringDataBaseDir}", warehouse_cfg["loweringDataBaseDir"])
     if lowering_id is not None:

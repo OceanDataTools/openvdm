@@ -187,7 +187,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
             return {'verdict': True, 'skipped': True}
 
         try:
-            readme_fn = readme_filename(settings['filename'], self.cruise_id, self.lowering_id)
+            readme_fn = readme_filename(settings['filename'], self.cruise_id, self.lowering_id, self.terms)
         except ValueError as exc:
             return {'verdict': False, 'reason': str(exc)}
 
@@ -220,7 +220,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker): # pylint: disable=too-ma
 
         readme_relpath = os.path.join(self.lowering_dir, readme_fn)
         readme_path = os.path.join(self.cruise_dir, readme_relpath)
-        written, reason = write_readme(readme_path, text)
+        written, reason = write_readme(readme_path, text, terms, lowering=True)
         if not written:
             return {'verdict': False, 'reason': reason}
 

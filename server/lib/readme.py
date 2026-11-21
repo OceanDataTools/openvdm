@@ -98,7 +98,8 @@ def readme_settings(config: dict, block_name: str = 'cruiseReadme',
     return {'enable': enable, 'filename': filename, 'template': template}
 
 
-def readme_filename(filename: str, cruise_id: str, lowering_id: Optional[str] = None) -> str:
+def readme_filename(filename: str, cruise_id: str, lowering_id: Optional[str] = None,
+                    terms=None) -> str:
     """Return a README's file name with ``{cruiseID}`` and ``{loweringID}`` filled in (#447).
 
     Args:
@@ -107,6 +108,9 @@ def readme_filename(filename: str, cruise_id: str, lowering_id: Optional[str] = 
         lowering_id: The lowering's ID, for a lowering README; ``None`` for the
             cruise README, whose name can't use ``{loweringID}`` since it
             describes every lowering.
+        terms: The install's names for cruises and lowerings, for the error
+            (:class:`server.lib.terms.Terms` or ``OpenVDM.get_terms()``'s
+            dict); the defaults without it (#712).
 
     Returns:
         str: The file name, e.g. ``RR2601_README.md``.
@@ -116,7 +120,8 @@ def readme_filename(filename: str, cruise_id: str, lowering_id: Optional[str] = 
             filled-in name isn't a plain file name (e.g. an ID with ``/``).
     """
     if lowering_id is None and '{loweringID}' in filename:
-        raise ValueError(f"The cruise README's filename can't use {{loweringID}}: {filename}")
+        raise ValueError(f"The {Terms(terms).cruise_lower} README's filename can't use {{loweringID}}: "
+                         f"{filename}")
     name = filename.replace('{cruiseID}', cruise_id or '')
     if lowering_id is not None:
         name = name.replace('{loweringID}', lowering_id)
@@ -412,7 +417,7 @@ def render_readme(template_path: str, context: dict) -> str:
     return f"{note}\n{body}"
 
 
-def write_readme(path: str, text: str) -> tuple:
+def write_readme(path: str, text: str, terms=None, lowering: bool = False) -> tuple:
     """Write the README, unless a file there wasn't written by OpenVDM.
 
     The file is written to a temporary file next to it and then renamed, so
@@ -421,6 +426,11 @@ def write_readme(path: str, text: str) -> tuple:
     Args:
         path: The README's path.
         text: Its text, from :func:`render_readme`.
+        terms: The install's names for cruises and lowerings, for the reason
+            (:class:`server.lib.terms.Terms` or ``OpenVDM.get_terms()``'s
+            dict); the defaults without it (#712).
+        lowering: Whether it's a lowering README, which is in the lowering's
+            directory and named by ``loweringReadme``.
 
     Returns:
         tuple[bool, str]: ``(True, '')`` when written; ``(False, reason)``
@@ -433,9 +443,12 @@ def write_readme(path: str, text: str) -> tuple:
         except OSError as exc:
             return False, f"Unable to read the existing {os.path.basename(path)}: {exc}"
         if not os.path.isfile(path) or GENERATED_MARKER not in first_line:
-            return False, (f"{os.path.basename(path)} already exists in the cruise directory and "
+            names = Terms(terms)
+            where = names.lowering_lower if lowering else names.cruise_lower
+            setting = 'loweringReadme' if lowering else 'cruiseReadme'
+            return False, (f"{os.path.basename(path)} already exists in the {where} directory and "
                            "wasn't written by OpenVDM, so it wasn't replaced. Rename or remove it, "
-                           "or set another cruiseReadme filename in openvdm.yaml.")
+                           f"or set another {setting} filename in openvdm.yaml.")
 
     tmp_path = f"{path}.tmp"
     try:

@@ -466,6 +466,14 @@ def test_resolve_extra_directory_errors(fake_ovdm, warehouse, settings, message)
         tracks.resolve_extra_directory(fake_ovdm, 'Tracklines', str(warehouse.cruise_dir), 'TEST001', warehouse.config)
 
 
+def test_per_lowering_error_uses_the_install_names(fake_ovdm, warehouse) -> None:
+    """The per-lowering error says what the install calls a lowering (#712)."""
+    fake_ovdm.get_extra_directory_by_name.return_value = {'enable': '1', 'destDir': 'Tracks/{loweringID}'}
+    fake_ovdm.get_terms.return_value = {'lowering': 'ROV Dive'}
+    with pytest.raises(RuntimeError, match=r'is per ROV dive \(Tracks/\{loweringID\}\)'):
+        tracks.resolve_extra_directory(fake_ovdm, 'Tracklines', str(warehouse.cruise_dir), 'TEST001', warehouse.config)
+
+
 def test_output_arguments_are_exclusive() -> None:
     """-e and -o can't be used together."""
     parser = argparse.ArgumentParser()

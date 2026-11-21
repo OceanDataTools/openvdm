@@ -51,10 +51,13 @@ class Terms:  # pylint: disable=too-few-public-methods
         """Take the names from ``OpenVDM.get_terms()``.
 
         Args:
-            names: ``cruise``, ``cruises``, ``lowering`` and ``lowerings``;
-                :data:`server.lib.openvdm.DEFAULT_TERMS`' value for any
-                missing or empty, and all of them if *names* isn't a dict.
+            names: ``cruise``, ``cruises``, ``lowering`` and ``lowerings``, or
+                another :class:`Terms`; :data:`server.lib.openvdm.DEFAULT_TERMS`'
+                value for any missing or empty, and all of them if *names* is
+                neither.
         """
+        if isinstance(names, Terms):
+            names = names.as_dict()
         names = names if isinstance(names, dict) else {}
         for key, default in DEFAULT_TERMS.items():
             value = str(names.get(key) or default)
