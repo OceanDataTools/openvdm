@@ -61,9 +61,11 @@ class Copy:  # pylint: disable=too-few-public-methods
         self.calls = []
         self.files = (['a.raw'], ['b.raw'], [])
         self.fail = None
+        self.idle_timeouts = []
 
-    def __call__(self, current_job, command, file_count):
+    def __call__(self, current_job, command, file_count, idle_timeout=0):
         self.calls.append((command, file_count))
+        self.idle_timeouts.append(idle_timeout)
         if self.fail:
             raise TransferCommandError('rclone', 1, self.fail)
         return self.files
@@ -74,7 +76,7 @@ def copy(monkeypatch):
     """A Copy in place of every worker's run_transfer_command()."""
     fake = Copy()
     monkeypatch.setattr(cdt_run.OVDMGearmanWorker, 'run_transfer_command',
-                        lambda self, job, command, count: fake(job, command, count))
+                        lambda self, job, command, count, idle_timeout=0: fake(job, command, count, idle_timeout))
     return fake
 
 
@@ -187,7 +189,7 @@ def test_rsync_password_file_cant_be_written(worker, monkeypatch) -> None:
 
 def test_run_transfer_command_reports_progress(worker, monkeypatch) -> None:
     """Progress maps the copy's 0-100% to the job's 5-95%."""
-    def fake(cmd, count, progress, should_stop):
+    def fake(cmd, count, progress, should_stop, idle_timeout=0):  # pylint: disable=unused-argument
         progress(50)
         return {'new': ['a'], 'updated': [], 'deleted': ['b'], 'stopped': False}
 
@@ -335,7 +337,8 @@ def test_rsync_destination(worker, fake_run, copy) -> None:
     password_arg = next(arg for arg in cmd if arg.startswith('--password-file='))
     assert Path(password_arg.split('=', 1)[1]).parent.name.startswith('openvdm-')
     assert cmd[0] == 'rsync' and cmd[-1] == 'rsync://survey@host/module/backups/'
-    assert '--dry-run' not in cmd
+    assert '--dry-run' not in cmd and '--timeout=300' in cmd and copy.idle_timeouts == [300]
+    assert not any(arg.startswith('--timeout') for arg in dry), 'the dry run is local (#711)'
 
 
 def test_ssh_destination(worker, fake_run, copy, monkeypatch) -> None:

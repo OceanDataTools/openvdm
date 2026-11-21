@@ -283,7 +283,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return test_cdt_destination(self.cruise_data_transfer)
 
 
-    def run_transfer_command(self, current_job, command, file_count):
+    def run_transfer_command(self, current_job, command, file_count, idle_timeout=0):
         """Run an rsync or rclone transfer command and collect the files it transferred.
 
         Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
@@ -294,6 +294,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             command: The rsync or rclone command as an argument list.
             file_count: Number of files expected; with ``0`` the command isn't
                 run.
+            idle_timeout: Seconds rsync may receive nothing before the copy is
+                ended and fails; 0 for none (#711).
 
         Returns:
             tuple[list, list, list]: ``(new_files, updated_files, deleted_files)``.
@@ -305,7 +307,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         def _progress(percent):
             self.send_job_status(current_job, int(90 * percent/100) + 5, 100)
 
-        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop)
+        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop,
+                                                     idle_timeout)
         return result['new'], result['updated'], result['deleted']
 
 
@@ -339,6 +342,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
 
 
             use_sshpass = False
+            io_timeout = 0    # rclone has its own timeouts (#711)
             if ':' in self.cruise_data_transfer['destDir']:
 
                 # Only rclone remotes are copied with rclone here (#465)
@@ -351,8 +355,11 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
                 is_darwin = check_darwin(cdt_cfg)
                 dest_dir = f"{cdt_cfg['sshUser']}@{cdt_cfg['sshServer']}:{cdt_cfg['destDir']}"
 
-                flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
-                extra_args = ['-e', 'ssh']
+                # A copy that stalls fails instead of holding the transfer (#711)
+                io_timeout = transfer_utils.rsync_timeouts(self.ovdm.config)['ioTimeout']
+                flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin,
+                                            io_timeout=io_timeout)
+                extra_args = ['-e', transfer_utils.SSH_COMMAND]
                 cmd = build_rsync_command(flags, extra_args, self.shipboard_data_warehouse_config['shipboardDataWarehouseBaseDir'].rstrip('/') + '/', dest_dir.rstrip('/') + '/', include_file)
 
                 use_sshpass = True
@@ -360,7 +367,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             try:
                 # The SSH password goes to sshpass in a file, not on the command line (#426)
                 with sshpass_command(cmd, cdt_cfg) if use_sshpass else nullcontext(cmd) as cmd:
-                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, cmd, len(files['include']))
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(
+                        current_job, cmd, len(files['include']), io_timeout)
             except TransferCommandError as exc:
                 # Don't report a failed transfer as successful (#230)
                 return {'verdict': False, 'reason': f"Transfer failed: {exc}"}

@@ -162,13 +162,14 @@ class Copy:  # pylint: disable=too-few-public-methods
         self.calls = []
         self.fail = None
 
-    def __call__(self, current_job, command, file_count):
+    def __call__(self, current_job, command, file_count, idle_timeout=0):
         files_from = next((arg.split('=', 1)[1] for arg in command if arg.startswith('--files-from=')), None)
         if files_from is None and '--files-from' in command:
             files_from = command[command.index('--files-from') + 1]
         with open(files_from, encoding='utf-8') as file:
             listed = file.read().splitlines()
-        self.calls.append(SimpleNamespace(command=command, count=file_count, listed=listed))
+        self.calls.append(SimpleNamespace(command=command, count=file_count, listed=listed,
+                                          idle_timeout=idle_timeout))
         if self.fail:
             raise TransferCommandError('rsync', 12, self.fail)
         return ['TEST001/a.txt'], [], []
@@ -179,7 +180,7 @@ def copy(monkeypatch):
     """A Copy in place of every worker's run_transfer_command()."""
     fake = Copy()
     monkeypatch.setattr(s2s_run.OVDMGearmanWorker, 'run_transfer_command',
-                        lambda self, job, command, count: fake(job, command, count))
+                        lambda self, job, command, count, idle_timeout=0: fake(job, command, count, idle_timeout))
     return fake
 
 
@@ -197,6 +198,9 @@ def test_rsync_over_ssh(worker, fake_ovdm, warehouse, copy, monkeypatch) -> None
     assert call.command[:2] == ['sshpass', '-f'] and 'ssh-pw' not in call.command
     assert call.command[-2:] == [f"{warehouse.base_dir}/", 'survey@shore.example.org:/ssdw/']
     assert '--bwlimit=128' in call.command and '--protect-args' in call.command
+    # A stalled copy fails instead of holding the transfer (#711)
+    assert '--timeout=300' in call.command and call.idle_timeout == 300
+    assert call.command[call.command.index('-e') + 1] == s2s_run.transfer_utils.SSH_COMMAND
 
 
 def test_rclone_remote(worker, fake_ovdm, warehouse, copy, monkeypatch) -> None:
@@ -242,7 +246,7 @@ def test_destination_test_routes_rclone_remotes(worker, monkeypatch) -> None:
 
 def test_run_transfer_command_reports_progress(worker, monkeypatch) -> None:
     """Progress maps the copy's 0-100% to the job's 5-95%."""
-    def fake(cmd, count, progress, should_stop):
+    def fake(cmd, count, progress, should_stop, idle_timeout=0):  # pylint: disable=unused-argument
         progress(100)
         return {'new': ['a'], 'updated': ['b'], 'deleted': [], 'stopped': False}
 

@@ -173,7 +173,7 @@ class _Worker:  # pylint: disable=too-few-public-methods
 
 def test_run_transfer_command_reports_progress(monkeypatch, tmp_path) -> None:
     """Progress maps rsync's 0-100% to the job's 5-95%."""
-    def fake(cmd, count, progress, should_stop):
+    def fake(cmd, count, progress, should_stop, idle_timeout=0):  # pylint: disable=unused-argument
         progress(0)
         progress(100)
         return {'new': ['a'], 'updated': ['b'], 'deleted': [], 'stopped': False}

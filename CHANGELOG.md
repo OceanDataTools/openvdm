@@ -6,7 +6,7 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
 
 ## [2.18.0] – Unreleased
 
-**Upgrading:** optionally, copy the `sourceListing` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689).
+**Upgrading:** optionally, copy the `rsyncTimeouts` block from `openvdm.yaml.dist` into your `openvdm.yaml` to change its limits; without it, the defaults below apply (#689, #711).
 
 ### Changed
 - **Worker messages use the install's names for cruises and lowerings:** an install that calls them something else, e.g. Voyage and Dive (#684), now sees those names in the workers' task steps (shown on the Configuration page after a task), failure reasons and OpenVDM messages too, e.g. "Verify voyage directory exists" and "Creating voyage directory failed". The workers fetch the names once per task job, and a transfer worker only when a message needs them; if the API can't be reached, the default names are used. Log messages still say cruise and lowering. A few step names now read "does not exist" instead of "does not exists" (#685).
@@ -17,7 +17,12 @@ All notable changes to OpenVDM are documented here, organized by release tag aga
   - a listing, the staleness check's re-listing included, that takes longer than an hour fails the transfer, saying so;
   - Stop ends an rsync or SSH listing, as it does a local or SMB one (#473), and nothing is copied or deleted.
   
-  The new `sourceListing` block in `openvdm.yaml` sets the two limits (`ioTimeout`, `timeLimit`, in seconds; 0 turns one off): raise `timeLimit` for a source that legitimately takes longer to list (#689).
+  The new `rsyncTimeouts` block in `openvdm.yaml` sets the limits (in seconds; 0 turns one off): `ioTimeout`, and `listingTimeLimit`, which you can raise for a source that legitimately takes longer to list (#689).
+- **A transfer stuck in a copy that stalled:** rsync copies to or from another host had no time limit either, so a copy whose connection or other end stalled left the transfer Running until its worker was restarted. Stop didn't end it either: it was only checked when rsync printed something. Now, for collection system transfers from rsync and SSH sources, cruise data transfers to rsync servers and ship-to-shore transfers over SSH:
+  - the copy fails when its rsync receives nothing for `rsyncTimeouts`' `ioTimeout` (5 minutes by default): rsync's `--timeout`, the listings' SSH connect and keepalive options, and a check of what rsync has read, since `--timeout` alone doesn't end a copy *from* a host whose rsync has hung. The check uses `/proc`, so it works on the Linux servers OpenVDM is installed on. The transfer fails, and its next run copies the rest;
+  - Stop is checked every second, so it ends a copy that has stalled.
+  
+  A slow copy that keeps receiving, e.g. a bandwidth-limited ship-to-shore transfer, or one going through many unchanged files, isn't affected, and a copy can take as long as it needs. Local, SMB and FTP-mount copies, and rclone's, have no new limit (#711).
 
 ## [2.17.0] – 2026-11-12
 

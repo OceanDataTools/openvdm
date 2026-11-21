@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import stat
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -476,27 +477,75 @@ def test_changed_files_lists_the_first_ten() -> None:
 
 
 def test_stop_terminates_the_command(tmp_path) -> None:
-    """Stop ends the command and returns the files so far, without failing."""
-    lines = iter([False, True])
+    """Stop ends the command and returns the files so far, without failing; it's checked
+    while the command prints nothing (#711)."""
     started = time.monotonic()
-    result = tu.run_transfer_command(_tool(tmp_path, 'rsync', '>f+++++++++ a.txt\n>f+++++++++ b.txt', 0,
-                                           then='exec sleep 30'), 2, should_stop=lambda: next(lines, True))
+    result = tu.run_transfer_command(_tool(tmp_path, 'rsync', '>f+++++++++ a.txt', 0,
+                                           then="sleep 2\necho '>f+++++++++ b.txt'\nexec sleep 30"), 2,
+                                     should_stop=lambda: time.monotonic() - started > 1, poll_interval=0.1)
     assert result == {'new': ['a.txt'], 'updated': [], 'deleted': [], 'stopped': True}
     assert time.monotonic() - started < 10
 
 
+def test_idle_copy_is_ended_and_fails(tmp_path, monkeypatch) -> None:
+    """A copy whose rsync reads nothing for idle_timeout seconds is ended and fails, naming the
+    setting, with the files it copied (#711)."""
+    monkeypatch.setattr(tu, '_rsync_bytes_read', lambda pid: 100)
+    started = time.monotonic()
+    with pytest.raises(tu.TransferCommandError) as raised:
+        tu.run_transfer_command(_tool(tmp_path, 'rsync', '>f+++++++++ a.txt', 0, then='exec sleep 30'), 2,
+                                idle_timeout=1, poll_interval=0.1)
+    assert str(raised.value) == ('rsync received nothing for 1 s and was ended '
+                                 '(rsyncTimeouts ioTimeout in openvdm.yaml)')
+    assert raised.value.files['new'] == ['a.txt'] and time.monotonic() - started < 10
+
+
+def test_copy_that_keeps_reading_isnt_ended(tmp_path, monkeypatch) -> None:
+    """A copy that prints nothing but keeps reading, e.g. past unchanged files, runs to the end."""
+    reads = iter(range(1000))
+    monkeypatch.setattr(tu, '_rsync_bytes_read', lambda pid: next(reads))
+    result = tu.run_transfer_command(_tool(tmp_path, 'rsync', '>f+++++++++ a.txt', 0, then='sleep 2'), 1,
+                                     idle_timeout=1, poll_interval=0.1)
+    assert result['new'] == ['a.txt'] and not result['stopped']
+
+
+def test_idle_timeout_is_off_without_proc(tmp_path, monkeypatch) -> None:
+    """Without /proc (e.g. macOS) the copy isn't ended for printing nothing."""
+    monkeypatch.setattr(tu, '_rsync_bytes_read', lambda pid: None)
+    result = tu.run_transfer_command(_tool(tmp_path, 'rsync', '>f+++++++++ a.txt', 0, then='sleep 2'), 1,
+                                     idle_timeout=1, poll_interval=0.1)
+    assert result['new'] == ['a.txt']
+
+
+@pytest.mark.skipif(not os.path.isdir('/proc/self'), reason='needs /proc (Linux)')
+def test_rsync_bytes_read_counts_rsync_processes(tmp_path) -> None:
+    """The bytes read by processes named rsync in the command's tree; other processes don't count."""
+    rsync = tmp_path / 'rsync'
+    rsync.symlink_to(sys.executable)
+    reader = "import sys, time; open('/dev/zero', 'rb').read(100000); print('read', flush=True); time.sleep(5)"
+    with subprocess.Popen([str(rsync), '-c', reader], stdout=subprocess.PIPE, text=True) as proc:
+        assert proc.stdout.readline() == 'read\n'
+        assert tu._rsync_bytes_read(proc.pid) >= 100000  # pylint: disable=protected-access
+        proc.kill()
+    with subprocess.Popen([sys.executable, '-c', reader], stdout=subprocess.PIPE, text=True) as proc:
+        assert proc.stdout.readline() == 'read\n'
+        assert tu._rsync_bytes_read(proc.pid) == 0  # pylint: disable=protected-access
+        proc.kill()
+    assert tu._rsync_bytes_read(2 ** 22 + 12345) is None  # pylint: disable=protected-access
+
+
 # --- Transfers: source listing limits (#689) ----------------------------------
 
-def test_source_listing_limits_defaults_and_settings(caplog) -> None:
+def test_rsync_timeouts_defaults_and_settings(caplog) -> None:
     """Unset values use the defaults; invalid ones are logged and use them too."""
-    assert tu.source_listing_limits({}) == {'ioTimeout': 300, 'timeLimit': 3600}
-    assert tu.source_listing_limits(
-        {'sourceListing': {'ioTimeout': 0, 'timeLimit': 7200}}) == {'ioTimeout': 0, 'timeLimit': 7200}
+    assert tu.rsync_timeouts({}) == {'ioTimeout': 300, 'listingTimeLimit': 3600}
+    assert tu.rsync_timeouts(
+        {'rsyncTimeouts': {'ioTimeout': 0, 'listingTimeLimit': 7200}}) == {'ioTimeout': 0, 'listingTimeLimit': 7200}
     with caplog.at_level(logging.WARNING):
-        assert tu.source_listing_limits(
-            {'sourceListing': {'ioTimeout': -1, 'timeLimit': '1h'}}) == {'ioTimeout': 300, 'timeLimit': 3600}
-    assert 'sourceListing ioTimeout' in caplog.text and "not '1h'" in caplog.text
-    assert tu.source_listing_limits({'sourceListing': None}) == {'ioTimeout': 300, 'timeLimit': 3600}
+        assert tu.rsync_timeouts(
+            {'rsyncTimeouts': {'ioTimeout': -1, 'listingTimeLimit': '1h'}}) == {'ioTimeout': 300, 'listingTimeLimit': 3600}
+    assert 'rsyncTimeouts ioTimeout' in caplog.text and "not '1h'" in caplog.text
+    assert tu.rsync_timeouts({'rsyncTimeouts': None}) == {'ioTimeout': 300, 'listingTimeLimit': 3600}
 
 
 def test_run_listing_command_runs_to_the_end() -> None:

@@ -233,7 +233,7 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         return True
 
 
-    def run_transfer_command(self, current_job, command, file_count):
+    def run_transfer_command(self, current_job, command, file_count, idle_timeout=0):
         """Run an rsync or rclone transfer command and collect the files it transferred.
 
         Uses :func:`server.lib.transfer_utils.run_transfer_command`, reporting
@@ -244,6 +244,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             command: The rsync or rclone command as an argument list.
             file_count: Number of files expected; with ``0`` the command isn't
                 run.
+            idle_timeout: Seconds rsync may receive nothing before the copy is
+                ended and fails; 0 for none (#711).
 
         Returns:
             tuple[list, list, list]: ``(new_files, updated_files, deleted_files)``.
@@ -255,7 +257,8 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
         def _progress(percent):
             self.send_job_status(current_job, int(90 * percent/100) + 5, 100)  # 95 - 5
 
-        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop)
+        result = transfer_utils.run_transfer_command(command, file_count, _progress, lambda: self.stop,
+                                                     idle_timeout)
         return result['new'], result['updated'], result['deleted']
 
 
@@ -381,12 +384,16 @@ class OVDMGearmanWorker(python3_gearman.GearmanWorker):
             try:
                 # === USING RSYNC ===
                 if transfer_type == 'rsync':
-                    real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin)
+                    # A copy that stalls fails instead of holding the transfer (#711)
+                    io_timeout = transfer_utils.rsync_timeouts(self.ovdm.config)['ioTimeout']
+                    real_flags = build_rsync_options(cdt_cfg, mode='real', is_darwin=is_darwin,
+                                                     io_timeout=io_timeout)
                     real_cmd = build_rsync_command(real_flags, [f"--password-file={password_file}"],
                                                    self.cruise_dir, dest_dir.rstrip('/') + '/',
                                                    None, exclude_file)
 
-                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(current_job, real_cmd, file_count)
+                    files['new'], files['updated'], files['deleted'] = self.run_transfer_command(
+                        current_job, real_cmd, file_count, io_timeout)
 
                 # === USING RCLONE === (local directories and SMB mounts, and
                 # rclone remotes for SSH and FTP destinations)
